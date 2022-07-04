@@ -12,8 +12,16 @@ def get_robot_yaml_path():
         simulation_setup_path, "robot", robot_model, f"{robot_model}.model.yaml"
     )
 
+def get_robot_space_encoder():
+    return rospy.get_param("space_encoder", "RobotSpecificEncoder")
+
 
 def get_laser_from_robot_yaml():
+    encoder = get_robot_space_encoder()
+
+    if encoder == "UniformSpaceEncoder":
+        return 1200, 0, 0, 0
+
     robot_yaml_path = get_robot_yaml_path()
 
     with open(robot_yaml_path, "r") as fd:
@@ -35,7 +43,12 @@ def get_laser_from_robot_yaml():
 
 
 def get_robot_state_size():
-    if not rospy.get_param("actions_in_obs", default=False):
+    encoder = get_robot_space_encoder()
+
+    if encoder == "UniformSpaceEncoder":
+        return 11
+
+    if not rospy.get_param("actions_in_obs", default=True):
         return 2  # robot state size
 
     return 2 + 3  # rho, theta, linear x, linear y, angular z
