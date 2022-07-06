@@ -91,9 +91,9 @@ The observation space has the following structure:
 The action space is always a 1D array with three entries. Each entry
 is in the interval [-1, 1]
 
-## Model Space Encoder
+## Rosnav Space Encoder
 
-The **Model Space Encoder** is designed as middleware to encode
+The **Rosnav Space Encoder** is designed as middleware to encode
 observations into desired observation arrays for the different
 architectures.
 
@@ -105,12 +105,12 @@ The space encoder offers the following functions:
 #### get_observation_space()
 
 Returns the shape of the observation space for the current
-robot and model.
+robot and Rosnav.
 
 #### get_action_space()
 
 Returns the shape of the action space for the current robot
-and model.
+and Rosnav.
 
 #### decode_action(action)
 
@@ -125,9 +125,9 @@ Returns the encoded observation that is fed into the network.
 
 The observation is a dictionary as described in [TODO](TODO)
 
-### Model Space Manager
+### Rosnav Space Manager
 
-To make things really simple, we offer a seperate model
+To make things really simple, we offer a seperate Rosnav
 space manager who will instantiate the encoder. The manager
 offers the same functions.
 
@@ -139,7 +139,7 @@ Currently the parameter works for following values:
 
 ### Required Parameters
 
-The model space encoder needs to have some parameters set up
+The Rosnav space encoder needs to have some parameters set up
 to work properly:
 
 | **Parameter Name**       | **Description**                                              |
@@ -176,7 +176,7 @@ def Environment(gym.Env):
   def __init__(self, *args, **kwargs):
     ... # Some code here
 
-    self.encoder = ModelSpaceManager()
+    self.encoder = RosnavSpaceManager()
 
     self.action_space = self.encoder.get_action_space()
     self.observation_space = self.encoder.get_observation_space()
@@ -184,8 +184,8 @@ def Environment(gym.Env):
     ... # Some code here
 ```
 
-This will load the model space manager in a variable `encoder`.
-The real model space encoder is selected based on the parameter
+This will load the Rosnav space manager in a variable `encoder`.
+The real Rosnav space encoder is selected based on the parameter
 `space_encoder`. The encoder is also used in the step and
 reset function to encode observations and decode actions:
 
