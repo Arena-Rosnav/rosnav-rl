@@ -1,5 +1,5 @@
 from typing import Any
-from rl_utils.utils.model_space_manager.encoder_factory import BaseSpaceEncoderFactory
+from .encoder_factory import BaseSpaceEncoderFactory
 from .robot_specific_space_encoder import *
 from .uniform_space_encoder import *
 
@@ -17,7 +17,7 @@ import numpy as np
     Offers the action and observation space sizes
 """
 
-class ModelSpaceManager:
+class RosnavSpaceManager:
     def __init__(self):
         self._laser_num_beams = rospy.get_param("laser/num_beams")
         self._laser_max_range = rospy.get_param("laser/range")
