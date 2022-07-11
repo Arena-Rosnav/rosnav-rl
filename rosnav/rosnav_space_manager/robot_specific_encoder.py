@@ -1,8 +1,7 @@
 from gym import spaces
-import rospy
 import numpy as np
 
-from ..utils import stack_spaces
+from ..utils.utils import stack_spaces
 from .encoder_factory import BaseSpaceEncoderFactory
 from .base_space_encoder import BaseSpaceEncoder
 

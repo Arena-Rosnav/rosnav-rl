@@ -1,4 +1,5 @@
-import os, rospy
+import os
+import rospy
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import gym
@@ -11,7 +12,7 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 
 
 from .agent_factory import AgentFactory
-from ..utils.utils import get_laser_from_robot_yaml, get_robot_state_size
+from ..utils.utils import get_observation_space
 
 
 __all__ = ["MLP_ARENA2D_POLICY"]
@@ -21,8 +22,7 @@ __all__ = ["MLP_ARENA2D_POLICY"]
 _RS: Robot state size - placeholder for robot related inputs to the NN
 _L: Number of laser beams - placeholder for the laser beam data 
 """
-_RS = get_robot_state_size()
-_L, _, _, _ = get_laser_from_robot_yaml()
+_L, _RS = get_observation_space()
 
 
 class MLP_ARENA2D(nn.Module):

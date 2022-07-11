@@ -83,7 +83,7 @@ entries.
 The observation space has the following structure:
 
 ```
-<encoded_laser_scan>, <theta_goal, distance_goal>, <last_x_vel, last_y_vel, last_angular_vel>, <min_x_vel, max_x_vel>, <min_y_vel, max_y_vel>, <min_angular_vel, max_angular_vel>
+<encoded_laser_scan>, <theta_goal, distance_goal>, <last_x_vel, last_y_vel, last_angular_vel>, <min_x_vel, max_x_vel>, <min_y_vel, max_y_vel>, <min_angular_vel, max_angular_vel>, <robot_radius>
 ```
 
 #### Action space
