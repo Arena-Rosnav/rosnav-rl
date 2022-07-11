@@ -1,7 +1,10 @@
+from rosnav.utils.constants import RosnavEncoder
 import rospy
 import rospkg
 import yaml
 import os
+from gym import spaces
+import numpy as np
 
 
 def get_robot_yaml_path():
@@ -16,39 +19,18 @@ def get_robot_space_encoder():
     return rospy.get_param("space_encoder", "RobotSpecificEncoder")
 
 
-def get_laser_from_robot_yaml():
-    encoder = get_robot_space_encoder()
+def get_observation_space():
+    observation_space = RosnavEncoder[get_robot_space_encoder()]
 
-    if encoder == "UniformSpaceEncoder":
-        return 1200, 0, 0, 0
-
-    robot_yaml_path = get_robot_yaml_path()
-
-    with open(robot_yaml_path, "r") as fd:
-        robot_data = yaml.safe_load(fd)
-
-        for plugin in robot_data["plugins"]:
-            if plugin["type"] == "Laser":
-                laser_angle_min = plugin["angle"]["min"]
-                laser_angle_max = plugin["angle"]["max"]
-                laser_angle_increment = plugin["angle"]["increment"]
-                
-                _L = int(
-                    round(
-                        (laser_angle_max - laser_angle_min) / laser_angle_increment
-                    )
-                )
-                
-                return _L, laser_angle_min, laser_angle_max, laser_angle_increment
+    return observation_space["lasers"], observation_space["meta"]
 
 
-def get_robot_state_size():
-    encoder = get_robot_space_encoder()
+def stack_spaces(*ss):
+    low = []
+    high = []
 
-    if encoder == "UniformSpaceEncoder":
-        return 11
-
-    if not rospy.get_param("actions_in_obs", default=True):
-        return 2  # robot state size
-
-    return 2 + 3  # rho, theta, linear x, linear y, angular z
+    for space in ss:
+        low.extend(space.low.tolist())
+        high.extend(space.high.tolist())
+    
+    return spaces.Box(np.array(low).flatten(), np.array(high).flatten())

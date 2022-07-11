@@ -1,6 +1,7 @@
 from typing import Tuple
 
-import gym, rospy
+import gym
+import rospy
 import os
 import rospkg
 import torch as th
@@ -10,14 +11,13 @@ from torch import nn
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 
-from ..utils.utils import get_laser_from_robot_yaml, get_robot_state_size
+from ..utils.utils import get_observation_space
 
 """ 
 _RS: Robot state size - placeholder for robot related inputs to the NN
 _L: Number of laser beams - placeholder for the laser beam data 
 """
-_RS = get_robot_state_size()
-_L, _, _, _ = get_laser_from_robot_yaml()
+_L, _RS = get_observation_space()
 
 
 class MLP_ARENA2D(nn.Module):
@@ -82,7 +82,8 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
     def __init__(
         self, observation_space: gym.spaces.Box, features_dim: int = 128
     ):
-        super(EXTRACTOR_1, self).__init__(observation_space, features_dim + _RS)
+        super(EXTRACTOR_1, self).__init__(
+            observation_space, features_dim + _RS)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 5, 2),
@@ -127,7 +128,8 @@ class EXTRACTOR_2(BaseFeaturesExtractor):
     def __init__(
         self, observation_space: gym.spaces.Box, features_dim: int = 128
     ):
-        super(EXTRACTOR_2, self).__init__(observation_space, features_dim + _RS)
+        super(EXTRACTOR_2, self).__init__(
+            observation_space, features_dim + _RS)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 5, 2),
@@ -172,7 +174,8 @@ class EXTRACTOR_3(BaseFeaturesExtractor):
     def __init__(
         self, observation_space: gym.spaces.Box, features_dim: int = 128
     ):
-        super(EXTRACTOR_3, self).__init__(observation_space, features_dim + _RS)
+        super(EXTRACTOR_3, self).__init__(
+            observation_space, features_dim + _RS)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 5, 2),
@@ -222,7 +225,8 @@ class EXTRACTOR_4(BaseFeaturesExtractor):
     def __init__(
         self, observation_space: gym.spaces.Box, features_dim: int = 32
     ):
-        super(EXTRACTOR_4, self).__init__(observation_space, features_dim + _RS)
+        super(EXTRACTOR_4, self).__init__(
+            observation_space, features_dim + _RS)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 8, 4),
@@ -269,7 +273,8 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
     def __init__(
         self, observation_space: gym.spaces.Box, features_dim: int = 32
     ):
-        super(EXTRACTOR_5, self).__init__(observation_space, features_dim + _RS)
+        super(EXTRACTOR_5, self).__init__(
+            observation_space, features_dim + _RS)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 8, 4),
@@ -278,7 +283,7 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
             nn.ReLU(),
             nn.Conv1d(64, 64, 3, 1),
             nn.ReLU(),
-            nn.Flatten(),
+            nn.Flatten()
         )
 
         # Compute shape by doing one forward pass
@@ -316,7 +321,8 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
     def __init__(
         self, observation_space: gym.spaces.Box, features_dim: int = 32
     ):
-        super(EXTRACTOR_6, self).__init__(observation_space, features_dim + _RS)
+        super(EXTRACTOR_6, self).__init__(
+            observation_space, features_dim + _RS)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 8, 4),
@@ -349,3 +355,26 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
 
         extracted_features = self.fc(self.cnn(laser_scan))
         return th.cat((extracted_features, robot_state), 1)
+
+
+class UNIFIED_SPACE_EXTRACTOR(BaseFeaturesExtractor):
+    def __init__(
+        self, observation_space: gym.spaces.Box, features_dim: int = 32
+    ):
+        super().__init__(observation_space, features_dim)
+
+        self.model = nn.Sequential(
+            nn.Linear(observation_space.shape[0], 512),
+            nn.ReLU(),
+            nn.Linear(512, features_dim)
+        )
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        """
+        :return: (th.Tensor) features,
+            extracted features by the network
+        """
+
+        # obs = th.unsqueeze(observations, 0)
+
+        return self.model(observations)

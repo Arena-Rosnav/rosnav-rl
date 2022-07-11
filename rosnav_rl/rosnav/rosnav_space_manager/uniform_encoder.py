@@ -5,7 +5,7 @@ import math
 import numpy as np
 from scipy import interpolate
 
-from ..utils import stack_spaces
+from ..utils.utils import stack_spaces
 from .encoder_factory import BaseSpaceEncoderFactory
 from .base_space_encoder import BaseSpaceEncoder
 
@@ -21,7 +21,7 @@ from .base_space_encoder import BaseSpaceEncoder
 LASER_SCANS = 1200
 
 
-@BaseSpaceEncoderFactory.register("UniformSpaceEncoder")
+@BaseSpaceEncoderFactory.register("UniformEncoder")
 class UniformSpaceEncoder(BaseSpaceEncoder):
     def __init__(self, *args):
         super().__init__(*args)
@@ -66,7 +66,7 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
 
         return np.hstack(
             [
-                sampled_lasers, np.array([rho, theta]), last_action, self.max_velocities
+                sampled_lasers, np.array([rho, theta]), last_action, self.max_velocities, self._radius
             ]
         )
 
@@ -99,6 +99,12 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
                 low=-10,
                 high=10,
                 shape=(6,), # [-x, x, -y, y, -angle, angle]
+                dtype=np.float32
+            ),
+            spaces.Box(  # Radius
+                low=0,
+                high=2,
+                shape=(1,),
                 dtype=np.float32
             )
         )

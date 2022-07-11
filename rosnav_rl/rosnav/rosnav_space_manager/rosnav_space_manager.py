@@ -1,13 +1,8 @@
-from typing import Any
 from .encoder_factory import BaseSpaceEncoderFactory
-from .robot_specific_space_encoder import *
-from .uniform_space_encoder import *
+from .robot_specific_encoder import *
+from .uniform_encoder import *
 
 import rospy
-import yaml
-
-from gym import spaces
-import numpy as np
 
 
 """
@@ -46,7 +41,9 @@ class RosnavSpaceManager:
         return self._encoder.get_action_space()
 
     def encode_observation(self, observation):
-        return self._encoder.encode_observation(observation)
+        encoded_obs = self._encoder.encode_observation(observation)
+
+        return encoded_obs
 
     def decode_action(self, action):
         return self._encoder.decode_action(action)
