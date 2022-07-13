@@ -16,7 +16,7 @@ neural networks for a bunch of robots. It also contains
 encoders to integrate the models into existing infrastructures
 with ease. It **does not** contain the necessary complete
 infrastructure to train models, though, one can use
-(**arena-rosnav**)[#TODO] to train a new model.
+[arena-rosnav](https://github.com/Arena-Rosnav/arena-rosnav) to train a new model.
 
 ## Architectures
 
