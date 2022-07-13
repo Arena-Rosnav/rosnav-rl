@@ -211,3 +211,7 @@ reset function to encode observations and decode actions:
 ```
 
 ### Usage For Testing
+
+For testing we provide a node. The node requires the same params as described above and offers a service call `rosnav/get_action` to get the next action from a given observation. The message sent to the service has to be a `GetAction`-Message and contains above mentioned observations.
+
+
