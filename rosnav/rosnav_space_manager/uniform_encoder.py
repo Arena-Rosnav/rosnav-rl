@@ -1,4 +1,3 @@
-from random import sample
 from gym import spaces
 import rospy
 import math
