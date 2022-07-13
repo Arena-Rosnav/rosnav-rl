@@ -117,13 +117,17 @@ and Rosnav.
 Returns the decoded action based on the action calculated by
 the network.
 
-The action is a tuple of two or three values as described in [TODO](TODO).
+The action is a tuple of two or three values. Two values are used for non holonomic robots. The action will always be returned in the format [x_vel, y_cal, anglular_velocity]
 
 #### encode_observation(observation)
 
 Returns the encoded observation that is fed into the network.
 
-The observation is a dictionary as described in [TODO](TODO)
+The observation is a dictionary containing following keys:
+
+- __laser_scan__: Array of current laser scan values
+- __goal_in_robot_frame__: Tuple of (rho, theta) with distance and angle to the current goal
+- __last_action__: Last action as array of three values
 
 ### Rosnav Space Manager
 
