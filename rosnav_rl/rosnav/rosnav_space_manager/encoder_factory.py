@@ -1,5 +1,6 @@
 from .base_space_encoder import BaseSpaceEncoder
 
+
 class BaseSpaceEncoderFactory:
     """The factory class for creating space encoders"""
 
