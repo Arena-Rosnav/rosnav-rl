@@ -40,21 +40,23 @@ class AgentFactory:
     # end register()
 
     @classmethod
-    def instantiate(cls, name: str, **kwargs) -> Union[Type[BaseAgent], Type[BasePolicy]]:
+    def instantiate(
+        cls, name: str, **kwargs
+    ) -> Union[Type[BaseAgent], Type[BasePolicy]]:
         """Factory command to create the agent.
         This method gets the appropriate agent class from the registry
         and creates an instance of it, while passing in the parameters
         given in ``kwargs``.
 
         Args:
-            name (str): The name of the agent to create.
+            name (str): The name of the agent to create.agent_class
 
         Returns:
             An instance of the agent that is created.
         """
         assert name in cls.registry, f"Agent '{name}' is not registered!"
         agent_class = cls.registry[name]
-        
+
         if issubclass(agent_class, BaseAgent):
             return agent_class(**kwargs)
         else:

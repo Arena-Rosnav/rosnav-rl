@@ -1,72 +1,15 @@
+import os
 from typing import Tuple
 
 import gym
-import rospy
-import os
 import rospkg
+import rospy
 import torch as th
 import yaml
-
+from stable_baselines3.common.policies import BaseFeaturesExtractor
 from torch import nn
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
-
-from ..utils.utils import get_observation_space
-
-""" 
-_RS: Robot state size - placeholder for robot related inputs to the NN
-_L: Number of laser beams - placeholder for the laser beam data 
-"""
-_L, _RS = get_observation_space()
-
-
-class MLP_ARENA2D(nn.Module):
-    """
-    Custom Multilayer Perceptron for policy and value function.
-    Architecture was taken as reference from: https://github.com/ignc-research/arena2D/tree/master/arena2d-agents.
-
-    :param feature_dim: dimension of the features extracted with the features_extractor (e.g. features from a CNN)
-    :param last_layer_dim_pi: (int) number of units for the last layer of the policy network
-    :param last_layer_dim_vf: (int) number of units for the last layer of the value network
-    """
-
-    def __init__(
-        self,
-        feature_dim: int,
-        last_layer_dim_pi: int = 32,
-        last_layer_dim_vf: int = 32,
-    ):
-        super(MLP_ARENA2D, self).__init__()
-
-        # Save output dimensions, used to create the distributions
-        self.latent_dim_pi = last_layer_dim_pi
-        self.latent_dim_vf = last_layer_dim_vf
-
-        # Body network
-        self.body_net = nn.Sequential(
-            nn.Linear(_L + _RS, 64),
-            nn.ReLU(),
-            nn.Linear(64, feature_dim),
-            nn.ReLU(),
-        )
-
-        # Policy network
-        self.policy_net = nn.Sequential(
-            nn.Linear(feature_dim, last_layer_dim_pi), nn.ReLU()
-        )
-
-        # Value network
-        self.value_net = nn.Sequential(
-            nn.Linear(feature_dim, last_layer_dim_vf), nn.ReLU()
-        )
-
-    def forward(self, features: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
-        """
-        :return: (th.Tensor, th.Tensor) latent_policy, latent_value of the specified network.
-            If all layers are shared, then ``latent_policy == latent_value``
-        """
-        body_x = self.body_net(features)
-        return self.policy_net(body_x), self.value_net(body_x)
+from ..utils.utils import get_observation_space_from_file
 
 
 class EXTRACTOR_1(BaseFeaturesExtractor):
@@ -77,13 +20,20 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
     :param observation_space: (gym.Space)
     :param features_dim: (int) Number of features extracted.
         This corresponds to the number of unit for the last layer.
+
+    Note:
+        self._rs: Robot state size - placeholder for robot related inputs to the NN
+        self._l: Number of laser beams - placeholder for the laser beam data
     """
 
     def __init__(
-        self, observation_space: gym.spaces.Box, features_dim: int = 128
+        self,
+        observation_space: gym.spaces.Box,
+        robot_model: str = None,
+        features_dim: int = 128,
     ):
-        super(EXTRACTOR_1, self).__init__(
-            observation_space, features_dim + _RS)
+        self._l, self._rs = get_observation_space_from_file(robot_model)
+        super(EXTRACTOR_1, self).__init__(observation_space, features_dim + self._rs)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 5, 2),
@@ -94,7 +44,7 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
         # Compute shape by doing one forward pass
         with th.no_grad():
             # tensor_forward = th.as_tensor(observation_space.sample()[None]).float()
-            tensor_forward = th.randn(1, 1, _L)
+            tensor_forward = th.randn(1, 1, self._l)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc_1 = nn.Sequential(
@@ -107,8 +57,8 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
         :return: (th.Tensor),
             extracted features by the network
         """
-        laser_scan = th.unsqueeze(observations[:, :-_RS], 1)
-        robot_state = observations[:, -_RS:]
+        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+        robot_state = observations[:, -self._rs :]
 
         extracted_features = self.fc_1(self.cnn(laser_scan))
         return th.cat((extracted_features, robot_state), 1)
@@ -118,7 +68,7 @@ class EXTRACTOR_2(BaseFeaturesExtractor):
     """
     Custom Convolutional Neural Network to serve as feature extractor ahead of the policy and value network.
     Architecture was taken as reference from: https://arxiv.org/abs/1808.03841
-    (DRL_LOCAL_PLANNER)
+    (DRLself._lOCAL_PLANNER)
 
     :param observation_space: (gym.Space)
     :param features_dim: (int) Number of features extracted.
@@ -126,10 +76,13 @@ class EXTRACTOR_2(BaseFeaturesExtractor):
     """
 
     def __init__(
-        self, observation_space: gym.spaces.Box, features_dim: int = 128
+        self,
+        observation_space: gym.spaces.Box,
+        robot_model: str = None,
+        features_dim: int = 128,
     ):
-        super(EXTRACTOR_2, self).__init__(
-            observation_space, features_dim + _RS)
+        self._l, self._rs = get_observation_space_from_file(robot_model)
+        super(EXTRACTOR_2, self).__init__(observation_space, features_dim + self._rs)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 5, 2),
@@ -142,7 +95,7 @@ class EXTRACTOR_2(BaseFeaturesExtractor):
         # Compute shape by doing one forward pass
         with th.no_grad():
             # tensor_forward = th.as_tensor(observation_space.sample()[None]).float()
-            tensor_forward = th.randn(1, 1, _L)
+            tensor_forward = th.randn(1, 1, self._l)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc_1 = nn.Sequential(
@@ -155,8 +108,8 @@ class EXTRACTOR_2(BaseFeaturesExtractor):
         :return: (th.Tensor),
             extracted features by the network
         """
-        laser_scan = th.unsqueeze(observations[:, :-_RS], 1)
-        robot_state = observations[:, -_RS:]
+        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+        robot_state = observations[:, -self._rs :]
 
         extracted_features = self.fc_1(self.cnn(laser_scan))
         return th.cat((extracted_features, robot_state), 1)
@@ -171,11 +124,8 @@ class EXTRACTOR_3(BaseFeaturesExtractor):
         This corresponds to the number of unit for the last layer.
     """
 
-    def __init__(
-        self, observation_space: gym.spaces.Box, features_dim: int = 128
-    ):
-        super(EXTRACTOR_3, self).__init__(
-            observation_space, features_dim + _RS)
+    def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 128):
+        super(EXTRACTOR_3, self).__init__(observation_space, features_dim + self._rs)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 5, 2),
@@ -188,7 +138,7 @@ class EXTRACTOR_3(BaseFeaturesExtractor):
         # Compute shape by doing one forward pass
         with th.no_grad():
             # tensor_forward = th.as_tensor(observation_space.sample()[None]).float()
-            tensor_forward = th.randn(1, 1, _L)
+            tensor_forward = th.randn(1, 1, self._l)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc_1 = nn.Sequential(
@@ -203,8 +153,8 @@ class EXTRACTOR_3(BaseFeaturesExtractor):
         :return: (th.Tensor),
             extracted features by the network
         """
-        laser_scan = th.unsqueeze(observations[:, :-_RS], 1)
-        robot_state = observations[:, -_RS:]
+        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+        robot_state = observations[:, -self._rs :]
 
         extracted_features = self.fc_2(self.fc_1(self.cnn(laser_scan)))
         # return self.fc_2(features)
@@ -223,10 +173,13 @@ class EXTRACTOR_4(BaseFeaturesExtractor):
     """
 
     def __init__(
-        self, observation_space: gym.spaces.Box, features_dim: int = 32
+        self,
+        observation_space: gym.spaces.Box,
+        robot_model: str = None,
+        features_dim: int = 32,
     ):
-        super(EXTRACTOR_4, self).__init__(
-            observation_space, features_dim + _RS)
+        self._l, self._rs = get_observation_space_from_file(robot_model)
+        super(EXTRACTOR_4, self).__init__(observation_space, features_dim + self._rs)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 8, 4),
@@ -240,7 +193,7 @@ class EXTRACTOR_4(BaseFeaturesExtractor):
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            tensor_forward = th.randn(1, 1, _L)
+            tensor_forward = th.randn(1, 1, self._l)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc = nn.Sequential(
@@ -254,8 +207,8 @@ class EXTRACTOR_4(BaseFeaturesExtractor):
             extracted features by the network
         """
 
-        laser_scan = th.unsqueeze(observations[:, :-_RS], 1)
-        robot_state = observations[:, -_RS:]
+        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+        robot_state = observations[:, -self._rs :]
 
         extracted_features = self.fc(self.cnn(laser_scan))
         return th.cat((extracted_features, robot_state), 1)
@@ -271,10 +224,13 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
     """
 
     def __init__(
-        self, observation_space: gym.spaces.Box, features_dim: int = 32
+        self,
+        observation_space: gym.spaces.Box,
+        robot_model: str = None,
+        features_dim: int = 32,
     ):
-        super(EXTRACTOR_5, self).__init__(
-            observation_space, features_dim + _RS)
+        self._l, self._rs = get_observation_space_from_file(robot_model)
+        super(EXTRACTOR_5, self).__init__(observation_space, features_dim + self._rs)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 8, 4),
@@ -283,12 +239,12 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
             nn.ReLU(),
             nn.Conv1d(64, 64, 3, 1),
             nn.ReLU(),
-            nn.Flatten()
+            nn.Flatten(),
         )
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            tensor_forward = th.randn(1, 1, _L)
+            tensor_forward = th.randn(1, 1, self._l)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc = nn.Sequential(
@@ -302,8 +258,8 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
             extracted features by the network
         """
 
-        laser_scan = th.unsqueeze(observations[:, :-_RS], 1)
-        robot_state = observations[:, -_RS:]
+        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+        robot_state = observations[:, -self._rs :]
 
         extracted_features = self.fc(self.cnn(laser_scan))
         return th.cat((extracted_features, robot_state), 1)
@@ -319,10 +275,13 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
     """
 
     def __init__(
-        self, observation_space: gym.spaces.Box, features_dim: int = 32
+        self,
+        observation_space: gym.spaces.Box,
+        robot_model: str = None,
+        features_dim: int = 32,
     ):
-        super(EXTRACTOR_6, self).__init__(
-            observation_space, features_dim + _RS)
+        self._l, self._rs = get_observation_space_from_file(robot_model)
+        super(EXTRACTOR_6, self).__init__(observation_space, features_dim + self._rs)
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 8, 4),
@@ -336,7 +295,7 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            tensor_forward = th.randn(1, 1, _L)
+            tensor_forward = th.randn(1, 1, self._l)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc = nn.Sequential(
@@ -350,8 +309,8 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
             extracted features by the network
         """
 
-        laser_scan = th.unsqueeze(observations[:, :-_RS], 1)
-        robot_state = observations[:, -_RS:]
+        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+        robot_state = observations[:, -self._rs :]
 
         extracted_features = self.fc(self.cnn(laser_scan))
         return th.cat((extracted_features, robot_state), 1)
@@ -359,14 +318,18 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
 
 class UNIFIED_SPACE_EXTRACTOR(BaseFeaturesExtractor):
     def __init__(
-        self, observation_space: gym.spaces.Box, features_dim: int = 32
+        self,
+        observation_space: gym.spaces.Box,
+        robot_model: str = None,
+        features_dim: int = 32,
     ):
+        self._l, self._rs = get_observation_space_from_file(robot_model)
         super().__init__(observation_space, features_dim)
 
         self.model = nn.Sequential(
             nn.Linear(observation_space.shape[0], 512),
             nn.ReLU(),
-            nn.Linear(512, features_dim)
+            nn.Linear(512, features_dim),
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
