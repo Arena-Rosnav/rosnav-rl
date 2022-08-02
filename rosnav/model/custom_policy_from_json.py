@@ -48,7 +48,7 @@ class CUSTOM_NETWORK(nn.Module):
         super(CUSTOM_NETWORK, self).__init__()
 
         # Create empty body network
-        self.body_net=nn.Sequential()
+        self.body_net = nn.Sequential()
 
         # Read file
         with open(path, 'r') as f:
@@ -104,7 +104,11 @@ class CUSTOM(ActorCriticPolicy):
         activation_fn: Type[nn.Module] = nn.ReLU,
         *args,
         **kwargs,
+        
     ):
+        #auslagern mit read file sachen
+        self.path=rospy.get_param("/custom_network_path")
+
         super(CUSTOM, self).__init__(
             observation_space,
             action_space,
@@ -116,5 +120,6 @@ class CUSTOM(ActorCriticPolicy):
         )
         # Enable orthogonal initialization
         self.ortho_init = True
+        
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = CUSTOM_NETWORK(self.path,64)
