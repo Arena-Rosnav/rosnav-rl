@@ -14,8 +14,9 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 
 from .agent_factory import AgentFactory
 from ..utils.utils import get_observation_space
-from .custom_policy_utils.utils import parseParameters
-from .custom_policy_utils.modules import modules
+from .custom_policy_utils.utils import readJson
+from .custom_policy_utils.utils import createBodyNetwork
+
 
 __all__ = ["CUSTOM"]
 
@@ -47,26 +48,11 @@ class CUSTOM_NETWORK(nn.Module):
     ):
         super(CUSTOM_NETWORK, self).__init__()
 
-        # Create empty body network
-        self.body_net = nn.Sequential()
-
         # Read file
-        with open(path, 'r') as f:
-            data = json.load(f)
-        
-        # Number of the module to be added to the NN
-        moduleNumber = 0
+        data=readJson(path)
 
-        # Iterate over each module given in the json in the policy
-        for module in data["policy"]:
-
-            # Parse parameters for module
-            parsedParameters = parseParameters(module)
-
-            # Add each module to the body network with corresponding number of module
-            self.body_net.add_module(f'{moduleNumber}', modules[module["name"].lower()](parsedParameters))
-
-            moduleNumber += 1
+        # Create the network based on JSON
+        self.body_net=createBodyNetwork(data)
 
         print(self.body_net)
 
