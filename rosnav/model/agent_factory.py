@@ -57,6 +57,5 @@ class AgentFactory:
 
         if issubclass(agent_class, BaseAgent):
             return agent_class(**kwargs)
-            
         else:
             return agent_class
