@@ -18,7 +18,7 @@ def readJson(path):
         return json.load(f)
 
 def createBodyNetwork(data):
-    body_net=nn.Sequential()
+    body_net = nn.Sequential()
 
     # Number of the module to be added to the NN
     moduleNumber = 0

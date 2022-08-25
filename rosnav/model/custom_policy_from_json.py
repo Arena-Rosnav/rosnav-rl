@@ -49,12 +49,10 @@ class CUSTOM_NETWORK(nn.Module):
         super(CUSTOM_NETWORK, self).__init__()
 
         # Read file
-        data=readJson(path)
+        data = readJson(path)
 
         # Create the network based on JSON
-        self.body_net=createBodyNetwork(data)
-
-        print(self.body_net)
+        self.body_net = createBodyNetwork(data)
 
         # Save output dimensions, used to create the distributions
         self.latent_dim_pi = last_layer_dim_pi
