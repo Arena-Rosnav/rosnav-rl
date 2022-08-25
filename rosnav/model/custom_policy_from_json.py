@@ -90,7 +90,7 @@ class CUSTOM(ActorCriticPolicy):
         **kwargs,
         
     ):
-        #auslagern mit read file sachen
+        # Getting the path to NN with rosparams
         self.path=rospy.get_param("/custom_network_path")
 
         super(CUSTOM, self).__init__(
@@ -106,4 +106,4 @@ class CUSTOM(ActorCriticPolicy):
         self.ortho_init = True
         
     def _build_mlp_extractor(self) -> None:
-        self.mlp_extractor = CUSTOM_NETWORK(self.path,64)
+        self.mlp_extractor = CUSTOM_NETWORK(self.path, 64)
