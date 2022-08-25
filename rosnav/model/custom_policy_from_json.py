@@ -14,8 +14,8 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 
 from .agent_factory import AgentFactory
 from ..utils.utils import get_observation_space
-from .custom_policy_utils.utils import readJson
-from .custom_policy_utils.utils import createBodyNetwork
+from .custom_policy_utils.utils import read_json
+from .custom_policy_utils.utils import create_body_network
 
 
 __all__ = ["CUSTOM"]
@@ -49,10 +49,12 @@ class CUSTOM_NETWORK(nn.Module):
         super(CUSTOM_NETWORK, self).__init__()
 
         # Read file
-        data = readJson(path)
+        data = read_json(path)
 
         # Create the network based on JSON
-        self.body_net = createBodyNetwork(data)
+        self.body_net = create_body_network(data)
+
+        print(self.body_net)
 
         # Save output dimensions, used to create the distributions
         self.latent_dim_pi = last_layer_dim_pi
