@@ -54,7 +54,7 @@ class AgentFactory:
         """
         assert name in cls.registry, f"Agent '{name}' is not registered!"
         agent_class = cls.registry[name]
-        
+
         if issubclass(agent_class, BaseAgent):
             return agent_class(**kwargs)
         else:
