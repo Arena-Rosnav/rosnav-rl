@@ -2,6 +2,7 @@ import rospy
 import rospkg
 import os
 import sys
+import json
 from stable_baselines3 import PPO
 
 from rosnav.srv import GetAction, GetActionResponse
@@ -10,15 +11,27 @@ from rosnav.rosnav_space_manager.rosnav_space_manager import RosnavSpaceManager
 
 from rosnav import *
 sys.modules["rl_agent"] = sys.modules["rosnav"]
+sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
 
 
 class RosnavNode:
     def __init__(self):
+        # Agent name and path
+        self.agent_name = rospy.get_param("agent_name")
+        self.agent_path = self._get_model_path(self.agent_name)
+
+        assert os.path.isdir(self.agent_path), f"Model cannot be found at {self.agent_path}"
+
+        # Load hyperparams
+        self._hyperparams = self._load_hyperparams(self.agent_path)
+
+        self._obs_structure = self._get_observation_space_structure(self._hyperparams)
+
         # Set RosnavSpaceEncoder as Middleware
         self._encoder = RosnavSpaceManager()
 
         # Load the model
-        self._agent = self._get_model()
+        self._agent = self._get_model(self.agent_path)
 
         self._get_next_action_srv = rospy.Service(
             "rosnav/get_action", GetAction, self._handle_next_action_srv
@@ -29,7 +42,7 @@ class RosnavNode:
             "goal_in_robot_frame": request.goal_in_robot_frame,
             "laser_scan": request.laser_scan,
             "last_action": request.last_action
-        })
+        }, self._obs_structure)
 
         action = self._agent.predict(observation, deterministic=True)[0]
 
@@ -40,21 +53,24 @@ class RosnavNode:
 
         return response
 
-    def _get_model(self):
-        agent_name = rospy.get_param("agent_name")
-        agent_path = self._get_model_path(agent_name)
-
-        assert os.path.isfile(agent_path), f"Model cannot be found at {agent_path}"
-
-        return PPO.load(agent_path).policy
+    def _get_model(self, agent_path):
+        return PPO.load(os.path.join(agent_path, "best_model.zip")).policy
 
     def _get_model_path(self, model_name):
         return os.path.join(
             rospkg.RosPack().get_path("rosnav"),
             "agents",
-            model_name,
-            "best_model.zip"
+            model_name
         )
+
+    def _load_hyperparams(self, agent_path):
+        with open(os.path.join(agent_path, "hyperparameters.json")) as file:
+            return json.load(file)
+
+    def _get_observation_space_structure(self, hyperparams):
+        structure = hyperparams.get("observation_space", ["laser_scan", "goal_in_robot_frame"])
+
+        return structure
 
 
 if __name__ == "__main__":
