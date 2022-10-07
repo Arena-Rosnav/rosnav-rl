@@ -14,6 +14,9 @@ class AGENT_6(BaseAgent):
     net_arch = [128, 64, 64, dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
 
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
 
 @AgentFactory.register("AGENT_7")
 class AGENT_7(BaseAgent):
@@ -22,6 +25,9 @@ class AGENT_7(BaseAgent):
     features_extractor_kwargs = None
     net_arch = [128, 128, 128, dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
 
 
 @AgentFactory.register("AGENT_8")
@@ -32,6 +38,9 @@ class AGENT_8(BaseAgent):
     net_arch = [64, 64, 64, 64, dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
 
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
 
 @AgentFactory.register("AGENT_9")
 class AGENT_9(BaseAgent):
@@ -40,6 +49,9 @@ class AGENT_9(BaseAgent):
     features_extractor_kwargs = None
     net_arch = [64, 64, 64, 64, dict(pi=[64, 64, 64], vf=[64, 64, 64])]
     activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
 
 
 @AgentFactory.register("AGENT_10")
@@ -50,6 +62,9 @@ class AGENT_10(BaseAgent):
     net_arch = [128, 128, 128, 128, dict(pi=[64, 64, 64], vf=[64, 64, 64])]
     activation_fn = nn.ReLU
 
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
 
 @AgentFactory.register("AGENT_11")
 class AGENT_11(BaseAgent):
@@ -58,6 +73,9 @@ class AGENT_11(BaseAgent):
     features_extractor_kwargs = None
     net_arch = [512, 512, 512, 512, dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
 
 
 @AgentFactory.register("AGENT_17")
@@ -68,6 +86,9 @@ class AGENT_17(BaseAgent):
     net_arch = [dict(pi=[64, 64, 64], vf=[64, 64, 64])]
     activation_fn = nn.ReLU
 
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
 
 @AgentFactory.register("AGENT_18")
 class AGENT_18(BaseAgent):
@@ -76,6 +97,9 @@ class AGENT_18(BaseAgent):
     features_extractor_kwargs = dict(features_dim=128)
     net_arch = [128, dict(pi=[64, 64, 64], vf=[64, 64, 64])]
     activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
 
 
 @AgentFactory.register("AGENT_19")
@@ -86,6 +110,9 @@ class AGENT_19(BaseAgent):
     net_arch = [dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
 
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
 
 @AgentFactory.register("AGENT_20")
 class AGENT_20(BaseAgent):
@@ -94,6 +121,9 @@ class AGENT_20(BaseAgent):
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[128], vf=[128])]
     activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
 
 
 @AgentFactory.register("AGENT_21")
@@ -104,6 +134,9 @@ class AGENT_21(BaseAgent):
     net_arch = [dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
 
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
 
 @AgentFactory.register("AGENT_22")
 class AGENT_22(BaseAgent):
@@ -112,6 +145,9 @@ class AGENT_22(BaseAgent):
     features_extractor_kwargs = dict(features_dim=64)
     net_arch = [dict(pi=[64, 64, 64], vf=[64, 64, 64])]
     activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
 
 
 @AgentFactory.register("AGENT_23")
@@ -122,6 +158,9 @@ class AGENT_23(BaseAgent):
     net_arch = [128, dict(pi=[64, 64, 64], vf=[64, 64, 64])]
     activation_fn = nn.ReLU
 
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
 
 @AgentFactory.register("AGENT_24")
 class AGENT_24(BaseAgent):
@@ -131,6 +170,9 @@ class AGENT_24(BaseAgent):
     net_arch = [128, dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
 
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
 
 @AgentFactory.register("AGENT_25")
 class AGENT_25(BaseAgent):
@@ -139,3 +181,6 @@ class AGENT_25(BaseAgent):
     features_extractor_kwargs = None
     net_arch = [512, 256, dict(pi=[128], vf=[128])]
     activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
