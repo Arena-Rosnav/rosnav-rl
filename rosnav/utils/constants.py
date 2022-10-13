@@ -8,6 +8,11 @@ RosnavEncoder = {
     },
     "UniformEncoder": {
         "lasers": 1200,
-        "meta": 2 + 3 + 1 + 6 # Goal + Vel + Radius + Max Vel 
+        "meta": 2 + 3 + 1 + 6, # Goal + Vel + Radius + Max Vel 
+        "maxVelocity": {
+            "x": [-5, 5],
+            "y": [-5, 5],
+            "angular": [-10, 10]
+        }
     }
 }
