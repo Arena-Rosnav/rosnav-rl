@@ -2,8 +2,10 @@ import rospy
 import rospkg
 import os
 import sys
+import traceback
 import json
 from stable_baselines3 import PPO
+from stable_baselines3.common.utils import get_device
 
 from rosnav.srv import GetAction, GetActionResponse
 from rosnav.rosnav_space_manager.rosnav_space_manager import RosnavSpaceManager
@@ -24,6 +26,7 @@ class RosnavNode:
 
         # Load hyperparams
         self._hyperparams = self._load_hyperparams(self.agent_path)
+        # rospy.set_param("/actions_in_obs", self._hyperparams.get("actions_in_observationspace", False))
 
         self._obs_structure = self._get_observation_space_structure(self._hyperparams)
 
@@ -54,7 +57,16 @@ class RosnavNode:
         return response
 
     def _get_model(self, agent_path):
-        return PPO.load(os.path.join(agent_path, "best_model.zip")).policy
+        action_state_sizes = [0, 3]
+
+        for size in action_state_sizes:
+            rospy.set_param(rospy.get_namespace() + "action_state_size", size)
+            try:
+                return PPO.load(os.path.join(agent_path, "best_model.zip")).policy
+            except:
+                pass
+
+        rospy.signal_shutdown("")
 
     def _get_model_path(self, model_name):
         return os.path.join(
