@@ -11,11 +11,11 @@ from rosnav.utils.constants import RosnavEncoder
 
 def get_robot_yaml_path(robot_model: str = None) -> str:
     if not robot_model:
-        robot_model = rospy.get_param("model")
+        robot_model = rospy.get_param("robot_model")
 
     simulation_setup_path = rospkg.RosPack().get_path("arena-simulation-setup")
     return os.path.join(
-        simulation_setup_path, "robot", robot_model, f"{robot_model}.model.yaml"
+        simulation_setup_path, "robot", robot_model, f"model_params.yaml"
     )
 
 
@@ -24,26 +24,20 @@ def get_laser_from_robot_yaml(robot_model: str = None) -> Tuple[int, int, int, i
 
     with open(robot_yaml_path, "r") as fd:
         robot_data = yaml.safe_load(fd)
+        laser_data = robot_data["laser"]
 
-        for plugin in robot_data["plugins"]:
-            if plugin["type"] == "Laser":
-                laser_angle_min = plugin["angle"]["min"]
-                laser_angle_max = plugin["angle"]["max"]
-                laser_angle_increment = plugin["angle"]["increment"]
+        rospy.set_param("laser/num_beams", laser_data["num_beams"])
 
-                _L = int(
-                    round((laser_angle_max - laser_angle_min) / laser_angle_increment)
-                )
-
-                # Because RosnavEncoder ist weird...
-                rospy.set_param("laser/num_beams", _L)
-
-                return _L, laser_angle_min, laser_angle_max, laser_angle_increment
+        return (
+            laser_data["num_beams"], 
+            laser_data["angle"]["min"], 
+            laser_data["angle"]["max"],
+            laser_data["angle"]["increment"]
+        )
 
 
 def get_observation_space_from_file(robot_model: str = None) -> Tuple[int, int]:
-    actions_in_obs = rospy.get_param("/actions_in_obs", True)
-    robot_state_size, action_state_size = 2, 3 if actions_in_obs else 0
+    robot_state_size, action_state_size = 2, rospy.get_param(rospy.get_namespace() + "action_state_size", 3)
     num_beams, _, _, _ = get_laser_from_robot_yaml(robot_model)
 
     return num_beams, action_state_size + robot_state_size
