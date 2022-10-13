@@ -45,18 +45,12 @@ class RobotSpecificEncoder(BaseSpaceEncoder):
             self._actions[action]["linear"]
         ])
 
-    def encode_observation(self, observation):
-        rho, theta = observation["goal_in_robot_frame"]
-        scan = observation["laser_scan"]
-        last_action = observation["last_action"]
+    def encode_observation(self, observation, structure):
+        # rho, theta = observation["goal_in_robot_frame"]
+        # scan = observation["laser_scan"]
+        # last_action = observation["last_action"]
 
-        return np.hstack(
-            [
-                scan,
-                np.array([rho, theta]),
-                last_action,
-            ]
-        )
+        return np.hstack([observation[name] for name in structure])
 
     def get_observation_space(self):
         return stack_spaces(

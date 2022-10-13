@@ -1,4 +1,5 @@
 from gym import spaces
+from rosnav.utils.constants import RosnavEncoder
 import rospy
 import math
 import numpy as np
@@ -39,9 +40,12 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
         new_action = []
         
         for i in range(len(action)):
-            a = action[i]
-            adder = 1 if a >= 0 else 0
-            new_action.append(self.max_velocities[i * 2 + adder] * a)
+            new_action.append(
+                min(
+                    self.max_velocities[i * 2 + 1], 
+                    max(self.max_velocities[i * 2], action[i])
+                )
+            )
 
         return new_action
 
@@ -109,9 +113,15 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
         )
 
     def get_action_space(self):
+        max_velocity = RosnavEncoder["UniformEncoder"]["maxVelocity"]
+
+        x = max_velocity["x"]
+        y = max_velocity["y"]
+        angular = max_velocity["angular"]
+
         return spaces.Box(
-            low=np.array([-1, -1, -1]),
-            high=np.array([1, 1, 1]),
+            low=np.array([x[0], y[0], angular[0]]),
+            high=np.array([x[1], y[1], angular[1]]),
             dtype=np.float32,
         )
 

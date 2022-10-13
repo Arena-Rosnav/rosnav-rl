@@ -16,5 +16,5 @@ class BaseSpaceEncoder:
     def decode_action(self, action):
         raise NotImplementedError()
 
-    def encode_observation(self, observation):
+    def encode_observation(self, observation, structure):
         raise NotImplementedError()

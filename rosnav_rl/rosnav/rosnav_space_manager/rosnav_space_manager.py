@@ -40,8 +40,8 @@ class RosnavSpaceManager:
     def get_action_space(self):
         return self._encoder.get_action_space()
 
-    def encode_observation(self, observation):
-        encoded_obs = self._encoder.encode_observation(observation)
+    def encode_observation(self, observation, structure):
+        encoded_obs = self._encoder.encode_observation(observation, structure)
 
         return encoded_obs
 
