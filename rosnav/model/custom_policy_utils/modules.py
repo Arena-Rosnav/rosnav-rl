@@ -7,16 +7,16 @@ def relu(params):
     return nn.ReLU(params.get("inplace", False))
 
 def conv1d(params):
-    return nn.Conv1d(params["in_channels"], params["out_channels"], params["kernel_size"], params.get["stride"], params.get["padding"], params.get["padding_mode"], params.get["dilation"], params.get["groups"], params.get["bias"])
+    return nn.Conv1d(params["in_channels"], params["out_channels"], params["kernel_size"], params.get("stride", 1), params.get("padding", 0), params.get("dilation", 1), params.get("groups", 1), params.get("bias", True), params.get("padding_mode", 'zeros'))
 
 def conv2d(params):
-    return nn.Conv1d(params["in_channels"], params["out_channels"], params["kernel_size"], params.get["stride"], params.get["padding"], params.get["padding_mode"], params.get["dilation"], params.get["groups"], params.get["bias"])
+    return nn.Conv2d(params["in_channels"], params["out_channels"], params["kernel_size"], params.get("stride", 1), params.get("padding", 0), params.get("dilation", 1), params.get("groups", 1), params.get("bias", True), params.get("padding_mode", 'zeros'))
 
 def conv3d(params):
-    return nn.Conv1d(params["in_channels"], params["out_channels"], params["kernel_size"], params.get["stride"], params.get["padding"], params.get["padding_mode"], params.get["dilation"], params.get["groups"], params.get["bias"])
+    return nn.Conv3d(params["in_channels"], params["out_channels"], params["kernel_size"], params.get("stride", 1), params.get("padding", 0), params.get("dilation", 1), params.get("groups", 1), params.get("bias", True), params.get("padding_mode", 'zeros'))
 
 def tanh(params):
-    return nn.Tanh
+    return nn.Tanh()
 
 modules = {
     "relu" : relu,
