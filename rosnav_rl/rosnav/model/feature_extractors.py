@@ -32,6 +32,7 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
         robot_model: str = None,
         features_dim: int = 128,
     ):
+
         self._l, self._rs = get_observation_space_from_file(robot_model)
         super(EXTRACTOR_1, self).__init__(observation_space, features_dim + self._rs)
 

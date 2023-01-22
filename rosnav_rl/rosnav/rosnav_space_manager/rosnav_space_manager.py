@@ -1,6 +1,6 @@
 from .encoder_factory import BaseSpaceEncoderFactory
-from .robot_specific_encoder import *
-from .uniform_encoder import *
+from .default_encoder import *
+from .reduced_encoder import *
 
 import rospy
 
@@ -19,7 +19,7 @@ class RosnavSpaceManager:
         self._radius = rospy.get_param("robot_radius")
         self._is_holonomic = rospy.get_param("is_holonomic")
             
-        encoder_name = rospy.get_param("space_encoder", "RobotSpecificEncoder")
+        encoder_name = rospy.get_param("space_encoder", "DefaultEncoder")
 
         is_action_space_discrete = rospy.get_param("is_action_space_discrete", False)
         actions = rospy.get_param("actions/discrete") if is_action_space_discrete else rospy.get_param("actions/continuous")

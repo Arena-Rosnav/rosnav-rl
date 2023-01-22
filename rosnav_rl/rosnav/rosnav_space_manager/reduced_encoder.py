@@ -1,12 +1,16 @@
 from gym import spaces
 import numpy as np
+import math
 
 from ..utils.utils import stack_spaces
 from .encoder_factory import BaseSpaceEncoderFactory
 from .base_space_encoder import BaseSpaceEncoder
 
+from ..utils.constants import REDUCTION_FACTOR, RosnavEncoder
 
 """
+
+    TODO
     This encoder offers a robot specific observation and action space
     Different actions spaces for holonomic and non holonomic robots
 
@@ -14,10 +18,15 @@ from .base_space_encoder import BaseSpaceEncoder
     Action space: X Vel, (Y Vel), Angular Vel
 
 """
-@BaseSpaceEncoderFactory.register("RobotSpecificEncoder")
-class RobotSpecificEncoder(BaseSpaceEncoder):
+
+
+@BaseSpaceEncoderFactory.register("ReducedEncoder")
+class ReducedEncoder(BaseSpaceEncoder):
     def __init__(self, *args):
         super().__init__(*args)
+
+        rest = self._laser_num_beams % REDUCTION_FACTOR
+        self._laser_append_amount = 0 if rest == 0 else REDUCTION_FACTOR - rest
 
     def decode_action(self, action):
         if self._is_action_space_discrete:
@@ -50,14 +59,27 @@ class RobotSpecificEncoder(BaseSpaceEncoder):
         # scan = observation["laser_scan"]
         # last_action = observation["last_action"]
 
-        return np.hstack([observation[name] for name in structure])
+        new_obs_space = []
+
+        for name in structure:
+            data = observation[name]
+
+            if name == "laser_scan":
+                data = np.pad(data, [(0, self._laser_append_amount)], constant_values=self._laser_max_range)
+
+                data = np.array_split(data, len(data) / REDUCTION_FACTOR)
+                data = [min(d) for d in data]
+            
+            new_obs_space.append(data)
+
+        return np.hstack(new_obs_space)
 
     def get_observation_space(self):
         return stack_spaces(
             spaces.Box(
                 low=0,
                 high=self._laser_max_range,
-                shape=(self._laser_num_beams,),
+                shape=(math.floor(self._laser_num_beams / REDUCTION_FACTOR),),
                 dtype=np.float32,
             ),
             spaces.Box(low=0, high=15, shape=(1,), dtype=np.float32),
