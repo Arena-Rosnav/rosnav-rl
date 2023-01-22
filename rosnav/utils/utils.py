@@ -10,8 +10,7 @@ from rosnav.utils.constants import RosnavEncoder
 
 
 def get_robot_yaml_path(robot_model: str = None) -> str:
-    if not robot_model:
-        robot_model = rospy.get_param("robot_model")
+    robot_model = rospy.get_param(os.path.join(rospy.get_namespace(), "robot_model"))
 
     simulation_setup_path = rospkg.RosPack().get_path("arena-simulation-setup")
     return os.path.join(
@@ -26,7 +25,11 @@ def get_laser_from_robot_yaml(robot_model: str = None) -> Tuple[int, int, int, i
         robot_data = yaml.safe_load(fd)
         laser_data = robot_data["laser"]
 
-        rospy.set_param("laser/num_beams", laser_data["num_beams"])
+        rospy.set_param(
+            os.path.join(
+                rospy.get_namespace(), "laser/num_beams"
+            ), laser_data["num_beams"]
+        )
 
         return (
             laser_data["num_beams"], 
@@ -40,11 +43,13 @@ def get_observation_space_from_file(robot_model: str = None) -> Tuple[int, int]:
     robot_state_size, action_state_size = 2, rospy.get_param(rospy.get_namespace() + "action_state_size", 3)
     num_beams, _, _, _ = get_laser_from_robot_yaml(robot_model)
 
+    num_beams = RosnavEncoder[get_robot_space_encoder()]["lasers_to_adapted"](num_beams)
+
     return num_beams, action_state_size + robot_state_size
 
 
 def get_robot_space_encoder() -> str:
-    return rospy.get_param("space_encoder", "RobotSpecificEncoder")
+    return rospy.get_param("space_encoder", "DefaultEncoder")
 
 
 def get_observation_space() -> Tuple[int, int]:
