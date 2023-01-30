@@ -48,7 +48,7 @@ class BaseAgent(ABC):
 
     def get_kwargs(self):
         fe_kwargs = self.features_extractor_kwargs
-        fe_kwargs["robot_model"] = self.robot_model
+        # fe_kwargs["robot_model"] = self.robot_model
 
         kwargs = {
             "features_extractor_class": self.features_extractor_class,
