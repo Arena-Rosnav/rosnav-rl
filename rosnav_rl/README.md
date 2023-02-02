@@ -1,3 +1,5 @@
+<img width="600" src="img/logo.png" />
+
 # Rosnav - ROS Navigation
 
 This is the official **Rosnav** package. It contains trained
