@@ -7,11 +7,13 @@ def read_json(path):
         return json.load(f)
         
 
-def create_body_network(data):
+def create_body_network(data, firstLayerDimension):
     body_net = nn.Sequential()
 
     # Number of the module to be added to the NN
     module_number = 0
+    
+    data["policy"][0]["in_features"] = dimension
 
     # Iterate over each module given in the json in the policy
     for module in data["policy"]:
