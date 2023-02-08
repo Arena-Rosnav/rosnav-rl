@@ -52,7 +52,7 @@ class CUSTOM_NETWORK(nn.Module):
         data = read_json(path)
 
         # Create the network based on JSON
-        self.body_net = create_body_network(data)
+        self.body_net = create_body_network(data, _L + _RS)
 
         print(self.body_net)
 
