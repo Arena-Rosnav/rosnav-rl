@@ -42,8 +42,8 @@ class CUSTOM_NETWORK(nn.Module):
         self,
         path: str,
         feature_dim: int,
-        last_layer_dim_pi: int = 32,
-        last_layer_dim_vf: int = 32,
+        last_layer_dim_pi: int = 3,
+        last_layer_dim_vf: int = 3,
         
     ):
         super(CUSTOM_NETWORK, self).__init__()
