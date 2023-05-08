@@ -84,7 +84,7 @@ class RosnavNode:
         action_state_sizes = [0, 3]
 
         for size in action_state_sizes:
-            rospy.set_param(rospy.get_namespace() + "action_state_size", size)
+            rospy.set_param(f"{rospy.get_namespace()}action_state_size", size)
             try:
                 return PPO.load(os.path.join(agent_path, "best_model.zip")).policy
             except:
@@ -106,11 +106,10 @@ class RosnavNode:
         raise ValueError("No valid config file found in agent folder.")
 
     def _get_observation_space_structure(self, hyperparams):
-        structure = hyperparams.get(
-            "observation_space", ["laser_scan", "goal_in_robot_frame", "last_action"]
+        return hyperparams.get(
+            "observation_space",
+            ["laser_scan", "goal_in_robot_frame", "last_action"],
         )
-
-        return structure
 
     def _get_vec_normalize(self, agent_path):
         vec_normalize_path = os.path.join(agent_path, "vec_normalize.pkl")
