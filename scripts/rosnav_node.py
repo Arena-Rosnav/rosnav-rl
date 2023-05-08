@@ -61,8 +61,15 @@ class RosnavNode:
             self._obs_structure,
         )
 
-        if self._hyperparams["rl_agent"]["normalize"]:
-            observation = self._vec_normalize.normalize_obs(observation)
+        try:
+            if self._hyperparams["rl_agent"]["normalize"]:
+                observation = self._vec_normalize.normalize_obs(observation)
+        except ValueError as e:
+            rospy.logerr(e)
+            rospy.logerr(
+                "Check if the configuration file correctly specifies the observation space."
+            )
+            rospy.signal_shutdown("")
 
         action = self._agent.predict(observation, deterministic=True)[0]
 
