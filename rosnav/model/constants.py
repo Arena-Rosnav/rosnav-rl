@@ -11,8 +11,8 @@ class PolicyType(Enum):
     MLP_LSTM = "MlpLstmPolicy"
 
 
+# Parsed as ppo_kwargs to sb3 ppo class
 BASE_AGENT_ATTR = {
-    "type": PolicyType,
     "features_extractor_class": Union[Type[BaseFeaturesExtractor], None],
     "features_extractor_kwargs": Union[dict, None],
     "net_arch": Union[List[Union[int, dict]], None],
