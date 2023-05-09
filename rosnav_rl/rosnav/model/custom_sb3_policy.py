@@ -184,3 +184,16 @@ class AGENT_25(BaseAgent):
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
+
+
+@AgentFactory.register("AGENT_26")
+class AGENT_26(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    features_extractor_class = None
+    features_extractor_kwargs = None
+    net_arch = [256, 128]
+    activation_fn = nn.ReLU
+    n_lstm_layers = 16
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
