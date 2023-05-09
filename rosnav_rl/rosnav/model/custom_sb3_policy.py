@@ -153,9 +153,9 @@ class AGENT_22(BaseAgent):
 @AgentFactory.register("AGENT_23")
 class AGENT_23(BaseAgent):
     type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_5
+    features_extractor_class = EXTRACTOR_6
     features_extractor_kwargs = dict(features_dim=128)
-    net_arch = [128, dict(pi=[64, 64, 64], vf=[64, 64, 64])]
+    net_arch = [128, 64, 64, 64]
     activation_fn = nn.ReLU
 
     def __init__(self, robot_model: str = None):
@@ -176,10 +176,10 @@ class AGENT_24(BaseAgent):
 
 @AgentFactory.register("AGENT_25")
 class AGENT_25(BaseAgent):
-    type = PolicyType.MLP
-    features_extractor_class = None
-    features_extractor_kwargs = None
-    net_arch = [512, 256, dict(pi=[128], vf=[128])]
+    type = PolicyType.CNN
+    features_extractor_class = EXTRACTOR_6
+    features_extractor_kwargs = dict(features_dim=512)
+    net_arch = [512, 256, 128]
     activation_fn = nn.ReLU
 
     def __init__(self, robot_model: str = None):
