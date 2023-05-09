@@ -1,14 +1,10 @@
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import List, Type
 
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
-
-class PolicyType(Enum):
-    CNN = "CnnPolicy"
-    MLP = "MlpPolicy"
+from .constants import BASE_AGENT_ATTR, PolicyType
 
 
 class BaseAgent(ABC):
@@ -47,17 +43,10 @@ class BaseAgent(ABC):
         pass
 
     def get_kwargs(self):
-        fe_kwargs = self.features_extractor_kwargs
-        # fe_kwargs["robot_model"] = self.robot_model
-
-        kwargs = {
-            "features_extractor_class": self.features_extractor_class,
-            "features_extractor_kwargs": fe_kwargs,
-            "net_arch": self.net_arch,
-            "activation_fn": self.activation_fn,
-        }
-        if not kwargs["features_extractor_class"]:
-            del kwargs["features_extractor_class"]
-        if not kwargs["features_extractor_kwargs"]:
-            del kwargs["features_extractor_kwargs"]
+        kwargs = {}
+        for key in self.__dir__():
+            if key in BASE_AGENT_ATTR:
+                val = getattr(self, key)
+                if val is not None:
+                    kwargs[key] = val
         return kwargs
