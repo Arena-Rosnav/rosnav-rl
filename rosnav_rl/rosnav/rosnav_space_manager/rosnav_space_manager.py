@@ -1,6 +1,7 @@
 from .encoder_factory import BaseSpaceEncoderFactory
 from .default_encoder import *
 from .reduced_encoder import *
+from .stacked_space_encoder import *
 
 import rospy
 
