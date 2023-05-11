@@ -52,7 +52,7 @@ class DefaultEncoder(BaseSpaceEncoder):
         # scan = observation["laser_scan"]
         # last_action = observation["last_action"]
 
-        return np.hstack([observation[name] for name in structure])
+        return np.concatenate([observation[name] for name in structure], axis=0)
 
     def get_observation_space(self):
         return stack_spaces(
