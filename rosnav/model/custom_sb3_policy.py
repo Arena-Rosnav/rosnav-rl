@@ -197,3 +197,15 @@ class AGENT_26(BaseAgent):
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
+
+
+@AgentFactory.register("AGENT_27")
+class AGENT_27(BaseAgent):
+    type = PolicyType.CNN
+    features_extractor_class = EXTRACTOR_6
+    features_extractor_kwargs = dict(features_dim=512)
+    net_arch = [512, 256, 128]
+    activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model

@@ -62,7 +62,7 @@ class DefaultEncoder(BaseSpaceEncoder):
                 shape=(self._laser_num_beams,),
                 dtype=np.float32,
             ),
-            spaces.Box(low=0, high=15, shape=(1,), dtype=np.float32),
+            spaces.Box(low=0, high=20, shape=(1,), dtype=np.float32),
             spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
             spaces.Box(
                 low=-2.0,

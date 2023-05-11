@@ -32,9 +32,12 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
         robot_model: str = None,
         features_dim: int = 128,
     ):
-
         self._l, self._rs = get_observation_space_from_file(robot_model)
-        super(EXTRACTOR_1, self).__init__(observation_space, features_dim + self._rs)
+        self._stacked = len(observation_space.shape) > 1
+        self.num_stacks = observation_space.shape[0] if self._stacked else 1
+        super(EXTRACTOR_1, self).__init__(
+            observation_space, features_dim + self._rs * self.num_stacks
+        )
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 5, 2),
@@ -44,25 +47,39 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            # tensor_forward = th.as_tensor(observation_space.sample()[None]).float()
-            tensor_forward = th.randn(1, 1, self._l)
+            desired_shape = (1, self.num_stacks, self._l)
+            tensor_forward = th.randn(desired_shape)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
-        self.fc_1 = nn.Sequential(
+        self.fc = nn.Sequential(
             nn.Linear(n_flatten, features_dim),
             nn.ReLU(),
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         """
-        :return: (th.Tensor),
+        1. Extract laser
+        2. Extract robot state
+        3. Forward laser data through CNN
+        4. Return concatenation of extracted laser feats and robot states
+
+        :return: (th.Tensor) features,
             extracted features by the network
         """
-        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-        robot_state = observations[:, -self._rs :]
+        if not self._stacked:
+            # observations in shape [batch_size, obs_size]
+            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+            robot_state = observations[:, -self._rs :]
 
-        extracted_features = self.fc_1(self.cnn(laser_scan))
-        return th.cat((extracted_features, robot_state), 1)
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state), 1)
+        else:
+            # observations in shape [batch_size, num_stacks, obs_size]
+            laser_scan = observations[:, :, : -self._rs]
+            robot_state = observations[:, :, -self._rs :].squeeze(0)
+
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
 
 
 class EXTRACTOR_2(BaseFeaturesExtractor):
@@ -83,7 +100,11 @@ class EXTRACTOR_2(BaseFeaturesExtractor):
         features_dim: int = 128,
     ):
         self._l, self._rs = get_observation_space_from_file(robot_model)
-        super(EXTRACTOR_2, self).__init__(observation_space, features_dim + self._rs)
+        self._stacked = len(observation_space.shape) > 1
+        self.num_stacks = observation_space.shape[0] if self._stacked else 1
+        super(EXTRACTOR_2, self).__init__(
+            observation_space, features_dim + self._rs * self.num_stacks
+        )
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 5, 2),
@@ -95,25 +116,39 @@ class EXTRACTOR_2(BaseFeaturesExtractor):
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            # tensor_forward = th.as_tensor(observation_space.sample()[None]).float()
-            tensor_forward = th.randn(1, 1, self._l)
+            desired_shape = (1, self.num_stacks, self._l)
+            tensor_forward = th.randn(desired_shape)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
-        self.fc_1 = nn.Sequential(
+        self.fc = nn.Sequential(
             nn.Linear(n_flatten, features_dim),
             nn.ReLU(),
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         """
-        :return: (th.Tensor),
+        1. Extract laser
+        2. Extract robot state
+        3. Forward laser data through CNN
+        4. Return concatenation of extracted laser feats and robot states
+
+        :return: (th.Tensor) features,
             extracted features by the network
         """
-        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-        robot_state = observations[:, -self._rs :]
+        if not self._stacked:
+            # observations in shape [batch_size, obs_size]
+            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+            robot_state = observations[:, -self._rs :]
 
-        extracted_features = self.fc_1(self.cnn(laser_scan))
-        return th.cat((extracted_features, robot_state), 1)
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state), 1)
+        else:
+            # observations in shape [batch_size, num_stacks, obs_size]
+            laser_scan = observations[:, :, : -self._rs]
+            robot_state = observations[:, :, -self._rs :].squeeze(0)
+
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
 
 
 class EXTRACTOR_3(BaseFeaturesExtractor):
@@ -125,15 +160,17 @@ class EXTRACTOR_3(BaseFeaturesExtractor):
         This corresponds to the number of unit for the last layer.
     """
 
-    def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 128):
-        super(EXTRACTOR_3, self).__init__(observation_space, features_dim + self._rs)
-
-        self.cnn = nn.Sequential(
-            nn.Conv1d(1, 32, 5, 2),
-            nn.ReLU(),
-            nn.Conv1d(32, 32, 3, 2),
-            nn.ReLU(),
-            nn.Flatten(),
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        robot_model: str = None,
+        features_dim: int = 128,
+    ):
+        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._stacked = len(observation_space.shape) > 1
+        self.num_stacks = observation_space.shape[0] if self._stacked else 1
+        super(EXTRACTOR_3, self).__init__(
+            observation_space, features_dim + self._rs * self.num_stacks
         )
 
         # Compute shape by doing one forward pass
@@ -142,24 +179,37 @@ class EXTRACTOR_3(BaseFeaturesExtractor):
             tensor_forward = th.randn(1, 1, self._l)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
-        self.fc_1 = nn.Sequential(
+        self.fc = nn.Sequential(
             nn.Linear(n_flatten, 256),
+            nn.ReLU(),
+            nn.Linear(256, features_dim),
             nn.ReLU(),
         )
 
-        self.fc_2 = nn.Sequential(nn.Linear(256, features_dim), nn.ReLU())
-
     def forward(self, observations: th.Tensor) -> th.Tensor:
         """
-        :return: (th.Tensor),
+        1. Extract laser
+        2. Extract robot state
+        3. Forward laser data through CNN
+        4. Return concatenation of extracted laser feats and robot states
+
+        :return: (th.Tensor) features,
             extracted features by the network
         """
-        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-        robot_state = observations[:, -self._rs :]
+        if not self._stacked:
+            # observations in shape [batch_size, obs_size]
+            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+            robot_state = observations[:, -self._rs :]
 
-        extracted_features = self.fc_2(self.fc_1(self.cnn(laser_scan)))
-        # return self.fc_2(features)
-        return th.cat((extracted_features, robot_state), 1)
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state), 1)
+        else:
+            # observations in shape [batch_size, num_stacks, obs_size]
+            laser_scan = observations[:, :, : -self._rs]
+            robot_state = observations[:, :, -self._rs :].squeeze(0)
+
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
 
 
 class EXTRACTOR_4(BaseFeaturesExtractor):
@@ -180,7 +230,11 @@ class EXTRACTOR_4(BaseFeaturesExtractor):
         features_dim: int = 32,
     ):
         self._l, self._rs = get_observation_space_from_file(robot_model)
-        super(EXTRACTOR_4, self).__init__(observation_space, features_dim + self._rs)
+        self._stacked = len(observation_space.shape) > 1
+        self.num_stacks = observation_space.shape[0] if self._stacked else 1
+        super(EXTRACTOR_4, self).__init__(
+            observation_space, features_dim + self._rs * self.num_stacks
+        )
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 8, 4),
@@ -194,7 +248,8 @@ class EXTRACTOR_4(BaseFeaturesExtractor):
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            tensor_forward = th.randn(1, 1, self._l)
+            desired_shape = (1, self.num_stacks, self._l)
+            tensor_forward = th.randn(desired_shape)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc = nn.Sequential(
@@ -204,15 +259,28 @@ class EXTRACTOR_4(BaseFeaturesExtractor):
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         """
+        1. Extract laser
+        2. Extract robot state
+        3. Forward laser data through CNN
+        4. Return concatenation of extracted laser feats and robot states
+
         :return: (th.Tensor) features,
             extracted features by the network
         """
+        if not self._stacked:
+            # observations in shape [batch_size, obs_size]
+            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+            robot_state = observations[:, -self._rs :]
 
-        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-        robot_state = observations[:, -self._rs :]
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state), 1)
+        else:
+            # observations in shape [batch_size, num_stacks, obs_size]
+            laser_scan = observations[:, :, : -self._rs]
+            robot_state = observations[:, :, -self._rs :].squeeze(0)
 
-        extracted_features = self.fc(self.cnn(laser_scan))
-        return th.cat((extracted_features, robot_state), 1)
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
 
 
 class EXTRACTOR_5(BaseFeaturesExtractor):
@@ -231,7 +299,11 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
         features_dim: int = 32,
     ):
         self._l, self._rs = get_observation_space_from_file(robot_model)
-        super(EXTRACTOR_5, self).__init__(observation_space, features_dim + self._rs)
+        self._stacked = len(observation_space.shape) > 1
+        self.num_stacks = observation_space.shape[0] if self._stacked else 1
+        super(EXTRACTOR_5, self).__init__(
+            observation_space, features_dim + self._rs * self.num_stacks
+        )
 
         self.cnn = nn.Sequential(
             nn.Conv1d(1, 32, 8, 4),
@@ -245,7 +317,8 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            tensor_forward = th.randn(1, 1, self._l)
+            desired_shape = (1, self.num_stacks, self._l)
+            tensor_forward = th.randn(desired_shape)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc = nn.Sequential(
@@ -255,15 +328,28 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         """
+        1. Extract laser
+        2. Extract robot state
+        3. Forward laser data through CNN
+        4. Return concatenation of extracted laser feats and robot states
+
         :return: (th.Tensor) features,
             extracted features by the network
         """
+        if not self._stacked:
+            # observations in shape [batch_size, obs_size]
+            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+            robot_state = observations[:, -self._rs :]
 
-        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-        robot_state = observations[:, -self._rs :]
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state), 1)
+        else:
+            # observations in shape [batch_size, num_stacks, obs_size]
+            laser_scan = observations[:, :, : -self._rs]
+            robot_state = observations[:, :, -self._rs :].squeeze(0)
 
-        extracted_features = self.fc(self.cnn(laser_scan))
-        return th.cat((extracted_features, robot_state), 1)
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
 
 
 class EXTRACTOR_6(BaseFeaturesExtractor):
@@ -282,10 +368,14 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
         features_dim: int = 32,
     ):
         self._l, self._rs = get_observation_space_from_file(robot_model)
-        super(EXTRACTOR_6, self).__init__(observation_space, features_dim + self._rs)
+        self._stacked = len(observation_space.shape) > 1
+        self.num_stacks = observation_space.shape[0] if self._stacked else 1
+        super(EXTRACTOR_6, self).__init__(
+            observation_space, features_dim + self._rs * self.num_stacks
+        )
 
         self.cnn = nn.Sequential(
-            nn.Conv1d(1, 32, 8, 4),
+            nn.Conv1d(self.num_stacks, 32, 8, 4),
             nn.ReLU(),
             nn.Conv1d(32, 64, 4, 2),
             nn.ReLU(),
@@ -296,7 +386,8 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            tensor_forward = th.randn(1, 1, self._l)
+            desired_shape = (1, self.num_stacks, self._l)
+            tensor_forward = th.randn(desired_shape)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc = nn.Sequential(
@@ -306,15 +397,28 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         """
+        1. Extract laser
+        2. Extract robot state
+        3. Forward laser data through CNN
+        4. Return concatenation of extracted laser feats and robot states
+
         :return: (th.Tensor) features,
             extracted features by the network
         """
+        if not self._stacked:
+            # observations in shape [batch_size, obs_size]
+            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
+            robot_state = observations[:, -self._rs :]
 
-        laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-        robot_state = observations[:, -self._rs :]
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state), 1)
+        else:
+            # observations in shape [batch_size, num_stacks, obs_size]
+            laser_scan = observations[:, :, : -self._rs]
+            robot_state = observations[:, :, -self._rs :].squeeze(0)
 
-        extracted_features = self.fc(self.cnn(laser_scan))
-        return th.cat((extracted_features, robot_state), 1)
+            extracted_features = self.fc(self.cnn(laser_scan))
+            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
 
 
 class UNIFIED_SPACE_EXTRACTOR(BaseFeaturesExtractor):
