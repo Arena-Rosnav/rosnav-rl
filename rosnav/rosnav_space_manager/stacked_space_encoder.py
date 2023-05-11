@@ -40,3 +40,6 @@ class StackedSpaceEncoder(DefaultEncoder):
                 dtype=np.float32,  # angular vel
             ),
         )
+
+    def encode_observation(self, observation, structure):
+        return np.expand_dims(super().encode_observation(observation, structure), 0)
