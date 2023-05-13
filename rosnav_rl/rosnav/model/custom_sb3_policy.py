@@ -230,8 +230,8 @@ class AGENT_28(BaseAgent):
 
 
 # lstm + framestacking
-@AgentFactory.register("AGENT_28")
-class AGENT_28(BaseAgent):
+@AgentFactory.register("AGENT_29")
+class AGENT_29(BaseAgent):
     type = PolicyType.MLP_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
