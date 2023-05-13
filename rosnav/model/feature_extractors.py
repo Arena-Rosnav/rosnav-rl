@@ -439,7 +439,7 @@ class EXTRACTOR_7(BaseFeaturesExtractor):
         self._l, self._rs = get_observation_space_from_file(robot_model)
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_6, self).__init__(
+        super(EXTRACTOR_7, self).__init__(
             observation_space, features_dim + self._rs * self.num_stacks
         )
 
