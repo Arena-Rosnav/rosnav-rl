@@ -199,29 +199,48 @@ class AGENT_26(BaseAgent):
         self.robot_model = robot_model
 
 
+# framestacking
 @AgentFactory.register("AGENT_27")
 class AGENT_27(BaseAgent):
     type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_6
+    features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
-    net_arch = [512, 256, 128]
+    net_arch = [256, 128, 64]
     activation_fn = nn.ReLU
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
 
 
+# lstm
 @AgentFactory.register("AGENT_28")
 class AGENT_28(BaseAgent):
     type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_6
-    features_extractor_kwargs = dict(features_dim=512)
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=256)
     net_arch = [256, 128]
     activation_fn = nn.ReLU
     n_lstm_layers = 16
-    lstm_hidden_size = 6
+    lstm_hidden_size = 128
     shared_lstm = False
-    enable_critic_lstm = False
+    enable_critic_lstm = True
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
+
+# lstm + framestacking
+@AgentFactory.register("AGENT_28")
+class AGENT_28(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=512)
+    net_arch = [256, 256]
+    activation_fn = nn.ReLU
+    n_lstm_layers = 12
+    lstm_hidden_size = 256
+    shared_lstm = False
+    enable_critic_lstm = True
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
