@@ -246,10 +246,10 @@ class AGENT_29(BaseAgent):
         self.robot_model = robot_model
 
 
-# framestacking
+# lstm
 @AgentFactory.register("AGENT_30")
 class AGENT_30(BaseAgent):
-    type = PolicyType.CNN
+    type = PolicyType.MLP_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[256, 256, 64], vf=[256, 256])]
