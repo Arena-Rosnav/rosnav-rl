@@ -252,7 +252,7 @@ class AGENT_30(BaseAgent):
     type = PolicyType.MLP_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
-    net_arch = [dict(pi=[256, 256, 64], vf=[256, 256])]
+    net_arch = dict(pi=[256, 256, 64], vf=[256, 256])
     activation_fn = nn.ReLU
     n_lstm_layers = 6
     lstm_hidden_size = 256
@@ -269,7 +269,7 @@ class AGENT_31(BaseAgent):
     type = PolicyType.CNN
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
-    net_arch = [dict(pi=[512, 256, 128, 64], vf=[256, 256, 64])]
+    net_arch = dict(pi=[512, 256, 128, 64], vf=[256, 256, 64])
     activation_fn = nn.ReLU
 
     def __init__(self, robot_model: str = None):
