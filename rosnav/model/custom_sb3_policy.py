@@ -254,6 +254,10 @@ class AGENT_30(BaseAgent):
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[256, 256, 64], vf=[256, 256])]
     activation_fn = nn.ReLU
+    n_lstm_layers = 6
+    lstm_hidden_size = 256
+    shared_lstm = False
+    enable_critic_lstm = True
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
