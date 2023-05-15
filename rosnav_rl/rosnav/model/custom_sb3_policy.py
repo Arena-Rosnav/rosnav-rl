@@ -218,10 +218,10 @@ class AGENT_28(BaseAgent):
     type = PolicyType.MLP_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [256, 256]
+    net_arch = [256, 128]
     activation_fn = nn.ReLU
-    n_lstm_layers = 16
-    lstm_hidden_size = 256
+    n_lstm_layers = 6
+    lstm_hidden_size = 128
     shared_lstm = False
     enable_critic_lstm = True
 
