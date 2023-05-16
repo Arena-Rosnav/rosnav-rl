@@ -368,3 +368,20 @@ class AGENT_37(BaseAgent):
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
+
+
+# lstm + framestacking
+@AgentFactory.register("AGENT_38")
+class AGENT_38(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=512)
+    net_arch = [256, 256, 256]
+    activation_fn = nn.ReLU
+    n_lstm_layers = 6
+    lstm_hidden_size = 64
+    shared_lstm = False
+    enable_critic_lstm = True
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
