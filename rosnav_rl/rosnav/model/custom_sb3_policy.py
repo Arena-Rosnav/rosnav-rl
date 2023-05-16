@@ -402,3 +402,20 @@ class AGENT_39(BaseAgent):
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
+
+
+# lstm
+@AgentFactory.register("AGENT_40")
+class AGENT_40(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=512)
+    net_arch = dict(pi=[256, 64, 64], vf=[256, 64])
+    activation_fn = nn.ReLU
+    n_lstm_layers = 4
+    lstm_hidden_size = 64
+    shared_lstm = False
+    enable_critic_lstm = True
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
