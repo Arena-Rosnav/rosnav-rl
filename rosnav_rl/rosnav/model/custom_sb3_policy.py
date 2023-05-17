@@ -493,7 +493,7 @@ class AGENT_45(BaseAgent):
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = [128, 64, 64, 64]
     activation_fn = nn.ReLU
-    n_lstm_layers = 8
+    n_lstm_layers = 4
     lstm_hidden_size = 128
     shared_lstm = True
     enable_critic_lstm = False
