@@ -530,3 +530,16 @@ class AGENT_47(BaseAgent):
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
+
+
+# framestacking
+@AgentFactory.register("AGENT_48")
+class AGENT_48(BaseAgent):
+    type = PolicyType.CNN
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=256)
+    net_arch = dict(pi=[256, 128], vf=[256, 64])
+    activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
