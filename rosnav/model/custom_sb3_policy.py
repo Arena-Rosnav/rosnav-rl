@@ -453,7 +453,7 @@ class AGENT_42(BaseAgent):
 
 # lstm
 @AgentFactory.register("AGENT_43")
-class AGENT_40(BaseAgent):
+class AGENT_43(BaseAgent):
     type = PolicyType.MLP_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=128)
