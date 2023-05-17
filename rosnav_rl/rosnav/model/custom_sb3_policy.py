@@ -410,7 +410,24 @@ class AGENT_40(BaseAgent):
     type = PolicyType.MLP_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
-    net_arch = dict(pi=[256, 64, 64], vf=[256, 64])
+    net_arch = dict(pi=[256, 128], vf=[256, 128])
+    activation_fn = nn.ReLU
+    n_lstm_layers = 4
+    lstm_hidden_size = 64
+    shared_lstm = False
+    enable_critic_lstm = True
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
+
+# lstm + framestacking
+@AgentFactory.register("AGENT_41")
+class AGENT_41(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=256)
+    net_arch = [256, 256, 256, 64]
     activation_fn = nn.ReLU
     n_lstm_layers = 4
     lstm_hidden_size = 64
