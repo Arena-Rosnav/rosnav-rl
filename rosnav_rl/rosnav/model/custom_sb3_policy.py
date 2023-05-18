@@ -555,8 +555,8 @@ class AGENT_49(BaseAgent):
     activation_fn = nn.ReLU
     n_lstm_layers = 1
     lstm_hidden_size = 512
-    shared_lstm = True
-    enable_critic_lstm = False
+    shared_lstm = False
+    enable_critic_lstm = True
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
