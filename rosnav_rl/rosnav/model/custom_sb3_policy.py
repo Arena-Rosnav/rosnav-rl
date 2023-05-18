@@ -594,7 +594,7 @@ class AGENT_51(BaseAgent):
 
 # lstm + framestacking
 @AgentFactory.register("AGENT_52")
-class AGENT_51(BaseAgent):
+class AGENT_52(BaseAgent):
     type = PolicyType.MLP_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=256)
@@ -604,6 +604,19 @@ class AGENT_51(BaseAgent):
     lstm_hidden_size = 128
     shared_lstm = False
     enable_critic_lstm = True
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
+
+# framestacking
+@AgentFactory.register("AGENT_53")
+class AGENT_53(BaseAgent):
+    type = PolicyType.CNN
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=258)
+    net_arch = [64, 64, 64, 64]
+    activation_fn = nn.ReLU
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
