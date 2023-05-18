@@ -551,10 +551,10 @@ class AGENT_49(BaseAgent):
     type = PolicyType.MLP_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=256)
-    net_arch = dict(pi=[256, 64, 64, 64], vf=[256, 256])
+    net_arch = dict(pi=[64, 64, 64], vf=[64, 64])
     activation_fn = nn.ReLU
-    n_lstm_layers = 4
-    lstm_hidden_size = 256
+    n_lstm_layers = 1
+    lstm_hidden_size = 512
     shared_lstm = True
     enable_critic_lstm = False
 
