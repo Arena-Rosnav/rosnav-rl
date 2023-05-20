@@ -44,5 +44,5 @@ class StackedSpaceEncoder(DefaultEncoder):
     def encode_observation(self, observation, structure):
         return np.expand_dims(super().encode_observation(observation, structure), 0)
 
-    # def decode_action(self, action):
-    #     return super().decode_action(action[0])
+    def decode_action(self, action):
+        return super().decode_action(action[0])
