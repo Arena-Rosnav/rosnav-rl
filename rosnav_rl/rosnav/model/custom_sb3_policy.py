@@ -628,7 +628,7 @@ class AGENT_53(BaseAgent):
     type = PolicyType.CNN
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [512, 256, 128]
+    net_arch = [512, 256, 256, 64]
     activation_fn = nn.ReLU
 
     def __init__(self, robot_model: str = None):
