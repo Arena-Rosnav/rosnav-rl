@@ -487,20 +487,13 @@ class EXTRACTOR_7(BaseFeaturesExtractor):
             robot_state = observations[:, :, -self._rs :].squeeze(0)
 
             extracted_features = self.fc(self.cnn(laser_scan))
-            # return th.cat(
-            #     (extracted_features, robot_state.flatten(start_dim=1).unsqueeze(0)), 1
-            # )
 
-            robot_state = robot_state.flatten(start_dim=1)
-            if robot_state.ndim > 2:
-                robot_state = robot_state.flatten().unsqueeze(0)
-                # return th.cat((extracted_features, robot_state), 0)
-            try:
+            if robot_state.ndim > 2:  # in case of batched
+                robot_state = robot_state.flatten(start_dim=1)
                 return th.cat((extracted_features, robot_state), 1)
-            except:
-                return th.cat(
-                    (extracted_features, robot_state.flatten().unsqueeze(0)), 1
-                )
+            else:
+                robot_state = robot_state.flatten().unsqueeze(0)
+                return th.cat((extracted_features, robot_state), 1)
 
 
 class UNIFIED_SPACE_EXTRACTOR(BaseFeaturesExtractor):
