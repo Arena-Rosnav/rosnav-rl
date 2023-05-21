@@ -624,10 +624,10 @@ class AGENT_53(BaseAgent):
 
 # framestacking
 @AgentFactory.register("AGENT_54")
-class AGENT_53(BaseAgent):
+class AGENT_54(BaseAgent):
     type = PolicyType.CNN
     features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
+    features_extractor_kwargs = dict(features_dim=512)
     net_arch = [512, 256, 256, 64]
     activation_fn = nn.ReLU
 
