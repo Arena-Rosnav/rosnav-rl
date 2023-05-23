@@ -22,6 +22,8 @@ from stable_baselines3.common.vec_env.stacked_observations import StackedObserva
 sys.modules["rl_agent"] = sys.modules["rosnav"]
 sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
 
+from training.tools.general import determine_space_encoder
+
 
 class RosnavNode:
     DEFAULT_DONES = np.array([[False]])
@@ -48,19 +50,7 @@ class RosnavNode:
         )
 
         # Load observation normalization and frame stacking
-        self._normalized_mode = self._hyperparams["rl_agent"]["normalize"]
-        self._stacked_mode = (
-            self._hyperparams["rl_agent"]["frame_stacking"]["enabled"]
-            if "frame_stacking" in self._hyperparams["rl_agent"]
-            else False
-        )
-
-        if self._normalized_mode:
-            self._vec_normalize = self._get_vec_normalize(self.agent_path)
-
-        if self._stacked_mode:
-            rospy.set_param("space_encoder", "StackedEncoder")
-            self._stacked_obs_container = self._get_stacked_obs(self._hyperparams)
+        self.load_env_wrappers(self._hyperparams)
 
         # Set RosnavSpaceEncoder as Middleware
         self._encoder = RosnavSpaceManager()
@@ -77,6 +67,32 @@ class RosnavNode:
 
         self.state = None
         self._reset_state = True
+
+    def load_env_wrappers(self, hyperparams):
+        # Load observation normalization and frame stacking
+        self._normalized_mode = hyperparams["rl_agent"]["normalize"]
+        self._reduced_laser_mode = (
+            hyperparams["rl_agent"]["laser"]["reduce_num_beams"]["enabled"]
+            if "laser" in hyperparams["rl_agent"]
+            else False
+        )
+        self._stacked_mode = (
+            hyperparams["rl_agent"]["frame_stacking"]["enabled"]
+            if "frame_stacking" in hyperparams["rl_agent"]
+            else False
+        )
+
+        if self._normalized_mode:
+            self._vec_normalize = self._get_vec_normalize(self.agent_path)
+
+        if self._stacked_mode:
+            self._stacked_obs_container = self._get_stacked_obs(self._hyperparams)
+
+        # populate right encoder name based on params
+        rospy.set_param(
+            "space_encoder",
+            determine_space_encoder(self._stacked_mode, self._reduced_laser_mode),
+        )
 
     def _encode_observation(self, obs_msg: GetAction):
         return self._encoder.encode_observation(
