@@ -31,4 +31,23 @@ RosnavEncoder = {
         "meta": 2 + 3 + 1 + 6,  # Goal + Vel + Radius + Max Vel
         "maxVelocity": {"x": [-5, 5], "y": [-5, 5], "angular": [-10, 10]},
     },
+    "ReducedLaserEncoder": {
+        "lasers": rospy.get_param(
+            os.path.join(rospy.get_namespace(), "laser/reduced_num_laser_beams"),
+            rospy.get_param(os.path.join(rospy.get_namespace(), "laser/num_beams")),
+        ),
+        "meta": 2 + 3,  # Goal + Vel
+        "lasers_to_adapted": lambda _: rospy.get_param(
+            os.path.join(rospy.get_namespace(), "laser/reduced_num_laser_beams")
+        ),
+    },
+    "StackedReducedLaserEncoder": {
+        "lasers": rospy.get_param(
+            os.path.join(rospy.get_namespace(), "laser/reduced_num_laser_beams")
+        ),
+        "meta": 2 + 3,  # Goal + Vel,
+        "lasers_to_adapted": lambda _: rospy.get_param(
+            os.path.join(rospy.get_namespace(), "laser/reduced_num_laser_beams")
+        ),
+    },
 }

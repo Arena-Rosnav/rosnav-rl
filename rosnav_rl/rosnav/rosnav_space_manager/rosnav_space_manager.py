@@ -1,7 +1,9 @@
 from .encoder_factory import BaseSpaceEncoderFactory
-from .default_encoder import *
-from .reduced_encoder import *
-from .stacked_space_encoder import *
+from .default_encoder import DefaultEncoder
+from .reduced_encoder import ReducedEncoder
+from .stacked_encoder import StackedSpaceEncoder
+from .reduced_laser_encoder import ReducedLaserEncoder
+from .stacked_reduced_laser_encoder import StackedReducedLaserEncoder
 
 import rospy
 
