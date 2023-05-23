@@ -43,7 +43,8 @@ RosnavEncoder = {
     },
     "StackedReducedLaserEncoder": {
         "lasers": rospy.get_param(
-            os.path.join(rospy.get_namespace(), "laser/reduced_num_laser_beams")
+            os.path.join(rospy.get_namespace(), "laser/reduced_num_laser_beams"),
+            rospy.get_param(os.path.join(rospy.get_namespace(), "laser/num_beams")),
         ),
         "meta": 2 + 3,  # Goal + Vel,
         "lasers_to_adapted": lambda _: rospy.get_param(

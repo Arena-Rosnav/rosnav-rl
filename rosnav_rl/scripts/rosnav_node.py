@@ -8,8 +8,8 @@ import rospkg
 import rospy
 from rosnav import *
 from rosnav.model.agent_factory import AgentFactory
-from rosnav.model.custom_sb3_policy import *
 from rosnav.model.base_agent import PolicyType
+from rosnav.model.custom_sb3_policy import *
 from rosnav.msg import ResetStackedObs
 from rosnav.rosnav_space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav.srv import GetAction, GetActionResponse
@@ -18,11 +18,10 @@ from rosnav.utils.utils import load_json, load_vec_normalize, load_yaml, make_mo
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env.stacked_observations import StackedObservations
+from tools.general import determine_space_encoder
 
 sys.modules["rl_agent"] = sys.modules["rosnav"]
 sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
-
-from training.tools.general import determine_space_encoder
 
 
 class RosnavNode:
