@@ -41,6 +41,16 @@ def get_laser_from_robot_yaml(robot_model: str = None) -> Tuple[int, int, int, i
         )
 
 
+def get_actions_from_robot_yaml(robot_model: str = None):
+    robot_yaml_path = get_robot_yaml_path(robot_model)
+
+    with open(robot_yaml_path, "r") as fd:
+        robot_data = yaml.safe_load(fd)
+        action_data = robot_data["actions"]
+
+    return action_data
+
+
 def get_observation_space_from_file(robot_model: str = None) -> Tuple[int, int]:
     robot_state_size, action_state_size = 2, rospy.get_param(
         rospy.get_namespace() + "action_state_size", 3
