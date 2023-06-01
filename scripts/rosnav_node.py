@@ -19,8 +19,10 @@ from rosnav.utils.utils import load_json, load_vec_normalize, load_yaml, make_mo
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env.stacked_observations import StackedObservations
-from tools.general import determine_space_encoder
-from tools.ros_param_distributor import populate_discrete_action_space
+from tools.ros_param_distributor import (
+    populate_discrete_action_space,
+    determine_space_encoder,
+)
 
 sys.modules["rl_agent"] = sys.modules["rosnav"]
 sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
