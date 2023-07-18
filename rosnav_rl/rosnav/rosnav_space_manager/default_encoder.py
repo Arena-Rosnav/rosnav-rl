@@ -21,8 +21,16 @@ class DefaultEncoder(BaseSpaceEncoder):
         super().__init__(*args)
 
     def decode_action(self, action):
+        if (
+            self._is_action_space_discrete
+            and type(action) is list
+            or type(action) is np.ndarray
+        ):
+            action = action[0]
+
         if self._is_action_space_discrete:
             return self._extend_action_array(self._translate_disc_action(action))
+
         return self._extend_action_array(action)
 
     def _extend_action_array(self, action: np.ndarray) -> np.ndarray:

@@ -113,7 +113,9 @@ def make_mock_env(config: dict) -> DummyVecEnv:
         return flatland_gym_env.FlatlandEnv(
             ns="",
             reward_fnc=config["reward_fnc"],
-            is_action_space_discrete=config["discrete_action_space"],
+            is_action_space_discrete=config["discrete_action_space"]
+            if "discrete_action_space" in config
+            else config["action_space"]["discrete"],
             requires_task_manager=False,
         )
 

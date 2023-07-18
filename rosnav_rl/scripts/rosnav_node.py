@@ -20,8 +20,9 @@ from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env.stacked_observations import StackedObservations
 from tools.ros_param_distributor import (
-    populate_discrete_action_space,
     determine_space_encoder,
+    populate_discrete_action_space,
+    populate_laser_params,
 )
 
 sys.modules["rl_agent"] = sys.modules["rosnav"]
@@ -49,9 +50,9 @@ class RosnavNode:
             self._hyperparams["rl_agent"]
         )
 
-        with contextlib.suppress(KeyError):
-            if self._hyperparams["rl_agent"]["action_space"]["discrete"]:
-                populate_discrete_action_space(self._hyperparams)
+        self._setup_action_space(self._hyperparams)
+
+        populate_laser_params(self._hyperparams)
 
         # Load observation normalization and frame stacking
         self.load_env_wrappers(self._hyperparams)
@@ -72,6 +73,17 @@ class RosnavNode:
         self.state = None
         self._reset_state = True
 
+    def _setup_action_space(self, hyperparams):
+        is_action_space_discrete = (
+            hyperparams["rl_agent"]["discrete_action_space"]
+            if "discrete_action_space" in self._hyperparams["rl_agent"]
+            else self._hyperparams["rl_agent"]["action_space"]["discrete"]
+        )
+        rospy.set_param("is_action_space_discrete", is_action_space_discrete)
+
+        if is_action_space_discrete:
+            populate_discrete_action_space(hyperparams)
+
     def load_env_wrappers(self, hyperparams):
         # Load observation normalization and frame stacking
         self._normalized_mode = hyperparams["rl_agent"]["normalize"]
@@ -86,6 +98,12 @@ class RosnavNode:
             else False
         )
 
+        # populate right encoder name based on params
+        rospy.set_param(
+            "space_encoder",
+            determine_space_encoder(self._stacked_mode, self._reduced_laser_mode),
+        )
+
         if self._normalized_mode:
             self._vec_normalize = RosnavNode._get_vec_normalize(
                 self.agent_path, self._hyperparams
@@ -93,12 +111,6 @@ class RosnavNode:
 
         if self._stacked_mode:
             self._stacked_obs_container = RosnavNode._get_stacked_obs(self._hyperparams)
-
-        # populate right encoder name based on params
-        rospy.set_param(
-            "space_encoder",
-            determine_space_encoder(self._stacked_mode, self._reduced_laser_mode),
-        )
 
     def _encode_observation(self, obs_msg: GetAction):
         return self._encoder.encode_observation(
@@ -125,7 +137,7 @@ class RosnavNode:
 
         if self._stacked_mode:
             observation, _ = self._stacked_obs_container.update(
-                observation, self.DEFAULT_DONES, self.DEFAULT_INFOS
+                observation, RosnavNode.DEFAULT_DONES, RosnavNode.DEFAULT_INFOS
             )
 
         predict_dict = {"observation": observation, "deterministic": True}
@@ -134,11 +146,12 @@ class RosnavNode:
             predict_dict.update(
                 {
                     "state": self.state,
-                    "episode_start": self.DEFAULT_EPS_START
+                    "episode_start": RosnavNode.DEFAULT_EPS_START
                     if self._reset_state
                     else None,
                 }
             )
+            self._reset_state = False
 
         action, self.state = self._agent.predict(**predict_dict)
 
@@ -146,8 +159,6 @@ class RosnavNode:
 
         response = GetActionResponse()
         response.action = decoded_action
-
-        self._reset_state = False
 
         return response
 
