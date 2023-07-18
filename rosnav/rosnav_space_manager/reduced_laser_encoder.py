@@ -66,4 +66,6 @@ class ReducedLaserEncoder(DefaultEncoder):
         if x >= len(laserbeams):
             return laserbeams
         indices = np.round(np.linspace(0, len(laserbeams) - 1, x)).astype(int)[:x]
+        if type(laserbeams) == tuple:
+            laserbeams = np.array(laserbeams)
         return laserbeams[indices]
