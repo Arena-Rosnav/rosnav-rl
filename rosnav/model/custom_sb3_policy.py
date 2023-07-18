@@ -633,3 +633,42 @@ class AGENT_54(BaseAgent):
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
+
+
+# framestacking
+@AgentFactory.register("AGENT_55")
+class AGENT_55(BaseAgent):
+    type = PolicyType.CNN
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=512)
+    net_arch = [512, 256, 64]
+    activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
+
+# framestacking
+@AgentFactory.register("AGENT_56")
+class AGENT_56(BaseAgent):
+    type = PolicyType.CNN
+    features_extractor_class = EXTRACTOR_7
+    features_extractor_kwargs = dict(features_dim=256)
+    net_arch = [256, 256, 256, 64]
+    activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
+
+
+# framestacking
+@AgentFactory.register("AGENT_57")
+class AGENT_57(BaseAgent):
+    type = PolicyType.CNN
+    features_extractor_class = EXTRACTOR_8
+    features_extractor_kwargs = dict(features_dim=512)
+    net_arch = [512, 256, 64, 64]
+    activation_fn = nn.ReLU
+
+    def __init__(self, robot_model: str = None):
+        self.robot_model = robot_model
