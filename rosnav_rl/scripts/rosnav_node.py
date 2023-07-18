@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 import sys
@@ -18,7 +19,10 @@ from rosnav.utils.utils import load_json, load_vec_normalize, load_yaml, make_mo
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env.stacked_observations import StackedObservations
-from tools.general import determine_space_encoder
+from tools.ros_param_distributor import (
+    populate_discrete_action_space,
+    determine_space_encoder,
+)
 
 sys.modules["rl_agent"] = sys.modules["rosnav"]
 sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
@@ -32,21 +36,22 @@ class RosnavNode:
     def __init__(self):
         # Agent name and path
         self.agent_name = rospy.get_param("agent_name")
-        self.agent_path = self._get_model_path(self.agent_name)
+        self.agent_path = RosnavNode._get_model_path(self.agent_name)
 
         assert os.path.isdir(
             self.agent_path
         ), f"Model cannot be found at {self.agent_path}"
 
-        self.valid_cfg_names = VALID_CONFIG_NAMES
-
         # Load hyperparams
-        self._hyperparams = self._load_hyperparams(self.agent_path)
-        # rospy.set_param("/actions_in_obs", self._hyperparams.get("actions_in_observationspace", False))
+        self._hyperparams = RosnavNode._load_hyperparams(self.agent_path)
 
-        self._obs_structure = self._get_observation_space_structure(
+        self._obs_structure = RosnavNode._get_observation_space_structure(
             self._hyperparams["rl_agent"]
         )
+
+        with contextlib.suppress(KeyError):
+            if self._hyperparams["rl_agent"]["action_space"]["discrete"]:
+                populate_discrete_action_space(self._hyperparams)
 
         # Load observation normalization and frame stacking
         self.load_env_wrappers(self._hyperparams)
@@ -82,10 +87,12 @@ class RosnavNode:
         )
 
         if self._normalized_mode:
-            self._vec_normalize = self._get_vec_normalize(self.agent_path)
+            self._vec_normalize = RosnavNode._get_vec_normalize(
+                self.agent_path, self._hyperparams
+            )
 
         if self._stacked_mode:
-            self._stacked_obs_container = self._get_stacked_obs(self._hyperparams)
+            self._stacked_obs_container = RosnavNode._get_stacked_obs(self._hyperparams)
 
         # populate right encoder name based on params
         rospy.set_param(
@@ -177,11 +184,13 @@ class RosnavNode:
 
         rospy.signal_shutdown("")
 
-    def _get_model_path(self, model_name):
+    @staticmethod
+    def _get_model_path(model_name):
         return os.path.join(rospkg.RosPack().get_path("rosnav"), "agents", model_name)
 
-    def _load_hyperparams(self, agent_path):
-        for cfg_name in self.valid_cfg_names:
+    @staticmethod
+    def _load_hyperparams(agent_path):
+        for cfg_name in VALID_CONFIG_NAMES:
             cfg_path = os.path.join(agent_path, cfg_name)
             if os.path.isfile(cfg_path):
                 if cfg_name.endswith(".json"):
@@ -193,17 +202,20 @@ class RosnavNode:
                 return cfg_dict
         raise ValueError("No valid config file found in agent folder.")
 
-    def _get_observation_space_structure(self, hyperparams):
+    @staticmethod
+    def _get_observation_space_structure(hyperparams):
         return hyperparams.get(
             "observation_space",
             ["laser_scan", "goal_in_robot_frame", "last_action"],
         )
 
-    def _get_vec_normalize(self, agent_path):
+    @staticmethod
+    def _get_vec_normalize(agent_path, hyperparams):
         vec_normalize_path = os.path.join(agent_path, "vec_normalize.pkl")
-        return load_vec_normalize(vec_normalize_path, self._hyperparams["rl_agent"])
+        return load_vec_normalize(vec_normalize_path, hyperparams["rl_agent"])
 
-    def _get_stacked_obs(self, hyperparams: dict):
+    @staticmethod
+    def _get_stacked_obs(hyperparams: dict):
         venv = make_mock_env(hyperparams["rl_agent"])
         return StackedObservations(
             1,
