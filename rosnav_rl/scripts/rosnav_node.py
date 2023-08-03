@@ -15,7 +15,7 @@ from rosnav.msg import ResetStackedObs
 from rosnav.rosnav_space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav.srv import GetAction, GetActionResponse
 from rosnav.utils.constants import VALID_CONFIG_NAMES
-from rosnav.utils.utils import load_json, load_vec_normalize, load_yaml, make_mock_env
+from rosnav.utils.utils import load_json, load_vec_normalize, load_yaml, make_mock_env, wrap_vec_framestack
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env.stacked_observations import StackedObservations
@@ -39,16 +39,12 @@ class RosnavNode:
         self.agent_name = rospy.get_param("agent_name")
         self.agent_path = RosnavNode._get_model_path(self.agent_name)
 
-        assert os.path.isdir(
-            self.agent_path
-        ), f"Model cannot be found at {self.agent_path}"
+        assert os.path.isdir(self.agent_path), f"Model cannot be found at {self.agent_path}"
 
         # Load hyperparams
         self._hyperparams = RosnavNode._load_hyperparams(self.agent_path)
 
-        self._obs_structure = RosnavNode._get_observation_space_structure(
-            self._hyperparams["rl_agent"]
-        )
+        self._obs_structure = RosnavNode._get_observation_space_structure(self._hyperparams["rl_agent"])
 
         self._setup_action_space(self._hyperparams)
 
@@ -63,12 +59,8 @@ class RosnavNode:
         # Load the model
         self._agent = self._get_model(self._hyperparams, self.agent_path)
 
-        self._get_next_action_srv = rospy.Service(
-            "rosnav/get_action", GetAction, self._handle_next_action_srv
-        )
-        self._sub_reset_stacked_obs = rospy.Subscriber(
-            "rosnav/reset_stacked_obs", ResetStackedObs, self._reset_stacked_obs
-        )
+        self._get_next_action_srv = rospy.Service("rosnav/get_action", GetAction, self._handle_next_action_srv)
+        self._sub_reset_stacked_obs = rospy.Subscriber("rosnav/reset_stacked_obs", ResetStackedObs, self._reset_stacked_obs)
 
         self.state = None
         self._reset_state = True
@@ -88,14 +80,10 @@ class RosnavNode:
         # Load observation normalization and frame stacking
         self._normalized_mode = hyperparams["rl_agent"]["normalize"]
         self._reduced_laser_mode = (
-            hyperparams["rl_agent"]["laser"]["reduce_num_beams"]["enabled"]
-            if "laser" in hyperparams["rl_agent"]
-            else False
+            hyperparams["rl_agent"]["laser"]["reduce_num_beams"]["enabled"] if "laser" in hyperparams["rl_agent"] else False
         )
         self._stacked_mode = (
-            hyperparams["rl_agent"]["frame_stacking"]["enabled"]
-            if "frame_stacking" in hyperparams["rl_agent"]
-            else False
+            hyperparams["rl_agent"]["frame_stacking"]["enabled"] if "frame_stacking" in hyperparams["rl_agent"] else False
         )
 
         # populate right encoder name based on params
@@ -104,13 +92,12 @@ class RosnavNode:
             determine_space_encoder(self._stacked_mode, self._reduced_laser_mode),
         )
 
-        if self._normalized_mode:
-            self._vec_normalize = RosnavNode._get_vec_normalize(
-                self.agent_path, self._hyperparams
-            )
-
         if self._stacked_mode:
-            self._stacked_obs_container = RosnavNode._get_stacked_obs(self._hyperparams)
+            self._vec_stacked = RosnavNode._get_vec_stacked(self._hyperparams)
+            self._stacked_obs_container = self._vec_stacked.stacked_obs
+
+        if self._normalized_mode:
+            self._vec_normalize = RosnavNode._get_vec_normalize(self.agent_path, self._hyperparams, self._vec_stacked)
 
     def _encode_observation(self, obs_msg: GetAction):
         return self._encoder.encode_observation(
@@ -125,20 +112,18 @@ class RosnavNode:
     def _handle_next_action_srv(self, request: GetAction):
         observation = self._encode_observation(request)
 
+        if self._stacked_mode:
+            observation, _ = self._stacked_obs_container.update(
+                observation, RosnavNode.DEFAULT_DONES, RosnavNode.DEFAULT_INFOS
+            )
+
         if self._normalized_mode:
             try:
                 observation = self._vec_normalize.normalize_obs(observation)
             except ValueError as e:
                 rospy.logerr(e)
-                rospy.logerr(
-                    "Check if the configuration file correctly specifies the observation space."
-                )
+                rospy.logerr("Check if the configuration file correctly specifies the observation space.")
                 rospy.signal_shutdown("")
-
-        if self._stacked_mode:
-            observation, _ = self._stacked_obs_container.update(
-                observation, RosnavNode.DEFAULT_DONES, RosnavNode.DEFAULT_INFOS
-            )
 
         predict_dict = {"observation": observation, "deterministic": True}
 
@@ -146,9 +131,7 @@ class RosnavNode:
             predict_dict.update(
                 {
                     "state": self.state,
-                    "episode_start": RosnavNode.DEFAULT_EPS_START
-                    if self._reset_state
-                    else None,
+                    "episode_start": RosnavNode.DEFAULT_EPS_START if self._reset_state else None,
                 }
             )
             self._reset_state = False
@@ -187,9 +170,7 @@ class RosnavNode:
                     return PPO.load(os.path.join(agent_path, "best_model.zip")).policy
                 else:
                     self._recurrent_arch = True
-                    return RecurrentPPO.load(
-                        os.path.join(agent_path, "best_model.zip")
-                    ).policy
+                    return RecurrentPPO.load(os.path.join(agent_path, "best_model.zip")).policy
             except:
                 pass
 
@@ -221,19 +202,14 @@ class RosnavNode:
         )
 
     @staticmethod
-    def _get_vec_normalize(agent_path, hyperparams):
+    def _get_vec_normalize(agent_path, hyperparams, venv=None):
         vec_normalize_path = os.path.join(agent_path, "vec_normalize.pkl")
-        return load_vec_normalize(vec_normalize_path, hyperparams["rl_agent"])
+        return load_vec_normalize(vec_normalize_path, hyperparams["rl_agent"], venv)
 
     @staticmethod
-    def _get_stacked_obs(hyperparams: dict):
+    def _get_vec_stacked(hyperparams: dict):
         venv = make_mock_env(hyperparams["rl_agent"])
-        return StackedObservations(
-            1,
-            hyperparams["rl_agent"]["frame_stacking"]["stack_size"],
-            venv.observation_space,
-            "first",
-        )
+        return wrap_vec_framestack(venv, hyperparams["rl_agent"]["frame_stacking"]["stack_size"])
 
 
 if __name__ == "__main__":
