@@ -17,6 +17,10 @@ add_service_files(FILES
   GetAction.srv
 )
 
+add_message_files(FILES
+  ResetStackedObs.msg
+)
+
 generate_messages()
 
 catkin_package(

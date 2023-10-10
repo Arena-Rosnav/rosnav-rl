@@ -19,19 +19,19 @@ def check_format(cls: Type[BaseAgent]):
             type(cls.features_extractor_kwargs) is dict
         ), "Features extractor kwargs have to be of type 'dict'!"
 
-    if cls.net_arch:
-        assert (
-            type(cls.net_arch) is list
-        ), "Network architecture kwargs have to be of type 'list'!"
-        for entry in cls.net_arch:
-            assert (
-                type(entry) is dict or type(entry) is int
-            ), "Network architecture entries have to be of either type 'list' or 'dict'!"
-            if type(entry) is dict:
-                assert "pi" in entry or "vf" in entry, (
-                    "net_arch dictionaries have to contain either 'pi' or 'vf'"
-                    "for the respective network head!"
-                )
+    # if cls.net_arch:
+    #     assert (
+    #         type(cls.net_arch) is list
+    #     ), "Network architecture kwargs have to be of type 'list'!"
+    #     for entry in cls.net_arch:
+    #         assert (
+    #             type(entry) is dict or type(entry) is int
+    #         ), "Network architecture entries have to be of either type 'list' or 'dict'!"
+    #         if type(entry) is dict:
+    #             assert "pi" in entry or "vf" in entry, (
+    #                 "net_arch dictionaries have to contain either 'pi' or 'vf'"
+    #                 "for the respective network head!"
+    #             )
 
     if cls.activation_fn:
         assert issubclass(
