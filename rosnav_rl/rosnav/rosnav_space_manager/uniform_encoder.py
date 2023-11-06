@@ -30,20 +30,25 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
         self._laser_angle_max = rospy.get_param("laser/angle/max")
         self._laser_angle_increment = rospy.get_param("laser/angle/increment")
 
-        self._missing_lasers = int((2 * math.pi - abs(self._laser_angle_min) - abs(self._laser_angle_max)) / self._laser_num_beams)
+        self._missing_lasers = int(
+            (2 * math.pi - abs(self._laser_angle_min) - abs(self._laser_angle_max))
+            / self._laser_num_beams
+        )
 
-        self._lasers_right = int(abs(self._laser_angle_min) / self._laser_angle_increment)
+        self._lasers_right = int(
+            abs(self._laser_angle_min) / self._laser_angle_increment
+        )
 
         self.max_velocities = np.array(self._get_max_velocity())
 
     def decode_action(self, action):
         new_action = []
-        
+
         for i in range(len(action)):
             new_action.append(
                 min(
-                    self.max_velocities[i * 2 + 1], 
-                    max(self.max_velocities[i * 2], action[i])
+                    self.max_velocities[i * 2 + 1],
+                    max(self.max_velocities[i * 2], action[i]),
                 )
             )
 
@@ -54,13 +59,15 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
         scan = observation["laser_scan"]
         last_action = observation["last_action"]
 
-        right_lasers = scan[:self._lasers_right]
-        left_lasers = scan[self._lasers_right:]
+        right_lasers = scan[: self._lasers_right]
+        left_lasers = scan[self._lasers_right :]
 
-        lasers = np.hstack([
-            np.array(left_lasers), 
-            # np.full(self._missing_lasers, self._laser_max_range), 
-            np.array(right_lasers)]
+        lasers = np.hstack(
+            [
+                np.array(left_lasers),
+                # np.full(self._missing_lasers, self._laser_max_range),
+                np.array(right_lasers),
+            ]
         )
 
         ## Scale lasers to LASER_SCAN
@@ -69,10 +76,13 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
 
         return np.hstack(
             [
-                sampled_lasers, np.array([rho, theta]), last_action, self.max_velocities, self._radius
+                sampled_lasers,
+                np.array([rho, theta]),
+                last_action,
+                self.max_velocities,
+                self._radius,
             ]
         )
-
 
     def get_observation_space(self):
         return stack_spaces(
@@ -83,9 +93,7 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
                 dtype=np.float32,
             ),
             spaces.Box(low=0, high=15, shape=(1,), dtype=np.float32),
-            spaces.Box(
-                low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32
-            ),
+            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
             spaces.Box(
                 low=-2.0,
                 high=2.0,
@@ -101,15 +109,10 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
             spaces.Box(  ## All max velocities
                 low=-10,
                 high=10,
-                shape=(6,), # [-x, x, -y, y, -angle, angle]
-                dtype=np.float32
+                shape=(6,),  # [-x, x, -y, y, -angle, angle]
+                dtype=np.float32,
             ),
-            spaces.Box(  # Radius
-                low=0,
-                high=2,
-                shape=(1,),
-                dtype=np.float32
-            )
+            spaces.Box(low=0, high=2, shape=(1,), dtype=np.float32),  # Radius
         )
 
     def get_action_space(self):
@@ -126,7 +129,9 @@ class UniformSpaceEncoder(BaseSpaceEncoder):
         )
 
     def _get_max_velocity(self):
-        assert not self._is_action_space_discrete, "Discrete action space is not supported for uniform interface"
+        assert (
+            not self._is_action_space_discrete
+        ), "Discrete action space is not supported for uniform interface"
 
         linear_range = self._actions["linear_range"]
         angular_range = self._actions["angular_range"]

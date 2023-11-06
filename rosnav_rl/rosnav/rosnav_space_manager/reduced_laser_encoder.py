@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 import rospy
-from gym import spaces
+from gymnasium import spaces
 
 from ..utils.utils import stack_spaces
 from .base_space_encoder import BaseSpaceEncoder

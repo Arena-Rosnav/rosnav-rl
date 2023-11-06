@@ -6,7 +6,7 @@ import numpy as np
 import rospkg
 import rospy
 import yaml
-from gym import spaces
+from gymnasium import spaces
 from rosnav.utils.constants import RosnavEncoder
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
@@ -16,7 +16,9 @@ def get_robot_yaml_path(robot_model: str = None) -> str:
     robot_model = rospy.get_param(os.path.join(rospy.get_namespace(), "robot_model"))
 
     simulation_setup_path = rospkg.RosPack().get_path("arena-simulation-setup")
-    return os.path.join(simulation_setup_path, "robot", robot_model, f"model_params.yaml")
+    return os.path.join(
+        simulation_setup_path, "robot", robot_model, f"model_params.yaml"
+    )
 
 
 def get_laser_from_robot_yaml(robot_model: str = None) -> Tuple[int, int, int, int]:
@@ -50,7 +52,9 @@ def get_actions_from_robot_yaml(robot_model: str = None):
 
 
 def get_observation_space_from_file(robot_model: str = None) -> Tuple[int, int]:
-    robot_state_size, action_state_size = 2, rospy.get_param(rospy.get_namespace() + "action_state_size", 3)
+    robot_state_size, action_state_size = 2, rospy.get_param(
+        rospy.get_namespace() + "action_state_size", 3
+    )
     num_beams, _, _, _ = get_laser_from_robot_yaml(robot_model)
 
     num_beams = RosnavEncoder[get_robot_space_encoder()]["lasers_to_adapted"](num_beams)
@@ -87,7 +91,9 @@ def stack_stacked_spaces(*ss) -> spaces.Box:
         low.extend(space.low.tolist())
         high.extend(space.high.tolist())
 
-    return spaces.Box(np.expand_dims(np.array(low), axis=0), np.expand_dims(np.array(high), axis=0))
+    return spaces.Box(
+        np.expand_dims(np.array(low), axis=0), np.expand_dims(np.array(high), axis=0)
+    )
 
 
 def load_json(file_path: str) -> dict:
