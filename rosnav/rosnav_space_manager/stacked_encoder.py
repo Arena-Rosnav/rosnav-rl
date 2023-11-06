@@ -1,5 +1,5 @@
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 
 from ..utils.utils import stack_stacked_spaces
 from .default_encoder import DefaultEncoder
