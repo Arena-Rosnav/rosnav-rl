@@ -1,10 +1,9 @@
-from gym import spaces
 import numpy as np
+from gymnasium import spaces
 
 from ..utils.utils import stack_spaces
-from .encoder_factory import BaseSpaceEncoderFactory
 from .base_space_encoder import BaseSpaceEncoder
-
+from .encoder_factory import BaseSpaceEncoderFactory
 
 """
     This encoder offers a robot specific observation and action space
@@ -14,14 +13,24 @@ from .base_space_encoder import BaseSpaceEncoder
     Action space: X Vel, (Y Vel), Angular Vel
 
 """
+
+
 @BaseSpaceEncoderFactory.register("DefaultEncoder")
 class DefaultEncoder(BaseSpaceEncoder):
     def __init__(self, *args):
         super().__init__(*args)
 
     def decode_action(self, action):
+        # if (
+        #     self._is_action_space_discrete
+        #     and type(action) is list
+        #     or type(action) is np.ndarray
+        # ):
+        #     action = action[0]
+
         if self._is_action_space_discrete:
-            return self._translate_disc_action(action)
+            return self._extend_action_array(self._translate_disc_action(action))
+
         return self._extend_action_array(action)
 
     def _extend_action_array(self, action: np.ndarray) -> np.ndarray:
@@ -38,19 +47,20 @@ class DefaultEncoder(BaseSpaceEncoder):
             return np.array([action[0], 0, action[1]])
 
     def _translate_disc_action(self, action):
-        assert not self._is_holonomic, "Discrete action space currently not supported for holonomic robots"
-        
-        return np.array([
-            self._actions[action]["linear"], 
-            self._actions[action]["linear"]
-        ])
+        assert (
+            not self._is_holonomic
+        ), "Discrete action space currently not supported for holonomic robots"
+
+        return np.array(
+            [self._actions[action]["linear"], self._actions[action]["angular"]]
+        )
 
     def encode_observation(self, observation, structure):
         # rho, theta = observation["goal_in_robot_frame"]
         # scan = observation["laser_scan"]
         # last_action = observation["last_action"]
 
-        return np.hstack([observation[name] for name in structure])
+        return np.concatenate([observation[name] for name in structure], axis=0)
 
     def get_observation_space(self):
         return stack_spaces(
@@ -60,10 +70,8 @@ class DefaultEncoder(BaseSpaceEncoder):
                 shape=(self._laser_num_beams,),
                 dtype=np.float32,
             ),
-            spaces.Box(low=0, high=15, shape=(1,), dtype=np.float32),
-            spaces.Box(
-                low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32
-            ),
+            spaces.Box(low=0, high=20, shape=(1,), dtype=np.float32),
+            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
             spaces.Box(
                 low=-2.0,
                 high=2.0,
@@ -80,8 +88,8 @@ class DefaultEncoder(BaseSpaceEncoder):
 
     def get_action_space(self):
         if self._is_action_space_discrete:
-                # self._discrete_actions is a list, each element is a dict with the keys ["name", 'linear','angular']
-                return spaces.Discrete(len(self._actions))
+            # self._discrete_actions is a list, each element is a dict with the keys ["name", 'linear','angular']
+            return spaces.Discrete(len(self._actions))
 
         linear_range = self._actions["linear_range"]
         angular_range = self._actions["angular_range"]
@@ -97,7 +105,7 @@ class DefaultEncoder(BaseSpaceEncoder):
             linear_range["x"],
             linear_range["y"],
         )
-        
+
         return spaces.Box(
             low=np.array(
                 [
@@ -115,4 +123,3 @@ class DefaultEncoder(BaseSpaceEncoder):
             ),
             dtype=np.float32,
         )
-

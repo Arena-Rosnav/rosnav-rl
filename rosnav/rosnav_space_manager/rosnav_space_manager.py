@@ -1,6 +1,9 @@
 from .encoder_factory import BaseSpaceEncoderFactory
-from .default_encoder import *
-from .reduced_encoder import *
+from .default_encoder import DefaultEncoder
+from .reduced_encoder import ReducedEncoder
+from .stacked_encoder import StackedSpaceEncoder
+from .reduced_laser_encoder import ReducedLaserEncoder
+from .stacked_reduced_laser_encoder import StackedReducedLaserEncoder
 
 import rospy
 
@@ -12,20 +15,25 @@ import rospy
     Offers the action and observation space sizes
 """
 
+
 class RosnavSpaceManager:
     def __init__(self):
         self._laser_num_beams = rospy.get_param("laser/num_beams")
         self._laser_max_range = rospy.get_param("laser/range")
         self._radius = rospy.get_param("robot_radius")
         self._is_holonomic = rospy.get_param("is_holonomic")
-            
+
         encoder_name = rospy.get_param("space_encoder", "DefaultEncoder")
 
         is_action_space_discrete = rospy.get_param("is_action_space_discrete", False)
-        actions = rospy.get_param("actions/discrete") if is_action_space_discrete else rospy.get_param("actions/continuous")
+        actions = (
+            rospy.get_param("actions/discrete")
+            if is_action_space_discrete
+            else rospy.get_param("actions/continuous")
+        )
 
         self._encoder = BaseSpaceEncoderFactory.instantiate(
-            encoder_name, 
+            encoder_name,
             self._laser_num_beams,
             self._laser_max_range,
             self._radius,

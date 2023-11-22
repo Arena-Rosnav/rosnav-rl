@@ -1,5 +1,13 @@
 class BaseSpaceEncoder:
-    def __init__(self, laser_num_beams, laser_max_range, radius, is_holonomic, actions, is_action_space_discrete):
+    def __init__(
+        self,
+        laser_num_beams,
+        laser_max_range,
+        radius,
+        is_holonomic,
+        actions,
+        is_action_space_discrete,
+    ):
         self._laser_num_beams = laser_num_beams
         self._laser_max_range = laser_max_range
         self._radius = radius
