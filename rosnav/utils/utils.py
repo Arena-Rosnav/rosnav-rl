@@ -107,16 +107,11 @@ def load_yaml(file_path: str) -> dict:
 
 
 def make_mock_env(config: dict) -> DummyVecEnv:
-    import rl_utils.envs.flatland_gym_env as flatland_gym_env
+    import rl_utils.envs.flatland_gymnasium_env as flatland_gym_env
 
     def _init():
         return flatland_gym_env.FlatlandEnv(
-            ns="",
-            reward_fnc=config["reward_fnc"],
-            is_action_space_discrete=config["discrete_action_space"]
-            if "discrete_action_space" in config
-            else config["action_space"]["discrete"],
-            requires_task_manager=False,
+            ns="", reward_fnc=config["reward_fnc"], verbose=False
         )
 
     return DummyVecEnv([_init])
