@@ -1,7 +1,7 @@
 import os
 from typing import Tuple
 
-import gym
+import gymnasium as gym
 import rospkg
 import rospy
 import torch as th
@@ -9,7 +9,7 @@ import yaml
 from stable_baselines3.common.policies import BaseFeaturesExtractor
 from torch import nn
 
-from ..utils.utils import get_observation_space_from_file
+from rosnav.utils.utils import get_observation_space_from_file
 
 
 class EXTRACTOR_1(BaseFeaturesExtractor):
