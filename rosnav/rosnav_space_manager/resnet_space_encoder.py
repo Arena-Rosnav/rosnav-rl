@@ -76,6 +76,7 @@ class ResNetSpaceEncoder(DefaultEncoder):
 
     def get_observation_space(self):
         return stack_spaces(
+            # laser stack
             spaces.Box(
                 low=0,
                 high=self._roi_in_m,
@@ -185,8 +186,8 @@ class ResNetSpaceEncoder(DefaultEncoder):
             relative_pos = ResNetSpaceEncoder.get_relative_pos(
                 data.location, robot_pose
             )
-            index = self._get_map_index(np.array(relative_pos))
+            index = self._get_map_index(relative_pos)
             if 0 <= index[0] < map_size and 0 <= index[1] < map_size:
-                pos_map[tuple(index)] = data.evidence
+                pos_map[index] = data.evidence
 
         return pos_map
