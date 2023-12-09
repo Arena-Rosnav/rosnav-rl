@@ -85,7 +85,7 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
             ),
             # semantic info
             *(
-                ResNetSpaceEncoder.feature_map_observation_space[
+                SemanticResNetSpaceEncoder.feature_map_observation_space[
                     SemanticAttribute[obs_space.name]
                 ](self._feature_map_size)
                 for obs_space in self._semantic_info
@@ -183,7 +183,7 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
         map_size = pos_map.shape[0]
 
         for data in semantic_data:
-            relative_pos = ResNetSpaceEncoder.get_relative_pos(
+            relative_pos = SemanticResNetSpaceEncoder.get_relative_pos(
                 data.location, robot_pose
             )
             index = self._get_map_index(relative_pos)
