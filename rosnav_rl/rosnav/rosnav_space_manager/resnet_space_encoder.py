@@ -12,8 +12,8 @@ from .encoder_factory import BaseSpaceEncoderFactory
 from pedsim_agents.utils import SemanticAttribute
 
 
-@BaseSpaceEncoderFactory.register("ResNetEncoder")
-class ResNetSpaceEncoder(DefaultEncoder):
+@BaseSpaceEncoderFactory.register("SemanticResNetSpaceEncoder")
+class SemanticResNetSpaceEncoder(DefaultEncoder):
     feature_map_observation_space = {
         SemanticAttribute.IS_PEDESTRIAN: lambda map_size: spaces.Box(
             low=0,
