@@ -3,44 +3,20 @@ from typing import List, Tuple
 
 import numpy as np
 from gymnasium import spaces
+from pedsim_agents.utils import SemanticAttribute
+from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+
 from pedsim_msgs.msg import SemanticDatum
 
-from ..utils.utils import stack_spaces
+
+from ..utils.utils import stack_spaces, unpack_space
+from ..utils.observation_spaces import OBS_SPACES
 from .default_encoder import DefaultEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
-
-from pedsim_agents.utils import SemanticAttribute
 
 
 @BaseSpaceEncoderFactory.register("SemanticResNetSpaceEncoder")
 class SemanticResNetSpaceEncoder(DefaultEncoder):
-    feature_map_observation_space = {
-        SemanticAttribute.IS_PEDESTRIAN: lambda map_size: spaces.Box(
-            low=0,
-            high=1,
-            shape=(map_size * map_size,),
-            dtype=int,
-        ),
-        SemanticAttribute.PEDESTRIAN_TYPE: lambda map_size: spaces.Box(
-            low=0,
-            high=5,
-            shape=(map_size * map_size,),
-            dtype=int,
-        ),
-        SemanticAttribute.PEDESTRIAN_VEL_X: lambda map_size: spaces.Box(
-            low=-3.0,
-            high=3.0,
-            shape=(map_size * map_size,),
-            dtype=np.float32,
-        ),
-        SemanticAttribute.PEDESTRIAN_VEL_Y: lambda map_size: spaces.Box(
-            low=-6.0,
-            high=6.0,
-            shape=(map_size * map_size,),
-            dtype=np.float32,
-        ),
-    }
-
     def __init__(
         self,
         laser_num_beams,
@@ -64,17 +40,21 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
         self._laser_queue = deque()
         self._feature_map_size = feature_map_size
         self._roi_in_m = roi_in_m
-        self._grid_center = self._feature_map_size // 2
         self._laser_stack_size = laser_stack_size
 
+        self._basic_info = [OBS_DICT_KEYS.GOAL]
         self._semantic_info = [
             SemanticAttribute.IS_PEDESTRIAN,
             SemanticAttribute.PEDESTRIAN_TYPE,
-            SemanticAttribute.PEDESTRIAN_VEL_X,
-            SemanticAttribute.PEDESTRIAN_VEL_Y,
+            # SemanticAttribute.PEDESTRIAN_VEL_X,
+            # SemanticAttribute.PEDESTRIAN_VEL_Y,
         ]
 
     def get_observation_space(self):
+        basic_obs_spaces = []
+        for obs_space in self._basic_info:
+            basic_obs_spaces += unpack_space(*OBS_SPACES.BASIC[obs_space])
+
         return stack_spaces(
             # laser stack
             spaces.Box(
@@ -85,29 +65,13 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
             ),
             # semantic info
             *(
-                SemanticResNetSpaceEncoder.feature_map_observation_space[
-                    SemanticAttribute[obs_space.name]
-                ](self._feature_map_size)
+                OBS_SPACES.FEATURE_MAP[SemanticAttribute[obs_space.name]](
+                    self._feature_map_size
+                )
                 for obs_space in self._semantic_info
             ),
-            # goal distance
-            spaces.Box(low=0, high=30, shape=(1,), dtype=np.float32),
-            # goal angle
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
-            # linear vel
-            spaces.Box(
-                low=-2.0,
-                high=2.0,
-                shape=(2,),
-                dtype=np.float32,
-            ),
-            # angular vel
-            spaces.Box(
-                low=-4.0,
-                high=4.0,
-                shape=(1,),
-                dtype=np.float32,
-            ),
+            # basic info
+            *basic_obs_spaces,
         )
 
     def encode_observation(self, observation: dict, structure: list) -> np.ndarray:
@@ -116,14 +80,20 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
         )
 
         observation_maps = [
-            self._get_semantic_map(observation[sem_info.value], observation["odom"])
+            self._get_semantic_map(
+                observation[sem_info.value], observation["robot_pose"]
+            )
             for sem_info in self._semantic_info
         ]
 
         return np.concatenate(
             [laser_map.flatten()]
             + [obs_map.flatten() for obs_map in observation_maps]
-            + [observation[name] for name in structure if name != "laser_scan"],
+            + [
+                observation[name]
+                for name in structure
+                if name not in ["laser_scan", "last_action"]
+            ],
             axis=0,
         )
 
@@ -137,8 +107,12 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
 
     def _get_map_index(self, position: tuple) -> tuple:
         x, y, *_ = position
-        x = int((x / self._roi_in_m + 0.5) * self._feature_map_size)
-        y = int((y / self._roi_in_m + 0.5) * self._feature_map_size)
+        x = int((x / self._roi_in_m) * self._feature_map_size) + (
+            self._feature_map_size // 2 - 1
+        )
+        y = int((y / self._roi_in_m) * self._feature_map_size) + (
+            self._feature_map_size // 2 - 1
+        )
         x = min(max(x, 0), self._feature_map_size - 1)
         y = min(max(y, 0), self._feature_map_size - 1)
         return x, y
