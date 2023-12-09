@@ -9,8 +9,7 @@ import torch
 import yaml
 from gymnasium import spaces
 from rosnav.utils.constants import RosnavEncoder
-from stable_baselines3.common.vec_env import (DummyVecEnv, VecFrameStack,
-                                              VecNormalize)
+from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
 
@@ -74,6 +73,10 @@ def get_observation_space() -> Tuple[int, int]:
     return observation_space["lasers"], observation_space["meta"]
 
 
+def unpack_space(*os):
+    return [obs_space for obs_space in os]
+
+
 def stack_spaces(*ss) -> spaces.Box:
     low = []
     high = []
@@ -126,10 +129,11 @@ def wrap_vec_framestack(env: DummyVecEnv, stack_size: int) -> VecFrameStack:
 def load_vec_normalize(path: str, config: dict, venv: VecEnv = None) -> VecNormalize:
     return VecNormalize.load(path, venv or make_mock_env(config))
 
+
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
