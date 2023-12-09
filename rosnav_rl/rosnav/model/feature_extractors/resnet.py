@@ -466,7 +466,12 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
             torch.Tensor: Output tensor after forward pass
         """
         # preprocessing:
-        ped_pos = observations[:, :12800]
-        scan = observations[:, 12800:19200]
+        # scan_map = observations[:, :6400]
+        # ped_map = observations[:, 6400:32000]
+        # goal = observations[:, 32000:32002]
+        # last_action = observations[:, 32002:32005]
+
+        scan = observations[:, :6400]
+        ped_pos = observations[:, 6400:19200]
         goal = observations[:, 19200:]
         return self._forward_impl(ped_pos, scan, goal)
