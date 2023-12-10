@@ -672,3 +672,12 @@ class AGENT_57(BaseAgent):
 
     def __init__(self, robot_model: str = None):
         self.robot_model = robot_model
+
+
+@AgentFactory.register("BarnResNet")
+class BarnResNet(BaseAgent):
+    type = PolicyType.CNN
+    features_extractor_class = MID_FUSION_BOTTLENECK_EXTRACTOR_1
+    features_extractor_kwargs = {}
+    net_arch = [256, 64]
+    activation_fn = nn.ReLU

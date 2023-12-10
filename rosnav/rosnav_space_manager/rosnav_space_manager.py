@@ -4,6 +4,7 @@ from .reduced_encoder import ReducedEncoder
 from .stacked_encoder import StackedSpaceEncoder
 from .reduced_laser_encoder import ReducedLaserEncoder
 from .stacked_reduced_laser_encoder import StackedReducedLaserEncoder
+from .resnet_space_encoder import SemanticResNetSpaceEncoder
 
 import rospy
 
