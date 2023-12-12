@@ -73,34 +73,6 @@ def get_observation_space() -> Tuple[int, int]:
     return observation_space["lasers"], observation_space["meta"]
 
 
-def unpack_space(*os):
-    return [obs_space for obs_space in os]
-
-
-def stack_spaces(*ss) -> spaces.Box:
-    low = []
-    high = []
-
-    for space in ss:
-        low.extend(space.low.tolist())
-        high.extend(space.high.tolist())
-
-    return spaces.Box(np.array(low).flatten(), np.array(high).flatten())
-
-
-def stack_stacked_spaces(*ss) -> spaces.Box:
-    low = []
-    high = []
-
-    for space in ss:
-        low.extend(space.low.tolist())
-        high.extend(space.high.tolist())
-
-    return spaces.Box(
-        np.expand_dims(np.array(low), axis=0), np.expand_dims(np.array(high), axis=0)
-    )
-
-
 def load_json(file_path: str) -> dict:
     with open(file_path) as file:
         return json.load(file)
