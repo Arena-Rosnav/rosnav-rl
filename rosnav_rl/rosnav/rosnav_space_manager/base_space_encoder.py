@@ -1,12 +1,15 @@
 class BaseSpaceEncoder:
     def __init__(
         self,
-        laser_num_beams,
-        laser_max_range,
-        radius,
-        is_holonomic,
-        actions,
-        is_action_space_discrete,
+        laser_num_beams: int,
+        laser_max_range: float,
+        radius: float,
+        is_holonomic: bool,
+        actions: dict,
+        is_action_space_discrete: bool,
+        stacked: bool = False,
+        *args,
+        **kwargs
     ):
         self._laser_num_beams = laser_num_beams
         self._laser_max_range = laser_max_range
@@ -14,6 +17,7 @@ class BaseSpaceEncoder:
         self._is_holonomic = is_holonomic
         self._actions = actions
         self._is_action_space_discrete = is_action_space_discrete
+        self._stacked = stacked
 
     def get_observation_space(self):
         raise NotImplementedError()

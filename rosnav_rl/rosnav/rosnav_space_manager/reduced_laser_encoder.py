@@ -4,10 +4,11 @@ import numpy as np
 import rospy
 from gymnasium import spaces
 
-from ..utils.utils import stack_spaces
+from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
+from ..utils.observation_space.space_index import SPACE_FACTORY_KEYS
 from .base_space_encoder import BaseSpaceEncoder
-from .encoder_factory import BaseSpaceEncoderFactory
 from .default_encoder import DefaultEncoder
+from .encoder_factory import BaseSpaceEncoderFactory
 
 """
 
@@ -38,28 +39,23 @@ class ReducedLaserEncoder(DefaultEncoder):
         return super().encode_observation(observation, structure)
 
     def get_observation_space(self):
-        return stack_spaces(
-            spaces.Box(
-                low=0,
-                high=self._laser_max_range,
-                shape=(self._reduced_num_laser_beams,),
-                dtype=np.float32,
-            ),
-            spaces.Box(low=0, high=20, shape=(1,), dtype=np.float32),
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
-            spaces.Box(
-                low=-2.0,
-                high=2.0,
-                shape=(2,),
-                dtype=np.float32,  # linear vel
-            ),
-            spaces.Box(
-                low=-4.0,
-                high=4.0,
-                shape=(1,),
-                dtype=np.float32,  # angular vel
-            ),
-        )
+        return ObservationSpaceManager(
+            [
+                SPACE_FACTORY_KEYS.LASER.name,
+                SPACE_FACTORY_KEYS.GOAL.name,
+                SPACE_FACTORY_KEYS.LAST_ACTION.name,
+            ],
+            enable_frame_stacking=self._stacked,
+            space_kwargs={
+                "laser_num_beams": self._reduced_num_laser_beams,
+                "laser_max_range": self._laser_max_range,
+                "goal_max_dist": 20,
+                "min_linear_vel": -2.0,
+                "max_linear_vel": -2.0,
+                "min_angular_vel": -4.0,
+                "max_angular_vel": 4.0,
+            },
+        ).unified_observation_space
 
     @staticmethod
     def reduce_laserbeams(laserbeams: np.ndarray, x: int) -> np.ndarray:
