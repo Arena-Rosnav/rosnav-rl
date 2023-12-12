@@ -2,15 +2,14 @@ from collections import deque
 from typing import List, Tuple
 
 import numpy as np
-from gymnasium import spaces
-from pedsim_agents.utils import SemanticAttribute
+from pedsim_msgs.msg import SemanticDatum
 from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
-from pedsim_msgs.msg import SemanticDatum
-
-
-from ..utils.utils import stack_spaces, unpack_space
-from ..utils.observation_spaces import OBS_SPACES
+from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
+from ..utils.observation_space.space_index import (
+    OBS_SPACE_TO_OBS_DICT_KEY,
+    SPACE_FACTORY_KEYS,
+)
 from .default_encoder import DefaultEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
 
@@ -19,81 +18,65 @@ from .encoder_factory import BaseSpaceEncoderFactory
 class SemanticResNetSpaceEncoder(DefaultEncoder):
     def __init__(
         self,
-        laser_num_beams,
-        laser_max_range,
-        radius,
-        is_holonomic,
-        actions,
-        is_action_space_discrete,
+        radius: float,
+        is_holonomic: bool,
+        actions: dict,
+        is_action_space_discrete: bool,
         feature_map_size: int = 80,
         roi_in_m: int = 20,
         laser_stack_size: int = 10,
+        stacked: bool = False,
+        *args,
+        **kwargs
     ):
         super().__init__(
-            laser_num_beams,
-            laser_max_range,
-            radius,
-            is_holonomic,
-            actions,
-            is_action_space_discrete,
+            radius=radius,
+            is_holonomic=is_holonomic,
+            actions=actions,
+            is_action_space_discrete=is_action_space_discrete,
+            stacked=stacked,
+            **kwargs
         )
         self._laser_queue = deque()
         self._feature_map_size = feature_map_size
         self._roi_in_m = roi_in_m
         self._laser_stack_size = laser_stack_size
 
-        self._basic_info = [OBS_DICT_KEYS.GOAL]
-        self._semantic_info = [
-            SemanticAttribute.IS_PEDESTRIAN,
-            SemanticAttribute.PEDESTRIAN_TYPE,
-            # SemanticAttribute.PEDESTRIAN_VEL_X,
-            # SemanticAttribute.PEDESTRIAN_VEL_Y,
-        ]
+        self._observation_space_manager = ObservationSpaceManager(
+            [
+                SPACE_FACTORY_KEYS.STACKED_LASER_MAP.name,
+                SPACE_FACTORY_KEYS.PEDESTRIAN_LOCATION.name,
+                SPACE_FACTORY_KEYS.PEDESTRIAN_TYPE.name,
+                SPACE_FACTORY_KEYS.GOAL.name,
+            ],
+            enable_frame_stacking=self._stacked,
+            space_kwargs={
+                "roi_in_m": self._roi_in_m,
+                "feature_map_size": self._feature_map_size,
+                "goal_max_dist": 20,
+            },
+        )
 
     def get_observation_space(self):
-        basic_obs_spaces = []
-        for obs_space in self._basic_info:
-            basic_obs_spaces += unpack_space(*OBS_SPACES.BASIC[obs_space])
-
-        return stack_spaces(
-            # laser stack
-            spaces.Box(
-                low=0,
-                high=self._roi_in_m,
-                shape=(self._feature_map_size * self._feature_map_size,),
-                dtype=int,
-            ),
-            # semantic info
-            *(
-                OBS_SPACES.FEATURE_MAP[SemanticAttribute[obs_space.name]](
-                    self._feature_map_size
-                )
-                for obs_space in self._semantic_info
-            ),
-            # basic info
-            *basic_obs_spaces,
-        )
+        return self._observation_space_manager.unified_observation_space
 
     def encode_observation(self, observation: dict, structure: list) -> np.ndarray:
         laser_map = self._process_laser_scan(
-            observation["laser_scan"], observation.get("is_done", False)
+            observation[OBS_DICT_KEYS.LASER], observation.get("is_done", False)
         )
 
         observation_maps = [
             self._get_semantic_map(
-                observation[sem_info.value], observation["robot_pose"]
+                observation[OBS_SPACE_TO_OBS_DICT_KEY[space]],
+                observation[OBS_DICT_KEYS.ROBOT_POSE],
             )
-            for sem_info in self._semantic_info
+            for space in self._observation_space_manager.space_list
         ]
 
         return np.concatenate(
             [laser_map.flatten()]
             + [obs_map.flatten() for obs_map in observation_maps]
-            + [
-                observation[name]
-                for name in structure
-                if name not in ["laser_scan", "last_action"]
-            ],
+            + [observation[name] for name in structure if name not in ["last_action"]],
             axis=0,
         )
 
@@ -123,12 +106,16 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
     def _build_laser_map(self, laser_queue) -> np.ndarray:
         laser_array = np.array(laser_queue)
         # laserstack list of 10 np.arrays of shape (720,)
-        scan_avg = np.zeros((20, 80))
+        scan_avg = np.zeros((20, self._feature_map_size))
         # horizontal stacking of the pooling operations
         # min pooling over every 9th entry
-        scan_avg[::2, :] = np.min(laser_array.reshape(10, 80, 9), axis=2)
+        scan_avg[::2, :] = np.min(
+            laser_array.reshape(10, self._feature_map_size, 9), axis=2
+        )
         # avg pooling over every 9th entry
-        scan_avg[1::2, :] = np.mean(laser_array.reshape(10, 80, 9), axis=2)
+        scan_avg[1::2, :] = np.mean(
+            laser_array.reshape(10, self._feature_map_size, 9), axis=2
+        )
 
         scan_avg_map = np.tile(scan_avg.ravel(), 4).reshape(
             (self._feature_map_size, self._feature_map_size)
