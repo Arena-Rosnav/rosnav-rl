@@ -1,7 +1,8 @@
 import numpy as np
 from gymnasium import spaces
 
-from ..utils.utils import stack_spaces
+from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
+from ..utils.observation_space.space_index import SPACE_FACTORY_KEYS
 from .base_space_encoder import BaseSpaceEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
 
@@ -17,16 +18,12 @@ from .encoder_factory import BaseSpaceEncoderFactory
 
 @BaseSpaceEncoderFactory.register("DefaultEncoder")
 class DefaultEncoder(BaseSpaceEncoder):
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args)
 
     def decode_action(self, action):
-        # if (
-        #     self._is_action_space_discrete
-        #     and type(action) is list
-        #     or type(action) is np.ndarray
-        # ):
-        #     action = action[0]
+        if self._stacked:
+            action = action[0] if action.ndim == 2 else action
 
         if self._is_action_space_discrete:
             return self._extend_action_array(self._translate_disc_action(action))
@@ -60,31 +57,29 @@ class DefaultEncoder(BaseSpaceEncoder):
         # scan = observation["laser_scan"]
         # last_action = observation["last_action"]
 
-        return np.concatenate([observation[name] for name in structure], axis=0)
+        obs = np.concatenate([observation[name] for name in structure], axis=0)
+        if self._stacked:
+            return np.expand_dims(obs, 0)
+        return obs
 
     def get_observation_space(self):
-        return stack_spaces(
-            spaces.Box(
-                low=0,
-                high=self._laser_max_range,
-                shape=(self._laser_num_beams,),
-                dtype=np.float32,
-            ),
-            spaces.Box(low=0, high=20, shape=(1,), dtype=np.float32),
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
-            spaces.Box(
-                low=-2.0,
-                high=2.0,
-                shape=(2,),
-                dtype=np.float32,  # linear vel
-            ),
-            spaces.Box(
-                low=-4.0,
-                high=4.0,
-                shape=(1,),
-                dtype=np.float32,  # angular vel
-            ),
-        )
+        return ObservationSpaceManager(
+            [
+                SPACE_FACTORY_KEYS.LASER.name,
+                SPACE_FACTORY_KEYS.GOAL.name,
+                SPACE_FACTORY_KEYS.LAST_ACTION.name,
+            ],
+            enable_frame_stacking=self._stacked,
+            space_kwargs={
+                "laser_num_beams": self._laser_num_beams,
+                "laser_max_range": self._laser_max_range,
+                "goal_max_dist": 20,
+                "min_linear_vel": -2.0,
+                "max_linear_vel": -2.0,
+                "min_angular_vel": -4.0,
+                "max_angular_vel": 4.0,
+            },
+        ).unified_observation_space
 
     def get_action_space(self):
         if self._is_action_space_discrete:
