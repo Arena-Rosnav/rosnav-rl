@@ -14,6 +14,7 @@ Details:
     - The feature extractor takes input observations and performs a series of convolutional and 
         batch normalization operations, followed by fusion and goal networks to extract features.
 """
+import rospy
 import gymnasium as gym
 import torch
 import torch.nn as nn
@@ -181,6 +182,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
             observation_space (gym.spaces.Box): Observation space of the environment
             features_dim (int, optional): Number of features extracted. Defaults to 256.
         """
+        rospy.set_param("rl_agent/resnet", True)
         # network parameters:
         block = Bottleneck
         layers = [2, 1, 1]
