@@ -7,6 +7,7 @@ from .space_index import SPACE_FACTORY_KEYS
 from .spaces.base.goal_space import GoalSpace
 from .spaces.base.laser_space import LaserScanSpace
 from .spaces.base.last_action_space import LastActionSpace
+from .spaces.feature_maps.stacked_laser_map_space import StackedLaserMapSpace
 from .spaces.feature_maps.pedestrian_location_space import PedestrianLocationSpace
 from .spaces.feature_maps.pedestrian_type_space import PedestrianTypeSpace
 from .spaces.feature_maps.pedestrian_vel_x_space import PedestrianVelXSpace
