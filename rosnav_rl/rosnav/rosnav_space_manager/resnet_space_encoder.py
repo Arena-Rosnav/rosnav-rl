@@ -54,6 +54,7 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
                 "roi_in_m": self._roi_in_m,
                 "feature_map_size": self._feature_map_size,
                 "goal_max_dist": 20,
+                **kwargs,
             },
         )
 
