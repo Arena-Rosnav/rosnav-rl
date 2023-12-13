@@ -7,9 +7,9 @@ from ..base_observation_space import BaseObservationSpace
 
 @SpaceFactory.register("ped_type")
 class PedestrianTypeSpace(BaseObservationSpace):
-    def __init__(self, feature_map_size: int, num_types: int, *args, **kwargs) -> None:
+    def __init__(self, feature_map_size: int, num_ped_types: int, *args, **kwargs) -> None:
         self._map_size = feature_map_size
-        self._num_types = num_types
+        self._num_types = num_ped_types
 
     def get_gym_space(self) -> spaces.Space:
         return spaces.Box(

@@ -22,6 +22,8 @@ class RosnavSpaceManager:
         self._radius = rospy.get_param("robot_radius")
         self._is_holonomic = rospy.get_param("is_holonomic")
 
+        self._num_ped_types = 5
+
         is_action_space_discrete = rospy.get_param(
             "rl_agent/action_space/discrete", False
         )
@@ -37,6 +39,7 @@ class RosnavSpaceManager:
             encoder_name,
             laser_num_beams=self._laser_num_beams,
             laser_max_range=self._laser_max_range,
+            num_ped_types=self._num_ped_types,
             radius=self._radius,
             is_holonomic=self._is_holonomic,
             actions=actions,
@@ -45,6 +48,7 @@ class RosnavSpaceManager:
         )
 
     def _determine_encoder_name(self) -> str:
+        return "SemanticResNetSpaceEncoder"
         if rospy.get_param("rl_agent/reduce_num_beams/enabled", False):
             return "ReducedLaserEncoder"
         if rospy.get_param("rl_agent/resnet", False):
