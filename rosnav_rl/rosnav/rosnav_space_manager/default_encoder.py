@@ -19,7 +19,7 @@ from .encoder_factory import BaseSpaceEncoderFactory
 @BaseSpaceEncoderFactory.register("DefaultEncoder")
 class DefaultEncoder(BaseSpaceEncoder):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args)
+        super().__init__(**kwargs)
 
     def decode_action(self, action):
         if self._stacked:

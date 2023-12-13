@@ -24,8 +24,8 @@ from .encoder_factory import BaseSpaceEncoderFactory
 
 @BaseSpaceEncoderFactory.register("ReducedLaserEncoder")
 class ReducedLaserEncoder(DefaultEncoder):
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(**kwargs)
         self._reduced_num_laser_beams = rospy.get_param(
             "laser/reduced_num_laser_beams", self._laser_num_beams
         )
