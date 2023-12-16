@@ -4,9 +4,9 @@ class BaseSpaceEncoder:
         laser_num_beams: int,
         laser_max_range: float,
         radius: float,
-        is_holonomic: bool,
+        holonomic: bool,
         actions: dict,
-        is_action_space_discrete: bool,
+        action_space_discrete: bool,
         stacked: bool = False,
         *args,
         **kwargs
@@ -14,19 +14,21 @@ class BaseSpaceEncoder:
         self._laser_num_beams = laser_num_beams
         self._laser_max_range = laser_max_range
         self._radius = radius
-        self._is_holonomic = is_holonomic
+        self._is_holonomic = holonomic
         self._actions = actions
-        self._is_action_space_discrete = is_action_space_discrete
+        self._is_action_space_discrete = action_space_discrete
         self._stacked = stacked
 
-    def get_observation_space(self):
+    @property
+    def observation_space(self):
         raise NotImplementedError()
 
-    def get_action_space(self):
+    @property
+    def action_space(self):
         raise NotImplementedError()
 
     def decode_action(self, action):
         raise NotImplementedError()
 
-    def encode_observation(self, observation, structure):
+    def encode_observation(self):
         raise NotImplementedError()
