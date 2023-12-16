@@ -1,6 +1,9 @@
 from enum import Enum
 from typing import List, Type, Union
 
+from rosnav.utils.observation_space.observation_space_manager import (
+    ObservationSpaceManager,
+)
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
@@ -13,6 +16,7 @@ class PolicyType(Enum):
 
 # Parsed as ppo_kwargs to sb3 ppo class
 BASE_AGENT_ATTR = {
+    "observation_space_manager": ObservationSpaceManager,
     "features_extractor_class": Union[Type[BaseFeaturesExtractor], None],
     "features_extractor_kwargs": Union[dict, None],
     "net_arch": Union[List[Union[int, dict]], None],

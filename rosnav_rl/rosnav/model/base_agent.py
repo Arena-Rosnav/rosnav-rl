@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import List, Type
 
+from rosnav.utils.observation_space.observation_space_manager import (
+    ObservationSpaceManager,
+)
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
@@ -13,9 +16,6 @@ class BaseAgent(ABC):
     The architecture of the eventual policy is determined by the
     'policy_kwargs' of the SB3 RL algorithm.
     """
-
-    def __init__(self):
-        pass
 
     @property
     @abstractmethod

@@ -9,7 +9,9 @@ import yaml
 from stable_baselines3.common.policies import BaseFeaturesExtractor
 from torch import nn
 
-from rosnav.utils.utils import get_observation_space_from_file
+from rosnav.utils.observation_space.observation_space_manager import (
+    ObservationSpaceManager,
+)
 
 
 class EXTRACTOR_1(BaseFeaturesExtractor):
@@ -29,14 +31,21 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
     def __init__(
         self,
         observation_space: gym.spaces.Box,
+        observation_manager: ObservationSpaceManager,
         robot_model: str = None,
         features_dim: int = 128,
     ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._l, self._goal, self._last_action = (
+            observation_manager["laser"].shape[0],
+            observation_manager["goal"].shape[0],
+            observation_manager["last_action"].shape[0],
+        )
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
+
         super(EXTRACTOR_1, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
+            observation_space,
+            features_dim + (self._goal + self._last_action) * self.num_stacks,
         )
 
         self.cnn = nn.Sequential(
@@ -66,44 +75,58 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
         :return: (th.Tensor) features,
             extracted features by the network
         """
+        _robot_state = self._goal + self._last_action
         if not self._stacked:
             # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
+            laser_scan = th.unsqueeze(observations[:, :-_robot_state], 1)
+            robot_state = observations[:, -_robot_state:]
 
             extracted_features = self.fc(self.cnn(laser_scan))
             return th.cat((extracted_features, robot_state), 1)
         else:
             # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
+            laser_scan = observations[:, :, :-_robot_state]
+            robot_state = observations[:, :, -_robot_state:].squeeze(0)
 
             extracted_features = self.fc(self.cnn(laser_scan))
             return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
 
 
-class EXTRACTOR_2(BaseFeaturesExtractor):
+class EXTRACTOR_2(EXTRACTOR_1):
     """
     Custom Convolutional Neural Network to serve as feature extractor ahead of the policy and value network.
     Architecture was taken as reference from: https://arxiv.org/abs/1808.03841
-    (DRLself._lOCAL_PLANNER)
 
     :param observation_space: (gym.Space)
     :param features_dim: (int) Number of features extracted.
         This corresponds to the number of unit for the last layer.
+
+    Note:
+        self._rs: Robot state size - placeholder for robot related inputs to the NN
+        self._l: Number of laser beams - placeholder for the laser beam data
     """
 
     def __init__(
         self,
         observation_space: gym.spaces.Box,
+        observation_manager: ObservationSpaceManager,
         robot_model: str = None,
         features_dim: int = 128,
     ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._l, self._goal, self._last_action = (
+            observation_manager["laser"].shape[0],
+            observation_manager["goal"].shape[0],
+            observation_manager["last_action"].shape[0],
+        )
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_2, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
+
+        super().__init__(
+            observation_space=observation_space,
+            observation_manager=observation_manager,
+            robot_model=robot_model,
+            features_dim=features_dim
+            + (self._goal + self._last_action) * self.num_stacks,
         )
 
         self.cnn = nn.Sequential(
@@ -125,58 +148,56 @@ class EXTRACTOR_2(BaseFeaturesExtractor):
             nn.ReLU(),
         )
 
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
 
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-        if not self._stacked:
-            # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
-        else:
-            # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
-
-
-class EXTRACTOR_3(BaseFeaturesExtractor):
+class EXTRACTOR_3(EXTRACTOR_1):
     """
     Custom Convolutional Neural Network to serve as feature extractor ahead of the policy and value network.
+    Architecture was taken as reference from: https://arxiv.org/abs/1808.03841
 
     :param observation_space: (gym.Space)
     :param features_dim: (int) Number of features extracted.
         This corresponds to the number of unit for the last layer.
+
+    Note:
+        self._rs: Robot state size - placeholder for robot related inputs to the NN
+        self._l: Number of laser beams - placeholder for the laser beam data
     """
 
     def __init__(
         self,
         observation_space: gym.spaces.Box,
+        observation_manager: ObservationSpaceManager,
         robot_model: str = None,
         features_dim: int = 128,
     ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._l, self._goal, self._last_action = (
+            observation_manager["laser"].shape[0],
+            observation_manager["goal"].shape[0],
+            observation_manager["last_action"].shape[0],
+        )
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_3, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
+
+        super().__init__(
+            observation_space=observation_space,
+            observation_manager=observation_manager,
+            robot_model=robot_model,
+            features_dim=features_dim
+            + (self._goal + self._last_action) * self.num_stacks,
+        )
+
+        self.cnn = nn.Sequential(
+            nn.Conv1d(1, 32, 5, 2),
+            nn.ReLU(),
+            nn.Conv1d(32, 32, 3, 2),
+            nn.ReLU(),
+            nn.Flatten(),
         )
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            # tensor_forward = th.as_tensor(observation_space.sample()[None]).float()
-            tensor_forward = th.randn(1, 1, self._l)
+            desired_shape = (1, self.num_stacks, self._l)
+            tensor_forward = th.randn(desired_shape)
             n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc = nn.Sequential(
@@ -186,54 +207,42 @@ class EXTRACTOR_3(BaseFeaturesExtractor):
             nn.ReLU(),
         )
 
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
 
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-        if not self._stacked:
-            # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
-        else:
-            # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
-
-
-class EXTRACTOR_4(BaseFeaturesExtractor):
+class EXTRACTOR_4(EXTRACTOR_1):
     """
-    Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
-    Architecture was taken as reference from: https://github.com/ethz-asl/navrep
-    (CNN_NAVREP)
+    Custom Convolutional Neural Network to serve as feature extractor ahead of the policy and value network.
+    Architecture was taken as reference from: https://arxiv.org/abs/1808.03841
 
     :param observation_space: (gym.Space)
     :param features_dim: (int) Number of features extracted.
         This corresponds to the number of unit for the last layer.
+
+    Note:
+        self._rs: Robot state size - placeholder for robot related inputs to the NN
+        self._l: Number of laser beams - placeholder for the laser beam data
     """
 
     def __init__(
         self,
         observation_space: gym.spaces.Box,
+        observation_manager: ObservationSpaceManager,
         robot_model: str = None,
-        features_dim: int = 32,
+        features_dim: int = 128,
     ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._l, self._goal, self._last_action = (
+            observation_manager["laser"].shape[0],
+            observation_manager["goal"].shape[0],
+            observation_manager["last_action"].shape[0],
+        )
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_4, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
+
+        super().__init__(
+            observation_space=observation_space,
+            observation_manager=observation_manager,
+            robot_model=robot_model,
+            features_dim=features_dim
+            + (self._goal + self._last_action) * self.num_stacks,
         )
 
         self.cnn = nn.Sequential(
@@ -257,52 +266,42 @@ class EXTRACTOR_4(BaseFeaturesExtractor):
             nn.ReLU(),
         )
 
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
 
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-        if not self._stacked:
-            # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
-        else:
-            # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
-
-
-class EXTRACTOR_5(BaseFeaturesExtractor):
+class EXTRACTOR_5(EXTRACTOR_1):
     """
-    Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
+    Custom Convolutional Neural Network to serve as feature extractor ahead of the policy and value network.
+    Architecture was taken as reference from: https://arxiv.org/abs/1808.03841
 
     :param observation_space: (gym.Space)
     :param features_dim: (int) Number of features extracted.
         This corresponds to the number of unit for the last layer.
+
+    Note:
+        self._rs: Robot state size - placeholder for robot related inputs to the NN
+        self._l: Number of laser beams - placeholder for the laser beam data
     """
 
     def __init__(
         self,
         observation_space: gym.spaces.Box,
+        observation_manager: ObservationSpaceManager,
         robot_model: str = None,
-        features_dim: int = 32,
+        features_dim: int = 128,
     ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._l, self._goal, self._last_action = (
+            observation_manager["laser"].shape[0],
+            observation_manager["goal"].shape[0],
+            observation_manager["last_action"].shape[0],
+        )
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_5, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
+
+        super().__init__(
+            observation_space=observation_space,
+            observation_manager=observation_manager,
+            robot_model=robot_model,
+            features_dim=features_dim
+            + (self._goal + self._last_action) * self.num_stacks,
         )
 
         self.cnn = nn.Sequential(
@@ -326,33 +325,8 @@ class EXTRACTOR_5(BaseFeaturesExtractor):
             nn.ReLU(),
         )
 
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
 
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-        if not self._stacked:
-            # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
-        else:
-            # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
-
-
-class EXTRACTOR_6(BaseFeaturesExtractor):
+class EXTRACTOR_6(EXTRACTOR_1):
     """
     Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
 
@@ -364,14 +338,24 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
     def __init__(
         self,
         observation_space: gym.spaces.Box,
+        observation_manager: ObservationSpaceManager,
         robot_model: str = None,
-        features_dim: int = 32,
+        features_dim: int = 128,
     ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._l, self._goal, self._last_action = (
+            observation_manager["laser"].shape[0],
+            observation_manager["goal"].shape[0],
+            observation_manager["last_action"].shape[0],
+        )
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_6, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
+
+        super().__init__(
+            observation_space=observation_space,
+            observation_manager=observation_manager,
+            robot_model=robot_model,
+            features_dim=features_dim
+            + (self._goal + self._last_action) * self.num_stacks,
         )
 
         self.cnn = nn.Sequential(
@@ -395,33 +379,8 @@ class EXTRACTOR_6(BaseFeaturesExtractor):
             nn.ReLU(),
         )
 
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
 
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-        if not self._stacked:
-            # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
-        else:
-            # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
-
-
-class EXTRACTOR_7(BaseFeaturesExtractor):
+class EXTRACTOR_7(EXTRACTOR_1):
     """
     Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
 
@@ -433,14 +392,24 @@ class EXTRACTOR_7(BaseFeaturesExtractor):
     def __init__(
         self,
         observation_space: gym.spaces.Box,
+        observation_manager: ObservationSpaceManager,
         robot_model: str = None,
-        features_dim: int = 32,
+        features_dim: int = 128,
     ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._l, self._goal, self._last_action = (
+            observation_manager["laser"].shape[0],
+            observation_manager["goal"].shape[0],
+            observation_manager["last_action"].shape[0],
+        )
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_7, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
+
+        super().__init__(
+            observation_space=observation_space,
+            observation_manager=observation_manager,
+            robot_model=robot_model,
+            features_dim=features_dim
+            + (self._goal + self._last_action) * self.num_stacks,
         )
 
         self.cnn = nn.Sequential(
@@ -464,39 +433,8 @@ class EXTRACTOR_7(BaseFeaturesExtractor):
             nn.ReLU(),
         )
 
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
 
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-        if not self._stacked:
-            # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
-        else:
-            # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-
-            if robot_state.ndim > 2:  # in case of batched
-                robot_state = robot_state.flatten(start_dim=1)
-                return th.cat((extracted_features, robot_state), 1)
-            else:
-                robot_state = robot_state.flatten().unsqueeze(0)
-                return th.cat((extracted_features, robot_state), 1)
-
-
-class EXTRACTOR_7(BaseFeaturesExtractor):
+class EXTRACTOR_8(EXTRACTOR_1):
     """
     Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
 
@@ -508,89 +446,24 @@ class EXTRACTOR_7(BaseFeaturesExtractor):
     def __init__(
         self,
         observation_space: gym.spaces.Box,
+        observation_manager: ObservationSpaceManager,
         robot_model: str = None,
-        features_dim: int = 32,
+        features_dim: int = 128,
     ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
+        self._l, self._goal, self._last_action = (
+            observation_manager["laser"].shape[0],
+            observation_manager["goal"].shape[0],
+            observation_manager["last_action"].shape[0],
+        )
         self._stacked = len(observation_space.shape) > 1
         self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_7, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
-        )
 
-        self.cnn = nn.Sequential(
-            nn.Conv1d(self.num_stacks, 32, 8, 4),
-            nn.ReLU(),
-            nn.Conv1d(32, 64, 4, 2),
-            nn.ReLU(),
-            nn.Conv1d(64, 64, 3, 1),
-            nn.ReLU(),
-            nn.Flatten(),
-        )
-
-        # Compute shape by doing one forward pass
-        with th.no_grad():
-            desired_shape = (1, self.num_stacks, self._l)
-            tensor_forward = th.randn(desired_shape)
-            n_flatten = self.cnn(tensor_forward).shape[1]
-
-        self.fc = nn.Sequential(
-            nn.Linear(n_flatten, features_dim),
-            nn.ReLU(),
-        )
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
-
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-        if not self._stacked:
-            # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
-        else:
-            # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-
-            if robot_state.ndim > 2:  # in case of batched
-                robot_state = robot_state.flatten(start_dim=1)
-                return th.cat((extracted_features, robot_state), 1)
-            else:
-                robot_state = robot_state.flatten().unsqueeze(0)
-                return th.cat((extracted_features, robot_state), 1)
-
-
-class EXTRACTOR_8(BaseFeaturesExtractor):
-    """
-    Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
-
-    :param observation_space: (gym.Space)
-    :param features_dim: (int) Number of features extracted.
-        This corresponds to the number of unit for the last layer.
-    """
-
-    def __init__(
-        self,
-        observation_space: gym.spaces.Box,
-        robot_model: str = None,
-        features_dim: int = 32,
-    ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
-        self._stacked = len(observation_space.shape) > 1
-        self.num_stacks = observation_space.shape[0] if self._stacked else 1
-        super(EXTRACTOR_8, self).__init__(
-            observation_space, features_dim + self._rs * self.num_stacks
+        super().__init__(
+            observation_space=observation_space,
+            observation_manager=observation_manager,
+            robot_model=robot_model,
+            features_dim=features_dim
+            + (self._goal + self._last_action) * self.num_stacks,
         )
 
         self.cnn = nn.Sequential(
@@ -616,61 +489,3 @@ class EXTRACTOR_8(BaseFeaturesExtractor):
             nn.Linear(n_flatten, features_dim),
             nn.ReLU(),
         )
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
-
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-        if not self._stacked:
-            # observations in shape [batch_size, obs_size]
-            laser_scan = th.unsqueeze(observations[:, : -self._rs], 1)
-            robot_state = observations[:, -self._rs :]
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
-        else:
-            # observations in shape [batch_size, num_stacks, obs_size]
-            laser_scan = observations[:, :, : -self._rs]
-            robot_state = observations[:, :, -self._rs :].squeeze(0)
-
-            extracted_features = self.fc(self.cnn(laser_scan))
-
-            if robot_state.ndim > 2:  # in case of batched
-                robot_state = robot_state.flatten(start_dim=1)
-                return th.cat((extracted_features, robot_state), 1)
-            else:
-                robot_state = robot_state.flatten().unsqueeze(0)
-                return th.cat((extracted_features, robot_state), 1)
-
-
-class UNIFIED_SPACE_EXTRACTOR(BaseFeaturesExtractor):
-    def __init__(
-        self,
-        observation_space: gym.spaces.Box,
-        robot_model: str = None,
-        features_dim: int = 32,
-    ):
-        self._l, self._rs = get_observation_space_from_file(robot_model)
-        super().__init__(observation_space, features_dim)
-
-        self.model = nn.Sequential(
-            nn.Linear(observation_space.shape[0], 512),
-            nn.ReLU(),
-            nn.Linear(512, features_dim),
-        )
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        """
-        :return: (th.Tensor) features,
-            extracted features by the network
-        """
-
-        # obs = th.unsqueeze(observations, 0)
-
-        return self.model(observations)
