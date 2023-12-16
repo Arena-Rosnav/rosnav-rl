@@ -2,10 +2,13 @@ from typing import Tuple
 
 import numpy as np
 from gymnasium import spaces
+from numpy import ndarray
 
 from ...observation_space_factory import SpaceFactory
 from ...utils import stack_spaces
 from ..base_observation_space import BaseObservationSpace
+
+from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 
 @SpaceFactory.register("last_action")
@@ -27,6 +30,7 @@ class LastActionSpace(BaseObservationSpace):
         self._max_translational_vel = max_translational_vel
         self._min_angular_vel = min_angular_vel
         self._max_angular_vel = max_angular_vel
+        super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> Tuple[spaces.Space, ...]:
         _spaces = (
@@ -50,3 +54,6 @@ class LastActionSpace(BaseObservationSpace):
             ),
         )
         return stack_spaces(*_spaces)
+
+    def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
+        return observation[OBS_DICT_KEYS.LAST_ACTION]
