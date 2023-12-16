@@ -33,22 +33,29 @@ class RosnavSpaceManager:
             else rospy.get_param("actions/continuous")
         )
 
-        encoder_name = self._determine_encoder_name()
-
         self._encoder = BaseSpaceEncoderFactory.instantiate(
-            encoder_name,
-            laser_num_beams=self._laser_num_beams,
-            laser_max_range=self._laser_max_range,
-            num_ped_types=self._num_ped_types,
-            radius=self._radius,
-            is_holonomic=self._is_holonomic,
-            actions=actions,
-            is_action_space_discrete=is_action_space_discrete,
-            stacked=self._stacked,
+            self._determine_encoder_name(),
+            action_space_kwargs={
+                "radius": self._radius,
+                "holonomic": self._is_holonomic,
+                "action_space_discrete": is_action_space_discrete,
+                "actions": actions,
+                "stacked": self._stacked,
+            },
+            observation_list=None,  # use default_observation_list
+            observation_kwargs={
+                "min_linear_vel": -2.0,
+                "max_linear_vel": 2.0,
+                "min_angular_vel": -4.0,
+                "max_angular_vel": 4.0,
+                "laser_num_beams": self._laser_num_beams,
+                "laser_max_range": self._laser_max_range,
+                "num_ped_types": self._num_ped_types,
+            },
         )
 
     def _determine_encoder_name(self) -> str:
-        return "SemanticResNetSpaceEncoder"
+        # return "SemanticResNetSpaceEncoder"
         if rospy.get_param("rl_agent/reduce_num_beams/enabled", False):
             return "ReducedLaserEncoder"
         if rospy.get_param("rl_agent/resnet", False):
@@ -56,13 +63,17 @@ class RosnavSpaceManager:
         else:
             return "DefaultEncoder"
 
+    @property
+    def observation_space_manager(self):
+        return self._encoder.observation_space_manager
+
     def get_observation_space(self):
-        return self._encoder.get_observation_space()
+        return self._encoder.observation_space
 
     def get_action_space(self):
-        return self._encoder.get_action_space()
+        return self._encoder.action_space
 
-    def encode_observation(self, observation, structure):
+    def encode_observation(self, observation, structure=None):
         encoded_obs = self._encoder.encode_observation(observation, structure)
 
         return encoded_obs
