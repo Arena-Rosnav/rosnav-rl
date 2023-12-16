@@ -1,27 +1,32 @@
 from enum import Enum
-from pedsim_agents.utils import SemanticAttribute
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+
+from ..observation_space.spaces.base.goal_space import GoalSpace
+from ..observation_space.spaces.base.laser_space import LaserScanSpace
+from ..observation_space.spaces.base.last_action_space import LastActionSpace
+from ..observation_space.spaces.feature_maps.pedestrian_location_space import (
+    PedestrianLocationSpace,
+)
+from ..observation_space.spaces.feature_maps.pedestrian_type_space import (
+    PedestrianTypeSpace,
+)
+from ..observation_space.spaces.feature_maps.pedestrian_vel_x_space import (
+    PedestrianVelXSpace,
+)
+from ..observation_space.spaces.feature_maps.pedestrian_vel_y_space import (
+    PedestrianVelYSpace,
+)
+from ..observation_space.spaces.feature_maps.stacked_laser_map_space import (
+    StackedLaserMapSpace,
+)
 
 
-class SPACE_FACTORY_KEYS(Enum):
-    LASER = "laser"
-    GOAL = "goal"
-    LAST_ACTION = "last_action"
+class SPACE_INDEX(Enum):
+    LASER = LaserScanSpace
+    GOAL = GoalSpace
+    LAST_ACTION = LastActionSpace
 
-    STACKED_LASER_MAP = "stacked_laser_map"
-    PEDESTRIAN_LOCATION = "ped_location"
-    PEDESTRIAN_TYPE = "ped_type"
-    PEDESTRIAN_VEL_X = "ped_vel_x"
-    PEDESTRIAN_VEL_Y = "ped_vel_y"
-
-
-class OBS_SPACE_TO_OBS_DICT_KEY(Enum):
-    LASER = OBS_DICT_KEYS.LASER
-    GOAL = OBS_DICT_KEYS.GOAL
-    LAST_ACTION = OBS_DICT_KEYS.LAST_ACTION
-
-    PEDESTRIAN_LOCATION = SemanticAttribute.PEDESTRIAN_LOCATION.value
-    PEDESTRIAN_TYPE = SemanticAttribute.PEDESTRIAN_TYPE.value
-    PEDESTRIAN_MOVING = SemanticAttribute.PEDESTRIAN_MOVING.value
-    PEDESTRIAN_VEL_X = SemanticAttribute.PEDESTRIAN_VEL_X.value
-    PEDESTRIAN_VEL_Y = SemanticAttribute.PEDESTRIAN_VEL_Y.value
+    STACKED_LASER_MAP = StackedLaserMapSpace
+    PEDESTRIAN_LOCATION = PedestrianLocationSpace
+    PEDESTRIAN_TYPE = PedestrianTypeSpace
+    PEDESTRIAN_VEL_X = PedestrianVelXSpace
+    PEDESTRIAN_VEL_Y = PedestrianVelYSpace
