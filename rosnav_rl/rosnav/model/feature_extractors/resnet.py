@@ -14,10 +14,11 @@ Details:
     - The feature extractor takes input observations and performs a series of convolutional and 
         batch normalization operations, followed by fusion and goal networks to extract features.
 """
-import rospy
 import gymnasium as gym
+import rospy
 import torch
 import torch.nn as nn
+from rosnav.utils.observation_space.space_index import SPACE_INDEX
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 __all__ = ["MID_FUSION_BOTTLENECK_EXTRACTOR_1"]
@@ -173,6 +174,13 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
     The fusion net processes the input data (pedestrian position and scan) and the goal net processes the goal tensor.
     The fusion net includes convolutional layers, batch normalization, and residual connections using bottleneck blocks.
     """
+
+    REQUIRED_OBSERVATIONS = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.GOAL,
+    ]
 
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 256):
         """

@@ -12,6 +12,7 @@ from torch import nn
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
+from rosnav.utils.observation_space.space_index import SPACE_INDEX
 
 
 class EXTRACTOR_1(BaseFeaturesExtractor):
@@ -27,6 +28,12 @@ class EXTRACTOR_1(BaseFeaturesExtractor):
         self._rs: Robot state size - placeholder for robot related inputs to the NN
         self._l: Number of laser beams - placeholder for the laser beam data
     """
+
+    REQUIRED_OBSERVATIONS = [
+        SPACE_INDEX.LASER,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
 
     def __init__(
         self,

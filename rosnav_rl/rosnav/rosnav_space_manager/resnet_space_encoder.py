@@ -9,7 +9,7 @@ from .encoder_factory import BaseSpaceEncoderFactory
 
 @BaseSpaceEncoderFactory.register("SemanticResNetSpaceEncoder")
 class SemanticResNetSpaceEncoder(DefaultEncoder):
-    default_observation_list = [
+    DEFAULT_OBS_LIST = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_LOCATION,
         SPACE_INDEX.PEDESTRIAN_TYPE,
@@ -24,7 +24,7 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
         **kwargs
     ):
         if not observation_list:
-            observation_list = self.default_observation_list
+            observation_list = self.DEFAULT_OBS_LIST
 
         if not observation_kwargs:
             observation_kwargs = {
