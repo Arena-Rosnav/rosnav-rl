@@ -42,7 +42,7 @@ class BaseSpaceEncoderFactory:
         """
         assert name in cls.registry, f"BaseSpaceEncoder '{name}' is not registered!"
         agent_class = cls.registry[name]
-        
+
         if issubclass(agent_class, BaseSpaceEncoder):
             return agent_class(**kwargs)
         else:
