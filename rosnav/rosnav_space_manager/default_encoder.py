@@ -1,8 +1,11 @@
+from typing import List
+
 import numpy as np
 from gymnasium import spaces
 
+from ..utils.action_space.action_space_manager import ActionSpaceManager
 from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
-from ..utils.observation_space.space_index import SPACE_FACTORY_KEYS
+from ..utils.observation_space.space_index import SPACE_INDEX
 from .base_space_encoder import BaseSpaceEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
 
@@ -18,103 +21,60 @@ from .encoder_factory import BaseSpaceEncoderFactory
 
 @BaseSpaceEncoderFactory.register("DefaultEncoder")
 class DefaultEncoder(BaseSpaceEncoder):
-    def __init__(self, *args, **kwargs):
-        super().__init__(**kwargs)
+    default_observation_list = [
+        SPACE_INDEX.LASER,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
 
-    def decode_action(self, action):
-        if self._stacked:
-            action = action[0] if action.ndim == 2 else action
+    def __init__(
+        self,
+        action_space_kwargs: dict,
+        observation_list: List[SPACE_INDEX] = None,
+        observation_kwargs: dict = None,
+        *args,
+        **kwargs
+    ):
+        super().__init__(**action_space_kwargs, **observation_kwargs, **kwargs)
+        self._observation_list = observation_list
+        self.setup_action_space(action_space_kwargs)
+        self.setup_observation_space(observation_list, observation_kwargs)
 
-        if self._is_action_space_discrete:
-            return self._extend_action_array(self._translate_disc_action(action))
+    @property
+    def observation_space(self) -> spaces.Space:
+        return self._observation_space_manager.observation_space
 
-        return self._extend_action_array(action)
+    @property
+    def action_space(self) -> spaces.Space:
+        return self._action_space_manager.action_space
 
-    def _extend_action_array(self, action: np.ndarray) -> np.ndarray:
-        if self._is_holonomic:
-            assert (
-                self._is_holonomic and len(action) == 3
-            ), "Robot is holonomic but action with only two freedoms of movement provided"
+    @property
+    def action_space_manager(self):
+        return self._action_space_manager
 
-            return action
-        else:
-            assert (
-                not self._is_holonomic and len(action) == 2
-            ), "Robot is non-holonomic but action with more than two freedoms of movement provided"
-            return np.array([action[0], 0, action[1]])
+    @property
+    def observation_space_manager(self):
+        return self._observation_space_manager
 
-    def _translate_disc_action(self, action):
-        assert (
-            not self._is_holonomic
-        ), "Discrete action space currently not supported for holonomic robots"
+    def setup_action_space(self, action_space_kwargs: dict):
+        self._action_space_manager = ActionSpaceManager(**action_space_kwargs)
 
-        return np.array(
-            [self._actions[action]["linear"], self._actions[action]["angular"]]
+    def setup_observation_space(
+        self,
+        observation_list: List[SPACE_INDEX] = None,
+        observation_kwargs: dict = None,
+    ):
+        if not observation_list:
+            observation_list = self.default_observation_list
+
+        self._observation_space_manager = ObservationSpaceManager(
+            observation_list,
+            space_kwargs=observation_kwargs,
+            frame_stacking=self._stacked,
         )
 
-    def encode_observation(self, observation, structure):
-        # rho, theta = observation["goal_in_robot_frame"]
-        # scan = observation["laser_scan"]
-        # last_action = observation["last_action"]
+    def decode_action(self, action) -> np.ndarray:
+        return self._action_space_manager.decode_action(action)
 
-        obs = np.concatenate([observation[name] for name in structure], axis=0)
-        if self._stacked:
-            return np.expand_dims(obs, 0)
-        return obs
-
-    def get_observation_space(self):
-        return ObservationSpaceManager(
-            [
-                SPACE_FACTORY_KEYS.LASER.name,
-                SPACE_FACTORY_KEYS.GOAL.name,
-                SPACE_FACTORY_KEYS.LAST_ACTION.name,
-            ],
-            enable_frame_stacking=self._stacked,
-            space_kwargs={
-                "laser_num_beams": self._laser_num_beams,
-                "laser_max_range": self._laser_max_range,
-                "goal_max_dist": 20,
-                "min_linear_vel": -2.0,
-                "max_linear_vel": -2.0,
-                "min_angular_vel": -4.0,
-                "max_angular_vel": 4.0,
-            },
-        ).unified_observation_space
-
-    def get_action_space(self):
-        if self._is_action_space_discrete:
-            # self._discrete_actions is a list, each element is a dict with the keys ["name", 'linear','angular']
-            return spaces.Discrete(len(self._actions))
-
-        linear_range = self._actions["linear_range"]
-        angular_range = self._actions["angular_range"]
-
-        if not self._is_holonomic:
-            return spaces.Box(
-                low=np.array([linear_range[0], angular_range[0]]),
-                high=np.array([linear_range[1], angular_range[1]]),
-                dtype=np.float32,
-            )
-
-        linear_range_x, linear_range_y = (
-            linear_range["x"],
-            linear_range["y"],
-        )
-
-        return spaces.Box(
-            low=np.array(
-                [
-                    linear_range_x[0],
-                    linear_range_y[0],
-                    angular_range[0],
-                ]
-            ),
-            high=np.array(
-                [
-                    linear_range_x[1],
-                    linear_range_y[1],
-                    angular_range[1],
-                ]
-            ),
-            dtype=np.float32,
-        )
+    def encode_observation(self, observation, structure) -> np.ndarray:
+        return self._observation_space_manager.encode_observation(observation)
