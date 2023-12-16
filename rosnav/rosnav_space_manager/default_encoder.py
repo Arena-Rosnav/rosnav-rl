@@ -21,7 +21,7 @@ from .encoder_factory import BaseSpaceEncoderFactory
 
 @BaseSpaceEncoderFactory.register("DefaultEncoder")
 class DefaultEncoder(BaseSpaceEncoder):
-    default_observation_list = [
+    DEFAULT_OBS_LIST = [
         SPACE_INDEX.LASER,
         SPACE_INDEX.GOAL,
         SPACE_INDEX.LAST_ACTION,
@@ -65,7 +65,7 @@ class DefaultEncoder(BaseSpaceEncoder):
         observation_kwargs: dict = None,
     ):
         if not observation_list:
-            observation_list = self.default_observation_list
+            observation_list = self.DEFAULT_OBS_LIST
 
         self._observation_space_manager = ObservationSpaceManager(
             observation_list,
