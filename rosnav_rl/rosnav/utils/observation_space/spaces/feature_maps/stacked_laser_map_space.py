@@ -12,6 +12,30 @@ from .base_feature_map_space import BaseFeatureMapSpace
 
 @SpaceFactory.register("stacked_laser_map")
 class StackedLaserMapSpace(BaseFeatureMapSpace):
+    """
+    Represents a feature map space for stacked laser maps.
+
+    Args:
+        laser_stack_size (int): The size of the laser stack.
+        feature_map_size (int): The size of the feature map.
+        roi_in_m (float): The region of interest in meters.
+        flatten (bool, optional): Whether to flatten the feature map. Defaults to True.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Attributes:
+        _laser_queue (deque): A queue to store the laser scans.
+        _laser_stack_size (int): The size of the laser stack.
+
+    Methods:
+        _reset_laser_stack(laser_scan: np.ndarray): Resets the laser stack with zeros.
+        _process_laser_scan(laser_scan: np.ndarray, done: bool) -> np.ndarray: Processes the laser scan and returns the feature map.
+        _build_laser_map(laser_queue: deque) -> np.ndarray: Builds the laser map from the laser queue.
+        get_gym_space() -> spaces.Space: Returns the gym space for the feature map.
+        encode_observation(observation: dict, *args, **kwargs) -> ndarray: Encodes the observation into a feature map.
+
+    """
+
     def __init__(
         self,
         laser_stack_size: int,
@@ -32,9 +56,27 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         )
 
     def _reset_laser_stack(self, laser_scan: np.ndarray):
+        """
+        Resets the laser stack with zeros.
+
+        Args:
+            laser_scan (np.ndarray): The laser scan.
+
+        """
         self._laser_queue = deque([np.zeros_like(laser_scan)] * self._laser_stack_size)
 
     def _process_laser_scan(self, laser_scan: np.ndarray, done: bool) -> np.ndarray:
+        """
+        Processes the laser scan and returns the feature map.
+
+        Args:
+            laser_scan (np.ndarray): The laser scan.
+            done (bool): Whether the episode is done.
+
+        Returns:
+            np.ndarray: The feature map.
+
+        """
         if len(self._laser_queue) == 0:
             self._reset_laser_stack(laser_scan)
 
@@ -49,6 +91,16 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         return laser_map
 
     def _build_laser_map(self, laser_queue: deque) -> np.ndarray:
+        """
+        Builds the laser map from the laser queue.
+
+        Args:
+            laser_queue (deque): The laser queue.
+
+        Returns:
+            np.ndarray: The laser map.
+
+        """
         laser_array = np.array(laser_queue)
         # laserstack list of 10 np.arrays of shape (720,)
         scan_avg = np.zeros((20, self._feature_map_size))
@@ -69,6 +121,13 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         return scan_avg_map
 
     def get_gym_space(self) -> spaces.Space:
+        """
+        Returns the gym space for the feature map.
+
+        Returns:
+            spaces.Space: The gym space.
+
+        """
         return spaces.Box(
             low=0,
             high=self._roi_in_m,
@@ -77,6 +136,18 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         )
 
     def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
+        """
+        Encodes the observation into a feature map.
+
+        Args:
+            observation (dict): The observation dictionary.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ndarray: The encoded feature map.
+
+        """
         return self._process_laser_scan(
             observation[OBS_DICT_KEYS.LASER],
             observation.get(OBS_DICT_KEYS.DONE, False),
