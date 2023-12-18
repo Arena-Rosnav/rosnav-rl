@@ -21,6 +21,11 @@ from .encoder_factory import BaseSpaceEncoderFactory
 
 @BaseSpaceEncoderFactory.register("DefaultEncoder")
 class DefaultEncoder(BaseSpaceEncoder):
+    """
+    DefaultEncoder class is responsible for encoding and decoding actions and observations
+    using the default action and observation space managers.
+    """
+
     DEFAULT_OBS_LIST = [
         SPACE_INDEX.LASER,
         SPACE_INDEX.GOAL,
@@ -35,6 +40,16 @@ class DefaultEncoder(BaseSpaceEncoder):
         *args,
         **kwargs
     ):
+        """
+        Initializes a new instance of the DefaultEncoder class.
+
+        Args:
+            action_space_kwargs (dict): Keyword arguments for configuring the action space manager.
+            observation_list (List[SPACE_INDEX], optional): List of observation spaces to include. Defaults to None.
+            observation_kwargs (dict, optional): Keyword arguments for configuring the observation space manager. Defaults to None.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+        """
         super().__init__(**action_space_kwargs, **observation_kwargs, **kwargs)
         self._observation_list = observation_list
         self._observation_kwargs = observation_kwargs
@@ -43,29 +58,71 @@ class DefaultEncoder(BaseSpaceEncoder):
 
     @property
     def observation_space(self) -> spaces.Space:
+        """
+        Gets the observation space.
+
+        Returns:
+            spaces.Space: The observation space.
+        """
         return self._observation_space_manager.observation_space
 
     @property
     def action_space(self) -> spaces.Space:
+        """
+        Gets the action space.
+
+        Returns:
+            spaces.Space: The action space.
+        """
         return self._action_space_manager.action_space
 
     @property
     def action_space_manager(self):
+        """
+        Gets the action space manager.
+
+        Returns:
+            ActionSpaceManager: The action space manager.
+        """
         return self._action_space_manager
 
     @property
     def observation_space_manager(self):
+        """
+        Gets the observation space manager.
+
+        Returns:
+            ObservationSpaceManager: The observation space manager.
+        """
         return self._observation_space_manager
 
     @property
     def observation_list(self):
+        """
+        Gets the list of observation spaces.
+
+        Returns:
+            List[SPACE_INDEX]: The list of observation spaces.
+        """
         return self._observation_list
 
     @property
     def observation_kwargs(self):
+        """
+        Gets the keyword arguments for configuring the observation space manager.
+
+        Returns:
+            dict: The keyword arguments for configuring the observation space manager.
+        """
         return self._observation_kwargs
 
     def setup_action_space(self, action_space_kwargs: dict):
+        """
+        Sets up the action space manager.
+
+        Args:
+            action_space_kwargs (dict): Keyword arguments for configuring the action space manager.
+        """
         self._action_space_manager = ActionSpaceManager(**action_space_kwargs)
 
     def setup_observation_space(
@@ -73,6 +130,13 @@ class DefaultEncoder(BaseSpaceEncoder):
         observation_list: List[SPACE_INDEX] = None,
         observation_kwargs: dict = None,
     ):
+        """
+        Sets up the observation space manager.
+
+        Args:
+            observation_list (List[SPACE_INDEX], optional): List of observation spaces to include. Defaults to None.
+            observation_kwargs (dict, optional): Keyword arguments for configuring the observation space manager. Defaults to None.
+        """
         if not observation_list:
             observation_list = self.DEFAULT_OBS_LIST
 
@@ -83,7 +147,26 @@ class DefaultEncoder(BaseSpaceEncoder):
         )
 
     def decode_action(self, action) -> np.ndarray:
+        """
+        Decodes the action.
+
+        Args:
+            action: The action to decode.
+
+        Returns:
+            np.ndarray: The decoded action.
+        """
         return self._action_space_manager.decode_action(action)
 
     def encode_observation(self, observation, structure) -> np.ndarray:
+        """
+        Encodes the observation.
+
+        Args:
+            observation: The observation to encode.
+            structure: The structure of the observation.
+
+        Returns:
+            np.ndarray: The encoded observation.
+        """
         return self._observation_space_manager.encode_observation(observation)

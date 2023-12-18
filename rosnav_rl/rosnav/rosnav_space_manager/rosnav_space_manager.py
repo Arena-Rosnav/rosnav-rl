@@ -15,6 +15,10 @@ import rospy
 
 
 class RosnavSpaceManager:
+    """
+    Manages the space encoding and decoding for the ROS navigation system.
+    """
+
     def __init__(self):
         self._stacked = rospy.get_param("rl_agent/frame_stacking/enabled")
         self._laser_num_beams = rospy.get_param("laser/num_beams")
@@ -55,7 +59,11 @@ class RosnavSpaceManager:
         )
 
     def _determine_encoder_name(self) -> str:
-        # return "SemanticResNetSpaceEncoder"
+        """
+        Determines the name of the encoder based on the ROS parameters.
+        Returns:
+            str: The name of the encoder.
+        """
         if rospy.get_param("rl_agent/reduce_num_beams/enabled", False):
             return "ReducedLaserEncoder"
         if rospy.get_param("rl_agent/resnet", False):
@@ -65,18 +73,47 @@ class RosnavSpaceManager:
 
     @property
     def observation_space_manager(self):
+        """
+        Gets the observation space manager.
+        Returns:
+            object: The observation space manager.
+        """
         return self._encoder.observation_space_manager
 
     def get_observation_space(self):
+        """
+        Gets the observation space.
+        Returns:
+            object: The observation space.
+        """
         return self._encoder.observation_space
 
     def get_action_space(self):
+        """
+        Gets the action space.
+        Returns:
+            object: The action space.
+        """
         return self._encoder.action_space
 
     def encode_observation(self, observation, structure=None):
+        """
+        Encodes the given observation using the space encoder.
+        Args:
+            observation (object): The observation to encode.
+            structure (object, optional): The structure of the observation. Defaults to None.
+        Returns:
+            object: The encoded observation.
+        """
         encoded_obs = self._encoder.encode_observation(observation, structure)
-
         return encoded_obs
 
     def decode_action(self, action):
+        """
+        Decodes the given action using the space encoder.
+        Args:
+            action (object): The action to decode.
+        Returns:
+            object: The decoded action.
+        """
         return self._encoder.decode_action(action)

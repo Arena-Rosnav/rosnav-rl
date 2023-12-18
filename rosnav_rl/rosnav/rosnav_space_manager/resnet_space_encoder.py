@@ -9,6 +9,20 @@ from .encoder_factory import BaseSpaceEncoderFactory
 
 @BaseSpaceEncoderFactory.register("SemanticResNetSpaceEncoder")
 class SemanticResNetSpaceEncoder(DefaultEncoder):
+    """
+    Encoder class for semantic ResNet space encoding.
+
+    Args:
+        observation_list (List[SPACE_INDEX], optional): List of observation spaces to encode. Defaults to None.
+        observation_kwargs (dict, optional): Additional keyword arguments for observations. Defaults to None.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Attributes:
+        DEFAULT_OBS_LIST (List[SPACE_INDEX]): Default list of observation spaces to encode.
+
+    """
+
     DEFAULT_OBS_LIST = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_LOCATION,
@@ -23,6 +37,16 @@ class SemanticResNetSpaceEncoder(DefaultEncoder):
         *args,
         **kwargs
     ):
+        """
+        Initializes the SemanticResNetSpaceEncoder.
+
+        Args:
+            observation_list (List[SPACE_INDEX], optional): List of observation spaces to encode. Defaults to None.
+            observation_kwargs (dict, optional): Additional keyword arguments for observations. Defaults to None.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        """
         if not observation_list:
             observation_list = self.DEFAULT_OBS_LIST
 
