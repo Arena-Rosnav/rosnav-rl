@@ -21,6 +21,10 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
         self._space = self.get_gym_space()
 
+    @property
+    def feature_map_size(self):
+        return self._feature_map_size
+
     def _get_map_index(self, position: tuple) -> tuple:
         x, y, *_ = position
         x = int((x / self._roi_in_m) * self._feature_map_size) + (
