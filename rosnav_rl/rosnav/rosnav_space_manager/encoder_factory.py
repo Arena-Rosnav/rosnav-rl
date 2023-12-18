@@ -28,7 +28,7 @@ class BaseSpaceEncoderFactory:
         return inner_wrapper
 
     @classmethod
-    def instantiate(cls, name: str, *args, **kwargs):
+    def instantiate(cls, name: str, *args, **kwargs) -> BaseSpaceEncoder:
         """Factory command to create the agent.
         This method gets the appropriate agent class from the registry
         and creates an instance of it, while passing in the parameters
