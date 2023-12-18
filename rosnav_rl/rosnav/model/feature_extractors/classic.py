@@ -189,6 +189,18 @@ class EXTRACTOR_3(EXTRACTOR_1):
 
 
 class EXTRACTOR_4(EXTRACTOR_1):
+    """
+    Feature extractor class that extends EXTRACTOR_1.
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space.
+        observation_space_manager (ObservationSpaceManager): The observation space manager.
+        features_dim (int, optional): The dimension of the extracted features. Defaults to 128.
+        stacked_obs (bool, optional): Whether to use stacked observations. Defaults to False.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
+
     def __init__(
         self,
         observation_space: gym.spaces.Box,
@@ -273,14 +285,6 @@ class EXTRACTOR_5(EXTRACTOR_1):
 
 
 class EXTRACTOR_6(EXTRACTOR_1):
-    """
-    Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
-
-    :param observation_space: (gym.Space)
-    :param features_dim: (int) Number of features extracted.
-        This corresponds to the number of unit for the last layer.
-    """
-
     def __init__(
         self,
         observation_space: gym.spaces.Box,
@@ -324,11 +328,15 @@ class EXTRACTOR_6(EXTRACTOR_1):
 
 class EXTRACTOR_7(EXTRACTOR_1):
     """
-    Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
+    Feature extractor class that implements a specific network architecture (EXTRACTOR_7).
 
-    :param observation_space: (gym.Space)
-    :param features_dim: (int) Number of features extracted.
-        This corresponds to the number of unit for the last layer.
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment.
+        observation_space_manager (ObservationSpaceManager): The observation space manager.
+        features_dim (int, optional): The dimensionality of the extracted features. Defaults to 128.
+        stacked_obs (bool, optional): Whether to use stacked observations. Defaults to False.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(
@@ -374,11 +382,20 @@ class EXTRACTOR_7(EXTRACTOR_1):
 
 class EXTRACTOR_8(EXTRACTOR_1):
     """
-    Custom Convolutional Neural Network (Nature CNN) to serve as feature extractor ahead of the policy and value head.
+    Feature extractor class that implements a specific network architecture (EXTRACTOR_8).
 
-    :param observation_space: (gym.Space)
-    :param features_dim: (int) Number of features extracted.
-        This corresponds to the number of unit for the last layer.
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment.
+        observation_space_manager (ObservationSpaceManager): The observation space manager.
+        features_dim (int, optional): The dimensionality of the extracted features. Defaults to 128.
+        stacked_obs (bool, optional): Whether to use stacked observations. Defaults to False.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Attributes:
+        cnn (nn.Sequential): The convolutional neural network.
+        fc (nn.Sequential): The fully connected layers.
+
     """
 
     def __init__(
