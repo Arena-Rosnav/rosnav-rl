@@ -1,58 +1,27 @@
-import os
-from typing import Tuple
-
 import gymnasium as gym
-import rospkg
-import rospy
 import torch as th
-import yaml
-from stable_baselines3.common.policies import BaseFeaturesExtractor
-from torch import nn
-
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
 from rosnav.utils.observation_space.space_index import SPACE_INDEX
+from torch import nn
 
-from abc import ABC, abstractmethod
-
-
-class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
-    REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.LASER,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
-    ]
-
-    def __init__(
-        self,
-        observation_space: gym.spaces.Box,
-        observation_space_manager: ObservationSpaceManager,
-        features_dim: int,
-        stacked_obs: bool = False,
-    ):
-        # assert observation_space == observation_space_manager.observation_space
-        self._observation_space_manager = observation_space_manager
-        self._stacked_obs = stacked_obs
-        self._num_stacks = observation_space.shape[0] if self._stacked_obs else 1
-
-        super(RosnavBaseExtractor, self).__init__(
-            observation_space=observation_space,
-            features_dim=features_dim,
-        )
-
-        self._setup_network()
-
-    @abstractmethod
-    def _setup_network(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        raise NotImplementedError
+from .base_extractor import RosnavBaseExtractor
 
 
 class EXTRACTOR_1(RosnavBaseExtractor):
+    """
+    Feature extractor class that extracts features from observations for the EXTRACTOR_1 model.
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space.
+        observation_space_manager (ObservationSpaceManager): The observation space manager.
+        features_dim (int): The dimension of the extracted features. Default is 128.
+        stacked_obs (bool): Whether the observations are stacked. Default is False.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
+
     REQUIRED_OBSERVATIONS = [
         SPACE_INDEX.LASER,
         SPACE_INDEX.GOAL,
@@ -104,13 +73,13 @@ class EXTRACTOR_1(RosnavBaseExtractor):
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         """
-        1. Extract laser
-        2. Extract robot state
-        3. Forward laser data through CNN
-        4. Return concatenation of extracted laser feats and robot states
+        Forward pass of the feature extractor.
 
-        :return: (th.Tensor) features,
-            extracted features by the network
+        Args:
+            observations (th.Tensor): The input observations.
+
+        Returns:
+            th.Tensor: The extracted features by the network.
         """
         _robot_state_size = self._goal_size + self._last_action_size
         if not self._stacked_obs:
@@ -130,6 +99,18 @@ class EXTRACTOR_1(RosnavBaseExtractor):
 
 
 class EXTRACTOR_2(EXTRACTOR_1):
+    """
+    Feature extractor class that extends EXTRACTOR_1.
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space.
+        observation_space_manager (ObservationSpaceManager): The observation space manager.
+        features_dim (int, optional): The dimension of the extracted features. Defaults to 128.
+        stacked_obs (bool, optional): Whether to use stacked observations. Defaults to False.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
+
     def __init__(
         self,
         observation_space: gym.spaces.Box,
