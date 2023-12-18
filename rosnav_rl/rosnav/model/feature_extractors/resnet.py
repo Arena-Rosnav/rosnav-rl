@@ -179,6 +179,13 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
     The feature extractor consists of a fusion net and a goal net.
     The fusion net processes the input data (pedestrian position and scan) and the goal net processes the goal tensor.
     The fusion net includes convolutional layers, batch normalization, and residual connections using bottleneck blocks.
+
+    Required observations:
+        - Stacked laser map
+        - Pedestrian location
+        - Pedestrian type
+        - Goal
+
     """
 
     REQUIRED_OBSERVATIONS = [
@@ -193,6 +200,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         observation_space: gym.spaces.Box,
         observation_space_manager: ObservationSpaceManager,
         features_dim: int = 256,
+        stacked_obs: bool = False,
         block: nn.Module = Bottleneck,
         layers: list = [2, 1, 1],
         zero_init_residual: bool = True,
@@ -222,6 +230,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
             observation_space=observation_space,
             observation_space_manager=observation_space_manager,
             features_dim=features_dim,
+            stacked_obs=stacked_obs,
         )
 
         self._observation_space_manager = observation_space_manager
