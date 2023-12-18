@@ -14,12 +14,18 @@ Details:
     - The feature extractor takes input observations and performs a series of convolutional and 
         batch normalization operations, followed by fusion and goal networks to extract features.
 """
+from typing import List
+
 import gymnasium as gym
 import rospy
 import torch
 import torch.nn as nn
+from rosnav.utils.observation_space.observation_space_manager import (
+    ObservationSpaceManager,
+)
 from rosnav.utils.observation_space.space_index import SPACE_INDEX
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from .base_extractor import RosnavBaseExtractor
 
 __all__ = ["MID_FUSION_BOTTLENECK_EXTRACTOR_1"]
 
@@ -165,7 +171,7 @@ class Bottleneck(nn.Module):
         return out
 
 
-class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
+class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
     """
     This class defines a custom feature extractor `SEM_EXTRACTOR_1` that inherits from `BaseFeaturesExtractor`.
     It is supposed to be part of an middle-fusion-network.
@@ -182,7 +188,19 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
         SPACE_INDEX.GOAL,
     ]
 
-    def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 256):
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        observation_space_manager: ObservationSpaceManager,
+        features_dim: int = 256,
+        block: nn.Module = Bottleneck,
+        layers: list = [2, 1, 1],
+        zero_init_residual: bool = True,
+        groups: int = 1,
+        width_per_group: int = 64,
+        replace_stride_with_dilation: List[bool] = None,
+        norm_layer: nn.Module = nn.BatchNorm2d,
+    ):
         """
         Initializes the SEM_EXTRACTOR_1 feature extractor.
 
@@ -190,20 +208,36 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
             observation_space (gym.spaces.Box): Observation space of the environment
             features_dim (int, optional): Number of features extracted. Defaults to 256.
         """
-        rospy.set_param("rl_agent/resnet", True)
         # network parameters:
-        block = Bottleneck
-        layers = [2, 1, 1]
-        zero_init_residual = True
-        groups = 1
-        width_per_group = 64
-        replace_stride_with_dilation = None
-        norm_layer = None
+        # block = Bottleneck
+        # layers = [2, 1, 1]
+        # zero_init_residual = True
+        # groups = 1
+        # width_per_group = 64
+        # replace_stride_with_dilation = None
+        # norm_layer = None
 
         # superclass properties/methods
         super(MID_FUSION_BOTTLENECK_EXTRACTOR_1, self).__init__(
-            observation_space, features_dim
+            observation_space=observation_space,
+            observation_space_manager=observation_space_manager,
+            features_dim=features_dim,
         )
+
+        self._observation_space_manager = observation_space_manager
+
+        ### FUSION INPUT SIZES
+        self._feature_map_size = self._observation_space_manager[
+            SPACE_INDEX.PEDESTRIAN_LOCATION
+        ].feature_map_size
+        self._scan_map_size = self._observation_space_manager[
+            SPACE_INDEX.STACKED_LASER_MAP
+        ].shape[-1]
+        self._ped_map_size = (
+            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_LOCATION].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
+        )
+        self._goal_size = self._observation_space_manager[SPACE_INDEX.GOAL].shape[-1]
 
         ################## ped_pos net model: ###################
         if norm_layer is None:
@@ -215,11 +249,11 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
             # the 2x2 stride with a dilated convolution instead
-            replace_stride_with_dilation = [False, False, False]
-        if len(replace_stride_with_dilation) != 3:
+            replace_stride_with_dilation = [False] * len(layers)
+        if len(replace_stride_with_dilation) != len(layers):
             raise ValueError(
                 "replace_stride_with_dilation should be None "
-                "or a 3-element tuple, got {}".format(replace_stride_with_dilation)
+                f"or a {len(layers)}-element tuple, got {replace_stride_with_dilation}"
             )
         self.groups = groups
         self.base_width = width_per_group
@@ -422,8 +456,8 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(-1, 2, 80, 80)
-        scan_in = scan.reshape(-1, 1, 80, 80)
+        ped_in = ped_pos.reshape(-1, 2, self._feature_map_size, self._feature_map_size)
+        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
         fusion_in = torch.cat((scan_in, ped_in), dim=1)
 
         # See note [TorchScript super()]
@@ -481,7 +515,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(BaseFeaturesExtractor):
         # goal = observations[:, 32000:32002]
         # last_action = observations[:, 32002:32005]
 
-        scan = observations[:, :6400]
-        ped_pos = observations[:, 6400:19200]
-        goal = observations[:, 19200:]
+        scan = observations[:, : self._scan_map_size]
+        ped_pos = observations[:, self._scan_map_size : self._ped_map_size]
+        goal = observations[:, : -self._goal_size]
         return self._forward_impl(ped_pos, scan, goal)
