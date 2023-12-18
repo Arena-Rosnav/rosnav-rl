@@ -1,3 +1,7 @@
+import numpy as np
+from gymnasium import spaces
+
+
 class BaseSpaceEncoder:
     def __init__(
         self,
@@ -20,15 +24,15 @@ class BaseSpaceEncoder:
         self._stacked = stacked
 
     @property
-    def observation_space(self):
+    def observation_space(self) -> spaces.Box:
         raise NotImplementedError()
 
     @property
-    def action_space(self):
+    def action_space(self) -> spaces.Box:
         raise NotImplementedError()
 
-    def decode_action(self, action):
+    def decode_action(self, action) -> np.ndarray:
         raise NotImplementedError()
 
-    def encode_observation(self):
+    def encode_observation(self, observation: dict) -> np.ndarray:
         raise NotImplementedError()
