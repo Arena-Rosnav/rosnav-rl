@@ -5,6 +5,7 @@ from gymnasium import spaces
 
 from .space_index import SPACE_INDEX
 from .spaces.base_observation_space import BaseObservationSpace
+from .spaces.feature_maps.base_feature_map_space import BaseFeatureMapSpace
 from .utils import stack_spaces
 
 
@@ -37,6 +38,29 @@ class ObservationSpaceManager:
             frame_stacking_enabled=self._frame_stacking,
         )
 
+    def _setup_spaces(self):
+        self._space_containers = self._generate_space_container(
+            self._spacelist, self._space_kwargs
+        )
+
+    def _generate_space_container(
+        self,
+        space_list: List[Union[str, SPACE_INDEX]],
+        space_kwargs: Dict[str, Any],
+    ) -> Dict[str, Union[BaseObservationSpace, BaseFeatureMapSpace]]:
+        space_list = [
+            ObservationSpaceManager.get_space_index(space) for space in space_list
+        ]
+        return {
+            space_index.name: space_index.value(flatten=self._flatten, **space_kwargs)
+            for space_index in space_list
+        }
+
+    def __getitem__(self, space_name: Union[str, SPACE_INDEX]) -> spaces.Box:
+        if isinstance(space_name, SPACE_INDEX):
+            space_name = space_name.name
+        return self._space_containers[space_name.upper()].space
+
     def add_observation_space(self, space: SPACE_INDEX):
         assert isinstance(space, SPACE_INDEX), "Invalid Space Type"
         assert (
@@ -60,31 +84,15 @@ class ObservationSpaceManager:
             axis=0 if self._frame_stacking else 1,
         )
 
+    def get_space_container(
+        self, space_name: Union[str, SPACE_INDEX]
+    ) -> Union[BaseObservationSpace, BaseFeatureMapSpace]:
+        if isinstance(space_name, SPACE_INDEX):
+            space_name = space_name.name
+        return self._space_containers[space_name.upper()]
+
     @staticmethod
     def get_space_index(space_name: Union[str, SPACE_INDEX]) -> SPACE_INDEX:
         if isinstance(space_name, SPACE_INDEX):
             return space_name
         return SPACE_INDEX[space_name.upper()]
-
-    def _setup_spaces(self):
-        self._space_containers = self._generate_space_container(
-            self._spacelist, self._space_kwargs
-        )
-
-    def _generate_space_container(
-        self,
-        space_list: List[Union[str, SPACE_INDEX]],
-        space_kwargs: Dict[str, Any],
-    ) -> Dict[str, BaseObservationSpace]:
-        space_list = [
-            ObservationSpaceManager.get_space_index(space) for space in space_list
-        ]
-        return {
-            space_index.name: space_index.value(flatten=self._flatten, **space_kwargs)
-            for space_index in space_list
-        }
-
-    def __getitem__(self, space_name: Union[str, SPACE_INDEX]) -> spaces.Box:
-        if isinstance(space_name, SPACE_INDEX):
-            space_name = space_name.name
-        return self._space_containers[space_name.upper()].space
