@@ -239,6 +239,26 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         )
         self._goal_size = self._observation_space_manager[SPACE_INDEX.GOAL].shape[-1]
 
+        self._setup_network(
+            block,
+            groups,
+            layers,
+            width_per_group,
+            replace_stride_with_dilation,
+            norm_layer,
+            zero_init_residual,
+        )
+
+    def _setup_network(
+        self,
+        block: nn.Module,
+        groups: int,
+        layers: List[int],
+        width_per_group: int,
+        replace_stride_with_dilation: List[bool],
+        norm_layer: nn.Module,
+        zero_init_residual: bool,
+    ):
         ################## ped_pos net model: ###################
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -355,7 +375,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         #                               dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
-            nn.Linear(256 * block.expansion + 2, features_dim),
+            nn.Linear(256 * block.expansion + 2, self._features_dim),
             # nn.BatchNorm1d(features_dim),
             nn.ReLU(),
         )
