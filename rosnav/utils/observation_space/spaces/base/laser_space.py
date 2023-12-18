@@ -9,6 +9,20 @@ from ..base_observation_space import BaseObservationSpace
 
 @SpaceFactory.register("laser")
 class LaserScanSpace(BaseObservationSpace):
+    """
+    Represents the observation space for laser scan data.
+
+    Args:
+        laser_num_beams (int): The number of laser beams.
+        laser_max_range (float): The maximum range of the laser.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Attributes:
+        _num_beams (int): The number of laser beams.
+        _max_range (float): The maximum range of the laser.
+    """
+
     def __init__(
         self, laser_num_beams: int, laser_max_range: float, *args, **kwargs
     ) -> None:
@@ -17,6 +31,12 @@ class LaserScanSpace(BaseObservationSpace):
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:
+        """
+        Returns the Gym observation space for laser scan data.
+
+        Returns:
+            spaces.Space: The Gym observation space.
+        """
         return spaces.Box(
             low=0,
             high=self._max_range,
@@ -25,4 +45,13 @@ class LaserScanSpace(BaseObservationSpace):
         )
 
     def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
+        """
+        Encodes the laser scan observation.
+
+        Args:
+            observation (dict): The observation dictionary.
+
+        Returns:
+            ndarray: The encoded laser scan observation.
+        """
         return observation[OBS_DICT_KEYS.LASER]

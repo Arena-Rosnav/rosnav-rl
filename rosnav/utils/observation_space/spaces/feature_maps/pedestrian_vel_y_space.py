@@ -11,6 +11,24 @@ from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 @SpaceFactory.register("ped_vel_y")
 class PedestrianVelYSpace(BaseFeatureMapSpace):
+    """
+    A feature map space representing the y-component of pedestrian velocity.
+
+    Args:
+        min_speed_y (float): The minimum y-component of pedestrian velocity.
+        max_speed_y (float): The maximum y-component of pedestrian velocity.
+        feature_map_size (int): The size of the feature map.
+        roi_in_m (float): The region of interest in meters.
+        flatten (bool, optional): Whether to flatten the feature map. Defaults to True.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Attributes:
+        _map_size (int): The size of the feature map.
+        _min_speed (float): The minimum y-component of pedestrian velocity.
+        _max_speed (float): The maximum y-component of pedestrian velocity.
+    """
+
     def __init__(
         self,
         min_speed_y: float,
@@ -33,6 +51,12 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         )
 
     def get_gym_space(self) -> spaces.Space:
+        """
+        Get the Gym space representation of the feature map.
+
+        Returns:
+            spaces.Space: The Gym space representing the feature map.
+        """
         return spaces.Box(
             low=self._min_speed,
             high=self._max_speed,
@@ -41,6 +65,15 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         )
 
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+        """
+        Encode the observation into a numpy array.
+
+        Args:
+            observation (dict): The observation dictionary.
+
+        Returns:
+            np.ndarray: The encoded observation as a numpy array.
+        """
         return self._get_semantic_map(
             observation[SemanticAttribute.PEDESTRIAN_VEL_X.value],
             observation[OBS_DICT_KEYS.ROBOT_POSE],
