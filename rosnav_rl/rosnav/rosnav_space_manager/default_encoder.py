@@ -37,6 +37,7 @@ class DefaultEncoder(BaseSpaceEncoder):
     ):
         super().__init__(**action_space_kwargs, **observation_kwargs, **kwargs)
         self._observation_list = observation_list
+        self._observation_kwargs = observation_kwargs
         self.setup_action_space(action_space_kwargs)
         self.setup_observation_space(observation_list, observation_kwargs)
 
@@ -55,6 +56,14 @@ class DefaultEncoder(BaseSpaceEncoder):
     @property
     def observation_space_manager(self):
         return self._observation_space_manager
+
+    @property
+    def observation_list(self):
+        return self._observation_list
+
+    @property
+    def observation_kwargs(self):
+        return self._observation_kwargs
 
     def setup_action_space(self, action_space_kwargs: dict):
         self._action_space_manager = ActionSpaceManager(**action_space_kwargs)
