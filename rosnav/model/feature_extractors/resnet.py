@@ -227,6 +227,19 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         self._observation_space_manager = observation_space_manager
 
         ### FUSION INPUT SIZES
+        self._get_input_sizes()
+
+        self._setup_network(
+            block,
+            groups,
+            layers,
+            width_per_group,
+            replace_stride_with_dilation,
+            norm_layer,
+            zero_init_residual,
+        )
+
+    def _get_input_sizes(self):
         self._feature_map_size = self._observation_space_manager[
             SPACE_INDEX.PEDESTRIAN_LOCATION
         ].feature_map_size
@@ -238,16 +251,6 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
             + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
         )
         self._goal_size = self._observation_space_manager[SPACE_INDEX.GOAL].shape[-1]
-
-        self._setup_network(
-            block,
-            groups,
-            layers,
-            width_per_group,
-            replace_stride_with_dilation,
-            norm_layer,
-            zero_init_residual,
-        )
 
     def _setup_network(
         self,
