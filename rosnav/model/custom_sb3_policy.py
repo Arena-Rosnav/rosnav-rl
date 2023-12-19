@@ -1,4 +1,5 @@
 """Custom policies built by SB3 during runtime through parsing 'policy_kwargs'"""
+from rosnav.rosnav_space_manager.resnet_space_encoder import SemanticResNetSpaceEncoder
 from torch import nn
 
 from .agent_factory import AgentFactory
@@ -644,9 +645,6 @@ class AGENT_55(BaseAgent):
     net_arch = [512, 256, 64]
     activation_fn = nn.ReLU
 
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
 
 # framestacking
 @AgentFactory.register("AGENT_56")
@@ -656,9 +654,6 @@ class AGENT_56(BaseAgent):
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = [256, 256, 256, 64]
     activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
 
 
 # framestacking
@@ -670,13 +665,46 @@ class AGENT_57(BaseAgent):
     net_arch = [512, 256, 64, 64]
     activation_fn = nn.ReLU
 
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
 
 @AgentFactory.register("BarnResNet")
 class BarnResNet(BaseAgent):
     type = PolicyType.CNN
+    space_encoder_class = SemanticResNetSpaceEncoder
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.GOAL,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+    }
+    features_extractor_class = MID_FUSION_BOTTLENECK_EXTRACTOR_1
+    features_extractor_kwargs = {}
+    net_arch = [256, 64]
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("RosnavResNet")
+class RosnavResNet(BaseAgent):
+    type = PolicyType.CNN
+    space_encoder_class = SemanticResNetSpaceEncoder
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+    }
     features_extractor_class = MID_FUSION_BOTTLENECK_EXTRACTOR_1
     features_extractor_kwargs = {}
     net_arch = [256, 64]
