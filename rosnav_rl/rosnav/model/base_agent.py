@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import List, Type
 
+from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
+from rosnav.utils.observation_space.space_index import SPACE_INDEX
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
 from .constants import BASE_AGENT_ATTR, PolicyType
+from rosnav.rosnav_space_manager.default_encoder import DefaultEncoder
 
 
 class BaseAgent(ABC):
@@ -16,6 +19,18 @@ class BaseAgent(ABC):
     The architecture of the eventual policy is determined by the
     'policy_kwargs' of the SB3 RL algorithm.
     """
+
+    @property
+    def space_encoder_class(self) -> Type[BaseSpaceEncoder]:
+        return DefaultEncoder
+
+    @property
+    def observation_spaces(self) -> List[SPACE_INDEX]:
+        return None
+
+    @property
+    def observation_space_kwargs(self) -> dict:
+        return {}
 
     @property
     @abstractmethod
