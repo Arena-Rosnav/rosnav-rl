@@ -1,10 +1,17 @@
-from .encoder_factory import BaseSpaceEncoderFactory
-from .default_encoder import DefaultEncoder
-from .reduced_laser_encoder import ReducedLaserEncoder
-from .resnet_space_encoder import SemanticResNetSpaceEncoder
+from typing import Dict, List, Union, Any
 
 import rospy
+from rosnav.utils.observation_space.spaces.base_observation_space import (
+    BaseObservationSpace,
+)
+from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
+    BaseFeatureMapSpace,
+)
 
+from .default_encoder import DefaultEncoder
+from .encoder_factory import BaseSpaceEncoderFactory
+from .reduced_laser_encoder import ReducedLaserEncoder
+from .resnet_space_encoder import SemanticResNetSpaceEncoder
 
 """
     Provides a uniform interface between model and environment.
@@ -16,10 +23,31 @@ import rospy
 
 class RosnavSpaceManager:
     """
-    Manages the space encoding and decoding for the ROS navigation system.
+    Manages the observation and action spaces for the ROS navigation system.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        space_encoder_class=DefaultEncoder,
+        observation_spaces: List[
+            Union[BaseObservationSpace, BaseFeatureMapSpace]
+        ] = None,
+        observation_space_kwargs: Dict[str, Any] = None,
+        action_space_kwargs: Dict[str, Any] = None,
+    ):
+        """
+        Initializes the RosnavSpaceManager.
+
+        Args:
+            space_encoder_class (class, optional): The class for encoding the observation and action spaces. Defaults to None.
+            observation_spaces (List[Union[BaseObservationSpace, BaseFeatureMapSpace]], optional): The list of observation spaces. Defaults to None.
+            observation_space_kwargs (Dict[str, Any], optional): Additional keyword arguments for the observation spaces. Defaults to None.
+            action_space_kwargs (Dict[str, Any], optional): Additional keyword arguments for the action spaces. Defaults to None.
+        """
+        observation_spaces = observation_spaces or []
+        observation_space_kwargs = observation_space_kwargs or {}
+        action_space_kwargs = action_space_kwargs or {}
+
         self._stacked = rospy.get_param("rl_agent/frame_stacking/enabled")
         self._laser_num_beams = rospy.get_param("laser/num_beams")
         self._laser_max_range = rospy.get_param("laser/range")
@@ -37,39 +65,31 @@ class RosnavSpaceManager:
             else rospy.get_param("actions/continuous")
         )
 
-        self._encoder = BaseSpaceEncoderFactory.instantiate(
-            self._determine_encoder_name(),
-            action_space_kwargs={
-                "radius": self._radius,
-                "holonomic": self._is_holonomic,
-                "action_space_discrete": is_action_space_discrete,
-                "actions": actions,
-                "stacked": self._stacked,
-            },
-            observation_list=None,  # use default_observation_list
-            observation_kwargs={
-                "min_linear_vel": -2.0,
-                "max_linear_vel": 2.0,
-                "min_angular_vel": -4.0,
-                "max_angular_vel": 4.0,
-                "laser_num_beams": self._laser_num_beams,
-                "laser_max_range": self._laser_max_range,
-                "num_ped_types": self._num_ped_types,
-            },
-        )
+        _action_space_kwargs = {
+            "radius": self._radius,
+            "holonomic": self._is_holonomic,
+            "action_space_discrete": is_action_space_discrete,
+            "actions": actions,
+            "stacked": self._stacked,
+            **action_space_kwargs,
+        }
 
-    def _determine_encoder_name(self) -> str:
-        """
-        Determines the name of the encoder based on the ROS parameters.
-        Returns:
-            str: The name of the encoder.
-        """
-        if rospy.get_param("rl_agent/reduce_num_beams/enabled", False):
-            return "ReducedLaserEncoder"
-        if rospy.get_param("rl_agent/resnet", False):
-            return "SemanticResNetSpaceEncoder"
-        else:
-            return "DefaultEncoder"
+        _observation_kwargs = {
+            "min_linear_vel": -2.0,
+            "max_linear_vel": 2.0,
+            "min_angular_vel": -4.0,
+            "max_angular_vel": 4.0,
+            "laser_num_beams": self._laser_num_beams,
+            "laser_max_range": self._laser_max_range,
+            "num_ped_types": self._num_ped_types,
+            **observation_space_kwargs,
+        }
+
+        self._encoder = space_encoder_class(
+            action_space_kwargs=_action_space_kwargs,
+            observation_list=None,  # use default_observation_list
+            observation_kwargs=_observation_kwargs,
+        )
 
     @property
     def observation_space_manager(self):
