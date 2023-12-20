@@ -48,8 +48,7 @@ class EXTRACTOR_1(RosnavBaseExtractor):
         super(EXTRACTOR_1, self).__init__(
             observation_space=observation_space,
             observation_space_manager=observation_space_manager,
-            features_dim=features_dim
-            + (self._goal_size + self._last_action_size) * self._num_stacks,
+            features_dim=features_dim,
             stacked_obs=stacked_obs,
         )
 
@@ -67,7 +66,11 @@ class EXTRACTOR_1(RosnavBaseExtractor):
             n_flatten = self.cnn(tensor_forward).shape[-1]
 
         self.fc = nn.Sequential(
-            nn.Linear(n_flatten, self._features_dim),
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                self._features_dim,
+            ),
             nn.ReLU(),
         )
 
@@ -87,15 +90,19 @@ class EXTRACTOR_1(RosnavBaseExtractor):
             laser_scan = th.unsqueeze(observations[:, :-_robot_state_size], 1)
             robot_state = observations[:, -_robot_state_size:]
 
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state), 1)
+            cnn_features = self.cnn(laser_scan)
+            extracted_features = th.cat((cnn_features, robot_state), 1)
+            return self.fc(extracted_features)
         else:
             # observations in shape [batch_size, num_stacks, obs_size]
             laser_scan = observations[:, :, :-_robot_state_size]
             robot_state = observations[:, :, -_robot_state_size:].squeeze(0)
 
-            extracted_features = self.fc(self.cnn(laser_scan))
-            return th.cat((extracted_features, robot_state.flatten().unsqueeze(0)), 1)
+            cnn_features = self.cnn(laser_scan)
+            extracted_features = th.cat(
+                (cnn_features, robot_state.flatten().unsqueeze(0)), 1
+            )
+            return self.fc(extracted_features)
 
 
 class EXTRACTOR_2(EXTRACTOR_1):
@@ -143,7 +150,11 @@ class EXTRACTOR_2(EXTRACTOR_1):
             n_flatten = self.cnn(tensor_forward).shape[-1]
 
         self.fc = nn.Sequential(
-            nn.Linear(n_flatten, self._features_dim),
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                self._laser_size,
+            ),
             nn.ReLU(),
         )
 
@@ -181,7 +192,11 @@ class EXTRACTOR_3(EXTRACTOR_1):
             n_flatten = self.cnn(tensor_forward).shape[-1]
 
         self.fc = nn.Sequential(
-            nn.Linear(n_flatten, 256),
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                256,
+            ),
             nn.ReLU(),
             nn.Linear(256, self._features_dim),
             nn.ReLU(),
@@ -235,7 +250,11 @@ class EXTRACTOR_4(EXTRACTOR_1):
             n_flatten = self.cnn(tensor_forward).shape[-1]
 
         self.fc = nn.Sequential(
-            nn.Linear(n_flatten, 256),
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                256,
+            ),
             nn.ReLU(),
             nn.Linear(256, self._features_dim),
             nn.ReLU(),
@@ -277,7 +296,11 @@ class EXTRACTOR_5(EXTRACTOR_1):
             n_flatten = self.cnn(tensor_forward).shape[-1]
 
         self.fc = nn.Sequential(
-            nn.Linear(n_flatten, 256),
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                256,
+            ),
             nn.ReLU(),
             nn.Linear(256, self._features_dim),
             nn.ReLU(),
@@ -319,7 +342,11 @@ class EXTRACTOR_6(EXTRACTOR_1):
             n_flatten = self.cnn(tensor_forward).shape[-1]
 
         self.fc = nn.Sequential(
-            nn.Linear(n_flatten, 256),
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                256,
+            ),
             nn.ReLU(),
             nn.Linear(256, self._features_dim),
             nn.ReLU(),
@@ -373,7 +400,11 @@ class EXTRACTOR_7(EXTRACTOR_1):
             n_flatten = self.cnn(tensor_forward).shape[-1]
 
         self.fc = nn.Sequential(
-            nn.Linear(n_flatten, 256),
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                256,
+            ),
             nn.ReLU(),
             nn.Linear(256, self._features_dim),
             nn.ReLU(),
@@ -431,10 +462,14 @@ class EXTRACTOR_8(EXTRACTOR_1):
         with th.no_grad():
             desired_shape = (1, self._num_stacks, self._laser_size)
             tensor_forward = th.randn(desired_shape)
-            n_flatten = self.cnn(tensor_forward).shape[-1]
+            n_flatten = self.cnn(tensor_forward).shape[1]
 
         self.fc = nn.Sequential(
-            nn.Linear(n_flatten, 256),
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                256,
+            ),
             nn.ReLU(),
             nn.Linear(256, self._features_dim),
             nn.ReLU(),
