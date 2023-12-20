@@ -135,14 +135,18 @@ class ObservationSpaceManager:
             np.ndarray: The encoded observation.
 
         """
-        return np.concatenate(
+        _concatenated = np.concatenate(
             [
                 self._space_containers[space.name].encode_observation(
                     observation, **kwargs
                 )
                 for space in self._spacelist
             ],
-            axis=0 if self._frame_stacking else 1,
+        )
+        return (
+            _concatenated
+            if not self._frame_stacking
+            else np.expand_dims(_concatenated, axis=0)
         )
 
     def get_space_container(
