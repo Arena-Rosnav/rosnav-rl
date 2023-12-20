@@ -173,19 +173,20 @@ class Bottleneck(nn.Module):
 
 class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
     """
-    This class defines a custom feature extractor `SEM_EXTRACTOR_1` that inherits from `BaseFeaturesExtractor`.
-    It is supposed to be part of an middle-fusion-network.
+    Feature extractor class that implements a mid-fusion ResNet-based architecture.
 
-    The feature extractor consists of a fusion net and a goal net.
-    The fusion net processes the input data (pedestrian position and scan) and the goal net processes the goal tensor.
-    The fusion net includes convolutional layers, batch normalization, and residual connections using bottleneck blocks.
-
-    Required observations:
-        - Stacked laser map
-        - Pedestrian location
-        - Pedestrian type
-        - Goal
-
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment
+        observation_space_manager (ObservationSpaceManager): The observation space manager
+        features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
+        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
+        layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
+        zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
+        groups (int, optional): The number of groups to use in the ResNet architecture. Defaults to 1.
+        width_per_group (int, optional): The width of each group in the ResNet architecture. Defaults to 64.
+        replace_stride_with_dilation (List[bool], optional): Whether to replace stride with dilation in each block of the ResNet architecture. Defaults to None.
+        norm_layer (nn.Module, optional): The normalization layer to use in the ResNet architecture. Defaults to nn.BatchNorm2d.
     """
 
     REQUIRED_OBSERVATIONS = [
@@ -209,21 +210,13 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: nn.Module = nn.BatchNorm2d,
     ):
-        """
-        Initializes the SEM_EXTRACTOR_1 feature extractor.
-
-        Args:
-            observation_space (gym.spaces.Box): Observation space of the environment
-            features_dim (int, optional): Number of features extracted. Defaults to 256.
-        """
-        # network parameters:
-        # block = Bottleneck
-        # layers = [2, 1, 1]
-        # zero_init_residual = True
-        # groups = 1
-        # width_per_group = 64
-        # replace_stride_with_dilation = None
-        # norm_layer = None
+        self._block = block
+        self._groups = groups
+        self._layers = layers
+        self._width_per_group = width_per_group
+        self._replace_stride_with_dilation = replace_stride_with_dilation
+        self._norm_layer = norm_layer
+        self._zero_init_residual = zero_init_residual
 
         # superclass properties/methods
         super(MID_FUSION_BOTTLENECK_EXTRACTOR_1, self).__init__(
@@ -233,25 +226,23 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
             stacked_obs=stacked_obs,
         )
 
-        self._observation_space_manager = observation_space_manager
-
         ### FUSION INPUT SIZES
         self._get_input_sizes()
 
-        self._setup_network(
-            block,
-            groups,
-            layers,
-            width_per_group,
-            replace_stride_with_dilation,
-            norm_layer,
-            zero_init_residual,
-        )
-
     def _get_input_sizes(self):
-        self._feature_map_size = self._observation_space_manager[
+        """
+        Calculate the input sizes for the feature extraction process.
+
+        This method calculates the input sizes required for the feature extraction process
+        based on the observation space manager. It sets the values for the feature map size,
+        scan map size, pedestrian map size, and goal size.
+
+        Returns:
+            None
+        """
+        self._feature_map_size = self._observation_space_manager.get_space_container(
             SPACE_INDEX.PEDESTRIAN_LOCATION
-        ].feature_map_size
+        ).feature_map_size
         self._scan_map_size = self._observation_space_manager[
             SPACE_INDEX.STACKED_LASER_MAP
         ].shape[-1]
@@ -261,46 +252,46 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         )
         self._goal_size = self._observation_space_manager[SPACE_INDEX.GOAL].shape[-1]
 
-    def _setup_network(
-        self,
-        block: nn.Module,
-        groups: int,
-        layers: List[int],
-        width_per_group: int,
-        replace_stride_with_dilation: List[bool],
-        norm_layer: nn.Module,
-        zero_init_residual: bool,
-    ):
+    def _setup_network(self):
+        """
+        Sets up the network architecture for feature extraction.
+        """
         ################## ped_pos net model: ###################
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
-        self._norm_layer = norm_layer
+        if self._norm_layer is None:
+            self._norm_layer = nn.BatchNorm2d
 
         self.inplanes = 64
         self.dilation = 1
-        if replace_stride_with_dilation is None:
+        if self._replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
             # the 2x2 stride with a dilated convolution instead
-            replace_stride_with_dilation = [False] * len(layers)
-        if len(replace_stride_with_dilation) != len(layers):
+            self._replace_stride_with_dilation = [False] * len(self._layers)
+        if len(self._replace_stride_with_dilation) != len(self._layers):
             raise ValueError(
                 "replace_stride_with_dilation should be None "
-                f"or a {len(layers)}-element tuple, got {replace_stride_with_dilation}"
+                f"or a {len(self._layers)}-element tuple, got {self._replace_stride_with_dilation}"
             )
-        self.groups = groups
-        self.base_width = width_per_group
+        self.base_width = self._width_per_group
         self.conv1 = nn.Conv2d(
             3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
         )
-        self.bn1 = norm_layer(self.inplanes)
+        self.bn1 = self._norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer1 = self._make_layer(self._block, 64, self._layers[0])
         self.layer2 = self._make_layer(
-            block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0]
+            self._block,
+            128,
+            self._layers[1],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[0],
         )
         self.layer3 = self._make_layer(
-            block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1]
+            self._block,
+            256,
+            self._layers[2],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[1],
         )
 
         self.conv2_2 = nn.Sequential(
@@ -387,7 +378,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         #                               dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
-            nn.Linear(256 * block.expansion + 2, self._features_dim),
+            nn.Linear(256 * self._block.expansion + 2, self._features_dim),
             # nn.BatchNorm1d(features_dim),
             nn.ReLU(),
         )
@@ -407,7 +398,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         # Zero-initialize the last BN in each residual branch,
         # so that the residual branch starts with zeros, and each residual block behaves like an identity.
         # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
-        if zero_init_residual:
+        if self._zero_init_residual:
             for m in self.modules():
                 if isinstance(m, Bottleneck):
                     nn.init.constant_(m.bn3.weight, 0)
@@ -452,7 +443,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
                 planes,
                 stride,
                 downsample,
-                self.groups,
+                self._groups,
                 self.base_width,
                 previous_dilation,
                 norm_layer,
@@ -464,7 +455,7 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
                 block(
                     self.inplanes,
                     planes,
-                    groups=self.groups,
+                    groups=self._groups,
                     base_width=self.base_width,
                     dilation=self.dilation,
                     norm_layer=norm_layer,
