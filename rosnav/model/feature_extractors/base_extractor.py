@@ -34,6 +34,8 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
         observation_space_manager: ObservationSpaceManager,
         features_dim: int,
         stacked_obs: bool = False,
+        *args,
+        **kwargs
     ):
         """
         Initialize the base feature extractor.
@@ -53,10 +55,10 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
             features_dim=features_dim,
         )
 
-        self._setup_network()
+        self._setup_network(**kwargs)
 
     @abstractmethod
-    def _setup_network(self):
+    def _setup_network(self, *args, **kwargs):
         """
         Set up the network architecture for feature extraction.
         """
