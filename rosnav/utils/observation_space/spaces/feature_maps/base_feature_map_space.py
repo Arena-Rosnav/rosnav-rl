@@ -3,6 +3,8 @@ from typing import List
 
 import numpy as np
 import pedsim_msgs.msg as pedsim_msgs
+from geometry_msgs.msg import Point, Pose2D
+
 
 from ..base_observation_space import BaseObservationSpace
 
@@ -105,10 +107,28 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         Returns:
             tuple: The relative position.
         """
+        if isinstance(reference_frame, Point):
+            return (
+                distant_frame.x - reference_frame.x,
+                distant_frame.y - reference_frame.y,
+                distant_frame.z - reference_frame.z,
+            )
+        return BaseFeatureMapSpace.get_relative_pos2d(reference_frame, distant_frame)
+
+    def get_relative_pos2d(reference_frame, distant_frame) -> tuple:
+        """
+        Get the relative position between a reference frame and a distant frame.
+
+        Args:
+            reference_frame: The reference frame.
+            distant_frame: The distant frame.
+
+        Returns:
+            tuple: The relative position.
+        """
         return (
             distant_frame.x - reference_frame.x,
             distant_frame.y - reference_frame.y,
-            distant_frame.z - reference_frame.z,
         )
 
     @abstractmethod
