@@ -77,4 +77,4 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         return self._get_semantic_map(
             observation[SemanticAttribute.PEDESTRIAN_VEL_X.value],
             observation[OBS_DICT_KEYS.ROBOT_POSE],
-        )
+        ).flatten()

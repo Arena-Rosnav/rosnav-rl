@@ -74,6 +74,6 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[SemanticAttribute.PEDESTRIAN_LOCATION.value],
+            observation[SemanticAttribute.IS_PEDESTRIAN.value],
             observation[OBS_DICT_KEYS.ROBOT_POSE],
-        )
+        ).flatten()
