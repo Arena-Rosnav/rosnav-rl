@@ -107,7 +107,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         Returns:
             tuple: The relative position.
         """
-        if isinstance(reference_frame, Point):
+        if isinstance(reference_frame, Point) and isinstance(distant_frame, Point):
             return (
                 distant_frame.x - reference_frame.x,
                 distant_frame.y - reference_frame.y,
@@ -115,6 +115,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             )
         return BaseFeatureMapSpace.get_relative_pos2d(reference_frame, distant_frame)
 
+    @staticmethod
     def get_relative_pos2d(reference_frame, distant_frame) -> tuple:
         """
         Get the relative position between a reference frame and a distant frame.
