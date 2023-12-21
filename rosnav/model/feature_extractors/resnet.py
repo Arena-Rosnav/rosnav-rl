@@ -539,10 +539,14 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         # last_action = observations[:, 32002:32005]
         if not self._stacked_obs:
             scan = observations[:, : self._scan_map_size]
-            ped_pos = observations[:, self._scan_map_size : self._ped_map_size]
+            ped_pos = observations[
+                :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
+            ]
             goal = observations[:, : -self._goal_size]
         else:
-            scan = observations[:, : self._scan_map_size]
-            ped_pos = observations[:, self._scan_map_size : self._ped_map_size]
-            goal = observations[:, : -self._goal_size]
+            scan = observations[:, :, : self._scan_map_size]
+            ped_pos = observations[
+                :, :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
+            ]
+            goal = observations[:, :, : -self._goal_size]
         return self._forward_impl(ped_pos, scan, goal)
