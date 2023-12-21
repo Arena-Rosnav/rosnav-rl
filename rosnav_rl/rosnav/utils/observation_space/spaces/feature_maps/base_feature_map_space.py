@@ -1,7 +1,8 @@
+from abc import abstractmethod
 from typing import List
 
 import numpy as np
-from pedsim_msgs.msg import SemanticDatum
+import pedsim_msgs.msg as pedsim_msgs
 
 from ..base_observation_space import BaseObservationSpace
 
@@ -67,13 +68,13 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         return x, y
 
     def _get_semantic_map(
-        self, semantic_data: List[SemanticDatum], robot_pose
+        self, semantic_data: List[pedsim_msgs.SemanticData], robot_pose
     ) -> np.ndarray:
         """
         Get the semantic map based on the semantic data and robot pose.
 
         Args:
-            semantic_data (List[SemanticDatum]): The semantic data.
+            semantic_data (List[pedsim_msgs.SemanticData]): The semantic data.
             robot_pose: The robot pose.
 
         Returns:
@@ -82,7 +83,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         pos_map = np.zeros((self._feature_map_size, self._feature_map_size))
         map_size = pos_map.shape[0]
 
-        for data in semantic_data:
+        for data in semantic_data.points:
             relative_pos = BaseFeatureMapSpace.get_relative_pos(
                 data.location, robot_pose
             )
@@ -109,3 +110,18 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             distant_frame.y - reference_frame.y,
             distant_frame.z - reference_frame.z,
         )
+
+    @abstractmethod
+    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+        """
+        Encodes the observation into a numpy array.
+
+        Args:
+            observation (dict): The observation dictionary.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            np.ndarray: The encoded observation as a numpy array.
+        """
+        raise NotImplementedError
