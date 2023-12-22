@@ -44,7 +44,6 @@ class RosnavSpaceManager:
             observation_space_kwargs (Dict[str, Any], optional): Additional keyword arguments for the observation spaces. Defaults to None.
             action_space_kwargs (Dict[str, Any], optional): Additional keyword arguments for the action spaces. Defaults to None.
         """
-        observation_spaces = observation_spaces or []
         observation_space_kwargs = observation_space_kwargs or {}
         action_space_kwargs = action_space_kwargs or {}
 
@@ -54,7 +53,12 @@ class RosnavSpaceManager:
         self._radius = rospy.get_param("robot_radius")
         self._is_holonomic = rospy.get_param("is_holonomic")
 
+        # TODO: add num_ped_types to rosparam
         self._num_ped_types = 5
+        self._ped_min_speed_x = -5.0
+        self._ped_max_speed_x = 5.0
+        self._ped_min_speed_y = -5.0
+        self._ped_max_speed_y = 5.0
 
         is_action_space_discrete = rospy.get_param(
             "rl_agent/action_space/discrete", False
@@ -82,12 +86,16 @@ class RosnavSpaceManager:
             "laser_num_beams": self._laser_num_beams,
             "laser_max_range": self._laser_max_range,
             "num_ped_types": self._num_ped_types,
+            "min_speed_x": self._ped_min_speed_x,
+            "max_speed_x": self._ped_max_speed_x,
+            "min_speed_y": self._ped_min_speed_y,
+            "max_speed_y": self._ped_max_speed_y,
             **observation_space_kwargs,
         }
 
         self._encoder = space_encoder_class(
             action_space_kwargs=_action_space_kwargs,
-            observation_list=None,  # use default_observation_list
+            observation_list=observation_spaces,  # use default_observation_list
             observation_kwargs=_observation_kwargs,
         )
 

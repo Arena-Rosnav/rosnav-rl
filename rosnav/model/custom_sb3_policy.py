@@ -1,4 +1,8 @@
 """Custom policies built by SB3 during runtime through parsing 'policy_kwargs'"""
+from rosnav.model.feature_extractors.resnet.resnet import (
+    RESNET_MID_FUSION_EXTRACTOR_1,
+    RESNET_MID_FUSION_EXTRACTOR_2,
+)
 from rosnav.rosnav_space_manager.resnet_space_encoder import SemanticResNetSpaceEncoder
 from torch import nn
 
@@ -681,14 +685,37 @@ class BarnResNet(BaseAgent):
         "feature_map_size": 80,
         "laser_stack_size": 10,
     }
-    features_extractor_class = MID_FUSION_BOTTLENECK_EXTRACTOR_1
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_1
     features_extractor_kwargs = {}
     net_arch = [256, 64]
     activation_fn = nn.ReLU
 
 
-@AgentFactory.register("RosnavResNet")
-class RosnavResNet(BaseAgent):
+@AgentFactory.register("RosnavResNet_1")
+class RosnavResNet_1(BaseAgent):
+    type = PolicyType.CNN
+    space_encoder_class = SemanticResNetSpaceEncoder
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.GOAL,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+    }
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_2
+    features_extractor_kwargs = {}
+    net_arch = [256, 64]
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("RosnavResNet_2")
+class RosnavResNet_2(BaseAgent):
     type = PolicyType.CNN
     space_encoder_class = SemanticResNetSpaceEncoder
     observation_spaces = [
@@ -705,7 +732,7 @@ class RosnavResNet(BaseAgent):
         "feature_map_size": 80,
         "laser_stack_size": 10,
     }
-    features_extractor_class = MID_FUSION_BOTTLENECK_EXTRACTOR_1
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_2
     features_extractor_kwargs = {}
     net_arch = [256, 64]
     activation_fn = nn.ReLU
