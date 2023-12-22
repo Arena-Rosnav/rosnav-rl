@@ -14,9 +14,12 @@ Details:
     - The feature extractor takes input observations and performs a series of convolutional and 
         batch normalization operations, followed by fusion and goal networks to extract features.
 """
+from copy import deepcopy
 from typing import List
 
 import gymnasium as gym
+from gymnasium.spaces.box import Box
+from torch.nn.modules import BatchNorm2d, Module
 import rospy
 import torch
 import torch.nn as nn
@@ -24,154 +27,15 @@ from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
 from rosnav.utils.observation_space.space_index import SPACE_INDEX
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from .base_extractor import RosnavBaseExtractor
 
-__all__ = ["MID_FUSION_BOTTLENECK_EXTRACTOR_1"]
+from ..base_extractor import RosnavBaseExtractor
+from .bottleneck import Bottleneck
+from .utils import conv1x1, conv3x3
 
-
-def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1) -> nn.Conv2d:
-    """
-    3x3 convolution with padding
-
-    Args:
-        in_planes (int): Number of input channels
-        out_planes (int): Number of output channels
-        stride (int, optional): Stride for the convolution. Defaults to 1.
-        groups (int, optional): Number of groups for grouped convolution. Defaults to 1.
-        dilation (int, optional): Dilation rate for dilated convolution. Defaults to 1.
-
-    Returns:
-        nn.Conv2d: 3x3 convolutional layer with specified parameters
-    """
-    return nn.Conv2d(
-        in_planes,
-        out_planes,
-        kernel_size=3,
-        stride=stride,
-        padding=dilation,
-        groups=groups,
-        bias=False,
-        dilation=dilation,
-    )
+__all__ = ["RESNET_MID_FUSION_EXTRACTOR_1", "RESNET_MID_FUSION_EXTRACTOR_2"]
 
 
-def conv1x1(in_planes, out_planes, stride=1) -> nn.Conv2d:
-    """
-    1x1 convolution
-
-    Args:
-        in_planes (int): Number of input channels
-        out_planes (int): Number of output channels
-        stride (int, optional): Stride for the convolution. Defaults to 1.
-
-    Returns:
-        nn.Conv2d: 1x1 convolutional layer with specified parameters
-    """
-    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
-
-
-class Bottleneck(nn.Module):
-    """
-    The `Bottleneck` class is a module in the torchvision library that implements a variant of the
-    ResNet architecture known as ResNet V1.5. It is designed to improve accuracy for image recognition tasks.
-    The class consists of an initialization method and a forward method.
-
-    Note:
-        Bottleneck in torchvision places the stride for downsampling at 3x3 convolution(self.conv2)
-        while original implementation places the stride at the first 1x1 convolution(self.conv1)
-        according to "Deep residual learning for image recognition"https://arxiv.org/abs/1512.03385.
-        This variant is also known as ResNet V1.5 and improves accuracy according to
-        https://ngc.nvidia.com/catalog/model-scripts/nvidia:resnet_50_v1_5_for_pytorch.
-    """
-
-    expansion = 2  # 4
-
-    def __init__(
-        self,
-        inplanes: int,
-        planes: int,
-        stride: int = 1,
-        downsample: callable = None,
-        groups: int = 1,
-        base_width: int = 64,
-        dilation: int = 1,
-        norm_layer: nn.Module = None,
-    ):
-        """
-        The method initializes various layers and parameters including:
-            - convolutional layers (`conv1`, `conv2`, `conv3`),
-            - batch normalization layers (`bn1`, `bn2`, `bn3`),
-            - ReLU activation function (`relu`),
-            - downsampling function (`downsample`),
-            - and stride (`stride`).
-
-        Args:
-            inplanes (int): Number of input channels
-            planes (int): Number of output channels
-            stride (int, optional): Stride for downsampling. Defaults to 1.
-            downsample (callable, optional): Optional downsampling function. Defaults to None.
-            groups (int, optional): Number of groups for grouped convolution. Defaults to 1.
-            base_width (int, optional): Base width for the bottleneck. Defaults to 64.
-            dilation (int, optional): Dilation rate for dilated convolution. Defaults to 1.
-            norm_layer (nn.Module, optional): Normalization layer. Defaults to None.
-        """
-        super(Bottleneck, self).__init__()
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
-        width = int(planes * (base_width / 64.0)) * groups
-        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
-        self.conv1 = conv1x1(inplanes, width)
-        self.bn1 = norm_layer(width)
-        self.conv2 = conv3x3(width, width, stride, groups, dilation)
-        self.bn2 = norm_layer(width)
-        self.conv3 = conv1x1(width, planes * self.expansion)
-        self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        The forward pass takes an input tensor `x` and performs the following operations:
-            1. Assigns the input tensor to the variable `identity`
-            2. Applies a 1x1 convolution, batch normalization, and ReLU activation (conv1, bn1, relu)
-            3. Applies a 3x3 convolution, batch normalization, and ReLU activation (conv2, bn2, relu)
-            4. Applies another 1x1 convolution and batch normalization (conv3, bn3)
-            5. If downsampling is specified, applies the downsampling function to the input tensor
-            6. Adds the input tensor to the output tensor (Skip-Connection)
-            7. Applies ReLU activation to the output tensor
-            8. Returns the output tensor
-
-        Args:
-            x (torch.Tensor): Input tensor.
-
-        Returns:
-            torch.Tensor: Output tensor.
-        """
-        identity = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out = self.relu(out)
-
-        out = self.conv3(out)
-        out = self.bn3(out)
-
-        if self.downsample is not None:
-            identity = self.downsample(x)
-
-        out += identity
-        out = self.relu(out)
-
-        return out
-
-
-class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
+class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     """
     Feature extractor class that implements a mid-fusion ResNet-based architecture.
 
@@ -219,12 +83,14 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         self._zero_init_residual = zero_init_residual
 
         # superclass properties/methods
-        super(MID_FUSION_BOTTLENECK_EXTRACTOR_1, self).__init__(
+        super(RESNET_MID_FUSION_EXTRACTOR_1, self).__init__(
             observation_space=observation_space,
             observation_space_manager=observation_space_manager,
             features_dim=features_dim,
             stacked_obs=stacked_obs,
         )
+
+        self._init_layer_weights()
 
         ### FUSION INPUT SIZES
         self._get_input_sizes()
@@ -383,6 +249,16 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
             nn.ReLU(),
         )
 
+    def _init_layer_weights(self):
+        """
+        Initialize the layers of the ResNet model.
+
+        This function initializes the convolutional layers, batch normalization layers, and linear layers
+        of the ResNet model. It uses different initialization methods for different types of layers.
+
+        Returns:
+            None
+        """
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
@@ -484,6 +360,8 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
         fusion_in = torch.cat((scan_in, ped_in), dim=1)
 
         # See note [TorchScript super()]
+        # extra layer conv, bn, relu
+
         x = self.conv1(fusion_in)
         x = self.bn1(x)
         x = self.relu(x)
@@ -550,3 +428,310 @@ class MID_FUSION_BOTTLENECK_EXTRACTOR_1(RosnavBaseExtractor):
             ]
             goal = observations[:, :, -self._goal_size :]
         return self._forward_impl(ped_pos, scan, goal)
+
+
+class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
+    """
+    Feature extractor class that implements a mid-fusion ResNet-based architecture.
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment
+        observation_space_manager (ObservationSpaceManager): The observation space manager
+        features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
+        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
+        layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
+        zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
+        groups (int, optional): The number of groups to use in the ResNet architecture. Defaults to 1.
+        width_per_group (int, optional): The width of each group in the ResNet architecture. Defaults to 64.
+        replace_stride_with_dilation (List[bool], optional): Whether to replace stride with dilation in each block of the ResNet architecture. Defaults to None.
+        norm_layer (nn.Module, optional): The normalization layer to use in the ResNet architecture. Defaults to nn.BatchNorm2d.
+    """
+
+    REQUIRED_OBSERVATIONS = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.GOAL,
+    ]
+
+    def __init__(
+        self,
+        observation_space: Box,
+        observation_space_manager: ObservationSpaceManager,
+        features_dim: int = 256,
+        stacked_obs: bool = False,
+        block: Module = Bottleneck,
+        layers: list = [2, 1, 1, 1],
+        zero_init_residual: bool = True,
+        groups: int = 1,
+        width_per_group: int = 64,
+        replace_stride_with_dilation: List[bool] = None,
+        norm_layer: Module = nn.BatchNorm2d,
+    ):
+        super().__init__(
+            observation_space,
+            observation_space_manager,
+            features_dim,
+            stacked_obs,
+            block,
+            layers,
+            zero_init_residual,
+            groups,
+            width_per_group,
+            replace_stride_with_dilation,
+            norm_layer,
+        )
+
+    def _get_input_sizes(self):
+        """
+        Calculate the input sizes for the feature extraction process.
+
+        This method calculates the input sizes required for the feature extraction process
+        based on the observation space manager. It sets the values for the feature map size,
+        scan map size, pedestrian map size, and goal size.
+
+        Returns:
+            None
+        """
+        super()._get_input_sizes()
+        self._ped_map_size = (
+            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_LOCATION].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
+        )
+
+    def _setup_network(self):
+        """
+        Sets up the network architecture for feature extraction.
+        """
+        ################## ped_pos net model: ###################
+        if self._norm_layer is None:
+            self._norm_layer = nn.BatchNorm2d
+
+        self.inplanes = 64
+        self.dilation = 1
+        if self._replace_stride_with_dilation is None:
+            # each element in the tuple indicates if we should replace
+            # the 2x2 stride with a dilated convolution instead
+            self._replace_stride_with_dilation = [False] * len(self._layers)
+        if len(self._replace_stride_with_dilation) != len(self._layers):
+            raise ValueError(
+                "replace_stride_with_dilation should be None "
+                f"or a {len(self._layers)}-element tuple, got {self._replace_stride_with_dilation}"
+            )
+        self.base_width = self._width_per_group
+
+        # pre conv1
+        self.conv1_1 = nn.Conv2d(
+            5, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
+        )
+        self.bn1_1 = self._norm_layer(self.inplanes)
+        self.relu1_1 = nn.ReLU(inplace=True)
+
+        self.conv1 = nn.Conv2d(
+            self.inplanes, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
+        )
+        self.bn1 = self._norm_layer(self.inplanes)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        self.layer1 = self._make_layer(self._block, 64, self._layers[0])
+        self.layer2 = self._make_layer(
+            self._block,
+            128,
+            self._layers[1],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[0],
+        )
+        self.layer3 = self._make_layer(
+            self._block,
+            256,
+            self._layers[2],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[1],
+        )
+
+        self.conv2_2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=128,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=128,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(1, 1),
+            ),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+        )
+        self.downsample2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(2, 2),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+        )
+        self.relu2 = nn.ReLU(inplace=True)
+
+        self.conv3_2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=512,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=256,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(1, 1),
+            ),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=512,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(512),
+        )
+        self.downsample3 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=512,
+                kernel_size=(1, 1),
+                stride=(4, 4),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(512),
+        )
+        self.relu3 = nn.ReLU(inplace=True)
+
+        # self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+        #                               dilate=replace_stride_with_dilation[2])
+
+        # extra block at the end
+        self.layer4 = self._make_layer(
+            self._block,
+            256,
+            self._layers[3],
+            stride=1,
+            dilate=self._replace_stride_with_dilation[2],
+        )
+
+        self.conv4_2 = deepcopy(self.conv3_2)
+        self.downsample4 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=512,
+                kernel_size=(1, 1),
+                stride=(2, 2),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(512),
+        )
+        self.relu4 = nn.ReLU(inplace=True)
+
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.linear_fc = nn.Sequential(
+            nn.Linear(256 * self._block.expansion + 2, self._features_dim),
+            # nn.BatchNorm1d(features_dim),
+            nn.ReLU(),
+        )
+
+    def _forward_impl(
+        self, ped_pos: torch.Tensor, scan: torch.Tensor, goal: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Implements the forward pass for the feature extractor.
+
+        Args:
+            ped_pos (torch.Tensor): Pedestrian position tensor
+            scan (torch.Tensor): Scan tensor
+            goal (torch.Tensor): Goal tensor
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass
+        """
+        ###### Start of fusion net ######
+        ped_in = ped_pos.reshape(-1, 4, self._feature_map_size, self._feature_map_size)
+        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
+        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+
+        # See note [TorchScript super()]
+        # extra layer conv, bn, relu
+        x = self.conv1_1(fusion_in)
+        x = self.bn1_1(x)
+        x = self.relu1_1(x)
+
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        identity3 = self.downsample3(x)  # in: 64, out: 512
+
+        x = self.layer1(x)  # in: 64, out: 128
+
+        identity2 = self.downsample2(x)  # in: 128, out: 256
+
+        x = self.layer2(x)  # in: 256, out: 256
+
+        identity1 = self.downsample4(x)  # in: 256, out: 512
+
+        x = self.conv2_2(x)  # in: 256, out: 256
+        x += identity2
+        x = self.relu2(x)
+
+        x = self.layer3(x)  # in: 256, out: 512
+
+        x = self.conv3_2(x)  # in: 512, out: 512
+        x += identity1  # 512
+        x = self.relu3(x)
+
+        x = self.layer4(x)
+
+        x = self.conv4_2(x)  # in: 512, out: 512
+        x += identity3  # 512
+        x = self.relu4(x)
+
+        x = self.avgpool(x)
+        fusion_out = torch.flatten(x, 1)
+        ###### End of fusion net ######
+
+        ###### Start of goal net #######
+        goal_in = goal.reshape(-1, 2)
+        goal_out = torch.flatten(goal_in, 1)
+        ###### End of goal net #######
+        # Combine
+        fc_in = torch.cat((fusion_out, goal_out), dim=1)
+        x = self.linear_fc(fc_in)
+
+        return x
