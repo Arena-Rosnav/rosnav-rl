@@ -2,12 +2,12 @@ import math
 
 import numpy as np
 import rospy
-from gym import spaces
+from gymnasium import spaces
 
-from ..utils.utils import stack_spaces
+from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
 from .base_space_encoder import BaseSpaceEncoder
-from .encoder_factory import BaseSpaceEncoderFactory
 from .default_encoder import DefaultEncoder
+from .encoder_factory import BaseSpaceEncoderFactory
 
 """
 
@@ -23,46 +23,59 @@ from .default_encoder import DefaultEncoder
 
 @BaseSpaceEncoderFactory.register("ReducedLaserEncoder")
 class ReducedLaserEncoder(DefaultEncoder):
-    def __init__(self, *args):
-        super().__init__(*args)
+    """
+    Encoder class for reducing the number of laser beams in the observation.
+
+    Args:
+        observation_kwargs (dict): Additional keyword arguments for observation configuration.
+
+    Attributes:
+        _reduced_num_laser_beams (int): Number of reduced laser beams.
+
+    Methods:
+        encode_observation: Encodes the observation with reduced laser beams.
+        reduce_laserbeams: Reduces the number of laser beams in the laser scan.
+
+    """
+
+    def __init__(self, observation_kwargs: dict = None, *args, **kwargs):
         self._reduced_num_laser_beams = rospy.get_param(
             "laser/reduced_num_laser_beams", self._laser_num_beams
         )
+        observation_kwargs["laser_num_beams"] = self._reduced_num_laser_beams
+        super().__init__(observation_kwargs=observation_kwargs, **kwargs)
 
     def encode_observation(self, observation: dict, structure: list) -> np.ndarray:
-        if "laser_scan" in structure:
-            observation["laser_scan"] = ReducedLaserEncoder.reduce_laserbeams(
-                observation["laser_scan"], self._reduced_num_laser_beams
-            )
+        """
+        Encodes the observation with reduced laser beams.
+
+        Args:
+            observation (dict): The observation dictionary.
+            structure (list): The structure of the observation.
+
+        Returns:
+            np.ndarray: The encoded observation.
+
+        """
+        observation["laser_scan"] = ReducedLaserEncoder.reduce_laserbeams(
+            observation["laser_scan"], self._reduced_num_laser_beams
+        )
 
         return super().encode_observation(observation, structure)
 
-    def get_observation_space(self):
-        return stack_spaces(
-            spaces.Box(
-                low=0,
-                high=self._laser_max_range,
-                shape=(self._reduced_num_laser_beams,),
-                dtype=np.float32,
-            ),
-            spaces.Box(low=0, high=20, shape=(1,), dtype=np.float32),
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
-            spaces.Box(
-                low=-2.0,
-                high=2.0,
-                shape=(2,),
-                dtype=np.float32,  # linear vel
-            ),
-            spaces.Box(
-                low=-4.0,
-                high=4.0,
-                shape=(1,),
-                dtype=np.float32,  # angular vel
-            ),
-        )
-
     @staticmethod
     def reduce_laserbeams(laserbeams: np.ndarray, x: int) -> np.ndarray:
+        """
+        Reduces the number of laser beams in the laser scan.
+
+        Args:
+            laserbeams (np.ndarray): The laser scan array.
+            x (int): The desired number of reduced laser beams.
+
+        Returns:
+            np.ndarray: The laser scan array with reduced beams.
+
+        """
         if x >= len(laserbeams):
             return laserbeams
         indices = np.round(np.linspace(0, len(laserbeams) - 1, x)).astype(int)[:x]

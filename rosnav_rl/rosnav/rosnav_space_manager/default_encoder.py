@@ -1,7 +1,11 @@
-import numpy as np
-from gym import spaces
+from typing import List
 
-from ..utils.utils import stack_spaces
+import numpy as np
+from gymnasium import spaces
+
+from ..utils.action_space.action_space_manager import ActionSpaceManager
+from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
+from ..utils.observation_space.space_index import SPACE_INDEX
 from .base_space_encoder import BaseSpaceEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
 
@@ -17,109 +21,152 @@ from .encoder_factory import BaseSpaceEncoderFactory
 
 @BaseSpaceEncoderFactory.register("DefaultEncoder")
 class DefaultEncoder(BaseSpaceEncoder):
-    def __init__(self, *args):
-        super().__init__(*args)
+    """
+    DefaultEncoder class is responsible for encoding and decoding actions and observations
+    using the default action and observation space managers.
+    """
 
-    def decode_action(self, action):
-        if (
-            self._is_action_space_discrete
-            and type(action) is list
-            or type(action) is np.ndarray
-        ):
-            action = action[0]
+    DEFAULT_OBS_LIST = [
+        SPACE_INDEX.LASER,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
 
-        if self._is_action_space_discrete:
-            return self._extend_action_array(self._translate_disc_action(action))
+    def __init__(
+        self,
+        action_space_kwargs: dict,
+        observation_list: List[SPACE_INDEX] = None,
+        observation_kwargs: dict = None,
+        *args,
+        **kwargs
+    ):
+        """
+        Initializes a new instance of the DefaultEncoder class.
 
-        return self._extend_action_array(action)
+        Args:
+            action_space_kwargs (dict): Keyword arguments for configuring the action space manager.
+            observation_list (List[SPACE_INDEX], optional): List of observation spaces to include. Defaults to None.
+            observation_kwargs (dict, optional): Keyword arguments for configuring the observation space manager. Defaults to None.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+        """
+        super().__init__(**action_space_kwargs, **observation_kwargs, **kwargs)
+        self._observation_list = observation_list
+        self._observation_kwargs = observation_kwargs
+        self.setup_action_space(action_space_kwargs)
+        self.setup_observation_space(observation_list, observation_kwargs)
 
-    def _extend_action_array(self, action: np.ndarray) -> np.ndarray:
-        if self._is_holonomic:
-            assert (
-                self._is_holonomic and len(action) == 3
-            ), "Robot is holonomic but action with only two freedoms of movement provided"
+    @property
+    def observation_space(self) -> spaces.Space:
+        """
+        Gets the observation space.
 
-            return action
-        else:
-            assert (
-                not self._is_holonomic and len(action) == 2
-            ), "Robot is non-holonomic but action with more than two freedoms of movement provided"
-            return np.array([action[0], 0, action[1]])
+        Returns:
+            spaces.Space: The observation space.
+        """
+        return self._observation_space_manager.observation_space
 
-    def _translate_disc_action(self, action):
-        assert (
-            not self._is_holonomic
-        ), "Discrete action space currently not supported for holonomic robots"
+    @property
+    def action_space(self) -> spaces.Space:
+        """
+        Gets the action space.
 
-        return np.array(
-            [self._actions[action]["linear"], self._actions[action]["angular"]]
+        Returns:
+            spaces.Space: The action space.
+        """
+        return self._action_space_manager.action_space
+
+    @property
+    def action_space_manager(self):
+        """
+        Gets the action space manager.
+
+        Returns:
+            ActionSpaceManager: The action space manager.
+        """
+        return self._action_space_manager
+
+    @property
+    def observation_space_manager(self):
+        """
+        Gets the observation space manager.
+
+        Returns:
+            ObservationSpaceManager: The observation space manager.
+        """
+        return self._observation_space_manager
+
+    @property
+    def observation_list(self):
+        """
+        Gets the list of observation spaces.
+
+        Returns:
+            List[SPACE_INDEX]: The list of observation spaces.
+        """
+        return self._observation_list
+
+    @property
+    def observation_kwargs(self):
+        """
+        Gets the keyword arguments for configuring the observation space manager.
+
+        Returns:
+            dict: The keyword arguments for configuring the observation space manager.
+        """
+        return self._observation_kwargs
+
+    def setup_action_space(self, action_space_kwargs: dict):
+        """
+        Sets up the action space manager.
+
+        Args:
+            action_space_kwargs (dict): Keyword arguments for configuring the action space manager.
+        """
+        self._action_space_manager = ActionSpaceManager(**action_space_kwargs)
+
+    def setup_observation_space(
+        self,
+        observation_list: List[SPACE_INDEX] = None,
+        observation_kwargs: dict = None,
+    ):
+        """
+        Sets up the observation space manager.
+
+        Args:
+            observation_list (List[SPACE_INDEX], optional): List of observation spaces to include. Defaults to None.
+            observation_kwargs (dict, optional): Keyword arguments for configuring the observation space manager. Defaults to None.
+        """
+        if not observation_list:
+            observation_list = self.DEFAULT_OBS_LIST
+
+        self._observation_space_manager = ObservationSpaceManager(
+            observation_list,
+            space_kwargs=observation_kwargs,
+            frame_stacking=self._stacked,
         )
 
-    def encode_observation(self, observation, structure):
-        # rho, theta = observation["goal_in_robot_frame"]
-        # scan = observation["laser_scan"]
-        # last_action = observation["last_action"]
+    def decode_action(self, action) -> np.ndarray:
+        """
+        Decodes the action.
 
-        return np.concatenate([observation[name] for name in structure], axis=0)
+        Args:
+            action: The action to decode.
 
-    def get_observation_space(self):
-        return stack_spaces(
-            spaces.Box(
-                low=0,
-                high=self._laser_max_range,
-                shape=(self._laser_num_beams,),
-                dtype=np.float32,
-            ),
-            spaces.Box(low=0, high=20, shape=(1,), dtype=np.float32),
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
-            spaces.Box(
-                low=-2.0,
-                high=2.0,
-                shape=(2,),
-                dtype=np.float32,  # linear vel
-            ),
-            spaces.Box(
-                low=-4.0,
-                high=4.0,
-                shape=(1,),
-                dtype=np.float32,  # angular vel
-            ),
-        )
+        Returns:
+            np.ndarray: The decoded action.
+        """
+        return self._action_space_manager.decode_action(action)
 
-    def get_action_space(self):
-        if self._is_action_space_discrete:
-            # self._discrete_actions is a list, each element is a dict with the keys ["name", 'linear','angular']
-            return spaces.Discrete(len(self._actions))
+    def encode_observation(self, observation, structure) -> np.ndarray:
+        """
+        Encodes the observation.
 
-        linear_range = self._actions["linear_range"]
-        angular_range = self._actions["angular_range"]
+        Args:
+            observation: The observation to encode.
+            structure: The structure of the observation.
 
-        if not self._is_holonomic:
-            return spaces.Box(
-                low=np.array([linear_range[0], angular_range[0]]),
-                high=np.array([linear_range[1], angular_range[1]]),
-                dtype=np.float32,
-            )
-
-        linear_range_x, linear_range_y = (
-            linear_range["x"],
-            linear_range["y"],
-        )
-
-        return spaces.Box(
-            low=np.array(
-                [
-                    linear_range_x[0],
-                    linear_range_y[0],
-                    angular_range[0],
-                ]
-            ),
-            high=np.array(
-                [
-                    linear_range_x[1],
-                    linear_range_y[1],
-                    angular_range[1],
-                ]
-            ),
-            dtype=np.float32,
-        )
+        Returns:
+            np.ndarray: The encoded observation.
+        """
+        return self._observation_space_manager.encode_observation(observation)

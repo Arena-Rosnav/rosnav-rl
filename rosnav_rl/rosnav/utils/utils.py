@@ -5,8 +5,9 @@ from typing import Tuple
 import numpy as np
 import rospkg
 import rospy
+import torch
 import yaml
-from gym import spaces
+from gymnasium import spaces
 from rosnav.utils.constants import RosnavEncoder
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
@@ -16,7 +17,9 @@ def get_robot_yaml_path(robot_model: str = None) -> str:
     robot_model = rospy.get_param(os.path.join(rospy.get_namespace(), "robot_model"))
 
     simulation_setup_path = rospkg.RosPack().get_path("arena-simulation-setup")
-    return os.path.join(simulation_setup_path, "robot", robot_model, f"model_params.yaml")
+    return os.path.join(
+        simulation_setup_path, "robot", robot_model, f"model_params.yaml"
+    )
 
 
 def get_laser_from_robot_yaml(robot_model: str = None) -> Tuple[int, int, int, int]:
@@ -50,7 +53,9 @@ def get_actions_from_robot_yaml(robot_model: str = None):
 
 
 def get_observation_space_from_file(robot_model: str = None) -> Tuple[int, int]:
-    robot_state_size, action_state_size = 2, rospy.get_param(rospy.get_namespace() + "action_state_size", 3)
+    robot_state_size, action_state_size = 2, rospy.get_param(
+        rospy.get_namespace() + "action_state_size", 3
+    )
     num_beams, _, _, _ = get_laser_from_robot_yaml(robot_model)
 
     num_beams = RosnavEncoder[get_robot_space_encoder()]["lasers_to_adapted"](num_beams)
@@ -68,28 +73,6 @@ def get_observation_space() -> Tuple[int, int]:
     return observation_space["lasers"], observation_space["meta"]
 
 
-def stack_spaces(*ss) -> spaces.Box:
-    low = []
-    high = []
-
-    for space in ss:
-        low.extend(space.low.tolist())
-        high.extend(space.high.tolist())
-
-    return spaces.Box(np.array(low).flatten(), np.array(high).flatten())
-
-
-def stack_stacked_spaces(*ss) -> spaces.Box:
-    low = []
-    high = []
-
-    for space in ss:
-        low.extend(space.low.tolist())
-        high.extend(space.high.tolist())
-
-    return spaces.Box(np.expand_dims(np.array(low), axis=0), np.expand_dims(np.array(high), axis=0))
-
-
 def load_json(file_path: str) -> dict:
     with open(file_path) as file:
         return json.load(file)
@@ -101,16 +84,11 @@ def load_yaml(file_path: str) -> dict:
 
 
 def make_mock_env(config: dict) -> DummyVecEnv:
-    import rl_utils.envs.flatland_gym_env as flatland_gym_env
+    import rl_utils.envs.flatland_gymnasium_env as flatland_gym_env
 
     def _init():
         return flatland_gym_env.FlatlandEnv(
-            ns="",
-            reward_fnc=config["reward_fnc"],
-            is_action_space_discrete=config["discrete_action_space"]
-            if "discrete_action_space" in config
-            else config["action_space"]["discrete"],
-            requires_task_manager=False,
+            ns="", reward_fnc=config["reward_fnc"], verbose=False
         )
 
     return DummyVecEnv([_init])
@@ -122,3 +100,12 @@ def wrap_vec_framestack(env: DummyVecEnv, stack_size: int) -> VecFrameStack:
 
 def load_vec_normalize(path: str, config: dict, venv: VecEnv = None) -> VecNormalize:
     return VecNormalize.load(path, venv or make_mock_env(config))
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
