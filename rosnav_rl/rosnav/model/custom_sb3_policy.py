@@ -2,6 +2,7 @@
 from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_1,
     RESNET_MID_FUSION_EXTRACTOR_2,
+    RESNET_MID_FUSION_EXTRACTOR_3,
 )
 from rosnav.rosnav_space_manager.resnet_space_encoder import SemanticResNetSpaceEncoder
 from torch import nn
@@ -686,7 +687,7 @@ class BarnResNet(BaseAgent):
         "laser_stack_size": 10,
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_1
-    features_extractor_kwargs = {}
+    features_extractor_kwargs = {"features_dim": 512}
     net_arch = [256, 64]
     activation_fn = nn.ReLU
 
@@ -709,7 +710,7 @@ class RosnavResNet_1(BaseAgent):
         "laser_stack_size": 10,
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_2
-    features_extractor_kwargs = {}
+    features_extractor_kwargs = {"features_dim": 512}
     net_arch = [256, 64]
     activation_fn = nn.ReLU
 
@@ -732,7 +733,7 @@ class RosnavResNet_2(BaseAgent):
         "feature_map_size": 80,
         "laser_stack_size": 10,
     }
-    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_2
-    features_extractor_kwargs = {}
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_3
+    features_extractor_kwargs = {"features_dim": 512}
     net_arch = [256, 64]
     activation_fn = nn.ReLU
