@@ -12,102 +12,6 @@ from .base_agent import BaseAgent, PolicyType
 from .feature_extractors import *
 
 
-@AgentFactory.register("AGENT_6")
-class AGENT_6(BaseAgent):
-    type = PolicyType.MLP
-    features_extractor_class = None
-    features_extractor_kwargs = None
-    net_arch = [128, 64, 64, dict(pi=[64, 64], vf=[64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_7")
-class AGENT_7(BaseAgent):
-    type = PolicyType.MLP
-    features_extractor_class = None
-    features_extractor_kwargs = None
-    net_arch = [128, 128, 128, dict(pi=[64, 64], vf=[64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_8")
-class AGENT_8(BaseAgent):
-    type = PolicyType.MLP
-    features_extractor_class = None
-    features_extractor_kwargs = None
-    net_arch = [64, 64, 64, 64, dict(pi=[64, 64], vf=[64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_9")
-class AGENT_9(BaseAgent):
-    type = PolicyType.MLP
-    features_extractor_class = None
-    features_extractor_kwargs = None
-    net_arch = [64, 64, 64, 64, dict(pi=[64, 64, 64], vf=[64, 64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_10")
-class AGENT_10(BaseAgent):
-    type = PolicyType.MLP
-    features_extractor_class = None
-    features_extractor_kwargs = None
-    net_arch = [128, 128, 128, 128, dict(pi=[64, 64, 64], vf=[64, 64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_11")
-class AGENT_11(BaseAgent):
-    type = PolicyType.MLP
-    features_extractor_class = None
-    features_extractor_kwargs = None
-    net_arch = [512, 512, 512, 512, dict(pi=[64, 64], vf=[64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_17")
-class AGENT_17(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_4
-    features_extractor_kwargs = dict(features_dim=64)
-    net_arch = [dict(pi=[64, 64, 64], vf=[64, 64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_18")
-class AGENT_18(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_4
-    features_extractor_kwargs = dict(features_dim=128)
-    net_arch = [128, dict(pi=[64, 64, 64], vf=[64, 64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
 @AgentFactory.register("AGENT_19")
 class AGENT_19(BaseAgent):
     type = PolicyType.CNN
@@ -115,9 +19,6 @@ class AGENT_19(BaseAgent):
     features_extractor_kwargs = dict(features_dim=64)
     net_arch = [dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
 
 
 @AgentFactory.register("AGENT_20")
@@ -128,9 +29,6 @@ class AGENT_20(BaseAgent):
     net_arch = [dict(pi=[128], vf=[128])]
     activation_fn = nn.ReLU
 
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
 
 @AgentFactory.register("AGENT_21")
 class AGENT_21(BaseAgent):
@@ -139,9 +37,6 @@ class AGENT_21(BaseAgent):
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
 
 
 @AgentFactory.register("AGENT_22")
@@ -152,9 +47,6 @@ class AGENT_22(BaseAgent):
     net_arch = [dict(pi=[64, 64, 64], vf=[64, 64, 64])]
     activation_fn = nn.ReLU
 
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
 
 @AgentFactory.register("AGENT_23")
 class AGENT_23(BaseAgent):
@@ -163,123 +55,6 @@ class AGENT_23(BaseAgent):
     features_extractor_kwargs = dict(features_dim=128)
     net_arch = [128, 64, 64, 64]
     activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_24")
-class AGENT_24(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_6
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = [128, dict(pi=[64, 64], vf=[64, 64])]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_25")
-class AGENT_25(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_6
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = [512, 256, 128]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-@AgentFactory.register("AGENT_26")
-class AGENT_26(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = None
-    features_extractor_kwargs = None
-    net_arch = [256, 128]
-    activation_fn = nn.ReLU
-    n_lstm_layers = 16
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_27")
-class AGENT_27(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [256, 128]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm# lstm
-@AgentFactory.register("AGENT_28")
-class AGENT_28(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [256, 128]
-    activation_fn = nn.ReLU
-    n_lstm_layers = 6
-    lstm_hidden_size = 128
-    shared_lstm = False
-    enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm + framestacking
-@AgentFactory.register("AGENT_29")
-class AGENT_29(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = [256, 128]
-    activation_fn = nn.ReLU
-    n_lstm_layers = 12
-    lstm_hidden_size = 512
-    shared_lstm = False
-    enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm
-@AgentFactory.register("AGENT_30")
-class AGENT_30(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = dict(pi=[256, 256, 64], vf=[256, 256])
-    activation_fn = nn.ReLU
-    n_lstm_layers = 6
-    lstm_hidden_size = 256
-    shared_lstm = False
-    enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_31")
-class AGENT_31(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = dict(pi=[512, 256, 128, 64], vf=[256, 256, 64])
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
 
 
 # lstm
@@ -295,39 +70,6 @@ class AGENT_32(BaseAgent):
     shared_lstm = False
     enable_critic_lstm = True
 
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_33")
-class AGENT_33(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=258)
-    net_arch = dict(pi=[256, 256, 256], vf=[256, 256, 256])
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm + framestacking
-@AgentFactory.register("AGENT_34")
-class AGENT_34(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = dict(pi=[512, 256, 256], vf=[256, 256, 128])
-    activation_fn = nn.ReLU
-    n_lstm_layers = 12
-    lstm_hidden_size = 128
-    shared_lstm = False
-    enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
 
 # lstm + framestacking
 @AgentFactory.register("AGENT_35")
@@ -341,9 +83,6 @@ class AGENT_35(BaseAgent):
     lstm_hidden_size = 128
     shared_lstm = False
     enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
 
 
 # lstm
@@ -359,22 +98,6 @@ class AGENT_36(BaseAgent):
     shared_lstm = False
     enable_critic_lstm = True
 
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_37")
-class AGENT_37(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = dict(pi=[512, 128, 64], vf=[256, 256])
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
 
 # lstm + framestacking
 @AgentFactory.register("AGENT_38")
@@ -388,9 +111,6 @@ class AGENT_38(BaseAgent):
     lstm_hidden_size = 64
     shared_lstm = False
     enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
 
 
 # lstm
@@ -406,26 +126,6 @@ class AGENT_39(BaseAgent):
     shared_lstm = False
     enable_critic_lstm = True
 
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm
-@AgentFactory.register("AGENT_40")
-class AGENT_40(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = dict(pi=[256, 128], vf=[256, 128])
-    activation_fn = nn.ReLU
-    n_lstm_layers = 4
-    lstm_hidden_size = 64
-    shared_lstm = False
-    enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
 
 # lstm + framestacking
 @AgentFactory.register("AGENT_41")
@@ -439,163 +139,6 @@ class AGENT_41(BaseAgent):
     lstm_hidden_size = 128
     shared_lstm = True
     enable_critic_lstm = False
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_42")
-class AGENT_42(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=258)
-    net_arch = dict(pi=[256, 256, 256], vf=[256, 256])
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm
-@AgentFactory.register("AGENT_43")
-class AGENT_43(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=128)
-    net_arch = dict(pi=[128, 64, 64], vf=[128, 64])
-    activation_fn = nn.ReLU
-    n_lstm_layers = 12
-    lstm_hidden_size = 128
-    shared_lstm = True
-    enable_critic_lstm = False
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm + framestacking
-@AgentFactory.register("AGENT_44")
-class AGENT_44(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [128, 64, 64]
-    activation_fn = nn.ReLU
-    n_lstm_layers = 2
-    lstm_hidden_size = 512
-    shared_lstm = True
-    enable_critic_lstm = False
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm + framestacking
-@AgentFactory.register("AGENT_45")
-class AGENT_45(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = dict(pi=[256, 64, 64], vf=[128, 64, 64])
-    activation_fn = nn.ReLU
-    n_lstm_layers = 4
-    lstm_hidden_size = 256
-    shared_lstm = True
-    enable_critic_lstm = False
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_46")
-class AGENT_46(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = dict(pi=[128, 128, 64, 64], vf=[128, 128])
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm + framestacking
-@AgentFactory.register("AGENT_47")
-class AGENT_47(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = dict(pi=[256, 256, 64], vf=[256, 256])
-    activation_fn = nn.ReLU
-    n_lstm_layers = 1
-    lstm_hidden_size = 512
-    shared_lstm = True
-    enable_critic_lstm = False
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_48")
-class AGENT_48(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = dict(pi=[256, 128, 64], vf=[256, 128, 64])
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm + framestacking
-@AgentFactory.register("AGENT_49")
-class AGENT_49(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [64, 64, 64]
-    activation_fn = nn.ReLU
-    n_lstm_layers = 1
-    lstm_hidden_size = 512
-    shared_lstm = False
-    enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_50")
-class AGENT_50(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = dict(pi=[64, 64, 64, 64], vf=[128, 64, 32])
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# lstm + framestacking
-@AgentFactory.register("AGENT_51")
-class AGENT_51(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [64, 64, 64, 64]
-    activation_fn = nn.ReLU
-    n_lstm_layers = 4
-    lstm_hidden_size = 128
-    shared_lstm = False
-    enable_critic_lstm = True
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
 
 
 # lstm + framestacking
@@ -611,35 +154,6 @@ class AGENT_52(BaseAgent):
     shared_lstm = False
     enable_critic_lstm = True
 
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_53")
-class AGENT_53(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=258)
-    net_arch = [64, 64, 64, 64]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
-
-# framestacking
-@AgentFactory.register("AGENT_54")
-class AGENT_54(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=512)
-    net_arch = [256, 128, 64, 64]
-    activation_fn = nn.ReLU
-
-    def __init__(self, robot_model: str = None):
-        self.robot_model = robot_model
-
 
 # framestacking
 @AgentFactory.register("AGENT_55")
@@ -648,16 +162,6 @@ class AGENT_55(BaseAgent):
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [512, 256, 64]
-    activation_fn = nn.ReLU
-
-
-# framestacking
-@AgentFactory.register("AGENT_56")
-class AGENT_56(BaseAgent):
-    type = PolicyType.CNN
-    features_extractor_class = EXTRACTOR_7
-    features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [256, 256, 256, 64]
     activation_fn = nn.ReLU
 
 
@@ -673,6 +177,27 @@ class AGENT_57(BaseAgent):
 
 @AgentFactory.register("BarnResNet")
 class BarnResNet(BaseAgent):
+    """
+    Custom policy class for BarnResNet.
+
+    This policy uses a ResNet-based feature extractor and a CNN-based space encoder.
+    It defines the observation spaces and their corresponding kwargs.
+    The network architecture consists of two hidden layers with ReLU activation.
+
+    Reference:
+        https://ieeexplore.ieee.org/document/10089196
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for the space encoder.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The kwargs for the observation spaces.
+        features_extractor_class (class): The class for the feature extractor.
+        features_extractor_kwargs (dict): The kwargs for the feature extractor.
+        net_arch (list): The architecture of the network.
+        activation_fn (class): The activation function for the hidden layers.
+    """
+
     type = PolicyType.CNN
     space_encoder_class = SemanticResNetSpaceEncoder
     observation_spaces = [
@@ -694,6 +219,20 @@ class BarnResNet(BaseAgent):
 
 @AgentFactory.register("RosnavResNet_1")
 class RosnavResNet_1(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
     type = PolicyType.CNN
     space_encoder_class = SemanticResNetSpaceEncoder
     observation_spaces = [
@@ -717,6 +256,24 @@ class RosnavResNet_1(BaseAgent):
 
 @AgentFactory.register("RosnavResNet_2")
 class RosnavResNet_2(BaseAgent):
+    """
+    A custom policy class for the RosnavResNet_2 agent.
+
+    This policy uses a ResNet-based feature extractor and a CNN-based observation space encoder.
+    It defines the observation spaces and their corresponding kwargs, as well as the network architecture.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for the observation space encoder.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The kwargs for the observation spaces.
+        features_extractor_class (class): The class for the feature extractor.
+        features_extractor_kwargs (dict): The kwargs for the feature extractor.
+        net_arch (list): The network architecture.
+        activation_fn (class): The activation function for the network.
+
+    """
+
     type = PolicyType.CNN
     space_encoder_class = SemanticResNetSpaceEncoder
     observation_spaces = [
