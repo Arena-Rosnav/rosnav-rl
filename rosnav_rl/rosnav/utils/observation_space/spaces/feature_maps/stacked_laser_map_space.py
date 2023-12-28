@@ -47,6 +47,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
     ) -> None:
         self._laser_queue = deque()
         self._laser_stack_size = laser_stack_size
+        self._default_reward_info = {}
         super().__init__(
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
@@ -150,5 +151,5 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         """
         return self._process_laser_scan(
             observation[OBS_DICT_KEYS.LASER],
-            observation.get(OBS_DICT_KEYS.DONE, False),
+            kwargs.get(OBS_DICT_KEYS.DONE, False),
         ).flatten()
