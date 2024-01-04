@@ -124,16 +124,15 @@ class RosnavSpaceManager:
         """
         return self._encoder.action_space
 
-    def encode_observation(self, observation, structure=None):
+    def encode_observation(self, observation, *args, **kwargs):
         """
         Encodes the given observation using the space encoder.
         Args:
             observation (object): The observation to encode.
-            structure (object, optional): The structure of the observation. Defaults to None.
         Returns:
             object: The encoded observation.
         """
-        encoded_obs = self._encoder.encode_observation(observation, structure)
+        encoded_obs = self._encoder.encode_observation(observation, **kwargs)
         return encoded_obs
 
     def decode_action(self, action):
