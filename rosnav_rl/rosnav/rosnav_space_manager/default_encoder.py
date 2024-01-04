@@ -158,15 +158,14 @@ class DefaultEncoder(BaseSpaceEncoder):
         """
         return self._action_space_manager.decode_action(action)
 
-    def encode_observation(self, observation, structure) -> np.ndarray:
+    def encode_observation(self, observation, *args, **kwargs) -> np.ndarray:
         """
         Encodes the observation.
 
         Args:
             observation: The observation to encode.
-            structure: The structure of the observation.
 
         Returns:
             np.ndarray: The encoded observation.
         """
-        return self._observation_space_manager.encode_observation(observation)
+        return self._observation_space_manager.encode_observation(observation, **kwargs)

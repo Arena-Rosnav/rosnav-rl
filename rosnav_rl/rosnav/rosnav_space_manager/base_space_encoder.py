@@ -73,7 +73,7 @@ class BaseSpaceEncoder:
         """
         raise NotImplementedError()
 
-    def encode_observation(self, observation: dict) -> np.ndarray:
+    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
         """
         Encode the observation.
 
