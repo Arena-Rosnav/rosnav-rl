@@ -389,15 +389,15 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         x = self.relu3(x)
 
         x = self.avgpool(x)
-        fusion_out = x.flatten().unsqueeze(0)
+        fusion_out = x.squeeze(-1).squeeze(-1)
         ###### End of fusion net ######
 
         ###### Start of goal net #######
         # goal_in = goal.reshape(-1, 2)
-        goal_out = goal.flatten().unsqueeze(0)
+        # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal_out), dim=1)
+        fc_in = torch.cat((fusion_out, goal), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -689,7 +689,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         ped_in = ped_pos.reshape(-1, 4, self._feature_map_size, self._feature_map_size)
         scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
         fusion_in = torch.cat((scan_in, ped_in), dim=1)
-
+        
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
         x = self.conv1_1(fusion_in)
@@ -728,15 +728,15 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         x = self.relu4(x)
 
         x = self.avgpool(x)
-        fusion_out = torch.flatten(x).unsqueeze(0)
+        fusion_out = x.squeeze(-1).squeeze(-1)
         ###### End of fusion net ######
 
         ###### Start of goal net #######
         # goal_in = goal.reshape(-1, 2)
-        goal_out = goal.flatten().unsqueeze(0)
+        # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal_out), dim=1)
+        fc_in = torch.cat((fusion_out, goal), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1042,12 +1042,12 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         x = self.relu4(x)
 
         x = self.avgpool(x)
-        fusion_out = x.flatten().unsqueeze(0)
+        fusion_out = x.squeeze(-1).squeeze(-1)
         ###### End of fusion net ######
 
         ###### Start of goal net #######
         # goal_in = goal.reshape(-1, 2)
-        goal = goal.flatten().unsqueeze(0)
+        # goal_out = goal
 
         last_action_out = torch.flatten(last_action).unsqueeze(0)
         ###### End of goal net #######
