@@ -73,6 +73,8 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         width_per_group: int = 64,
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: nn.Module = nn.BatchNorm2d,
+        batch_mode: bool = False,
+        batch_size: int = -1,
     ):
         self._block = block
         self._groups = groups
@@ -81,6 +83,8 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         self._replace_stride_with_dilation = replace_stride_with_dilation
         self._norm_layer = norm_layer
         self._zero_init_residual = zero_init_residual
+        self._batch_mode = batch_mode
+        self._batch_size = batch_size
 
         self._observation_space_manager = observation_space_manager
         self._get_input_sizes()
@@ -402,21 +406,16 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         return x
 
-    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+    def _forward(self, observations: torch.Tensor) -> torch.Tensor:
         """
-        Performs the forward pass for the feature extractor.
+        Forward pass of the feature extractor network.
 
         Args:
-            observations (torch.Tensor): Input observations
+            observations (torch.Tensor): Input observations tensor.
 
         Returns:
-            torch.Tensor: Output tensor after forward pass
+            torch.Tensor: Output tensor after forward pass.
         """
-        # preprocessing:
-        # scan_map = observations[:, :6400]
-        # ped_map = observations[:, 6400:32000]
-        # goal = observations[:, 32000:32002]
-        # last_action = observations[:, 32002:32005]
         if not self._stacked_obs:
             scan = observations[:, : self._scan_map_size]
             ped_pos = observations[
@@ -429,7 +428,27 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
                 :, :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
             ]
             goal = observations[:, :, -self._goal_size :]
+
         return self._forward_impl(ped_pos, scan, goal)
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the ResNet model.
+
+        Args:
+            observations (torch.Tensor): Input observations.
+
+        Returns:
+            torch.Tensor: Output tensor after the forward pass.
+        """
+        if self._batch_mode and self._batch_size > 0:
+            # split observations into batches
+            observations = torch.split(observations, self._batch_size, dim=0)
+
+            # concatenate outputs
+            return torch.cat([self._forward(obs) for obs in observations], dim=0)
+
+        return self._forward(observations)
 
 
 class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
@@ -472,6 +491,8 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         width_per_group: int = 64,
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: Module = nn.BatchNorm2d,
+        batch_mode: bool = False,
+        batch_size: int = -1,
     ):
         super().__init__(
             observation_space,
@@ -485,6 +506,8 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
             width_per_group,
             replace_stride_with_dilation,
             norm_layer,
+            batch_mode=batch_mode,
+            batch_size=batch_size,
         )
 
     def _get_input_sizes(self):
@@ -689,7 +712,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         ped_in = ped_pos.reshape(-1, 4, self._feature_map_size, self._feature_map_size)
         scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
         fusion_in = torch.cat((scan_in, ped_in), dim=1)
-        
+
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
         x = self.conv1_1(fusion_in)
@@ -783,6 +806,8 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         width_per_group: int = 64,
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: Module = nn.BatchNorm2d,
+        batch_mode: bool = False,
+        batch_size: int = -1,
     ):
         super().__init__(
             observation_space,
@@ -796,6 +821,8 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
             width_per_group,
             replace_stride_with_dilation,
             norm_layer,
+            batch_mode=batch_mode,
+            batch_size=batch_size,
         )
 
     def _get_input_sizes(self):
@@ -1057,7 +1084,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
 
         return x
 
-    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+    def _forward(self, observations: torch.Tensor) -> torch.Tensor:
         """
         Performs the forward pass for the feature extractor.
 
@@ -1093,3 +1120,22 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
             ]
             last_action = observations[:, :, -self._last_action_size :]
         return self._forward_impl(ped_pos, scan, goal, last_action)
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the ResNet model.
+
+        Args:
+            observations (torch.Tensor): Input observations.
+
+        Returns:
+            torch.Tensor: Output tensor after the forward pass.
+        """
+        if self._batch_mode and self._batch_size > 0:
+            # split observations into batches
+            observations = torch.split(observations, self._batch_size, dim=0)
+
+            # concatenate outputs
+            return torch.cat([self._forward(obs) for obs in observations], dim=0)
+
+        return self._forward(observations)

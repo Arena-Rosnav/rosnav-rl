@@ -47,11 +47,11 @@ class RosnavSpaceManager:
         observation_space_kwargs = observation_space_kwargs or {}
         action_space_kwargs = action_space_kwargs or {}
 
-        self._stacked = rospy.get_param("rl_agent/frame_stacking/enabled")
-        self._laser_num_beams = rospy.get_param("laser/num_beams")
-        self._laser_max_range = rospy.get_param("laser/range")
-        self._radius = rospy.get_param("robot_radius")
-        self._is_holonomic = rospy.get_param("is_holonomic")
+        self._stacked = rospy.get_param_cached("rl_agent/frame_stacking/enabled")
+        self._laser_num_beams = rospy.get_param_cached("laser/num_beams")
+        self._laser_max_range = rospy.get_param_cached("laser/range")
+        self._radius = rospy.get_param_cached("robot_radius")
+        self._is_holonomic = rospy.get_param_cached("is_holonomic")
 
         # TODO: add num_ped_types to rosparam
         self._num_ped_types = 5
@@ -60,13 +60,13 @@ class RosnavSpaceManager:
         self._ped_min_speed_y = -5.0
         self._ped_max_speed_y = 5.0
 
-        is_action_space_discrete = rospy.get_param(
+        is_action_space_discrete = rospy.get_param_cached(
             "rl_agent/action_space/discrete", False
         )
         actions = (
-            rospy.get_param("actions/discrete")
+            rospy.get_param_cached("actions/discrete")
             if is_action_space_discrete
-            else rospy.get_param("actions/continuous")
+            else rospy.get_param_cached("actions/continuous")
         )
 
         _action_space_kwargs = {
