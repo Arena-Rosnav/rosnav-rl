@@ -441,7 +441,11 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         Returns:
             torch.Tensor: Output tensor after the forward pass.
         """
-        if self._batch_mode and self._batch_size > 0:
+        if (
+            self._batch_mode
+            and self._batch_size > 0
+            and observations.shape[0] >= self._batch_size
+        ):
             # split observations into batches
             observations = torch.split(observations, self._batch_size, dim=0)
 
@@ -1131,7 +1135,11 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         Returns:
             torch.Tensor: Output tensor after the forward pass.
         """
-        if self._batch_mode and self._batch_size > 0:
+        if (
+            self._batch_mode
+            and self._batch_size > 0
+            and observations.shape[0] >= self._batch_size
+        ):
             # split observations into batches
             observations = torch.split(observations, self._batch_size, dim=0)
 
