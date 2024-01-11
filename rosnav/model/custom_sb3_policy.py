@@ -251,7 +251,7 @@ class RosnavResNet_1(BaseAgent):
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_2
     features_extractor_kwargs = {
         "features_dim": 512,
-        "batch_mode": True,
+        "batch_mode": False,
         "batch_size": 32,
     }
     net_arch = [256, 64]
