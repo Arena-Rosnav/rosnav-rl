@@ -250,7 +250,7 @@ class RosnavResNet_1(BaseAgent):
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_2
     features_extractor_kwargs = {
-        "features_dim": 512,
+        "features_dim": 256,
         "batch_mode": False,
         "batch_size": 32,
     }
@@ -295,6 +295,6 @@ class RosnavResNet_2(BaseAgent):
         "laser_stack_size": 10,
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_3
-    features_extractor_kwargs = {"features_dim": 512}
+    features_extractor_kwargs = {"features_dim": 256}
     net_arch = [256, 64]
     activation_fn = nn.ReLU
