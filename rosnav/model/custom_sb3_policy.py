@@ -175,6 +175,16 @@ class AGENT_57(BaseAgent):
     activation_fn = nn.ReLU
 
 
+# framestacking
+@AgentFactory.register("AGENT_58")
+class AGENT_58(BaseAgent):
+    type = PolicyType.CNN
+    features_extractor_class = EXTRACTOR_8
+    features_extractor_kwargs = dict(features_dim=256)
+    net_arch = [64, 64]
+    activation_fn = nn.ReLU
+
+
 @AgentFactory.register("BarnResNet")
 class BarnResNet(BaseAgent):
     """
