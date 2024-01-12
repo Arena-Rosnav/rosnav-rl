@@ -181,7 +181,7 @@ class AGENT_58(BaseAgent):
     type = PolicyType.CNN
     features_extractor_class = EXTRACTOR_8
     features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [64, 64]
+    net_arch = [256, 64, 64]
     activation_fn = nn.ReLU
 
 
