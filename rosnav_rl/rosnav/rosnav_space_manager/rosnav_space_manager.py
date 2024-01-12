@@ -10,8 +10,9 @@ from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space i
 
 from .default_encoder import DefaultEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
-from .reduced_laser_encoder import ReducedLaserEncoder
 from .resnet_space_encoder import SemanticResNetSpaceEncoder
+
+from .encoder_wrapper.reduced_laser_wrapper import ReducedLaserWrapper
 
 """
     Provides a uniform interface between model and environment.
@@ -48,7 +49,11 @@ class RosnavSpaceManager:
         action_space_kwargs = action_space_kwargs or {}
 
         self._stacked = rospy.get_param_cached("rl_agent/frame_stacking/enabled")
-        self._laser_num_beams = rospy.get_param_cached("laser/num_beams")
+        self._laser_num_beams = (
+            rospy.get_param_cached("laser/num_beams")
+            if not rospy.get_param("laser/reduce_num_beams")
+            else rospy.get_param("laser/reduced_num_laser_beams")
+        )
         self._laser_max_range = rospy.get_param_cached("laser/range")
         self._radius = rospy.get_param_cached("robot_radius")
         self._is_holonomic = rospy.get_param_cached("is_holonomic")
@@ -98,6 +103,9 @@ class RosnavSpaceManager:
             observation_list=observation_spaces,  # use default_observation_list
             observation_kwargs=_observation_kwargs,
         )
+
+        if rospy.get_param("laser/reduce_num_beams"):
+            self._encoder = ReducedLaserWrapper(self._encoder, self._laser_num_beams)
 
     @property
     def observation_space_manager(self):
