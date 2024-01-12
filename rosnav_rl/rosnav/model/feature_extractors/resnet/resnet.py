@@ -1080,10 +1080,10 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         # goal_in = goal.reshape(-1, 2)
         # goal_out = goal
 
-        last_action_out = torch.flatten(last_action).unsqueeze(0)
+        # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal, last_action_out), dim=1)
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
