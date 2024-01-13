@@ -1,6 +1,7 @@
 from collections import deque
 
 import numpy as np
+import rospy
 from gymnasium import spaces
 from numpy import ndarray
 
@@ -102,22 +103,26 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
             np.ndarray: The laser map.
 
         """
-        laser_array = np.array(laser_queue)
-        # laserstack list of 10 np.arrays of shape (720,)
-        scan_avg = np.zeros((20, self._feature_map_size))
-        # horizontal stacking of the pooling operations
-        # min pooling over every 9th entry
-        scan_avg[::2, :] = np.min(
-            laser_array.reshape(10, self._feature_map_size, 9), axis=2
-        )
-        # avg pooling over every 9th entry
-        scan_avg[1::2, :] = np.mean(
-            laser_array.reshape(10, self._feature_map_size, 9), axis=2
-        )
+        try:
+            laser_array = np.array(laser_queue)
+            # laserstack list of 10 np.arrays of shape (720,)
+            scan_avg = np.zeros((20, self._feature_map_size))
+            # horizontal stacking of the pooling operations
+            # min pooling over every 9th entry
+            scan_avg[::2, :] = np.min(
+                laser_array.reshape(10, self._feature_map_size, 9), axis=2
+            )
+            # avg pooling over every 9th entry
+            scan_avg[1::2, :] = np.mean(
+                laser_array.reshape(10, self._feature_map_size, 9), axis=2
+            )
 
-        scan_avg_map = np.tile(scan_avg.ravel(), 4).reshape(
-            (self._feature_map_size, self._feature_map_size)
-        )
+            scan_avg_map = np.tile(scan_avg.ravel(), 4).reshape(
+                (self._feature_map_size, self._feature_map_size)
+            )
+        except Exception as e:
+            rospy.logwarn(f"[{rospy.get_name()}]: {e} \n Instead sample feature map once.")
+            return self.get_gym_space().sample()
 
         return scan_avg_map
 
