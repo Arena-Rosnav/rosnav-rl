@@ -79,6 +79,9 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
             np.ndarray: The feature map.
 
         """
+        if type(laser_scan) is not np.ndarray:
+            return np.zeros((self._feature_map_size * self._feature_map_size,))
+        
         if len(self._laser_queue) == 0:
             self._reset_laser_stack(laser_scan)
 
