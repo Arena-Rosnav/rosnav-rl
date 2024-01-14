@@ -2,6 +2,8 @@ from abc import abstractmethod
 from typing import List
 
 import numpy as np
+import rospy
+
 import pedsim_msgs.msg as pedsim_msgs
 from geometry_msgs.msg import Point, Pose2D
 
@@ -59,6 +61,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             tuple: The map index.
         """
         x, y, *_ = position
+        
         x = int((x / self._roi_in_m) * self._feature_map_size) + (
             self._feature_map_size // 2 - 1
         )
@@ -85,14 +88,16 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         pos_map = np.zeros((self._feature_map_size, self._feature_map_size))
         map_size = pos_map.shape[0]
 
-        for data in semantic_data.points:
-            relative_pos = BaseFeatureMapSpace.get_relative_pos(
-                data.location, robot_pose
-            )
-            index = self._get_map_index(relative_pos)
-            if 0 <= index[0] < map_size and 0 <= index[1] < map_size:
-                pos_map[index] = data.evidence
-
+        try:
+            for data in semantic_data.points:
+                relative_pos = BaseFeatureMapSpace.get_relative_pos(
+                    data.location, robot_pose
+                )
+                index = self._get_map_index(relative_pos)
+                if 0 <= index[0] < map_size and 0 <= index[1] < map_size:
+                    pos_map[index] = data.evidence
+        except Exception as e:
+            rospy.logwarn(e)
         return pos_map
 
     @staticmethod
