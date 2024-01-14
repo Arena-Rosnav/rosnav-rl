@@ -445,13 +445,13 @@ class EXTRACTOR_8(EXTRACTOR_1):
 
     def _setup_network(self):
         self.cnn = nn.Sequential(
-            nn.Conv1d(self._num_stacks, 32, 12, 4),
+            nn.Conv1d(self._num_stacks, 32, 8, 4),
             nn.ReLU(),
             nn.Conv1d(32, 64, 8, 4),
             nn.ReLU(),
             nn.Conv1d(64, 64, 4, 2),
             nn.ReLU(),
-            nn.Conv1d(64, 64, 3, 1),
+            nn.Conv1d(64, 64, 2, 1),
             nn.ReLU(),
             nn.Flatten(),
         )
@@ -510,13 +510,13 @@ class EXTRACTOR_9(EXTRACTOR_1):
 
     def _setup_network(self):
         self.cnn = nn.Sequential(
-            nn.Conv1d(self._num_stacks, 32, 12, 4),
+            nn.Conv1d(self._num_stacks, 32, 8, 4),
             nn.ReLU(),
             nn.Conv1d(32, 64, 8, 4),
             nn.ReLU(),
             nn.Conv1d(64, 64, 4, 2),
             nn.ReLU(),
-            nn.Conv1d(64, 64, 3, 1),
+            nn.Conv1d(64, 64, 2, 1),
             nn.ReLU(),
             nn.Flatten(),
         )
