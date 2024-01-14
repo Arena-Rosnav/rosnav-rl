@@ -472,3 +472,66 @@ class EXTRACTOR_8(EXTRACTOR_1):
             nn.Linear(256, self._features_dim),
             nn.ReLU(),
         )
+
+
+class EXTRACTOR_9(EXTRACTOR_1):
+    """
+    Feature extractor class that implements a specific network architecture (EXTRACTOR_9).
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment.
+        observation_space_manager (ObservationSpaceManager): The observation space manager.
+        features_dim (int, optional): The dimensionality of the extracted features. Defaults to 128.
+        stacked_obs (bool, optional): Whether to use stacked observations. Defaults to False.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Attributes:
+        cnn (nn.Sequential): The convolutional neural network.
+        fc (nn.Sequential): The fully connected layers.
+
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        observation_space_manager: ObservationSpaceManager,
+        features_dim: int = 128,
+        stacked_obs: bool = False,
+        *args,
+        **kwargs
+    ):
+        super().__init__(
+            observation_space=observation_space,
+            observation_space_manager=observation_space_manager,
+            features_dim=features_dim,
+            stacked_obs=stacked_obs,
+        )
+
+    def _setup_network(self):
+        self.cnn = nn.Sequential(
+            nn.Conv1d(self._num_stacks, 32, 12, 4),
+            nn.ReLU(),
+            nn.Conv1d(32, 64, 8, 4),
+            nn.ReLU(),
+            nn.Conv1d(64, 64, 4, 2),
+            nn.ReLU(),
+            nn.Conv1d(64, 64, 3, 1),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+
+        # Compute shape by doing one forward pass
+        with th.no_grad():
+            desired_shape = (1, self._num_stacks, self._laser_size)
+            tensor_forward = th.randn(desired_shape)
+            n_flatten = self.cnn(tensor_forward).shape[1]
+
+        self.fc = nn.Sequential(
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._num_stacks,
+                self._features_dim,
+            ),
+            nn.ReLU(),
+        )
