@@ -61,12 +61,12 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             tuple: The map index.
         """
         x, y, *_ = position
-        
+
         x = int((x / self._roi_in_m) * self._feature_map_size) + (
-            self._feature_map_size // 2 - 1
+            self._feature_map_size // 2
         )
         y = int((y / self._roi_in_m) * self._feature_map_size) + (
-            self._feature_map_size // 2 - 1
+            self._feature_map_size // 2
         )
         x = min(max(x, 0), self._feature_map_size - 1)
         y = min(max(y, 0), self._feature_map_size - 1)
