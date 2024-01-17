@@ -32,7 +32,12 @@ from ..base_extractor import RosnavBaseExtractor
 from .bottleneck import Bottleneck
 from .utils import conv1x1, conv3x3
 
-__all__ = ["RESNET_MID_FUSION_EXTRACTOR_1", "RESNET_MID_FUSION_EXTRACTOR_2"]
+__all__ = [
+    "RESNET_MID_FUSION_EXTRACTOR_1",
+    "RESNET_MID_FUSION_EXTRACTOR_2",
+    "RESNET_MID_FUSION_EXTRACTOR_3",
+    "RESNET_MID_FUSION_EXTRACTOR_4",
+]
 
 
 class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
@@ -87,6 +92,8 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         self._batch_size = batch_size
 
         self._observation_space_manager = observation_space_manager
+
+        self._num_pedestrian_feature_maps = self._get_num_pedestrian_feature_maps()
         self._get_input_sizes()
 
         super(RESNET_MID_FUSION_EXTRACTOR_1, self).__init__(
@@ -97,6 +104,24 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         )
 
         self._init_layer_weights()
+
+    def _get_num_pedestrian_feature_maps(self):
+        num_pedestrian_feature_maps = 0
+        for obs in self.REQUIRED_OBSERVATIONS:
+            if "PEDESTRIAN" in obs.name:
+                num_pedestrian_feature_maps += 1
+
+        return num_pedestrian_feature_maps
+
+    @property
+    def num_pedestrian_feature_maps(self):
+        """
+        Returns the number of pedestrian feature maps.
+
+        Returns:
+            int: Number of pedestrian feature maps
+        """
+        return self._num_pedestrian_feature_maps
 
     def _get_input_sizes(self):
         """
@@ -142,7 +167,12 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             )
         self.base_width = self._width_per_group
         self.conv1 = nn.Conv2d(
-            3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
+            self.num_pedestrian_feature_maps + 1,
+            self.inplanes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
         )
         self.bn1 = self._norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
@@ -361,7 +391,12 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(-1, 2, self._feature_map_size, self._feature_map_size)
+        ped_in = ped_pos.reshape(
+            -1,
+            self.num_pedestrian_feature_maps,
+            self._feature_map_size,
+            self._feature_map_size,
+        )
         scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
         fusion_in = torch.cat((scan_in, ped_in), dim=1)
 
@@ -1147,3 +1182,54 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
             return torch.cat([self._forward(obs) for obs in observations], dim=0)
 
         return self._forward(observations)
+
+
+class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
+    """
+    Feature extractor class that implements a mid-fusion ResNet-based architecture.
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment
+        observation_space_manager (ObservationSpaceManager): The observation space manager
+        features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
+        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
+        layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
+        zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
+        groups (int, optional): The number of groups to use in the ResNet architecture. Defaults to 1.
+        width_per_group (int, optional): The width of each group in the ResNet architecture. Defaults to 64.
+        replace_stride_with_dilation (List[bool], optional): Whether to replace stride with dilation in each block of the ResNet architecture. Defaults to None.
+        norm_layer (nn.Module, optional): The normalization layer to use in the ResNet architecture. Defaults to nn.BatchNorm2d.
+    """
+
+    REQUIRED_OBSERVATIONS = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.GOAL,
+    ]
+
+    def _get_input_sizes(self):
+        """
+        Calculate the input sizes for the feature extraction process.
+
+        This method calculates the input sizes required for the feature extraction process
+        based on the observation space manager. It sets the values for the feature map size,
+        scan map size, pedestrian map size, and goal size.
+
+        Returns:
+            None
+        """
+        super()._get_input_sizes()
+        self._ped_map_size = (
+            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_LOCATION].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
+        )
+
+    def _setup_network(self):
+        self.inplanes = 128
+        super()._setup_network()

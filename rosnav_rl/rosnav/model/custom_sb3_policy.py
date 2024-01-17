@@ -3,6 +3,7 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_1,
     RESNET_MID_FUSION_EXTRACTOR_2,
     RESNET_MID_FUSION_EXTRACTOR_3,
+    RESNET_MID_FUSION_EXTRACTOR_4,
 )
 from rosnav.rosnav_space_manager.resnet_space_encoder import SemanticResNetSpaceEncoder
 from torch import nn
@@ -317,4 +318,43 @@ class RosnavResNet_2(BaseAgent):
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_3
     features_extractor_kwargs = {"features_dim": 256}
     net_arch = [256, 64]
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("RosnavResNet_3")
+class RosnavResNet_3(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
+    type = PolicyType.CNN
+    space_encoder_class = SemanticResNetSpaceEncoder
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.GOAL,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+    }
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_4
+    features_extractor_kwargs = {
+        "features_dim": 512,
+    }
+    net_arch = dict(pi=[256, 64, 64], vf=[256, 64])
     activation_fn = nn.ReLU
