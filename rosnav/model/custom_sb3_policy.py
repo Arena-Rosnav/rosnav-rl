@@ -354,7 +354,7 @@ class RosnavResNet_3(BaseAgent):
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_4
     features_extractor_kwargs = {
-        "features_dim": 512,
+        "features_dim": 256,
     }
-    net_arch = dict(pi=[256, 64, 64], vf=[256, 64])
+    net_arch = dict(pi=[256, 128, 64], vf=[256, 64])
     activation_fn = nn.ReLU
