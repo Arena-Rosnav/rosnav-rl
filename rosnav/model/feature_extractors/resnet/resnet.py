@@ -591,7 +591,12 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
 
         # pre conv1
         self.conv1_1 = nn.Conv2d(
-            5, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
+            self.num_pedestrian_feature_maps + 1,
+            self.inplanes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
         )
         self.bn1_1 = self._norm_layer(self.inplanes)
         self.relu1_1 = nn.ReLU(inplace=True)
@@ -748,7 +753,12 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(-1, 4, self._feature_map_size, self._feature_map_size)
+        ped_in = ped_pos.reshape(
+            -1,
+            self.num_pedestrian_feature_maps,
+            self._feature_map_size,
+            self._feature_map_size,
+        )
         scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
         fusion_in = torch.cat((scan_in, ped_in), dim=1)
 
@@ -824,10 +834,10 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
 
     REQUIRED_OBSERVATIONS = [
         SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
         SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
         SPACE_INDEX.GOAL,
         SPACE_INDEX.LAST_ACTION,
     ]
@@ -903,7 +913,12 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
 
         # pre conv1
         self.conv1_1 = nn.Conv2d(
-            self.num_pedestrian_feature_maps + 1, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
+            self.num_pedestrian_feature_maps + 1,
+            self.inplanes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
         )
         self.bn1_1 = self._norm_layer(self.inplanes)
         self.relu1_1 = nn.ReLU(inplace=True)
@@ -1066,7 +1081,12 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(-1, 4, self._feature_map_size, self._feature_map_size)
+        ped_in = ped_pos.reshape(
+            -1,
+            self.num_pedestrian_feature_maps,
+            self._feature_map_size,
+            self._feature_map_size,
+        )
         scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
         fusion_in = torch.cat((scan_in, ped_in), dim=1)
 
