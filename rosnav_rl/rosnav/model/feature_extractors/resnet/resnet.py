@@ -1204,10 +1204,10 @@ class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
 
     REQUIRED_OBSERVATIONS = [
         SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
         SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
         SPACE_INDEX.GOAL,
     ]
 
@@ -1224,10 +1224,10 @@ class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
         """
         super()._get_input_sizes()
         self._ped_map_size = (
-            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_LOCATION].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
+            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
             + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_LOCATION].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
         )
 
     def _setup_network(self):

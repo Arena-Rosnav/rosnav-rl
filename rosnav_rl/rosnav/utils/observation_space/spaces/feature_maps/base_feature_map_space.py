@@ -68,12 +68,15 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         y = int((y / self._roi_in_m) * self._feature_map_size) + (
             self._feature_map_size // 2
         )
-        x = min(max(x, 0), self._feature_map_size - 1)
-        y = min(max(y, 0), self._feature_map_size - 1)
         return x, y
 
     def _get_semantic_map(
-        self, semantic_data: List[pedsim_msgs.SemanticData], robot_pose
+        self,
+        semantic_data: pedsim_msgs.SemanticData,
+        relative_pos: np.ndarray = None,
+        robot_pose: Pose2D = None,
+        *args,
+        **kwargs
     ) -> np.ndarray:
         """
         Get the semantic map based on the semantic data and robot pose.
@@ -86,56 +89,58 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             np.ndarray: The semantic map.
         """
         pos_map = np.zeros((self._feature_map_size, self._feature_map_size))
-        map_size = pos_map.shape[0]
+
+        if relative_pos is None and len(semantic_data.points) == 0:
+            return pos_map
 
         try:
-            for data in semantic_data.points:
-                relative_pos = BaseFeatureMapSpace.get_relative_pos(
-                    data.location, robot_pose
+            if relative_pos is None and len(semantic_data.points) > 0:
+                relative_pos = BaseFeatureMapSpace.get_relative_pos_to_robot(
+                    robot_pose, semantic_data.points
                 )
-                index = self._get_map_index(relative_pos)
-                if 0 <= index[0] < map_size and 0 <= index[1] < map_size:
+
+            for data, pos in zip(
+                semantic_data.points,
+                relative_pos,
+            ):
+                index = self._get_map_index(pos)
+                if (
+                    0 <= index[0] < self.feature_map_size
+                    and 0 <= index[1] < self.feature_map_size
+                ):
                     pos_map[index] = data.evidence
         except Exception as e:
             rospy.logwarn(e)
+
         return pos_map
 
     @staticmethod
-    def get_relative_pos(reference_frame, distant_frame) -> tuple:
-        """
-        Get the relative position between a reference frame and a distant frame.
-
-        Args:
-            reference_frame: The reference frame.
-            distant_frame: The distant frame.
-
-        Returns:
-            tuple: The relative position.
-        """
-        if isinstance(reference_frame, Point) and isinstance(distant_frame, Point):
-            return (
-                distant_frame.x - reference_frame.x,
-                distant_frame.y - reference_frame.y,
-                distant_frame.z - reference_frame.z,
-            )
-        return BaseFeatureMapSpace.get_relative_pos2d(reference_frame, distant_frame)
-
-    @staticmethod
-    def get_relative_pos2d(reference_frame, distant_frame) -> tuple:
-        """
-        Get the relative position between a reference frame and a distant frame.
-
-        Args:
-            reference_frame: The reference frame.
-            distant_frame: The distant frame.
-
-        Returns:
-            tuple: The relative position.
-        """
-        return (
-            distant_frame.x - reference_frame.x,
-            distant_frame.y - reference_frame.y,
+    def get_relative_pos_to_robot(
+        robot_pose: Pose2D, distant_frames: pedsim_msgs.SemanticData
+    ):
+        robot_pose_array = np.array([robot_pose.x, robot_pose.y, robot_pose.theta])
+        # homogeneous transformation matrix: map_T_robot
+        map_T_robot = np.array(
+            [
+                [
+                    np.cos(robot_pose_array[2]),
+                    -np.sin(robot_pose_array[2]),
+                    robot_pose_array[0],
+                ],
+                [
+                    np.sin(robot_pose_array[2]),
+                    np.cos(robot_pose_array[2]),
+                    robot_pose_array[1],
+                ],
+                [0, 0, 1],
+            ]
         )
+        robot_T_map = np.linalg.inv(map_T_robot)
+
+        ped_pos = np.stack(
+            [[frame.location.x, frame.location.y, 1] for frame in distant_frames]
+        )
+        return np.matmul(robot_T_map, ped_pos.T)
 
     @abstractmethod
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
