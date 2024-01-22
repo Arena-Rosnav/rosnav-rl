@@ -888,7 +888,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         if self._norm_layer is None:
             self._norm_layer = nn.BatchNorm2d
 
-        self.inplanes = 128
+        self.inplanes = 64
         self.dilation = 1
         if self._replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
@@ -903,7 +903,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
 
         # pre conv1
         self.conv1_1 = nn.Conv2d(
-            5, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
+            self.num_pedestrian_feature_maps + 1, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
         )
         self.bn1_1 = self._norm_layer(self.inplanes)
         self.relu1_1 = nn.ReLU(inplace=True)
@@ -1000,7 +1000,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         )
         self.downsample3 = nn.Sequential(
             nn.Conv2d(
-                in_channels=128,
+                in_channels=64,
                 out_channels=512,
                 kernel_size=(1, 1),
                 stride=(4, 4),
