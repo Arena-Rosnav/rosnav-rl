@@ -303,21 +303,21 @@ class RosnavResNet_2(BaseAgent):
     space_encoder_class = SemanticResNetSpaceEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
         SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
         SPACE_INDEX.GOAL,
         SPACE_INDEX.LAST_ACTION,
     ]
     observation_space_kwargs = {
-        "roi_in_m": 20,
+        "roi_in_m": 30,
         "feature_map_size": 80,
         "laser_stack_size": 10,
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_3
     features_extractor_kwargs = {"features_dim": 256}
-    net_arch = [256, 64]
+    net_arch = dict(pi=[256, 256, 64], vf=[256, 128, 64])
     activation_fn = nn.ReLU
 
 
