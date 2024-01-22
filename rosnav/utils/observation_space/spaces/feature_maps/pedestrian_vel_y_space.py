@@ -64,6 +64,22 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
             dtype=float,
         )
 
+    def _get_semantic_map(
+        self, relative_y_vel: np.ndarray, relative_pos: np.ndarray, *args, **kwargs
+    ) -> np.ndarray:
+        y_vel_map = np.zeros((self.feature_map_size, self.feature_map_size))
+
+        if relative_y_vel is not None and relative_pos is not None:
+            for vel_x, pos in zip(relative_y_vel, relative_pos):
+                index = self._get_map_index(pos)
+                if (
+                    0 <= index[0] < self.feature_map_size
+                    and 0 <= index[1] < self.feature_map_size
+                ):
+                    y_vel_map[index] = vel_x
+
+        return y_vel_map
+
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
         """
         Encode the observation into a numpy array.
@@ -75,6 +91,6 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[SemanticAttribute.PEDESTRIAN_VEL_X.value],
-            observation[OBS_DICT_KEYS.ROBOT_POSE],
+            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_X_VEL.value],
+            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
         ).flatten()

@@ -70,6 +70,41 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
             dtype=float,
         )
 
+    def _get_semantic_map(
+        self,
+        relative_x_vel: np.ndarray = None,
+        relative_pos: np.ndarray = None,
+        *args,
+        **kwargs
+    ) -> np.ndarray:
+        """
+        Generates a semantic map based on the relative x velocity and position of pedestrians.
+
+        Args:
+            relative_x_vel (np.ndarray): Array of relative x velocities of pedestrians.
+            relative_pos (np.ndarray): Array of relative positions of pedestrians.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            np.ndarray: Semantic map representing the x velocity of pedestrians.
+        """
+        x_vel_map = np.zeros((self.feature_map_size, self.feature_map_size))
+
+        if relative_x_vel is not None and relative_pos is not None:
+            for vel_x, pos in zip(
+                relative_x_vel,
+                relative_pos,
+            ):
+                index = self._get_map_index(pos)
+                if (
+                    0 <= index[0] < self.feature_map_size
+                    and 0 <= index[1] < self.feature_map_size
+                ):
+                    x_vel_map[index] = vel_x
+
+        return x_vel_map
+
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
         """
         Encodes the observation into a numpy array.
@@ -84,6 +119,6 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
 
         """
         return self._get_semantic_map(
-            observation[SemanticAttribute.PEDESTRIAN_VEL_X.value],
-            observation[OBS_DICT_KEYS.ROBOT_POSE],
+            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_X_VEL.value],
+            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
         ).flatten()

@@ -79,5 +79,6 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         """
         return self._get_semantic_map(
             observation[SemanticAttribute.PEDESTRIAN_TYPE.value],
+            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
             observation[OBS_DICT_KEYS.ROBOT_POSE],
         ).flatten()
