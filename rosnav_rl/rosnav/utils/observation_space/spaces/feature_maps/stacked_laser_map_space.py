@@ -1,6 +1,7 @@
 from collections import deque
 
 import numpy as np
+import numpy.matlib
 import rospy
 from gymnasium import spaces
 from numpy import ndarray
@@ -44,7 +45,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         roi_in_m: float,
         flatten: bool = True,
         *args,
-        **kwargs
+        **kwargs,
     ) -> None:
         self._laser_queue = deque()
         self._laser_stack_size = laser_stack_size
@@ -54,7 +55,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
             roi_in_m=roi_in_m,
             flatten=flatten,
             *args,
-            **kwargs
+            **kwargs,
         )
 
     def _reset_laser_stack(self, laser_scan: np.ndarray):
@@ -81,7 +82,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         """
         if type(laser_scan) is not np.ndarray:
             return np.zeros((self._feature_map_size * self._feature_map_size,))
-        
+
         if len(self._laser_queue) == 0:
             self._reset_laser_stack(laser_scan)
 
@@ -107,25 +108,37 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
 
         """
         try:
-            laser_array = np.array(laser_queue)
-            # laserstack list of 10 np.arrays of shape (720,)
-            scan_avg = np.zeros((20, self._feature_map_size))
-            # horizontal stacking of the pooling operations
-            # min pooling over every 9th entry
-            scan_avg[::2, :] = np.min(
-                laser_array.reshape(10, self._feature_map_size, 9), axis=2
-            )
-            # avg pooling over every 9th entry
-            scan_avg[1::2, :] = np.mean(
-                laser_array.reshape(10, self._feature_map_size, 9), axis=2
-            )
+            # laser_array = np.array(laser_queue)
+            # # laserstack list of 10 np.arrays of shape (720,)
+            # scan_avg = np.zeros((20, self._feature_map_size))
+            # # horizontal stacking of the pooling operations
+            # # min pooling over every 9th entry
+            # scan_avg[::2, :] = np.min(
+            #     laser_array.reshape(10, self._feature_map_size, 9), axis=2
+            # )
+            # # avg pooling over every 9th entry
+            # scan_avg[1::2, :] = np.mean(
+            #     laser_array.reshape(10, self._feature_map_size, 9), axis=2
+            # )
 
-            scan_avg_map = np.tile(scan_avg.ravel(), 4).reshape(
-                (self._feature_map_size, self._feature_map_size)
-            )
+            # scan_avg_map = np.tile(scan_avg.ravel(), 4).reshape(
+            #     (self._feature_map_size, self._feature_map_size)
+            # )
+            temp = np.array(laser_queue, dtype=np.float32).flatten()
+            scan_avg = np.zeros((20, 80))
+            for n in range(10):
+                scan_tmp = temp[n * 720 : (n + 1) * 720]
+                for i in range(80):
+                    scan_avg[2 * n, i] = np.min(scan_tmp[i * 9 : (i + 1) * 9])
+                    scan_avg[2 * n + 1, i] = np.mean(scan_tmp[i * 9 : (i + 1) * 9])
+
+            scan_avg = scan_avg.reshape(1600)
+            scan_avg_map = np.matlib.repmat(scan_avg, 1, 4).reshape((80, 80))
         except Exception as e:
-            rospy.logwarn(f"[{rospy.get_name()}]: {e} \n Instead sample feature map once.")
-            return self.get_gym_space().sample()
+            rospy.logwarn(
+                f"[{rospy.get_name()}, {StackedLaserMapSpace.__name__}]: {e} \n Cannot build laser map. Instead return empty map."
+            )
+            return np.zeros(self.get_gym_space().shape)
 
         return scan_avg_map
 
