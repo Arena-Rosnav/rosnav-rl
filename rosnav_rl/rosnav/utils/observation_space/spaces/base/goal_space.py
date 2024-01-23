@@ -59,4 +59,4 @@ class GoalSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        return np.array(observation[OBS_DICT_KEYS.GOAL])
+        return np.array(observation[OBS_DICT_KEYS.GOAL_DIST_ANGLE])
