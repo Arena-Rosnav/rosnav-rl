@@ -233,8 +233,8 @@ class BarnResNet(BaseAgent):
         "laser_stack_size": 10,
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_1
-    features_extractor_kwargs = {"features_dim": 512}
-    net_arch = [256, 64]
+    features_extractor_kwargs = {"features_dim": 256}
+    net_arch = dict(pi=[256], vf=[128])
     activation_fn = nn.ReLU
 
 
