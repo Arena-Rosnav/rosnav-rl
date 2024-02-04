@@ -37,7 +37,7 @@ class RosnavSpaceManager:
         action_space_kwargs: Dict[str, Any] = None,
     ):
         """
-        Initializes the RosnavSpaceManager.
+        Initializes the RosnavSpaceManager. Retrieves the Agent parameters from the ROS parameter server and initializes the space encoder containing the observation and action spaces.
 
         Args:
             space_encoder_class (class, optional): The class for encoding the observation and action spaces. Defaults to None.
@@ -100,7 +100,7 @@ class RosnavSpaceManager:
 
         self._encoder = space_encoder_class(
             action_space_kwargs=_action_space_kwargs,
-            observation_list=observation_spaces,  # use default_observation_list
+            observation_list=observation_spaces,
             observation_kwargs=_observation_kwargs,
         )
 
