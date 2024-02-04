@@ -14,6 +14,7 @@ Details:
     - The feature extractor takes input observations and performs a series of convolutional and 
         batch normalization operations, followed by fusion and goal networks to extract features.
 """
+
 from copy import deepcopy
 from typing import List
 
@@ -1251,7 +1252,6 @@ class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
         )
 
     def _setup_network(self):
-        self.inplanes = 128
         super()._setup_network()
 
 

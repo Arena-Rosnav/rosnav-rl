@@ -22,7 +22,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         roi_in_m: float,
         flatten: bool = True,
         *args,
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         Initialize the BaseFeatureMapSpace.
@@ -76,7 +76,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         relative_pos: np.ndarray = None,
         robot_pose: Pose2D = None,
         *args,
-        **kwargs
+        **kwargs,
     ) -> np.ndarray:
         """
         Get the semantic map based on the semantic data and robot pose.

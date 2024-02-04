@@ -1,4 +1,5 @@
 """Custom policies built by SB3 during runtime through parsing 'policy_kwargs'"""
+
 from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_1,
     RESNET_MID_FUSION_EXTRACTOR_2,
@@ -483,4 +484,45 @@ class RosnavResNet_6(BaseAgent):
         "width_per_group": 128,
     }
     net_arch = dict(pi=[256, 64], vf=[256])
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("RosnavResNet_7")
+class RosnavResNet_7(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
+    type = PolicyType.CNN
+    space_encoder_class = SemanticResNetSpaceEncoder
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 30,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+    }
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_6
+    features_extractor_kwargs = {
+        "features_dim": 256,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 128], vf=[256])
     activation_fn = nn.ReLU
