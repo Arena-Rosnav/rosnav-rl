@@ -504,7 +504,7 @@ class RosnavResNet_7(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = Def
+    space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
