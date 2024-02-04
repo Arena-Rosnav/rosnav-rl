@@ -8,7 +8,7 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_5,
     RESNET_MID_FUSION_EXTRACTOR_6,
 )
-from rosnav.rosnav_space_manager.resnet_space_encoder import SemanticResNetSpaceEncoder
+from rosnav.rosnav_space_manager.default_encoder import DefaultEncoder
 from torch import nn
 
 from .agent_factory import AgentFactory
@@ -223,7 +223,7 @@ class BarnResNet(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = SemanticResNetSpaceEncoder
+    space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_LOCATION,
@@ -258,7 +258,7 @@ class RosnavResNet_1(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = SemanticResNetSpaceEncoder
+    space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_LOCATION,
@@ -303,7 +303,7 @@ class RosnavResNet_2(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = SemanticResNetSpaceEncoder
+    space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
@@ -341,7 +341,7 @@ class RosnavResNet_3(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = SemanticResNetSpaceEncoder
+    space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
@@ -384,7 +384,7 @@ class RosnavResNet_4(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = SemanticResNetSpaceEncoder
+    space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
@@ -422,7 +422,7 @@ class RosnavResNet_5(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = SemanticResNetSpaceEncoder
+    space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
@@ -463,7 +463,7 @@ class RosnavResNet_6(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = SemanticResNetSpaceEncoder
+    space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
@@ -504,7 +504,7 @@ class RosnavResNet_7(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = SemanticResNetSpaceEncoder
+    space_encoder_class = Def
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
         SPACE_INDEX.PEDESTRIAN_VEL_X,
