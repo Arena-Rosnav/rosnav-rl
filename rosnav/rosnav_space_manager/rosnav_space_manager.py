@@ -10,7 +10,6 @@ from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space i
 
 from .default_encoder import DefaultEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
-from .resnet_space_encoder import SemanticResNetSpaceEncoder
 
 from .encoder_wrapper.reduced_laser_wrapper import ReducedLaserWrapper
 
