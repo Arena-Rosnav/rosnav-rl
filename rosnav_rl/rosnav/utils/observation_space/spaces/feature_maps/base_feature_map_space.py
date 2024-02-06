@@ -79,21 +79,24 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         **kwargs,
     ) -> np.ndarray:
         """
-        Get the semantic map based on the semantic data and robot pose.
+        Get the semantic map based on the given semantic data, relative position, and robot pose.
 
         Args:
-            semantic_data (List[pedsim_msgs.SemanticData]): The semantic data.
-            robot_pose: The robot pose.
+            semantic_data (pedsim_msgs.SemanticData): The semantic data containing information about the environment.
+            relative_pos (np.ndarray, optional): The relative positions of the semantic data points to the robot. Defaults to None.
+            robot_pose (Pose2D, optional): The pose of the robot. Defaults to None.
 
         Returns:
             np.ndarray: The semantic map.
         """
+
         pos_map = np.zeros((self._feature_map_size, self._feature_map_size))
 
         if relative_pos is None and len(semantic_data.points) == 0:
             return pos_map
 
         try:
+            # If relative_pos is not provided, calculate it
             if relative_pos is None and len(semantic_data.points) > 0:
                 relative_pos = BaseFeatureMapSpace.get_relative_pos_to_robot(
                     robot_pose, semantic_data.points

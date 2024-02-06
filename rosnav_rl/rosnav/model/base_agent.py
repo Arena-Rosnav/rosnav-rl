@@ -2,10 +2,9 @@ from abc import ABC, abstractmethod
 from typing import List, Type
 
 from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
-from rosnav.utils.observation_space.observation_space_manager import (
-    ObservationSpaceManager,
+from rosnav.utils.observation_space.spaces.base_observation_space import (
+    BaseObservationSpace,
 )
-from rosnav.utils.observation_space.space_index import SPACE_INDEX
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
@@ -19,7 +18,7 @@ class BaseAgent(ABC):
 
     Attributes:
         space_encoder_class (Type[BaseSpaceEncoder]): The class of the space encoder used by the agent.
-        observation_spaces (List[SPACE_INDEX]): List of observation space indices.
+        observation_spaces (List[BaseObservationSpace]): List of observation space indices.
         observation_space_kwargs (dict): Additional keyword arguments for the observation space.
         type (PolicyType): The type of policy used by the agent.
         features_extractor_class (Type[BaseFeaturesExtractor]): The class of the features extractor used by the agent.
@@ -43,12 +42,13 @@ class BaseAgent(ABC):
         return DefaultEncoder
 
     @property
-    def observation_spaces(self) -> List[SPACE_INDEX]:
+    @abstractmethod
+    def observation_spaces(self) -> List[BaseObservationSpace]:
         """
-        Get the list of observation space indices.
+        Get the list of observation spaces.
 
         Returns:
-            List[SPACE_INDEX]: List of observation space indices.
+            List[BaseObservationSpace]: List of observation spaces.
         """
         return None
 
