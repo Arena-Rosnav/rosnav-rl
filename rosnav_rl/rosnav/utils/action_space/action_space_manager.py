@@ -35,7 +35,7 @@ class ActionSpaceManager:
         actions: dict,
         stacked: bool,
         *args,
-        **kwargs
+        **kwargs,
     ) -> None:
         self._holonomic = holonomic
         self._discrete = action_space_discrete
@@ -127,6 +127,9 @@ class ActionSpaceManager:
         Returns:
             np.ndarray: The decoded action.
         """
+        if type(action) == int:
+            action = [action]
+
         if self._stacked:
             action = action[0] if action.ndim == 2 else action
 

@@ -2,19 +2,22 @@ import contextlib
 import json
 import os
 import sys
-import traceback
 
 import numpy as np
 import rospkg
+from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 import rospy
+from rl_utils.utils.observation_collector.observation_manager import ObservationManager
 from rosnav import *
 from rosnav.model.agent_factory import AgentFactory
 from rosnav.model.base_agent import PolicyType
 from rosnav.model.custom_sb3_policy import *
-from rosnav.msg import ResetStackedObs
 from rosnav.rosnav_space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav.srv import GetAction, GetActionResponse
 from rosnav.utils.constants import VALID_CONFIG_NAMES
+from rosnav.utils.observation_space.spaces.base_observation_space import (
+    BaseObservationSpace,
+)
 from rosnav.utils.utils import (
     load_json,
     load_vec_normalize,
@@ -24,15 +27,18 @@ from rosnav.utils.utils import (
 )
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env.stacked_observations import StackedObservations
 from tools.ros_param_distributor import (
     determine_space_encoder,
     populate_discrete_action_space,
     populate_laser_params,
 )
+from std_msgs.msg import Int16
+
 
 sys.modules["rl_agent"] = sys.modules["rosnav"]
 sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
+
+from typing import Any, Dict, List
 
 from task_generator.shared import Namespace
 
@@ -56,33 +62,45 @@ class RosnavNode:
         # Load hyperparams
         self._hyperparams = RosnavNode._load_hyperparams(self.agent_path)
 
-        self._obs_structure = RosnavNode._get_observation_space_structure(
-            self._hyperparams["rl_agent"]
-        )
-
         self._setup_action_space(self._hyperparams)
 
         populate_laser_params(self._hyperparams)
 
+        # Get Architecture Name and retrieve Observation spaces
+        architecture_name = self._hyperparams["rl_agent"]["architecture_name"]
+        agent: BaseAgent = AgentFactory.instantiate(architecture_name)
+        observation_spaces: List[BaseObservationSpace] = agent.observation_spaces
+        observation_spaces_kwargs = agent.observation_space_kwargs
+
         # Load observation normalization and frame stacking
-        self.load_env_wrappers(self._hyperparams)
+        self.load_env_wrappers(self._hyperparams, agent)
 
         # Set RosnavSpaceEncoder as Middleware
-        self._encoder = RosnavSpaceManager()
+        self._encoder = RosnavSpaceManager(
+            space_encoder_class=DefaultEncoder,
+            observation_spaces=observation_spaces,
+            observation_space_kwargs=observation_spaces_kwargs,
+            action_space_kwargs=None,
+        )
 
         # Load the model
-        self._agent = self._get_model(self._hyperparams, self.agent_path)
+        self._agent = self._get_model(
+            architecture_name=architecture_name,
+            checkpoint_name=self._hyperparams["rl_agent"]["checkpoint"],
+            agent_path=self.agent_path,
+        )
+
+        self._observation_manager = ObservationManager(self.ns)
 
         self._get_next_action_srv = rospy.Service(
             self.ns("rosnav/get_action"), GetAction, self._handle_next_action_srv
         )
         self._sub_reset_stacked_obs = rospy.Subscriber(
-            self.ns("rosnav/reset_stacked_obs"),
-            ResetStackedObs,
-            self._reset_stacked_obs,
+            "/scenario_reset", Int16, self._reset_stacked_obs
         )
 
         self.state = None
+        self._last_action = [0, 0, 0]
         self._reset_state = True
 
     def _setup_action_space(self, hyperparams):
@@ -91,12 +109,12 @@ class RosnavNode:
             if "discrete_action_space" in self._hyperparams["rl_agent"]
             else self._hyperparams["rl_agent"]["action_space"]["discrete"]
         )
-        rospy.set_param("is_action_space_discrete", is_action_space_discrete)
+        rospy.set_param("rl_agent/action_space/discrete", is_action_space_discrete)
 
         if is_action_space_discrete:
             populate_discrete_action_space(hyperparams)
 
-    def load_env_wrappers(self, hyperparams):
+    def load_env_wrappers(self, hyperparams, agent_description):
         # Load observation normalization and frame stacking
         self._normalized_mode = hyperparams["rl_agent"]["normalize"]
         self._reduced_laser_mode = (
@@ -110,33 +128,27 @@ class RosnavNode:
             else False
         )
 
-        # populate right encoder name based on params
-        rospy.set_param(
-            "space_encoder",
-            determine_space_encoder(self._stacked_mode, self._reduced_laser_mode),
-        )
-
         if self._stacked_mode:
-            self._vec_stacked = RosnavNode._get_vec_stacked(self._hyperparams)
+            self._vec_stacked = RosnavNode._get_vec_stacked(
+                agent_description, self._hyperparams
+            )
             self._stacked_obs_container = self._vec_stacked.stacked_obs
+        else:
+            self._vec_stacked = None
 
         if self._normalized_mode:
             self._vec_normalize = RosnavNode._get_vec_normalize(
-                self.agent_path, self._hyperparams, self._vec_stacked
+                agent_description, self.agent_path, self._hyperparams, self._vec_stacked
             )
 
-    def _encode_observation(self, obs_msg: GetAction):
-        return self._encoder.encode_observation(
-            {
-                "goal_in_robot_frame": obs_msg.goal_in_robot_frame,
-                "laser_scan": obs_msg.laser_scan,
-                "last_action": obs_msg.last_action,
-            },
-            self._obs_structure,
-        )
+    def _encode_observation(self, observation: Dict[str, Any]):
+        return self._encoder.encode_observation(observation)
 
-    def _handle_next_action_srv(self, request: GetAction):
-        observation = self._encode_observation(request)
+    def get_action(self):
+        observation = self._observation_manager.get_observations()
+        observation[OBS_DICT_KEYS.LAST_ACTION] = self._last_action
+
+        observation = self._encode_observation(observation)
 
         if self._stacked_mode:
             observation, _ = self._stacked_obs_container.update(
@@ -159,9 +171,9 @@ class RosnavNode:
             predict_dict.update(
                 {
                     "state": self.state,
-                    "episode_start": RosnavNode.DEFAULT_EPS_START
-                    if self._reset_state
-                    else None,
+                    "episode_start": (
+                        RosnavNode.DEFAULT_EPS_START if self._reset_state else None
+                    ),
                 }
             )
             self._reset_state = False
@@ -170,8 +182,15 @@ class RosnavNode:
 
         decoded_action = self._encoder.decode_action(action)
 
+        self._last_action = decoded_action
+
+        return decoded_action
+
+    def _handle_next_action_srv(self, request: GetAction):
+        action = self.get_action()
+
         response = GetActionResponse()
-        response.action = decoded_action
+        response.action = action
 
         return response
 
@@ -182,31 +201,16 @@ class RosnavNode:
             observation = self._encode_observation(request)
             self._stacked_obs_container.reset(observation)
 
-    def _get_model(self, hyperparams: dict, agent_path: str):
-        action_state_sizes = [0, 3]
+    def _get_model(self, architecture_name: str, checkpoint_name: str, agent_path: str):
+        net_type: PolicyType = AgentFactory.registry[architecture_name].type
+        model_path = os.path.join(agent_path, f"{checkpoint_name}.zip")
 
-        try:
-            arch_name = hyperparams["rl_agent"]["architecture_name"]
-        except KeyError:
-            net_type = None
-        finally:
-            net_type: PolicyType = AgentFactory.registry[arch_name].type
-
-        for size in action_state_sizes:
-            try:
-                rospy.set_param(f"{rospy.get_namespace()}action_state_size", size)
-                if not net_type or net_type != PolicyType.MLP_LSTM:
-                    self._recurrent_arch = False
-                    return PPO.load(os.path.join(agent_path, "best_model.zip")).policy
-                else:
-                    self._recurrent_arch = True
-                    return RecurrentPPO.load(
-                        os.path.join(agent_path, "best_model.zip")
-                    ).policy
-            except RuntimeError:
-                pass
-
-        rospy.signal_shutdown("")
+        if not net_type or net_type != PolicyType.MLP_LSTM:
+            self._recurrent_arch = False
+            return PPO.load(model_path).policy
+        else:
+            self._recurrent_arch = True
+            return RecurrentPPO.load(model_path).policy
 
     @staticmethod
     def _get_model_path(model_name):
@@ -227,20 +231,16 @@ class RosnavNode:
         raise ValueError("No valid config file found in agent folder.")
 
     @staticmethod
-    def _get_observation_space_structure(hyperparams):
-        return hyperparams.get(
-            "observation_space",
-            ["laser_scan", "goal_in_robot_frame", "last_action"],
-        )
-
-    @staticmethod
-    def _get_vec_normalize(agent_path, hyperparams, venv=None):
-        vec_normalize_path = os.path.join(agent_path, "vec_normalize.pkl")
+    def _get_vec_normalize(agent_description, agent_path, hyperparams, venv=None):
+        if venv is None:
+            venv = make_mock_env(agent_description)
+        checkpoint = hyperparams["rl_agent"]["checkpoint"]
+        vec_normalize_path = os.path.join(agent_path, f"vec_normalize_{checkpoint}.pkl")
         return load_vec_normalize(vec_normalize_path, hyperparams["rl_agent"], venv)
 
     @staticmethod
-    def _get_vec_stacked(hyperparams: dict):
-        venv = make_mock_env(hyperparams["rl_agent"])
+    def _get_vec_stacked(agent_description, hyperparams: dict):
+        venv = make_mock_env(agent_description)
         return wrap_vec_framestack(
             venv, hyperparams["rl_agent"]["frame_stacking"]["stack_size"]
         )
