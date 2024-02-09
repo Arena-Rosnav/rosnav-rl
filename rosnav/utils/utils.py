@@ -83,12 +83,15 @@ def load_yaml(file_path: str) -> dict:
         return yaml.load(file, Loader=yaml.FullLoader)
 
 
-def make_mock_env(config: dict) -> DummyVecEnv:
+def make_mock_env(agent_description) -> DummyVecEnv:
     import rl_utils.envs.flatland_gymnasium_env as flatland_gym_env
 
     def _init():
         return flatland_gym_env.FlatlandEnv(
-            ns="", reward_fnc=config["reward_fnc"], verbose=False
+            ns="",
+            agent_description=agent_description,
+            reward_fnc=None,
+            trigger_init=False,
         )
 
     return DummyVecEnv([_init])
