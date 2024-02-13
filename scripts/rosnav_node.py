@@ -49,6 +49,12 @@ class RosnavNode:
     DEFAULT_EPS_START = np.array([True])
 
     def __init__(self, ns: Namespace = ""):
+        """
+        Initialize the RosnavNode class.
+
+        Args:
+            ns (Namespace, optional): The namespace for the node. Defaults to "".
+        """
         self.ns = Namespace(ns)
 
         # Agent name and path
@@ -73,7 +79,7 @@ class RosnavNode:
         observation_spaces_kwargs = agent.observation_space_kwargs
 
         # Load observation normalization and frame stacking
-        self.load_env_wrappers(self._hyperparams, agent)
+        self._load_env_wrappers(self._hyperparams, agent)
 
         # Set RosnavSpaceEncoder as Middleware
         self._encoder = RosnavSpaceManager(
@@ -96,14 +102,14 @@ class RosnavNode:
             self.ns("rosnav/get_action"), GetAction, self._handle_next_action_srv
         )
         self._sub_reset_stacked_obs = rospy.Subscriber(
-            "/scenario_reset", Int16, self._reset_stacked_obs
+            "/scenario_reset", Int16, self._on_scene_reset
         )
 
         self.state = None
         self._last_action = [0, 0, 0]
         self._reset_state = True
 
-    def _setup_action_space(self, hyperparams):
+    def _setup_action_space(self, hyperparams: dict):
         is_action_space_discrete = (
             hyperparams["rl_agent"]["discrete_action_space"]
             if "discrete_action_space" in self._hyperparams["rl_agent"]
@@ -114,7 +120,17 @@ class RosnavNode:
         if is_action_space_discrete:
             populate_discrete_action_space(hyperparams)
 
-    def load_env_wrappers(self, hyperparams, agent_description):
+    def _load_env_wrappers(self, hyperparams: dict, agent_description: BaseAgent):
+        """
+        Loads the environment wrappers based on the provided hyperparameters and agent description.
+
+        Args:
+            hyperparams (dict): The hyperparameters for the RL agent.
+            agent_description (BaseAgent): The description of the agent.
+
+        Returns:
+            None
+        """
         # Load observation normalization and frame stacking
         self._normalized_mode = hyperparams["rl_agent"]["normalize"]
         self._reduced_laser_mode = (
@@ -142,13 +158,36 @@ class RosnavNode:
             )
 
     def _encode_observation(self, observation: Dict[str, Any]):
+        """
+        Encodes the given observation using the encoder.
+
+        Args:
+            observation (Dict[str, Any]): The observation to be encoded.
+
+        Returns:
+            The encoded observation.
+        """
         return self._encoder.encode_observation(observation)
 
-    def get_action(self):
+    def _get_observation(self):
+        """
+        Get the observation from the observation manager and append the last action.
+
+        Returns:
+            dict: The observation dictionary.
+        """
         observation = self._observation_manager.get_observations()
         observation[OBS_DICT_KEYS.LAST_ACTION] = self._last_action
+        return observation
 
-        observation = self._encode_observation(observation)
+    def get_action(self):
+        """
+        Get the action to be taken based on the current observation.
+
+        Returns:
+            The decoded action to be taken.
+        """
+        observation = self._encode_observation(self._get_observation())
 
         if self._stacked_mode:
             observation, _ = self._stacked_obs_container.update(
@@ -187,6 +226,15 @@ class RosnavNode:
         return decoded_action
 
     def _handle_next_action_srv(self, request: GetAction):
+        """
+        Handles the service request to get the next action.
+
+        Args:
+            request (GetAction): The service request.
+
+        Returns:
+            GetActionResponse: The service response containing the next action.
+        """
         action = self.get_action()
 
         response = GetActionResponse()
@@ -194,14 +242,51 @@ class RosnavNode:
 
         return response
 
-    def _reset_stacked_obs(self, request: GetAction):
+    def _on_scene_reset(self, request: Int16):
+        """
+        Resets the last action and stacked observations.
+
+        Args:
+            request (Int16): The reset request.
+
+        Returns:
+            None
+        """
+        self._reset_last_action()
+        self._reset_stacked_obs()
+
+    def _reset_last_action(self):
+        """
+        Resets the last action to [0, 0, 0].
+        """
+        self._last_action = [0, 0, 0]
+
+    def _reset_stacked_obs(self):
+        """
+        Resets the stacked observation.
+
+        This method sets the `_reset_state` flag to True, clears the `state` variable,
+        and resets the stacked observation container if the stacked mode is enabled.
+        """
         self._reset_state = True
+        self.state = None
 
         if self._stacked_mode:
-            observation = self._encode_observation(request)
+            observation = self._encode_observation(self._get_observation())
             self._stacked_obs_container.reset(observation)
 
     def _get_model(self, architecture_name: str, checkpoint_name: str, agent_path: str):
+        """
+        Get the model based on the given architecture name, checkpoint name, and agent path.
+
+        Args:
+            architecture_name (str): The name of the architecture.
+            checkpoint_name (str): The name of the checkpoint.
+            agent_path (str): The path to the agent.
+
+        Returns:
+            policy: The loaded policy model.
+        """
         net_type: PolicyType = AgentFactory.registry[architecture_name].type
         model_path = os.path.join(agent_path, f"{checkpoint_name}.zip")
 
@@ -231,7 +316,21 @@ class RosnavNode:
         raise ValueError("No valid config file found in agent folder.")
 
     @staticmethod
-    def _get_vec_normalize(agent_description, agent_path, hyperparams, venv=None):
+    def _get_vec_normalize(
+        agent_description: BaseAgent, agent_path: str, hyperparams: dict, venv=None
+    ):
+        """
+        Get the vector normalizer for the RL agent.
+
+        Args:
+            agent_description (str): Description of the agent.
+            agent_path (str): Path to the agent.
+            hyperparams (dict): Hyperparameters for the RL agent.
+            venv (object, optional): Virtual environment. Defaults to None.
+
+        Returns:
+            object: Vector normalizer for the RL agent.
+        """
         if venv is None:
             venv = make_mock_env(agent_description)
         checkpoint = hyperparams["rl_agent"]["checkpoint"]
@@ -239,7 +338,17 @@ class RosnavNode:
         return load_vec_normalize(vec_normalize_path, hyperparams["rl_agent"], venv)
 
     @staticmethod
-    def _get_vec_stacked(agent_description, hyperparams: dict):
+    def _get_vec_stacked(agent_description: BaseAgent, hyperparams: dict):
+        """
+        Returns a vectorized environment with frame stacking.
+
+        Args:
+            agent_description (str): Description of the agent.
+            hyperparams (dict): Hyperparameters for the RL agent.
+
+        Returns:
+            Vectorized environment with frame stacking.
+        """
         venv = make_mock_env(agent_description)
         return wrap_vec_framestack(
             venv, hyperparams["rl_agent"]["frame_stacking"]["stack_size"]
