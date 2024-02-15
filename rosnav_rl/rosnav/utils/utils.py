@@ -14,11 +14,11 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
 
 def get_robot_yaml_path(robot_model: str = None) -> str:
-    robot_model = rospy.get_param(os.path.join(rospy.get_namespace(), "robot_model"))
+    robot_model = rospy.get_param(os.path.join(rospy.get_namespace(), "model"))
 
     simulation_setup_path = rospkg.RosPack().get_path("arena_simulation_setup")
     return os.path.join(
-        simulation_setup_path, "robot", robot_model, f"model_params.yaml"
+        simulation_setup_path, "entities", "robots", robot_model, f"model_params.yaml"
     )
 
 
