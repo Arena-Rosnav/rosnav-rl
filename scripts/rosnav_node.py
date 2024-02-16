@@ -67,6 +67,7 @@ class RosnavNode:
 
         # Load hyperparams
         self._hyperparams = RosnavNode._load_hyperparams(self.agent_path)
+        rospy.set_param("rl_agent", self._hyperparams["rl_agent"])
 
         self._setup_action_space(self._hyperparams)
 
