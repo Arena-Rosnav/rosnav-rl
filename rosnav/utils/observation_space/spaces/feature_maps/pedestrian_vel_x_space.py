@@ -92,10 +92,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         x_vel_map = np.zeros((self.feature_map_size, self.feature_map_size))
 
         if relative_x_vel is not None and relative_pos is not None:
-            for vel_x, pos in zip(
-                relative_x_vel,
-                relative_pos,
-            ):
+            for vel_x, pos in zip(relative_x_vel, relative_pos):
                 index = self._get_map_index(pos)
                 if (
                     0 <= index[0] < self.feature_map_size
