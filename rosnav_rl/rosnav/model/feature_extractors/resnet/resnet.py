@@ -136,13 +136,13 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             None
         """
         self._feature_map_size = self._observation_space_manager.get_space_container(
-            SPACE_INDEX.PEDESTRIAN_LOCATION
+            SPACE_INDEX.PEDESTRIAN_TYPE
         ).feature_map_size
         self._scan_map_size = self._observation_space_manager[
             SPACE_INDEX.STACKED_LASER_MAP
         ].shape[-1]
         self._ped_map_size = (
-            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_LOCATION].shape[-1]
+            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
             + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
         )
         self._goal_size = self._observation_space_manager[SPACE_INDEX.GOAL].shape[-1]
@@ -563,7 +563,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         """
         super()._get_input_sizes()
         self._ped_map_size = (
-            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_LOCATION].shape[-1]
+            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
             + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
             + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
             + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
