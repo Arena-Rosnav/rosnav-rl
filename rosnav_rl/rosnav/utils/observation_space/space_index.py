@@ -18,6 +18,9 @@ from ..observation_space.spaces.feature_maps.pedestrian_vel_y_space import (
 from ..observation_space.spaces.feature_maps.stacked_laser_map_space import (
     StackedLaserMapSpace,
 )
+from .spaces.feature_maps.pedestrian_social_state_space import (
+    PedestrianSocialStateSpace,
+)
 
 
 class SPACE_INDEX(Enum):
@@ -30,3 +33,4 @@ class SPACE_INDEX(Enum):
     PEDESTRIAN_TYPE = PedestrianTypeSpace
     PEDESTRIAN_VEL_X = PedestrianVelXSpace
     PEDESTRIAN_VEL_Y = PedestrianVelYSpace
+    PEDESTRIAN_SOCIAL_STATE = PedestrianSocialStateSpace
