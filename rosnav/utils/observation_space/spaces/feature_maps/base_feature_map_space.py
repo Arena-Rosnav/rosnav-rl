@@ -4,7 +4,7 @@ from typing import List
 import numpy as np
 import rospy
 
-import pedsim_msgs.msg as pedsim_msgs
+import crowdsim_msgs.msg as crowdsim_msgs
 from geometry_msgs.msg import Point, Pose2D
 
 
@@ -72,7 +72,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
     def _get_semantic_map(
         self,
-        semantic_data: pedsim_msgs.SemanticData,
+        semantic_data: crowdsim_msgs.SemanticData,
         relative_pos: np.ndarray = None,
         robot_pose: Pose2D = None,
         *args,
@@ -82,7 +82,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         Get the semantic map based on the given semantic data, relative position, and robot pose.
 
         Args:
-            semantic_data (pedsim_msgs.SemanticData): The semantic data containing information about the environment.
+            semantic_data (crowdsim_msgs.SemanticData): The semantic data containing information about the environment.
             relative_pos (np.ndarray, optional): The relative positions of the semantic data points to the robot. Defaults to None.
             robot_pose (Pose2D, optional): The pose of the robot. Defaults to None.
 
@@ -119,7 +119,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
     @staticmethod
     def get_relative_pos_to_robot(
-        robot_pose: Pose2D, distant_frames: pedsim_msgs.SemanticData
+        robot_pose: Pose2D, distant_frames: crowdsim_msgs.SemanticData
     ):
         robot_pose_array = np.array([robot_pose.x, robot_pose.y, robot_pose.theta])
         # homogeneous transformation matrix: map_T_robot
