@@ -2,6 +2,7 @@ import contextlib
 import json
 import os
 import sys
+import argparse
 
 import numpy as np
 import rospkg
@@ -109,6 +110,10 @@ class RosnavNode:
         self.state = None
         self._last_action = [0, 0, 0]
         self._reset_state = True
+        self._is_reset = False
+
+        while not rospy.is_shutdown():
+            rospy.spin()
 
     def _setup_action_space(self, hyperparams: dict):
         is_action_space_discrete = (
@@ -158,7 +163,7 @@ class RosnavNode:
                 agent_description, self.agent_path, self._hyperparams, self._vec_stacked
             )
 
-    def _encode_observation(self, observation: Dict[str, Any]):
+    def _encode_observation(self, observation: Dict[str, Any], *args, **kwargs):
         """
         Encodes the given observation using the encoder.
 
@@ -168,7 +173,7 @@ class RosnavNode:
         Returns:
             The encoded observation.
         """
-        return self._encoder.encode_observation(observation)
+        return self._encoder.encode_observation(observation, **kwargs)
 
     def _get_observation(self):
         """
@@ -188,7 +193,9 @@ class RosnavNode:
         Returns:
             The decoded action to be taken.
         """
-        observation = self._encode_observation(self._get_observation())
+        observation = self._encode_observation(
+            self._get_observation(), is_done=self._is_reset
+        )
 
         if self._stacked_mode:
             observation, _ = self._stacked_obs_container.update(
@@ -273,7 +280,9 @@ class RosnavNode:
         self.state = None
 
         if self._stacked_mode:
-            observation = self._encode_observation(self._get_observation())
+            observation = self._encode_observation(
+                self._get_observation(), is_done=True
+            )
             self._stacked_obs_container.reset(observation)
 
     def _get_model(self, architecture_name: str, checkpoint_name: str, agent_path: str):
@@ -357,9 +366,11 @@ class RosnavNode:
 
 
 if __name__ == "__main__":
+    # Parse --namespace argument
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--namespace", type=str, default="")
+    args = parser.parse_args()
+
     rospy.init_node("rosnav_node")
 
-    node = RosnavNode()
-
-    while not rospy.is_shutdown():
-        rospy.spin()
+    node = RosnavNode(ns=args.namespace)
