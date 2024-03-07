@@ -1247,7 +1247,7 @@ class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
         self._ped_map_size = (
             self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
             + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_LOCATION].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
             + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
         )
 
