@@ -36,7 +36,7 @@ rl_agent:
       enabled: true
     discrete: true
   architecture_name: RosnavResNet_5
-  checkpoint: best_model
+  checkpoint: last_model
   frame_stacking:
     enabled: false
     stack_size: 6
@@ -49,7 +49,7 @@ rl_agent:
     enabled: true
     settings:
       final_value: 0.0001
-      initial_value: 0.0003
+      initial_value: 0.0002
     type: linear
   normalize:
     enabled: true
@@ -60,7 +60,7 @@ rl_agent:
       norm_obs: true
       norm_reward: true
   ppo:
-    batch_size: 2560
+    batch_size: 5120
     clip_range: 0.2
     ent_coef: 0.005
     gae_lambda: 0.95
@@ -69,7 +69,7 @@ rl_agent:
     m_batch_size: 256
     max_grad_norm: 0.5
     n_epochs: 3
-    n_steps: 128
+    n_steps: 256
     vf_coef: 0.22
   resume: jackal_RosnavResNet_5_2024_02_06__23_35_22
   reward_fnc: base_semantic
