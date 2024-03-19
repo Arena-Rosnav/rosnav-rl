@@ -88,6 +88,7 @@ class LastActionSpace(BaseObservationSpace):
         )
         return stack_spaces(*_spaces)
 
+    @BaseObservationSpace.apply_normalization
     def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
         """
         Encodes the observation by extracting the last action from the observation dictionary.
