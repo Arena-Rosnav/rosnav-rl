@@ -110,7 +110,7 @@ class RosnavSpaceManager:
         if rospy.get_param("laser/reduce_num_beams"):
             self._encoder = ReducedLaserWrapper(self._encoder, self._laser_num_beams)
 
-        if rospy.get_param("record_feature_maps", True):
+        if rospy.get_param("record_feature_maps", False):
             self._encoder = FeatureMapRecorderWrapper(
                 encoder=self._encoder, save_every_x_obs=4
             )
