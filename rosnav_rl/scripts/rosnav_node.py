@@ -49,14 +49,17 @@ class RosnavNode:
     DEFAULT_INFOS = [{}]
     DEFAULT_EPS_START = np.array([True])
 
-    def __init__(self, ns: Namespace = ""):
+    def __init__(self, ns: Namespace = None):
         """
         Initialize the RosnavNode class.
 
         Args:
             ns (Namespace, optional): The namespace for the node. Defaults to "".
         """
-        self.ns = Namespace(ns)
+        self.ns = Namespace(ns) if ns else Namespace(rospy.get_namespace()[:-1])
+        # self.ns = Namespace(ns) if ns else Namespace("/jackal")
+
+        rospy.loginfo(f"Starting Rosnav-Node on {self.ns}")
 
         # Agent name and path
         self.agent_name = rospy.get_param("agent_name")
@@ -80,8 +83,12 @@ class RosnavNode:
         observation_spaces: List[BaseObservationSpace] = agent.observation_spaces
         observation_spaces_kwargs = agent.observation_space_kwargs
 
+        rospy.loginfo("[RosnavNode] Setup action space and model settings.")
+
         # Load observation normalization and frame stacking
         self._load_env_wrappers(self._hyperparams, agent)
+
+        rospy.loginfo("[RosnavNode] Loaded environment wrappers.")
 
         # Set RosnavSpaceEncoder as Middleware
         self._encoder = RosnavSpaceManager(
@@ -98,7 +105,9 @@ class RosnavNode:
             agent_path=self.agent_path,
         )
 
-        self._observation_manager = ObservationManager(self.ns)
+        self._observation_manager = ObservationManager(Namespace(self.ns))
+
+        rospy.loginfo("[RosnavNode] Loaded model and ObsManager.")
 
         self._get_next_action_srv = rospy.Service(
             self.ns("rosnav/get_action"), GetAction, self._handle_next_action_srv
@@ -160,7 +169,11 @@ class RosnavNode:
 
         if self._normalized_mode:
             self._vec_normalize = RosnavNode._get_vec_normalize(
-                agent_description, self.agent_path, self._hyperparams, self._vec_stacked
+                agent_description,
+                self.agent_path,
+                self._hyperparams,
+                self._vec_stacked,
+                ns=self.ns,
             )
 
     def _encode_observation(self, observation: Dict[str, Any], *args, **kwargs):
@@ -327,7 +340,11 @@ class RosnavNode:
 
     @staticmethod
     def _get_vec_normalize(
-        agent_description: BaseAgent, agent_path: str, hyperparams: dict, venv=None
+        agent_description: BaseAgent,
+        agent_path: str,
+        hyperparams: dict,
+        venv=None,
+        ns: Namespace = "",
     ):
         """
         Get the vector normalizer for the RL agent.
@@ -342,13 +359,18 @@ class RosnavNode:
             object: Vector normalizer for the RL agent.
         """
         if venv is None:
-            venv = make_mock_env(agent_description)
+            venv = make_mock_env(ns, agent_description)
+        rospy.loginfo("[RosnavNode] Loaded mock env.")
         checkpoint = hyperparams["rl_agent"]["checkpoint"]
         vec_normalize_path = os.path.join(agent_path, f"vec_normalize_{checkpoint}.pkl")
-        return load_vec_normalize(vec_normalize_path, hyperparams["rl_agent"], venv)
+        return load_vec_normalize(vec_normalize_path, venv)
 
     @staticmethod
-    def _get_vec_stacked(agent_description: BaseAgent, hyperparams: dict):
+    def _get_vec_stacked(
+        agent_description: BaseAgent,
+        hyperparams: dict,
+        ns: Namespace = "",
+    ):
         """
         Returns a vectorized environment with frame stacking.
 
@@ -359,18 +381,22 @@ class RosnavNode:
         Returns:
             Vectorized environment with frame stacking.
         """
-        venv = make_mock_env(agent_description)
+        venv = make_mock_env(ns, agent_description)
         return wrap_vec_framestack(
             venv, hyperparams["rl_agent"]["frame_stacking"]["stack_size"]
         )
 
 
-if __name__ == "__main__":
-    # Parse --namespace argument
+def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--namespace", type=str, default="")
-    args = parser.parse_args()
 
+    parser.add_argument("-ns", "--namespace", type=str, default=None)
+
+    return parser.parse_known_args()[0]
+
+
+if __name__ == "__main__":
     rospy.init_node("rosnav_node")
+    args = parse_args()
 
-    node = RosnavNode(ns=args.namespace)
+    RosnavNode(ns=args.namespace)
