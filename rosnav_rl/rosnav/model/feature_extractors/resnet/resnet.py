@@ -1484,3 +1484,8 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         x = self.linear_fc(fc_in)
 
         return x
+
+
+class RESNET_RGBD_FUSION_EXTRACTOR():
+    def __init__():
+        
