@@ -102,6 +102,15 @@ class ResNet(nn.Module):
 
     
 def resnet50_groupnorm(input_channels: int, num_groups: int):
+    """Instantiates a ResNet50 with GroupNorm as normalization layer.
+    
+    Args:
+        input_channels (int): Number of channels of the input image, e.g. RGB: 3, RGBD: 4.
+        num_groups (int): Number of groups for the GroupNorm layers.
+    
+    Returns:
+        ResNet50 nn.Module object from ResNet class.
+    """
     return ResNet(
         layer_sizes=[3, 4, 6, 3],
         in_planes=input_channels,
