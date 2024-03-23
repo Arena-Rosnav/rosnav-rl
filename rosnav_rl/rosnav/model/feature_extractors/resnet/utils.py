@@ -1,4 +1,5 @@
 from torch import nn, Tensor
+import torch
 from typing import List, Union, Optional, Callable
 import numpy as np
 from torchvision.models.resnet import BasicBlock, Bottleneck, conv1x1
@@ -23,9 +24,9 @@ class ResNet(nn.Module):
         self.cardinality = cardinality
         self.base_planes = base_planes
         
-        self.conv1 = nn.Conv2d(in_planes, base_planes, kernal_size=7, stride=2, padding=3, bias=False)
-        self.in_planes = in_planes
-        self.norm1 = norm_layer(self.in_planes)
+        self.conv1 = nn.Conv2d(in_planes, base_planes, kernel_size=7, stride=2, padding=3, bias=False)
+        self.in_planes = base_planes
+        self.norm1 = self.norm_layer(self.in_planes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.res_layer1 = self._make_layer(
@@ -51,7 +52,7 @@ class ResNet(nn.Module):
     ) -> nn.Sequential:
         # first block
         # downsample
-        if stride != 1 or self.inplanes != planes * self.block_type.expansion:
+        if stride != 1 or self.in_planes != planes * self.block_type.expansion:
             downsample = nn.Sequential(
                 conv1x1(self.in_planes, planes * self.block_type.expansion, stride),
                 self.norm_layer(planes * self.block_type.expansion)
@@ -96,6 +97,16 @@ class ResNet(nn.Module):
         x = self.res_layer2(x)
         x = self.res_layer3(x)
         x = self.res_layer4(x)
+        
+        return x
 
-        
-        
+    
+def resnet50_groupnorm(input_channels: int, num_groups: int):
+    return ResNet(
+        layer_sizes=[3, 4, 6, 3],
+        in_planes=input_channels,
+        base_planes=64,
+        block_type=Bottleneck,
+        cardinality=1,
+        norm_layer=lambda channels: nn.GroupNorm(num_groups, channels)
+    )
