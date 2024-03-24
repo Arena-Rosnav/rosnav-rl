@@ -124,6 +124,13 @@ def resnet50_groupnorm(input_channels: int, num_groups: int):
     
 
 class RgbdPerceptionNet(nn.Module):
+    """Encapsulates the chosen backbone for the RGBD perception part.
+
+    Args:
+        out_dim (int): The final output dimension of the RGBD perception.
+        network_factory (Callable[..., ResNet]): Method which instantiates the backbone. 
+            This method will be given the given kwargs.
+    """
     HIDDEN_CHANNELS = 128  # As specified in DD-PPO paper
     TMP_OUT_SPATIAL = 4  # TODO: Use observation spaces
     
