@@ -1,6 +1,6 @@
 from torch import nn, Tensor
 import torch
-from typing import List, Union, Optional, Callable
+from typing import List, Union, Optional, Callable, Any
 import numpy as np
 from torchvision.models.resnet import BasicBlock, Bottleneck, conv1x1
 
@@ -42,6 +42,8 @@ class ResNet(nn.Module):
             block_count=layer_sizes[3], planes=self.base_planes * 2 * 2 * 2, stride=2
         )
         
+        self.out_planes = self.in_planes
+        self.out_shape = torch.Size([self.in_planes, ])
         
         
     def _make_layer(
@@ -119,3 +121,31 @@ def resnet50_groupnorm(input_channels: int, num_groups: int):
         cardinality=1,
         norm_layer=lambda channels: nn.GroupNorm(num_groups, channels)
     )
+    
+
+class RgbdPerceptionNet(nn.Module):
+    HIDDEN_CHANNELS = 128  # As specified in DD-PPO paper
+    TMP_OUT_SPATIAL = 4  # TODO: Use observation spaces
+    
+    def __init__(
+        self,
+        out_dim: int,
+        network_factory: Callable[..., ResNet],
+        **kwargs: Any
+    ):
+        self.input_channels = kwargs["input_channels"]
+        self.output = out_dim
+        
+        self.net = network_factory(kwargs)
+        self.conv = nn.Conv2d(in_channels=self.net.out_planes, out_channels=self.HIDDEN_CHANNELS)
+        self.fc = nn.Linear(in_features=self.HIDDEN_CHANNELS*self.TMP_OUT_SPATIAL*self.TMP_OUT_SPATIAL, out_features=out_dim)
+
+    def forward(
+        self,
+        x: Tensor
+    ):
+        x = self.net(x)
+        x = self.conv(x)
+        x = self.fc(x)
+        
+        return x
