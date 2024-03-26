@@ -38,7 +38,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         self._roi_in_m = roi_in_m
         self._flatten = flatten
 
-        self._space = self.get_gym_space()
+        super().__init__(*args, **kwargs)
 
     @property
     def feature_map_size(self):

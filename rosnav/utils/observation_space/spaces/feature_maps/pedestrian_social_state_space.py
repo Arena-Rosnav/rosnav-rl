@@ -1,13 +1,12 @@
 import numpy as np
+import pedsim_msgs.msg as pedsim_msgs
 from gymnasium import spaces
+from pedsim_agents.utils import SemanticAttribute
+from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
+from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
-
-from pedsim_agents.utils import SemanticAttribute
-import pedsim_msgs.msg as pedsim_msgs
-
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 
 @SpaceFactory.register("ped_social_state")
@@ -35,12 +34,14 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
 
     def __init__(
         self,
+        social_state_num: int,
         feature_map_size: int,
         roi_in_m: float,
         flatten: bool = True,
         *args,
         **kwargs
     ) -> None:
+        self._social_state_num = social_state_num
         super().__init__(
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
@@ -58,7 +59,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         """
         return spaces.Box(
             low=0,
-            high=9999,
+            high=self._social_state_num,
             shape=(self._feature_map_size * self._feature_map_size,),
             dtype=int,
         )
@@ -99,6 +100,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
 
         return social_state_map
 
+    @BaseObservationSpace.apply_normalization
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
         """
         Encode the observation into a numpy array.

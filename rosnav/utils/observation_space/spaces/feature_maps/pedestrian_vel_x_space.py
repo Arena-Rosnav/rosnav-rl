@@ -1,12 +1,11 @@
 import numpy as np
 from gymnasium import spaces
+from pedsim_agents.utils import SemanticAttribute
+from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
+from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
-
-from pedsim_agents.utils import SemanticAttribute
-
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 
 @SpaceFactory.register("ped_vel_x")
@@ -102,6 +101,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
 
         return x_vel_map
 
+    @BaseObservationSpace.apply_normalization
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
         """
         Encodes the observation into a numpy array.
