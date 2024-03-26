@@ -1,6 +1,6 @@
 import numpy as np
 from gymnasium import spaces
-from pedsim_agents.utils import SemanticAttribute
+from crowdsim_agents.utils import SemanticAttribute
 from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
