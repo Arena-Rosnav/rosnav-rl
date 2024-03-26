@@ -10,6 +10,7 @@ from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
 from .base_feature_map_space import BaseFeatureMapSpace
+from ..base_observation_space import BaseObservationSpace
 
 
 @SpaceFactory.register("stacked_laser_map")
@@ -157,6 +158,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
             dtype=np.float32,
         )
 
+    @BaseObservationSpace.apply_normalization
     def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
         """
         Encodes the observation into a feature map.

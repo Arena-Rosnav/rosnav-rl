@@ -44,6 +44,7 @@ class LaserScanSpace(BaseObservationSpace):
             dtype=np.float32,
         )
 
+    @BaseObservationSpace.apply_normalization
     def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
         """
         Encodes the laser scan observation.

@@ -83,12 +83,12 @@ def load_yaml(file_path: str) -> dict:
         return yaml.load(file, Loader=yaml.FullLoader)
 
 
-def make_mock_env(agent_description) -> DummyVecEnv:
+def make_mock_env(ns: str, agent_description) -> DummyVecEnv:
     import rl_utils.envs.flatland_gymnasium_env as flatland_gym_env
 
     def _init():
         return flatland_gym_env.FlatlandEnv(
-            ns="",
+            ns=ns,
             agent_description=agent_description,
             reward_fnc=None,
             trigger_init=False,
@@ -101,8 +101,8 @@ def wrap_vec_framestack(env: DummyVecEnv, stack_size: int) -> VecFrameStack:
     return VecFrameStack(env, n_stack=stack_size, channels_order="first")
 
 
-def load_vec_normalize(path: str, config: dict, venv: VecEnv = None) -> VecNormalize:
-    return VecNormalize.load(path, venv or make_mock_env(config))
+def load_vec_normalize(path: str, venv: VecEnv = None) -> VecNormalize:
+    return VecNormalize.load(path, venv)
 
 
 def set_seed(seed):
