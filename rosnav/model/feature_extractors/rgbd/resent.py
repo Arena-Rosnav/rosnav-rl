@@ -127,6 +127,9 @@ def resnet50_groupnorm(input_channels: int, num_groups: int):
 
 class RgbdPerceptionNet(nn.Module):
     """Encapsulates the chosen backbone for the RGBD perception part.
+    NOTICE: The backbone is passed via a factory method. The backbone should be a
+    ResNet object which results in a (out_planes, 1, 1) tensor where out_planes
+    is variable.
 
     Args:
         out_dim (int): The final output dimension of the RGBD perception.
