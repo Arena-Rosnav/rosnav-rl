@@ -1484,15 +1484,3 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         x = self.linear_fc(fc_in)
 
         return x
-
-
-class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
-    def __init__(self,
-                 observation_space: gym.spaces.Box,
-                 observation_space_manager: ObservationSpaceManager,
-                 features_dim: int = 256,
-                 rgbd_backbone: Callable[..., ResNet] = resnet50_groupnorm,
-                 rgbd_out_dim: int = -1,
-                 img_channels: int = 4
-                 ):
-        
