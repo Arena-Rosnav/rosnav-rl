@@ -41,6 +41,7 @@ class ResNet(nn.Module):
         self.res_layer4 = self._make_layer(
             block_count=layer_sizes[3], planes=self.base_planes * 2 * 2 * 2, stride=2
         )
+        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
         
         self.out_planes = self.in_planes
         self.out_shape = torch.Size([self.in_planes, ])
@@ -100,6 +101,8 @@ class ResNet(nn.Module):
         x = self.res_layer3(x)
         x = self.res_layer4(x)
         
+        x = self.avg_pool(x)
+        
         return x
 
     
@@ -131,8 +134,6 @@ class RgbdPerceptionNet(nn.Module):
         network_factory (Callable[..., ResNet]): Method which instantiates the backbone. 
             This method will be given the given kwargs.
     """
-    HIDDEN_CHANNELS = 128  # As specified in DD-PPO paper
-    TMP_OUT_SPATIAL = 4  # TODO: Use observation spaces
     
     def __init__(
         self,
@@ -144,15 +145,15 @@ class RgbdPerceptionNet(nn.Module):
         self.output = out_dim
         
         self.net = network_factory(kwargs)
-        self.conv = nn.Conv2d(in_channels=self.net.out_planes, out_channels=self.HIDDEN_CHANNELS)
-        self.fc = nn.Linear(in_features=self.HIDDEN_CHANNELS*self.TMP_OUT_SPATIAL*self.TMP_OUT_SPATIAL, out_features=out_dim)
+        self.fc = nn.Linear(in_features=self.net.out_planes, out_features=out_dim)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(
         self,
         x: Tensor
     ):
         x = self.net(x)
-        x = self.conv(x)
         x = self.fc(x)
+        x = self.relu(x)
         
         return x
