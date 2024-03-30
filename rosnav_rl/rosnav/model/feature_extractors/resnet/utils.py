@@ -1,159 +1,42 @@
-from torch import nn, Tensor
-import torch
-from typing import List, Union, Optional, Callable, Any
-import numpy as np
-from torchvision.models.resnet import BasicBlock, Bottleneck, conv1x1
+from torch import nn
 
 
-class ResNet(nn.Module):
-    def __init__(
-        self,
-        layer_sizes: List[int],
-        in_planes: int,
-        base_planes: int,
-        block_type: Union[BasicBlock, Bottleneck],
-        cardinality: int = 1,
-        norm_layer: Optional[Callable] = None
-    ):
-        super(ResNet, self).__init__()
-        
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
-        self.norm_layer = norm_layer
-        self.block_type = block_type
-        self.cardinality = cardinality
-        self.base_planes = base_planes
-        
-        self.conv1 = nn.Conv2d(in_planes, base_planes, kernel_size=7, stride=2, padding=3, bias=False)
-        self.in_planes = base_planes
-        self.norm1 = self.norm_layer(self.in_planes)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.res_layer1 = self._make_layer(
-            block_count=layer_sizes[0], planes=self.base_planes
-        )
-        self.res_layer2 = self._make_layer(
-            block_count=layer_sizes[1], planes=self.base_planes * 2, stride=2
-        )
-        self.res_layer3 = self._make_layer(
-            block_count=layer_sizes[2], planes=self.base_planes * 2 * 2, stride=2
-        )
-        self.res_layer4 = self._make_layer(
-            block_count=layer_sizes[3], planes=self.base_planes * 2 * 2 * 2, stride=2
-        )
-        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        
-        self.out_planes = self.in_planes
-        self.out_shape = torch.Size([self.in_planes, ])
-        
-        
-    def _make_layer(
-        self,
-        block_count: int,
-        planes: int,
-        stride: int = 1
-    ) -> nn.Sequential:
-        # first block
-        # downsample
-        if stride != 1 or self.in_planes != planes * self.block_type.expansion:
-            downsample = nn.Sequential(
-                conv1x1(self.in_planes, planes * self.block_type.expansion, stride),
-                self.norm_layer(planes * self.block_type.expansion)
-            )
-        else:
-            downsample = None
-        
-        layers = [
-            self.block_type(
-                self.in_planes,
-                planes,
-                stride,
-                downsample,
-                groups=self.cardinality,
-                base_width=self.base_planes,
-                norm_layer=self.norm_layer
-            )
-        ]
-        self.in_planes = planes * self.block_type.expansion
-        
-        # Rest blocks
-        for _ in range(1, block_count):
-            layers.append(
-                self.block_type(
-                    self.in_planes,
-                    planes,
-                    groups=self.cardinality,
-                    base_width=self.base_planes,
-                    norm_layer=self.norm_layer
-                )
-            )
-            
-        return nn.Sequential(*layers)
-    
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.conv1(x)
-        x = self.norm1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        
-        x = self.res_layer1(x)
-        x = self.res_layer2(x)
-        x = self.res_layer3(x)
-        x = self.res_layer4(x)
-        
-        x = self.avg_pool(x)
-        
-        return x
+def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1) -> nn.Conv2d:
+    """
+    3x3 convolution with padding
 
-    
-def resnet50_groupnorm(input_channels: int, num_groups: int):
-    """Instantiates a ResNet50 with GroupNorm as normalization layer.
-    
     Args:
-        input_channels (int): Number of channels of the input image, e.g. RGB: 3, RGBD: 4.
-        num_groups (int): Number of groups for the GroupNorm layers.
-    
+        in_planes (int): Number of input channels
+        out_planes (int): Number of output channels
+        stride (int, optional): Stride for the convolution. Defaults to 1.
+        groups (int, optional): Number of groups for grouped convolution. Defaults to 1.
+        dilation (int, optional): Dilation rate for dilated convolution. Defaults to 1.
+
     Returns:
-        ResNet50 nn.Module object from ResNet class.
+        nn.Conv2d: 3x3 convolutional layer with specified parameters
     """
-    return ResNet(
-        layer_sizes=[3, 4, 6, 3],
-        in_planes=input_channels,
-        base_planes=64,
-        block_type=Bottleneck,
-        cardinality=1,
-        norm_layer=lambda channels: nn.GroupNorm(num_groups, channels)
+    return nn.Conv2d(
+        in_planes,
+        out_planes,
+        kernel_size=3,
+        stride=stride,
+        padding=dilation,
+        groups=groups,
+        bias=False,
+        dilation=dilation,
     )
-    
 
-class RgbdPerceptionNet(nn.Module):
-    """Encapsulates the chosen backbone for the RGBD perception part.
+
+def conv1x1(in_planes, out_planes, stride=1) -> nn.Conv2d:
+    """
+    1x1 convolution
 
     Args:
-        out_dim (int): The final output dimension of the RGBD perception.
-        network_factory (Callable[..., ResNet]): Method which instantiates the backbone. 
-            This method will be given the given kwargs.
-    """
-    
-    def __init__(
-        self,
-        out_dim: int,
-        network_factory: Callable[..., ResNet],
-        **kwargs: Any
-    ):
-        self.input_channels = kwargs["input_channels"]
-        self.output = out_dim
-        
-        self.net = network_factory(kwargs)
-        self.fc = nn.Linear(in_features=self.net.out_planes, out_features=out_dim)
-        self.relu = nn.ReLU(inplace=True)
+        in_planes (int): Number of input channels
+        out_planes (int): Number of output channels
+        stride (int, optional): Stride for the convolution. Defaults to 1.
 
-    def forward(
-        self,
-        x: Tensor
-    ):
-        x = self.net(x)
-        x = self.fc(x)
-        x = self.relu(x)
-        
-        return x
+    Returns:
+        nn.Conv2d: 1x1 convolutional layer with specified parameters
+    """
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
