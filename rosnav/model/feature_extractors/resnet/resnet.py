@@ -31,7 +31,7 @@ from rosnav.utils.observation_space.space_index import SPACE_INDEX
 
 from ..base_extractor import RosnavBaseExtractor
 from .bottleneck import Bottleneck
-from .utils import conv1x1, conv3x3, resnet50_groupnorm, RgbdPerceptionNet, ResNet
+from .utils import conv1x1, conv3x3
 
 __all__ = [
     "RESNET_MID_FUSION_EXTRACTOR_1",
