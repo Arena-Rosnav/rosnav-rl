@@ -26,4 +26,4 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
                  rgbd_out_dim: int = -1,
                  img_channels: int = 4
                  ):
-        
+        pass
