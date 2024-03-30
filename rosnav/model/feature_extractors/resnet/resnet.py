@@ -16,7 +16,7 @@ Details:
 """
 
 from copy import deepcopy
-from typing import List
+from typing import List, Callable
 
 import gymnasium as gym
 from gymnasium.spaces.box import Box
@@ -31,7 +31,7 @@ from rosnav.utils.observation_space.space_index import SPACE_INDEX
 
 from ..base_extractor import RosnavBaseExtractor
 from .bottleneck import Bottleneck
-from .utils import conv1x1, conv3x3
+from .utils import conv1x1, conv3x3, resnet50_groupnorm, RgbdPerceptionNet, ResNet
 
 __all__ = [
     "RESNET_MID_FUSION_EXTRACTOR_1",
@@ -1486,6 +1486,13 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         return x
 
 
-class RESNET_RGBD_FUSION_EXTRACTOR():
-    def __init__():
+class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
+    def __init__(self,
+                 observation_space: gym.spaces.Box,
+                 observation_space_manager: ObservationSpaceManager,
+                 features_dim: int = 256,
+                 rgbd_backbone: Callable[..., ResNet] = resnet50_groupnorm,
+                 rgbd_out_dim: int = -1,
+                 img_channels: int = 4
+                 ):
         
