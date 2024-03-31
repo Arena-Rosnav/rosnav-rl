@@ -19,6 +19,29 @@ from .resent import resnet50_groupnorm, RgbdPerceptionNet, ResNet
 
 
 class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
+    """Feature extractor for RGBD enabled robots. Currently works
+    with the Arena unity training environment. The architecture is 
+    a combination of our previous Rosnav RL feature extractors and
+    the feature extractor proposed in DD-PPO paper 
+    (https://arxiv.org/pdf/1911.00357.pdf).
+    The network relies only on the RGBD camera for detecting static
+    or dynamic obstacles, i.e. no laser.
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment.
+        observation_space_manager (ObservationSpaceManager): The observation space manager.
+        features_dim (int, optional): The dimensionality of the output features. Defaults to 512.
+        rgbd_backbone (Callable[..., ResNet], optional): The factory method to initialize a ResNet 
+            object as the backbone for the RGBD perception network. Defaults to ResNet50 using GroupNorm.
+        rgbd_out_dim (int, optional): Output dimension of the RGBD perception network. Defaults to 512.
+        goal_out_dim (int, optional): Output dimension of the goal extractor network. Defaults to 32.
+            As proposed in the DD-PPO paper.
+        last_action_out_dim (int, optional): Output dimension of the last action extractor network.
+            Defaults to 32 like in the DD-PPO paper.
+        args: Currenlty not used.
+        kwargs: Keyword arguments which are passed to the backbone factory method.
+    """
+    
     REQUIRED_OBSERVATIONS = [
         SPACE_INDEX.RGBD,
         SPACE_INDEX.GOAL,
@@ -30,7 +53,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
                  observation_space_manager: ObservationSpaceManager,
                  image_height: int,
                  image_width: int,
-                 features_dim: int = 512 + 32 + 32,
+                 features_dim: int = 512,
                  rgbd_backbone: Callable[..., ResNet] = resnet50_groupnorm,
                  rgbd_out_dim: int = 512,
                  goal_out_dim: int = 32,
