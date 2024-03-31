@@ -140,13 +140,14 @@ class RgbdPerceptionNet(nn.Module):
     def __init__(
         self,
         out_dim: int,
+        input_channels: int,
         network_factory: Callable[..., ResNet],
         **kwargs: Any
     ):
-        self.input_channels = kwargs["input_channels"]
+        self.input_channels = input_channels
         self.output = out_dim
         
-        self.net = network_factory(kwargs)
+        self.net = network_factory(self.input_channels, kwargs)
         self.fc = nn.Linear(in_features=self.net.out_planes, out_features=out_dim)
         self.relu = nn.ReLU(inplace=True)
 
