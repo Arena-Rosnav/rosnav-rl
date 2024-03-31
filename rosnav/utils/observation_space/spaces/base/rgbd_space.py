@@ -32,8 +32,8 @@ class RGBDSpace(BaseObservationSpace):
         *args, 
         **kwargs    
     ) -> None:
-        self.image_height = image_height
-        self.image_width = image_width
+        self._image_height = image_height
+        self._image_width = image_width
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:
@@ -47,7 +47,7 @@ class RGBDSpace(BaseObservationSpace):
         return spaces.Box(
             low=np.finfo(np.float32).min,
             high=np.finfo(np.float32).max,
-            shape=(4 * self.image_height * self.image_width,),
+            shape=(4 * self._image_height * self._image_width,),
             dtype=np.float32,
         )
 
