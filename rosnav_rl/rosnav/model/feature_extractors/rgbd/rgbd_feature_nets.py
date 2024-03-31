@@ -86,7 +86,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     
     def _setup_network(self, *args, **kwargs):
         # RGBD part
-        self.visual_net = RgbdPerceptionNet(self._rgbd_out_dim, self._rgbd_backbone, kwargs)
+        self.visual_net = RgbdPerceptionNet(self._rgbd_out_dim, 4, self._rgbd_backbone, kwargs)
         
         # goal part
         self.goal_net = nn.Sequential(
