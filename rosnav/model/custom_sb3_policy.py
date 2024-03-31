@@ -8,6 +8,9 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_5,
     RESNET_MID_FUSION_EXTRACTOR_6,
 )
+from rosnav.model.feature_extractors.rgbd.rgbd_feature_nets import (
+    RESNET_RGBD_FUSION_EXTRACTOR_1
+)
 from rosnav.rosnav_space_manager.default_encoder import DefaultEncoder
 from torch import nn
 
@@ -526,3 +529,27 @@ class RosnavResNet_7(BaseAgent):
     }
     net_arch = dict(pi=[256, 128], vf=[256])
     activation_fn = nn.ReLU
+
+
+@AgentFactory.register("ArenaUnityResNet_1")
+class ArenaUnityResNet_1(BaseAgent):
+    
+    type = PolicyType.CNN
+    space_encoder_class = DefaultEncoder
+    observation_spaces = [
+        SPACE_INDEX.RGBD,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION
+    ]
+    observation_space_kwargs = {
+        "image_height": 128,
+        "image_width": 128
+    }
+    features_extractor_class = RESNET_RGBD_FUSION_EXTRACTOR_1
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "num_groups": 4
+    }
+    net_arch = dict(pi=[512, 256], vf=[512])
+    activation_fn = nn.ReLU
+    
