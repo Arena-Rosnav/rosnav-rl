@@ -38,7 +38,7 @@ class RGBDSpace(BaseObservationSpace):
 
     def get_gym_space(self) -> spaces.Space:
         """
-        Returns the Gym observation space for the rgbd
+        Returns the Gym observation space for the RGBD
         observation space.
 
         Returns:
@@ -53,12 +53,18 @@ class RGBDSpace(BaseObservationSpace):
 
     def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
         """
-        Encodes the laser scan observation.
+        Encodes the RGBD observation by concatenating the observation 
+        into a 4-channel (4, H, W)-tensor and flattening it.
 
         Args:
             observation (dict): The observation dictionary.
 
         Returns:
-            ndarray: The encoded laser scan observation.
+            ndarray: The encoded RGBD image of shape (4*H*W,).
         """
-        return observation[OBS_DICT_KEYS.LASER]
+        depth = observation[OBS_DICT_KEYS.IMAGE_DEPTH]  # shape (H, W)
+        color = observation[OBS_DICT_KEYS.IMAGE_COLOR]  # shape (3, H, W)
+        # concatenate channel dimension
+        depth = np.expand_dims(depth, axis=0)  # shape (1, H, W)
+        image = np.concatenate((color, depth), axis=0)
+        return image.flatten()
