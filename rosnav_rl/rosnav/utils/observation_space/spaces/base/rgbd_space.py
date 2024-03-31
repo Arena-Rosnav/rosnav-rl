@@ -44,14 +44,12 @@ class RGBDSpace(BaseObservationSpace):
         Returns:
             spaces.Space: The Gym observation space.
         """
-        return None
-        """
         return spaces.Box(
-            low=np.float32.,
-            high=,
+            low=np.finfo(np.float32).min,
+            high=np.finfo(np.float32).max,
             shape=(4 * self._image_height * self._image_width,),
             dtype=np.float32,
-        )"""
+        )
 
     def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
         """
