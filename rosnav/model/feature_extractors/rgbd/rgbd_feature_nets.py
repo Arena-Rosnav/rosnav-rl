@@ -113,6 +113,11 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         )
     
     def _forward_impl(self, image: Tensor, goal: Tensor, last_action: Tensor) -> Tensor:
+        # normalize image
+        image[:, :3, :, :] /= 255.0  # normalize to [0, 1]
+        image[:, 3, :, :] = torch.clamp(image[:, 3, :, :], min=0, max=10)  # clip to [0, 10]
+        image[:, 3, :, :] /= 10.0
+        
         # seperate nets
         visual_out = self.visual_net(image)
         goal_out = self.goal_net(goal)
