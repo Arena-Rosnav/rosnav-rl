@@ -101,11 +101,12 @@ class ResNet(nn.Module):
         x = self.res_layer4(x)
         
         x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
         
         return x
 
     
-def resnet50_groupnorm(input_channels: int, num_groups: int):
+def resnet50_groupnorm(input_channels: int, num_groups, **kwargs):
     """Instantiates a ResNet50 with GroupNorm as normalization layer.
     
     Args:
@@ -144,10 +145,12 @@ class RgbdPerceptionNet(nn.Module):
         network_factory: Callable[..., ResNet],
         **kwargs: Any
     ):
+        super(RgbdPerceptionNet, self).__init__()
+        
         self.input_channels = input_channels
         self.output = out_dim
         
-        self.net = network_factory(self.input_channels, kwargs)
+        self.net = network_factory(self.input_channels, **kwargs)
         self.fc = nn.Linear(in_features=self.net.out_planes, out_features=out_dim)
         self.relu = nn.ReLU(inplace=True)
 

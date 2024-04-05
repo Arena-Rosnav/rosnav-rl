@@ -58,7 +58,6 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
                  rgbd_out_dim: int = 512,
                  goal_out_dim: int = 32,
                  last_action_out_dim: int = 32,
-                 *args,
                  **kwargs
                  ):
         self._features_dim = features_dim
@@ -71,12 +70,13 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         
         self._observation_space_manager = observation_space_manager
         
+        self._get_input_sizes()
+        
         super(RESNET_RGBD_FUSION_EXTRACTOR_1, self).__init__(
             observation_space=observation_space,
             observation_space_manager=observation_space_manager,
             features_dim=features_dim,
-            args=args,
-            kwargs=kwargs
+            **kwargs
         )
         
     def _get_input_sizes(self):
@@ -86,7 +86,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     
     def _setup_network(self, *args, **kwargs):
         # RGBD part
-        self.visual_net = RgbdPerceptionNet(self._rgbd_out_dim, 4, self._rgbd_backbone, kwargs)
+        self.visual_net = RgbdPerceptionNet(self._rgbd_out_dim, 4, self._rgbd_backbone, **kwargs)
         
         # goal part
         self.goal_net = nn.Sequential(
