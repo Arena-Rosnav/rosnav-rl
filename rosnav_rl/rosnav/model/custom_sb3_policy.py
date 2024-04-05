@@ -548,8 +548,10 @@ class ArenaUnityResNet_1(BaseAgent):
     features_extractor_class = RESNET_RGBD_FUSION_EXTRACTOR_1
     features_extractor_kwargs = {
         "features_dim": 512,
-        "num_groups": 4
+        "num_groups": 4,
+        "image_height": 128,
+        "image_width": 128
     }
-    net_arch = dict(pi=[512, 256], vf=[512])
+    net_arch = dict(pi=[512, 128], vf=[512])
     activation_fn = nn.ReLU
     
