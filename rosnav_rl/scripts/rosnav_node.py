@@ -105,7 +105,12 @@ class RosnavNode:
             agent_path=self.agent_path,
         )
 
-        self._observation_manager = ObservationManager(Namespace(self.ns))
+        obs_unit_kwargs = {
+            "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False)
+        }
+        self._observation_manager = ObservationManager(
+            Namespace(self.ns), obs_unit_kwargs=obs_unit_kwargs
+        )
 
         rospy.loginfo("[RosnavNode] Loaded model and ObsManager.")
 
