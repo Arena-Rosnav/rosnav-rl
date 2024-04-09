@@ -147,7 +147,7 @@ class RosnavNode:
             None
         """
         # Load observation normalization and frame stacking
-        self._normalized_mode = hyperparams["rl_agent"]["normalize"]
+        self._normalized_mode = hyperparams["rl_agent"]["normalize"]["enabled"]
         self._reduced_laser_mode = (
             hyperparams["rl_agent"]["laser"]["reduce_num_beams"]["enabled"]
             if "laser" in hyperparams["rl_agent"]
