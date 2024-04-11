@@ -568,3 +568,35 @@ class RosnavResNet_5_norm(BaseAgent):
     }
     net_arch = dict(pi=[256, 64], vf=[256])
     activation_fn = nn.ReLU
+
+
+# lstm
+@AgentFactory.register("LSTM_ResNet_5_norm")
+class LSTM_ResNet_5_norm(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 30,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_5
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "width_per_group": 64,
+    }
+    net_arch = []
+    activation_fn = nn.ReLU
+    n_lstm_layers = 6
+    lstm_hidden_size = 256
+    shared_lstm = True
+    enable_critic_lstm = False
