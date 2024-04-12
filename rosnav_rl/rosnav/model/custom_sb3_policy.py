@@ -596,7 +596,7 @@ class LSTM_ResNet_5_norm(BaseAgent):
     }
     net_arch = []
     activation_fn = nn.ReLU
-    n_lstm_layers = 6
+    n_lstm_layers = 8
     lstm_hidden_size = 256
     shared_lstm = True
     enable_critic_lstm = False
