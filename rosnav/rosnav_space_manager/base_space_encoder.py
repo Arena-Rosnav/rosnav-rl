@@ -1,5 +1,11 @@
+from typing import List
+
 import numpy as np
 from gymnasium import spaces
+
+from ..utils.action_space.action_space_manager import ActionSpaceManager
+from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
+from ..utils.observation_space.space_index import SPACE_INDEX
 
 
 class BaseSpaceEncoder:
@@ -9,61 +15,123 @@ class BaseSpaceEncoder:
 
     def __init__(
         self,
-        laser_num_beams: int,
-        laser_max_range: float,
-        radius: float,
-        holonomic: bool,
-        actions: dict,
-        action_space_discrete: bool,
-        stacked: bool = False,
+        action_space_kwargs: dict,
+        observation_list: List[SPACE_INDEX] = None,
+        observation_kwargs: dict = None,
+        stacked_observation: bool = False,
         *args,
         **kwargs
     ):
         """
-        Initialize the BaseSpaceEncoder.
+        Initializes a new instance of the DefaultEncoder class.
 
         Args:
-            laser_num_beams (int): Number of laser beams.
-            laser_max_range (float): Maximum range of the laser.
-            radius (float): Radius of the robot.
-            holonomic (bool): Flag indicating whether the robot is holonomic or not.
-            actions (dict): Dictionary of available actions.
-            action_space_discrete (bool): Flag indicating whether the action space is discrete or continuous.
-            stacked (bool, optional): Flag indicating whether the observations are stacked. Defaults to False.
+            action_space_kwargs (dict): Keyword arguments for configuring the action space manager.
+            observation_list (List[SPACE_INDEX], optional): List of observation spaces to include. Defaults to None.
+            observation_kwargs (dict, optional): Keyword arguments for configuring the observation space manager. Defaults to None.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
-        self._laser_num_beams = laser_num_beams
-        self._laser_max_range = laser_max_range
-        self._radius = radius
-        self._is_holonomic = holonomic
-        self._actions = actions
-        self._is_action_space_discrete = action_space_discrete
-        self._stacked = stacked
+        self._observation_list = observation_list
+        self._observation_kwargs = observation_kwargs
+        self._stacked_observation = stacked_observation
+
+        self.setup_action_space(action_space_kwargs)
+        self.setup_observation_space(
+            stacked_observation, observation_list, observation_kwargs
+        )
 
     @property
-    def observation_space(self) -> spaces.Box:
+    def observation_space(self) -> spaces.Space:
         """
-        Get the observation space.
+        Gets the observation space.
 
         Returns:
-            spaces.Box: The observation space.
+            spaces.Space: The observation space.
         """
-        raise NotImplementedError()
+        return self._observation_space_manager.observation_space
 
     @property
-    def action_space(self) -> spaces.Box:
+    def action_space(self) -> spaces.Space:
         """
-        Get the action space.
+        Gets the action space.
 
         Returns:
-            spaces.Box: The action space.
+            spaces.Space: The action space.
         """
-        raise NotImplementedError()
+        return self._action_space_manager.action_space
+
+    @property
+    def action_space_manager(self):
+        """
+        Gets the action space manager.
+
+        Returns:
+            ActionSpaceManager: The action space manager.
+        """
+        return self._action_space_manager
+
+    @property
+    def observation_space_manager(self):
+        """
+        Gets the observation space manager.
+
+        Returns:
+            ObservationSpaceManager: The observation space manager.
+        """
+        return self._observation_space_manager
+
+    @property
+    def observation_list(self):
+        """
+        Gets the list of observation spaces.
+
+        Returns:
+            List[SPACE_INDEX]: The list of observation spaces.
+        """
+        return self._observation_list
+
+    @property
+    def observation_kwargs(self):
+        """
+        Gets the keyword arguments for configuring the observation space manager.
+
+        Returns:
+            dict: The keyword arguments for configuring the observation space manager.
+        """
+        return self._observation_kwargs
+
+    def setup_action_space(self, action_space_kwargs: dict):
+        """
+        Sets up the action space manager.
+
+        Args:
+            action_space_kwargs (dict): Keyword arguments for configuring the action space manager.
+        """
+        self._action_space_manager = ActionSpaceManager(**action_space_kwargs)
+
+    def setup_observation_space(
+        self,
+        stacked_observation: bool,
+        observation_list: List[SPACE_INDEX] = None,
+        observation_kwargs: dict = None,
+    ):
+        """
+        Sets up the observation space manager.
+
+        Args:
+            observation_list (List[SPACE_INDEX], optional): List of observation spaces to include. Defaults to None.
+            observation_kwargs (dict, optional): Keyword arguments for configuring the observation space manager. Defaults to None.
+        """
+        self._observation_space_manager = ObservationSpaceManager(
+            observation_list,
+            space_kwargs=observation_kwargs,
+            frame_stacking=stacked_observation,
+        )
 
     def decode_action(self, action) -> np.ndarray:
         """
-        Decode the action.
+        Decodes the action.
 
         Args:
             action: The action to decode.
@@ -71,16 +139,16 @@ class BaseSpaceEncoder:
         Returns:
             np.ndarray: The decoded action.
         """
-        raise NotImplementedError()
+        return self._action_space_manager.decode_action(action)
 
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(self, observation, *args, **kwargs) -> np.ndarray:
         """
-        Encode the observation.
+        Encodes the observation.
 
         Args:
-            observation (dict): The observation to encode.
+            observation: The observation to encode.
 
         Returns:
             np.ndarray: The encoded observation.
         """
-        raise NotImplementedError()
+        return self._observation_space_manager.encode_observation(observation, **kwargs)

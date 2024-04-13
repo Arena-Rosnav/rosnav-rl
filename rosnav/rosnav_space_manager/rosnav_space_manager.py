@@ -1,6 +1,9 @@
-from typing import Dict, List, Union, Any
+from typing import Any, Dict, List, Union
 
 import rospy
+from rosnav.rosnav_space_manager.encoder_wrapper.feature_map_recorder import (
+    FeatureMapRecorderWrapper,
+)
 from rosnav.utils.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
@@ -10,7 +13,6 @@ from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space i
 
 from .default_encoder import DefaultEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
-
 from .encoder_wrapper.reduced_laser_wrapper import ReducedLaserWrapper
 
 """
@@ -63,6 +65,7 @@ class RosnavSpaceManager:
         self._ped_max_speed_x = 5.0
         self._ped_min_speed_y = -5.0
         self._ped_max_speed_y = 5.0
+        self._social_state_num = 99
 
         is_action_space_discrete = rospy.get_param_cached(
             "rl_agent/action_space/discrete", False
@@ -94,6 +97,7 @@ class RosnavSpaceManager:
             "max_speed_x": self._ped_max_speed_x,
             "min_speed_y": self._ped_min_speed_y,
             "max_speed_y": self._ped_max_speed_y,
+            "social_state_num": self._social_state_num,
             **observation_space_kwargs,
         }
 
@@ -105,6 +109,11 @@ class RosnavSpaceManager:
 
         if rospy.get_param("laser/reduce_num_beams"):
             self._encoder = ReducedLaserWrapper(self._encoder, self._laser_num_beams)
+
+        if rospy.get_param("record_feature_maps", False):
+            self._encoder = FeatureMapRecorderWrapper(
+                encoder=self._encoder, save_every_x_obs=4
+            )
 
     @property
     def observation_space_manager(self):
