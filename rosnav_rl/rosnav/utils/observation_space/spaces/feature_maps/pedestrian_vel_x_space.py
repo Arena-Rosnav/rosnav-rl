@@ -1,12 +1,11 @@
 import numpy as np
 from gymnasium import spaces
+from crowdsim_agents.utils import SemanticAttribute
+from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
+from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
-
-from pedsim_agents.utils import SemanticAttribute
-
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 
 @SpaceFactory.register("ped_vel_x")
@@ -92,10 +91,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         x_vel_map = np.zeros((self.feature_map_size, self.feature_map_size))
 
         if relative_x_vel is not None and relative_pos is not None:
-            for vel_x, pos in zip(
-                relative_x_vel,
-                relative_pos,
-            ):
+            for vel_x, pos in zip(relative_x_vel, relative_pos):
                 index = self._get_map_index(pos)
                 if (
                     0 <= index[0] < self.feature_map_size
@@ -105,6 +101,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
 
         return x_vel_map
 
+    @BaseObservationSpace.apply_normalization
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
         """
         Encodes the observation into a numpy array.
