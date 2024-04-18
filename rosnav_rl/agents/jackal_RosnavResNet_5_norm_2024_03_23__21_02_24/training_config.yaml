@@ -1,7 +1,7 @@
 agent_name: jackal_RosnavResNet_5_norm_2024_03_23__21_02_24
 callbacks:
   periodic_eval:
-    eval_freq: 30000
+    eval_freq: 50000
     max_num_moves_per_eps: 250
     n_eval_episodes: 30
   stop_training:
