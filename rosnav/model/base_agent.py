@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Type
 
-from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
+from rosnav.rosnav_space_manager.encoder.base_space_encoder import BaseSpaceEncoder
 from rosnav.utils.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
@@ -9,7 +9,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
 from .constants import BASE_AGENT_ATTR, PolicyType
-from rosnav.rosnav_space_manager.default_encoder import DefaultEncoder
+from rosnav.rosnav_space_manager.encoder.default_encoder import DefaultEncoder
 
 
 class BaseAgent(ABC):

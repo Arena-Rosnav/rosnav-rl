@@ -3,9 +3,11 @@ from typing import List
 import numpy as np
 from gymnasium import spaces
 
-from ..utils.action_space.action_space_manager import ActionSpaceManager
-from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
-from ..utils.observation_space.space_index import SPACE_INDEX
+from rosnav.utils.action_space.action_space_manager import ActionSpaceManager
+from rosnav.utils.observation_space.observation_space_manager import (
+    ObservationSpaceManager,
+)
+from rosnav.utils.observation_space.space_index import SPACE_INDEX
 
 
 class BaseSpaceEncoder:

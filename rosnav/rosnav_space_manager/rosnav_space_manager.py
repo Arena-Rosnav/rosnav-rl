@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Union
 
 import rospy
-from rosnav.rosnav_space_manager.encoder_wrapper.feature_map_recorder import (
+from rosnav.rosnav_space_manager.encoder.encoder_wrapper.feature_map_recorder import (
     FeatureMapRecorderWrapper,
 )
 from rosnav.utils.observation_space.spaces.base_observation_space import (
@@ -11,9 +11,9 @@ from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space i
     BaseFeatureMapSpace,
 )
 
-from .default_encoder import DefaultEncoder
+from .encoder.default_encoder import DefaultEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
-from .encoder_wrapper.reduced_laser_wrapper import ReducedLaserWrapper
+from .encoder.encoder_wrapper.reduced_laser_wrapper import ReducedLaserWrapper
 
 """
     Provides a uniform interface between model and environment.

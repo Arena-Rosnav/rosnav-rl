@@ -2,8 +2,8 @@ from typing import Union, List, Dict
 
 import numpy as np
 
-from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
-from rosnav.rosnav_space_manager.encoder_wrapper.base_encoder_wrapper import (
+from rosnav.rosnav_space_manager.encoder.base_space_encoder import BaseSpaceEncoder
+from rosnav.rosnav_space_manager.encoder.encoder_wrapper.base_encoder_wrapper import (
     BaseEncoderWrapper,
 )
 

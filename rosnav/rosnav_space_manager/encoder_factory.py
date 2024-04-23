@@ -1,4 +1,4 @@
-from .base_space_encoder import BaseSpaceEncoder
+from .encoder.base_space_encoder import BaseSpaceEncoder
 
 
 class BaseSpaceEncoderFactory:
