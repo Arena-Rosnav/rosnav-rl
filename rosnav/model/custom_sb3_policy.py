@@ -8,7 +8,7 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_5,
     RESNET_MID_FUSION_EXTRACTOR_6,
 )
-from rosnav.rosnav_space_manager.default_encoder import DefaultEncoder
+from rosnav.rosnav_space_manager.encoder.default_encoder import DefaultEncoder
 from torch import nn
 
 from .agent_factory import AgentFactory
