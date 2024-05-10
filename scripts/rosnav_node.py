@@ -110,8 +110,20 @@ class RosnavNode:
         obs_unit_kwargs = {
             "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False)
         }
+        
+        from rl_utils.utils.observation_collector.observation_units.base_collector_unit import BaseCollectorUnit
+        from rl_utils.utils.observation_collector.observation_units.unity_collector_unity import UnityCollectorUnit
+        from rl_utils.utils.observation_collector.observation_units.globalplan_collector_unit import GlobalplanCollectorUnit
+        from rl_utils.utils.observation_collector.observation_units.semantic_ped_unit import SemanticAggregateUnit
         self._observation_manager = ObservationManager(
-            Namespace(self.ns), obs_unit_kwargs=obs_unit_kwargs
+            Namespace(self.ns), 
+            obs_structur=[
+                BaseCollectorUnit,
+                GlobalplanCollectorUnit,
+                SemanticAggregateUnit,
+                UnityCollectorUnit
+            ],
+            obs_unit_kwargs=obs_unit_kwargs
         )
         from time import sleep
         sleep(5)  # wait for unity collector unit to set itself up
