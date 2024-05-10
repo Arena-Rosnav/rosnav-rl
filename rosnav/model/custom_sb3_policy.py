@@ -793,9 +793,9 @@ class LSTM_ResNet_norm_5(BaseAgent):
         "features_dim": 512,
         "width_per_group": 64,
     }
-    net_arch = dict(pi=[256, 64], vf=[64])
+    net_arch = dict(pi=[256, 64], vf=[256])
     activation_fn = nn.ReLU
-    n_lstm_layers = 4
+    n_lstm_layers = 3
     lstm_hidden_size = 512
     shared_lstm = True
     enable_critic_lstm = False
