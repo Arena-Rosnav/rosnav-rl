@@ -111,6 +111,8 @@ class RosnavNode:
         self._observation_manager = ObservationManager(
             Namespace(self.ns), obs_unit_kwargs=obs_unit_kwargs
         )
+        from time import sleep
+        sleep(5)  # wait for unity collector unit to set itself up
 
         rospy.loginfo("[RosnavNode] Loaded model and ObsManager.")
 
