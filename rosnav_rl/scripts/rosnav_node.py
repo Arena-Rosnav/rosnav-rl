@@ -32,6 +32,7 @@ from tools.ros_param_distributor import (
     determine_space_encoder,
     populate_discrete_action_space,
     populate_laser_params,
+    populate_rgbd_params
 )
 from std_msgs.msg import Int16
 
@@ -76,6 +77,7 @@ class RosnavNode:
         self._setup_action_space(self._hyperparams)
 
         populate_laser_params(self._hyperparams)
+        populate_rgbd_params(self._hyperparams)
 
         # Get Architecture Name and retrieve Observation spaces
         architecture_name = self._hyperparams["rl_agent"]["architecture_name"]
