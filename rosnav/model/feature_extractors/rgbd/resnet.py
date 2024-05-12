@@ -1,7 +1,7 @@
 from torch import nn, Tensor
 import torch
 from typing import List, Union, Optional, Callable, Any
-from torchvision.models.resnet import BasicBlock, Bottleneck, conv1x1
+from .resblocks import BasicBlock, Bottleneck, conv1x1
 
 
 class ResNet(nn.Module):
