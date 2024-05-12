@@ -14,7 +14,7 @@ from rosnav.utils.observation_space.observation_space_manager import (
 from rosnav.utils.observation_space.space_index import SPACE_INDEX
 
 from ..base_extractor import RosnavBaseExtractor
-from .resent import resnet50_groupnorm, RgbdPerceptionNet, ResNet
+from .resnet import resnet50_groupnorm, RgbdPerceptionNet, ResNet
 
 
 
