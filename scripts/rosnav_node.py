@@ -112,7 +112,7 @@ class RosnavNode:
         }
         
         from rl_utils.utils.observation_collector.observation_units.base_collector_unit import BaseCollectorUnit
-        from rl_utils.utils.observation_collector.observation_units.unity_collector_unity import UnityCollectorUnit
+        from rl_utils.utils.observation_collector.observation_units.unity_collector_unit import UnityCollectorUnit
         from rl_utils.utils.observation_collector.observation_units.globalplan_collector_unit import GlobalplanCollectorUnit
         from rl_utils.utils.observation_collector.observation_units.semantic_ped_unit import SemanticAggregateUnit
         self._observation_manager = ObservationManager(
