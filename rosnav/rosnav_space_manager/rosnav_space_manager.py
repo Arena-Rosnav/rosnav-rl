@@ -10,10 +10,12 @@ from rosnav.utils.observation_space.spaces.base_observation_space import (
 from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
     BaseFeatureMapSpace,
 )
+from task_generator.shared import Namespace
 
 from .encoder.default_encoder import DefaultEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
 from .encoder.encoder_wrapper.reduced_laser_wrapper import ReducedLaserWrapper
+
 
 """
     Provides a uniform interface between model and environment.
@@ -36,6 +38,8 @@ class RosnavSpaceManager:
         ] = None,
         observation_space_kwargs: Dict[str, Any] = None,
         action_space_kwargs: Dict[str, Any] = None,
+        simulation_ns: str = "",
+        agent_parameter_ns: str = "",
     ):
         """
         Initializes the RosnavSpaceManager. Retrieves the Agent parameters from the ROS parameter server and initializes the space encoder containing the observation and action spaces.
@@ -45,19 +49,25 @@ class RosnavSpaceManager:
             observation_spaces (List[Union[BaseObservationSpace, BaseFeatureMapSpace]], optional): The list of observation spaces. Defaults to None.
             observation_space_kwargs (Dict[str, Any], optional): Additional keyword arguments for the observation spaces. Defaults to None.
             action_space_kwargs (Dict[str, Any], optional): Additional keyword arguments for the action spaces. Defaults to None.
+            agent_parameter_ns (str, optional): The prefix for the agent's dedicated parameter namespace. Defaults to None.
         """
         observation_space_kwargs = observation_space_kwargs or {}
         action_space_kwargs = action_space_kwargs or {}
 
-        self._stacked = rospy.get_param_cached("rl_agent/frame_stacking/enabled")
+        simulation_ns = Namespace(simulation_ns)
+        agent_parameter_ns = Namespace(agent_parameter_ns)
+
+        self._stacked = rospy.get_param_cached(
+            agent_parameter_ns("rl_agent/frame_stacking/enabled")
+        )
         self._laser_num_beams = (
             rospy.get_param_cached("laser/num_beams")
-            if not rospy.get_param("laser/reduce_num_beams")
-            else rospy.get_param("laser/reduced_num_laser_beams")
+            if not rospy.get_param(agent_parameter_ns("laser/reduce_num_beams"))
+            else rospy.get_param(agent_parameter_ns("laser/reduced_num_laser_beams"))
         )
         self._laser_max_range = rospy.get_param_cached("laser/range")
-        self._radius = rospy.get_param_cached("robot_radius")
-        self._is_holonomic = rospy.get_param_cached("is_holonomic")
+        self._radius = rospy.get_param_cached(simulation_ns("robot_radius"))
+        self._is_holonomic = rospy.get_param_cached(simulation_ns("is_holonomic"))
 
         # TODO: add num_ped_types to rosparam
         self._num_ped_types = 5
@@ -68,12 +78,12 @@ class RosnavSpaceManager:
         self._social_state_num = 99
 
         is_action_space_discrete = rospy.get_param_cached(
-            "rl_agent/action_space/discrete", False
+            agent_parameter_ns("rl_agent/action_space/discrete"), False
         )
         actions = (
-            rospy.get_param_cached("actions/discrete")
+            rospy.get_param_cached(agent_parameter_ns("actions/discrete"))
             if is_action_space_discrete
-            else rospy.get_param_cached("actions/continuous")
+            else rospy.get_param_cached(agent_parameter_ns("actions/continuous"))
         )
 
         _action_space_kwargs = {
@@ -107,7 +117,7 @@ class RosnavSpaceManager:
             observation_kwargs=_observation_kwargs,
         )
 
-        if rospy.get_param("laser/reduce_num_beams"):
+        if rospy.get_param(agent_parameter_ns("laser/reduce_num_beams")):
             self._encoder = ReducedLaserWrapper(self._encoder, self._laser_num_beams)
 
         if rospy.get_param("record_feature_maps", False):

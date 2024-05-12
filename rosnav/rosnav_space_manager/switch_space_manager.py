@@ -11,6 +11,8 @@ from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space i
 from .encoder.switch_space_encoder import SwitchSpaceEncoder
 from .rosnav_space_manager import RosnavSpaceManager
 
+from task_generator.shared import Namespace
+
 
 class SwitchSpaceManager(RosnavSpaceManager):
     def __init__(
@@ -20,20 +22,26 @@ class SwitchSpaceManager(RosnavSpaceManager):
         ] = None,
         observation_space_kwargs: Dict[str, Any] = None,
         action_space_kwargs: Dict[str, Any] = None,
+        simulation_ns: str = "",
+        agent_parameter_ns: str = "",
         *args,
-        **kwargs
+        **kwargs,
     ):
         observation_space_kwargs = observation_space_kwargs or {}
         action_space_kwargs = action_space_kwargs or {}
 
-        self._stacked = rospy.get_param_cached("rl_agent/frame_stacking/enabled")
+        simulation_ns = Namespace(simulation_ns)
+        agent_parameter_ns = Namespace(agent_parameter_ns)
+
         self._laser_num_beams = (
-            rospy.get_param_cached("laser/num_beams")
-            if not rospy.get_param("laser/reduce_num_beams")
-            else rospy.get_param("laser/reduced_num_laser_beams")
+            rospy.get_param_cached(agent_parameter_ns("laser/num_beams"))
+            if not rospy.get_param(agent_parameter_ns("laser/reduce_num_beams"))
+            else rospy.get_param(agent_parameter_ns("laser/reduced_num_laser_beams"))
         )
-        self._laser_max_range = rospy.get_param_cached("laser/range")
-        self._radius = rospy.get_param_cached("robot_radius")
+        self._laser_max_range = rospy.get_param_cached(
+            agent_parameter_ns("laser/range")
+        )
+        self._radius = rospy.get_param_cached(simulation_ns("robot_radius"))
 
         # TODO: add num_ped_types to rosparam
         self._num_ped_types = 5
