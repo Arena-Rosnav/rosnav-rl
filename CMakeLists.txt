@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs
   tf2_ros
   message_generation
+  message_runtime
 )
 
 catkin_python_setup()
@@ -24,9 +25,12 @@ add_message_files(FILES
 generate_messages()
 
 catkin_package(
+
+  # INCLUDE_DIRS include
   CATKIN_DEPENDS message_runtime
 )
 
+# include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
@@ -35,3 +39,11 @@ catkin_install_python(PROGRAMS
   scripts/rosnav_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+# # Mark cpp header files for installation
+# install(DIRECTORY include
+# DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+
+# # FILES_MATCHING PATTERN "*.h"
+# PATTERN ".svn" EXCLUDE
+# )
