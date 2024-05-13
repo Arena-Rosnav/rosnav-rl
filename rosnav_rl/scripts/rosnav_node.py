@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import argparse
+from time import sleep
 
 import numpy as np
 import rospkg
@@ -43,6 +44,8 @@ sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
 from typing import Any, Dict, List
 
 from task_generator.shared import Namespace
+from task_generator.utils import Utils
+from task_generator.constants import Constants
 
 
 class RosnavNode:
@@ -115,17 +118,21 @@ class RosnavNode:
         from rl_utils.utils.observation_collector.observation_units.unity_collector_unit import UnityCollectorUnit
         from rl_utils.utils.observation_collector.observation_units.globalplan_collector_unit import GlobalplanCollectorUnit
         from rl_utils.utils.observation_collector.observation_units.semantic_ped_unit import SemanticAggregateUnit
+        
+        obs_structur = [
+            BaseCollectorUnit,
+            GlobalplanCollectorUnit,
+            SemanticAggregateUnit
+        ]
+        if Utils.get_simulator() == Constants.Simulator.UNITY:
+            obs_structur.append(UnityCollectorUnit)
+
         self._observation_manager = ObservationManager(
             Namespace(self.ns), 
-            obs_structur=[
-                BaseCollectorUnit,
-                GlobalplanCollectorUnit,
-                SemanticAggregateUnit,
-                UnityCollectorUnit
-            ],
+            obs_structur=obs_structur,
             obs_unit_kwargs=obs_unit_kwargs
         )
-        from time import sleep
+
         sleep(5)  # wait for unity collector unit to set itself up
 
         rospy.loginfo("[RosnavNode] Loaded model and ObsManager.")
