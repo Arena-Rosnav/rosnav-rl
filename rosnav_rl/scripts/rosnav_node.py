@@ -111,7 +111,8 @@ class RosnavNode:
         )
 
         obs_unit_kwargs = {
-            "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False)
+            "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
+            "ns_to_semantic_topic": rospy.get_param("/train_mode", False),
         }
         
         from rl_utils.utils.observation_collector.observation_units.base_collector_unit import BaseCollectorUnit

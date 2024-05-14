@@ -1484,3 +1484,134 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         x = self.linear_fc(fc_in)
 
         return x
+
+
+class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
+    """
+    Feature extractor class that implements a mid-fusion ResNet-based architecture.
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment
+        observation_space_manager (ObservationSpaceManager): The observation space manager
+        features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
+        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
+        layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
+        zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
+        groups (int, optional): The number of groups to use in the ResNet architecture. Defaults to 1.
+        width_per_group (int, optional): The width of each group in the ResNet architecture. Defaults to 64.
+        replace_stride_with_dilation (List[bool], optional): Whether to replace stride with dilation in each block of the ResNet architecture. Defaults to None.
+        norm_layer (nn.Module, optional): The normalization layer to use in the ResNet architecture. Defaults to nn.BatchNorm2d.
+    """
+
+    REQUIRED_OBSERVATIONS = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+
+    def _setup_network(self):
+        super()._setup_network()
+        self.conv1 = nn.Conv2d(
+            self.num_pedestrian_feature_maps + 1,  # 1 for scan
+            64,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
+        )
+
+        self.linear_fc_2 = nn.Sequential(
+            nn.Linear(
+                256,
+                self._features_dim,
+            ),
+            # nn.BatchNorm1d(features_dim),
+            nn.ReLU(),
+        )
+
+    def _forward_impl(
+        self,
+        ped_pos: torch.Tensor,
+        scan: torch.Tensor,
+        goal: torch.Tensor,
+        last_action: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Implements the forward pass for the feature extractor.
+
+        Args:
+            ped_pos (torch.Tensor): Pedestrian position tensor
+            scan (torch.Tensor): Scan tensor
+            goal (torch.Tensor): Goal tensor
+            last_ac (torch.Tensor): Goal tensor
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass
+        """
+        ###### Start of fusion net ######
+        ped_in = ped_pos.reshape(
+            -1,
+            self.num_pedestrian_feature_maps,
+            self._feature_map_size,
+            self._feature_map_size,
+        )
+        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
+        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+
+        # See note [TorchScript super()]
+        # extra layer conv, bn, relu
+        # x = self.conv1_1(fusion_in)
+        # x = self.bn1_1(x)
+        # x = self.relu1_1(x)
+
+        x = self.conv1(fusion_in)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        identity3 = self.downsample3(x)  # in: 128, out: 512
+
+        x = self.layer1(x)  # in: 64, out: 128
+
+        identity2 = self.downsample2(x)  # in: 128, out: 256
+
+        x = self.layer2(x)  # in: 256, out: 256
+
+        identity1 = self.downsample4(x)  # in: 256, out: 512
+
+        x = self.conv2_2(x)  # in: 256, out: 256
+        x += identity2
+        x = self.relu2(x)
+
+        x = self.layer3(x)  # in: 256, out: 512
+
+        x = self.conv3_2(x)  # in: 512, out: 512
+        x += identity1  # 512
+        x = self.relu3(x)
+
+        x = self.layer4(x)
+
+        x = self.conv4_2(x)  # in: 512, out: 512
+        x += identity3  # 512
+        x = self.relu4(x)
+
+        x = self.avgpool(x)
+        fusion_out = x.squeeze(-1).squeeze(-1)
+        ###### End of fusion net ######
+
+        ###### Start of goal net #######
+        # goal_in = goal.reshape(-1, 2)
+        # goal_out = goal
+
+        # last_action_out = torch.flatten(last_action)
+        ###### End of goal net #######
+        # Combine
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        x = self.linear_fc(fc_in)
+        x = self.linear_fc_2(x)
+        return x
