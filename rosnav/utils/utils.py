@@ -90,7 +90,7 @@ def make_mock_env(ns: str, agent_description) -> DummyVecEnv:
         return flatland_gym_env.FlatlandEnv(
             ns=ns,
             agent_description=agent_description,
-            reward_fnc=None,
+            reward_fnc="default",
             trigger_init=False,
         )
 
