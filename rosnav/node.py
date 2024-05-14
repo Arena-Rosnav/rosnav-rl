@@ -53,7 +53,7 @@ class RosnavNode:
         self,
         ns: Namespace = None,
         agent_name: str = None,
-        use_cuda: bool = True,
+        cuda_device: Union[int, str] = 0,
         *args,
         **kwargs,
     ):
@@ -67,7 +67,7 @@ class RosnavNode:
         # Agent name and path
         self.agent_name = agent_name if agent_name else rospy.get_param("agent_name")
         self.agent_path = RosnavNode._get_model_path(self.agent_name)
-        self._use_cuda = use_cuda
+        self._cuda_device = cuda_device
 
         rospy.loginfo(
             f"Starting Rosnav-Node on {self.ns} with agent {self.agent_name}."
@@ -108,7 +108,9 @@ class RosnavNode:
         self._setup_observation_manager()
 
         self._get_next_action_srv = rospy.Service(
-            self.ns("rosnav/get_action"), GetAction, self._handle_next_action_srv
+            self.ns(f"rosnav/{self.agent_name}/get_action"),
+            GetAction,
+            self._handle_next_action_srv,
         )
         self._sub_reset_stacked_obs = rospy.Subscriber(
             "/scenario_reset", Int16, self._on_scene_reset
@@ -345,8 +347,8 @@ class RosnavNode:
             self._recurrent_arch = True
             agent = RecurrentPPO.load(model_path).policy
 
-        if self._use_cuda and torch.cuda.is_available():
-            self._agent.cuda()
+        if torch.cuda.is_available():
+            self._agent.cuda(self._cuda_device)
 
         rospy.loginfo(f"[RosnavNode] Loaded model from {model_path}.")
         return agent
