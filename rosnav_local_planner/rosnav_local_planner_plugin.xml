@@ -1,0 +1,13 @@
+<library path="lib/librosnav_local_planner">
+	<class name="rosnav_local_planner/RosnavLocalPlanner" type="rosnav_local_planner::RosnavLocalPlanner" base_class_type="nav_core::BaseLocalPlanner">
+		<description>
+			The rosnav_local_planner package implements a plugin
+			to the base_local_planner of the 2D navigation stack.
+		</description>
+	</class>
+	<class name="rosnav_local_planner/RosnavLocalPlanner" type="rosnav_local_planner::RosnavLocalPlanner" base_class_type="mbf_costmap_core::CostmapController">
+		<description>
+			Same plugin implemented MBF CostmapController's extended interface.
+		</description>
+	</class>
+</library>
