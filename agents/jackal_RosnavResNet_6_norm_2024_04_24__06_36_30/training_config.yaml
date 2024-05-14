@@ -1,0 +1,81 @@
+agent_name: jackal_RosnavResNet_6_norm_2024_04_24__06_36_30
+callbacks:
+  periodic_eval:
+    eval_freq: 15000
+    max_num_moves_per_eps: 200
+    n_eval_episodes: 40
+  stop_training:
+    threshold: 0.985
+    threshold_type: succ
+  training_curriculum:
+    curr_stage: 0
+    lower_threshold: 0.5
+    threshold_type: succ
+    training_curriculum_file: semantic.yaml
+    upper_threshold: 0.95
+debug_mode: false
+goal_radius: 0.3
+max_num_moves_per_eps: 100
+monitoring:
+  cmd_line_logging:
+    episode_statistics:
+      enabled: true
+      last_n_eps: 20
+    training_metrics:
+      enabled: true
+  eval_log: false
+  use_wandb: true
+n_envs: 20
+n_timesteps: 5000000
+no_gpu: false
+rl_agent:
+  action_space:
+    custom_discretization:
+      buckets_angular_vel: 16
+      buckets_linear_vel: 14
+      enabled: true
+    discrete: true
+  architecture_name: RosnavResNet_6_norm
+  checkpoint: last_model
+  frame_stacking:
+    enabled: false
+    stack_size: 5
+  laser:
+    full_range_laser: true
+    reduce_num_beams:
+      enabled: false
+      num_beams: 200
+  lr_schedule:
+    enabled: true
+    settings:
+      final_value: 0.0001
+      initial_value: 0.001
+    type: linear
+  normalize:
+    enabled: false
+    settings:
+      clip_obs: 30.0
+      clip_reward: 30.0
+      gamma: 0.99
+      norm_obs: true
+      norm_reward: true
+  ppo:
+    batch_size: 780
+    clip_range: 0.2
+    ent_coef: 0.005
+    gae_lambda: 0.95
+    gamma: 0.99
+    learning_rate: 0.0005
+    m_batch_size: 260
+    max_grad_norm: 0.5
+    n_epochs: 3
+    n_steps: 39
+    vf_coef: 0.22
+  resume: jackal_RosnavResNet_6_norm_2024_04_24__06_36_30
+  reward_fnc: base_semantic
+  space_encoder: RobotSpecificEncoder
+robot: jackal
+safety_distance: 1
+tm_modules: staged
+tm_obstacles: random
+tm_robots: random

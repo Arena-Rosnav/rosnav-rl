@@ -10,6 +10,7 @@ from rosnav.utils.observation_space.spaces.base_observation_space import (
 from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
     BaseFeatureMapSpace,
 )
+from task_generator.shared import Namespace
 
 from .default_encoder import DefaultEncoder
 from .encoder_factory import BaseSpaceEncoderFactory
@@ -36,6 +37,7 @@ class RosnavSpaceManager:
         ] = None,
         observation_space_kwargs: Dict[str, Any] = None,
         action_space_kwargs: Dict[str, Any] = None,
+        simulation_ns: str = "",
     ):
         """
         Initializes the RosnavSpaceManager. Retrieves the Agent parameters from the ROS parameter server and initializes the space encoder containing the observation and action spaces.
@@ -49,6 +51,8 @@ class RosnavSpaceManager:
         observation_space_kwargs = observation_space_kwargs or {}
         action_space_kwargs = action_space_kwargs or {}
 
+        simulation_ns = Namespace(simulation_ns)
+
         self._stacked = rospy.get_param_cached("rl_agent/frame_stacking/enabled")
         self._laser_num_beams = (
             rospy.get_param_cached("laser/num_beams")
@@ -56,7 +60,7 @@ class RosnavSpaceManager:
             else rospy.get_param("laser/reduced_num_laser_beams")
         )
         self._laser_max_range = rospy.get_param_cached("laser/range")
-        self._radius = rospy.get_param_cached("robot_radius")
+        self._radius = rospy.get_param_cached(simulation_ns("robot_radius"))
         self._is_holonomic = rospy.get_param_cached("is_holonomic")
 
         # TODO: add num_ped_types to rosparam
