@@ -1,23 +1,23 @@
-#include <rosnav_local_planner.h>
+#include <rosnav.h>
 // pluginlib macros
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
 
 // register this planner as a BaseLocalPlanner plugin
-PLUGINLIB_EXPORT_CLASS(rosnav_local_planner::RosnavLocalPlanner, nav_core::BaseLocalPlanner)
-PLUGINLIB_EXPORT_CLASS(rosnav_local_planner::RosnavLocalPlanner, mbf_costmap_core::CostmapController)
+PLUGINLIB_EXPORT_CLASS(rosnav::RosnavLocalPlanner, nav_core::BaseLocalPlanner)
+PLUGINLIB_EXPORT_CLASS(rosnav::RosnavLocalPlanner, mbf_costmap_core::CostmapController)
 
-rosnav_local_planner::RosnavLocalPlanner::RosnavLocalPlanner(): initialized_(false)
+rosnav::RosnavLocalPlanner::RosnavLocalPlanner(): initialized_(false)
 {
 }
 
-rosnav_local_planner::RosnavLocalPlanner::~RosnavLocalPlanner()
+rosnav::RosnavLocalPlanner::~RosnavLocalPlanner()
 {
 }
 
 
-void rosnav_local_planner::RosnavLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros)
+void rosnav::RosnavLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros)
 {
     if (!initialized_)
     {
@@ -47,7 +47,7 @@ void rosnav_local_planner::RosnavLocalPlanner::initialize(std::string name, tf2_
     }
 }
 
-bool rosnav_local_planner::RosnavLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& orig_global_plan)
+bool rosnav::RosnavLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& orig_global_plan)
 {
     // check if plugin is initialized
     if (!initialized_)
@@ -59,7 +59,7 @@ bool rosnav_local_planner::RosnavLocalPlanner::setPlan(const std::vector<geometr
     return true;
 }
 
-bool rosnav_local_planner::RosnavLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
+bool rosnav::RosnavLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
     // check if plugin is initialized
     if (!initialized_)
@@ -72,7 +72,7 @@ bool rosnav_local_planner::RosnavLocalPlanner::computeVelocityCommands(geometry_
     return false;
 }
 
-u_int32_t rosnav_local_planner::RosnavLocalPlanner::computeVelocityCommands(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity,
+u_int32_t rosnav::RosnavLocalPlanner::computeVelocityCommands(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity,
                                         geometry_msgs::TwistStamped &cmd_vel, std::string &message)
 {
     // check if plugin is initialized
@@ -85,7 +85,7 @@ u_int32_t rosnav_local_planner::RosnavLocalPlanner::computeVelocityCommands(cons
     return mbf_msgs::ExePathResult::SUCCESS;
 }
 
-bool rosnav_local_planner::RosnavLocalPlanner::retrieveVelocityCommands(geometry_msgs::TwistStamped &cmd_vel)
+bool rosnav::RosnavLocalPlanner::retrieveVelocityCommands(geometry_msgs::TwistStamped &cmd_vel)
 {
     ROS_DEBUG("Retrieving velocity commands...");
 
@@ -105,7 +105,7 @@ bool rosnav_local_planner::RosnavLocalPlanner::retrieveVelocityCommands(geometry
 }
 
 
-bool rosnav_local_planner::RosnavLocalPlanner::isGoalReached()
+bool rosnav::RosnavLocalPlanner::isGoalReached()
 {
     // check if plugin is initialized
     if (!initialized_)
@@ -117,7 +117,7 @@ bool rosnav_local_planner::RosnavLocalPlanner::isGoalReached()
     return false;
 }
 
-void rosnav_local_planner::RosnavLocalPlanner::reconfigureCB(RosnavLocalPlannerReconfigureConfig& config, uint32_t level)
+void rosnav::RosnavLocalPlanner::reconfigureCB(RosnavLocalPlannerReconfigureConfig& config, uint32_t level)
 {
     // check if plugin is initialized
     if (!initialized_)
@@ -148,7 +148,7 @@ void rosnav_local_planner::RosnavLocalPlanner::reconfigureCB(RosnavLocalPlannerR
     client_ = agent_srv_clients[active_agent];
 }
 
-std::vector<std::string> rosnav_local_planner::RosnavLocalPlanner::translateStrToList(std::string str, std::string separator)
+std::vector<std::string> rosnav::RosnavLocalPlanner::translateStrToList(std::string str, std::string separator)
 {
     std::vector<std::string> result;
     size_t pos = 0;
@@ -162,7 +162,7 @@ std::vector<std::string> rosnav_local_planner::RosnavLocalPlanner::translateStrT
 }
 
 
-bool rosnav_local_planner::RosnavLocalPlanner::updateAgentSelection(std::string agent_name)
+bool rosnav::RosnavLocalPlanner::updateAgentSelection(std::string agent_name)
 {
     std::string service_name = "rosnav/" + agent_name + "/get_action";
 
@@ -184,7 +184,7 @@ bool rosnav_local_planner::RosnavLocalPlanner::updateAgentSelection(std::string 
     return false;
 }
 
-bool rosnav_local_planner::RosnavLocalPlanner::getServiceClient(std::string service_name, ros::ServiceClient& client, double_t timeout=10)
+bool rosnav::RosnavLocalPlanner::getServiceClient(std::string service_name, ros::ServiceClient& client, double_t timeout=10)
 {
     // Wait for the service to become available
     if (ros::service::waitForService(service_name, ros::Duration(timeout)))

@@ -17,7 +17,7 @@
 #include <costmap_converter/costmap_converter_interface.h>
 
 // dynamic reconfigure
-#include <rosnav_local_planner/RosnavLocalPlannerReconfigureConfig.h>
+#include <rosnav/RosnavLocalPlannerReconfigureConfig.h>
 #include <dynamic_reconfigure/server.h>
 // #include <rosnav/srv/GetAction.h>
 
@@ -26,7 +26,7 @@
 #include <rosnav/GetAction.h>
 
 
-namespace rosnav_local_planner
+namespace rosnav
 {
     class RosnavLocalPlanner : public nav_core::BaseLocalPlanner,  public mbf_costmap_core::CostmapController
     {
