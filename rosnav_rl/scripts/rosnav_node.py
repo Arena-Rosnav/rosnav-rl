@@ -7,6 +7,7 @@ from time import sleep
 
 import numpy as np
 import rospkg
+from rl_utils.envs.utils import get_obs_structure
 from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 import rospy
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
@@ -115,18 +116,7 @@ class RosnavNode:
             "ns_to_semantic_topic": rospy.get_param("/train_mode", False),
         }
         
-        from rl_utils.utils.observation_collector.observation_units.base_collector_unit import BaseCollectorUnit
-        from rl_utils.utils.observation_collector.observation_units.unity_collector_unit import UnityCollectorUnit
-        from rl_utils.utils.observation_collector.observation_units.globalplan_collector_unit import GlobalplanCollectorUnit
-        from rl_utils.utils.observation_collector.observation_units.semantic_ped_unit import SemanticAggregateUnit
-        
-        obs_structur = [
-            BaseCollectorUnit,
-            GlobalplanCollectorUnit,
-            SemanticAggregateUnit
-        ]
-        if Utils.get_simulator() == Constants.Simulator.UNITY:
-            obs_structur.append(UnityCollectorUnit)
+        obs_structur = get_obs_structure()
 
         self._observation_manager = ObservationManager(
             Namespace(self.ns), 
