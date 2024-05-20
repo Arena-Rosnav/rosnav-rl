@@ -3,9 +3,11 @@ import json
 import os
 import sys
 import argparse
+from time import sleep
 
 import numpy as np
 import rospkg
+from rl_utils.envs.utils import get_obs_structure
 from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 import rospy
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
@@ -32,6 +34,7 @@ from tools.ros_param_distributor import (
     determine_space_encoder,
     populate_discrete_action_space,
     populate_laser_params,
+    populate_rgbd_params
 )
 from std_msgs.msg import Int16
 
@@ -42,6 +45,8 @@ sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
 from typing import Any, Dict, List
 
 from task_generator.shared import Namespace
+from task_generator.utils import Utils
+from task_generator.constants import Constants
 
 
 class RosnavNode:
@@ -76,6 +81,7 @@ class RosnavNode:
         self._setup_action_space(self._hyperparams)
 
         populate_laser_params(self._hyperparams)
+        populate_rgbd_params(self._hyperparams)
 
         # Get Architecture Name and retrieve Observation spaces
         architecture_name = self._hyperparams["rl_agent"]["architecture_name"]
@@ -109,9 +115,16 @@ class RosnavNode:
             "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
             "ns_to_semantic_topic": rospy.get_param("/train_mode", False),
         }
+        
+        obs_structur = get_obs_structure()
+
         self._observation_manager = ObservationManager(
-            Namespace(self.ns), obs_unit_kwargs=obs_unit_kwargs
+            Namespace(self.ns), 
+            obs_structur=obs_structur,
+            obs_unit_kwargs=obs_unit_kwargs
         )
+
+        sleep(5)  # wait for unity collector unit to set itself up
 
         rospy.loginfo("[RosnavNode] Loaded model and ObsManager.")
 

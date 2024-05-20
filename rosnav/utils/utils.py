@@ -11,6 +11,8 @@ from gymnasium import spaces
 from rosnav.utils.constants import RosnavEncoder
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
+from task_generator.utils import Utils
+from task_generator.constants import Constants
 
 
 def get_robot_yaml_path(robot_model: str = None) -> str:
@@ -85,16 +87,30 @@ def load_yaml(file_path: str) -> dict:
 
 def make_mock_env(ns: str, agent_description) -> DummyVecEnv:
     import rl_utils.envs.flatland_gymnasium_env as flatland_gym_env
+    import rl_utils.envs.arena_unity_env as arena_unity_env
 
-    def _init():
+    def _init_flatland_env():
         return flatland_gym_env.FlatlandEnv(
             ns=ns,
             agent_description=agent_description,
             reward_fnc=None,
             trigger_init=False,
         )
+    def _init_arena_unity_env():
+        return arena_unity_env.ArenaUnityEnv(
+            ns=ns,
+            agent_description=agent_description,
+            reward_fnc=None,
+            trigger_init=False,
+        )
 
-    return DummyVecEnv([_init])
+    sim = Utils.get_simulator()
+    if sim == Constants.Simulator.UNITY:
+        return DummyVecEnv([_init_arena_unity_env])
+    elif sim == Constants.Simulator.FLATLAND:
+        return DummyVecEnv([_init_flatland_env])
+    else:
+        raise RuntimeError(f"Training environemnts only supported for simulators Arena Unity and Flatland but got {sim}")
 
 
 def wrap_vec_framestack(env: DummyVecEnv, stack_size: int) -> VecFrameStack:
