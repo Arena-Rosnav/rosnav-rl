@@ -83,16 +83,18 @@ u_int32_t rosnav::RosnavLocalPlanner::computeVelocityCommands(const geometry_msg
         return mbf_msgs::ExePathResult::INTERNAL_ERROR;
     }
     bool succ = retrieveVelocityCommands(cmd_vel);
-    // saturateVelocity(
-    //     cmd_vel.twist.linear.x, 
-    //     cmd_vel.twist.linear.y, 
-    //     cmd_vel.twist.angular.z, 
-    //     config_.robot.max_vel_x, 
-    //     config_.robot.max_vel_y, 
-    //     config_.robot.max_vel_trans, 
-    //     config_.robot.max_vel_theta, 
-    //     config_.robot.max_vel_x_backwards
-    // );
+    // ROS_INFO("[PRE] Velocity commands: vx: %f, vy: %f, omega: %f", cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
+    saturateVelocity(
+        cmd_vel.twist.linear.x, 
+        cmd_vel.twist.linear.y, 
+        cmd_vel.twist.angular.z, 
+        config_.robot.max_vel_x, 
+        config_.robot.max_vel_y, 
+        config_.robot.max_vel_trans, 
+        config_.robot.max_vel_theta, 
+        config_.robot.max_vel_x_backwards
+    );
+    // ROS_INFO("[POST] Velocity commands: vx: %f, vy: %f, omega: %f", cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
     return mbf_msgs::ExePathResult::SUCCESS;
 }
 
@@ -249,11 +251,12 @@ void rosnav::RosnavLocalPlanner::saturateVelocity(double& vx, double& vy, double
         omega *= ratio_omega;
     }
 
-    double vel_linear = std::hypot(vx, vy);
-    if (vel_linear > max_vel_trans)
-    {
-        double max_vel_trans_ratio = max_vel_trans / vel_linear;
-        vx *= max_vel_trans_ratio;
-        vy *= max_vel_trans_ratio;
-    }
+    // double vel_linear = std::hypot(vx, vy);
+    // if (vel_linear > max_vel_trans)
+    // {
+    //     double max_vel_trans_ratio = max_vel_trans / vel_linear;
+    //     ROS_INFO("max_vel_trans_ratio: %f", max_vel_trans_ratio);
+    //     vx *= max_vel_trans_ratio;
+    //     vy *= max_vel_trans_ratio;
+    // }
 }

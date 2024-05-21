@@ -32,7 +32,7 @@ class RosnavConfig
       robot.max_vel_x = 2.0;
       robot.max_vel_x_backwards = 2.0;
       robot.max_vel_y = 0.0;
-      robot.max_vel_trans = 0.0;
+      robot.max_vel_trans = 100.0;
       robot.max_vel_theta = 0.3;
       robot.use_proportional_saturation = false;
     };
