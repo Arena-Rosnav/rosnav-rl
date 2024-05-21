@@ -1,4 +1,4 @@
-#include <rosnav.h>
+#include <rosnav_local_planner.h>
 // pluginlib macros
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
@@ -21,10 +21,11 @@ void rosnav::RosnavLocalPlanner::initialize(std::string name, tf2_ros::Buffer* t
 {
     if (!initialized_)
     {
+        ROS_INFO("Initializing RosnavLocalPlanner...");
+
         // create Node handle
         ros::NodeHandle nh_("~/" + name);
-
-        ROS_INFO("Initializing RosnavLocalPlanner...");
+        config_.loadRosParamFromNodeHandle(nh_);
 
         nh_.param("/agent_name", active_agent, std::string(""));
 
@@ -82,6 +83,16 @@ u_int32_t rosnav::RosnavLocalPlanner::computeVelocityCommands(const geometry_msg
         return mbf_msgs::ExePathResult::INTERNAL_ERROR;
     }
     bool succ = retrieveVelocityCommands(cmd_vel);
+    saturateVelocity(
+        cmd_vel.twist.linear.x, 
+        cmd_vel.twist.linear.y, 
+        cmd_vel.twist.angular.z, 
+        config_.robot.max_vel_x, 
+        config_.robot.max_vel_y, 
+        config_.robot.max_vel_trans, 
+        config_.robot.max_vel_theta, 
+        config_.robot.max_vel_x_backwards
+    );
     return mbf_msgs::ExePathResult::SUCCESS;
 }
 
@@ -119,6 +130,10 @@ bool rosnav::RosnavLocalPlanner::isGoalReached()
 
 void rosnav::RosnavLocalPlanner::reconfigureCB(RosnavLocalPlannerReconfigureConfig& config, uint32_t level)
 {
+    boost::mutex::scoped_lock l(config_mutex_);
+
+    config_.reconfigure(config);
+
     // check if plugin is initialized
     if (!initialized_)
     {
@@ -132,20 +147,20 @@ void rosnav::RosnavLocalPlanner::reconfigureCB(RosnavLocalPlannerReconfigureConf
         return;
     }
 
-    boost::mutex::scoped_lock l(config_mutex_);
-
     // deal with new agent
     if (!(std::find(agent_selection_list.begin(), agent_selection_list.end(), config.active_agent) != agent_selection_list.end())) {
         ROS_INFO("New agent detected: %s", config.active_agent.c_str());
         if (!(updateAgentSelection(config.active_agent)))
         {
-            ROS_INFO("Keeping the current agent selection and most recently active agent '%s'", active_agent.c_str());
+            ROS_INFO("Keeping the current agent selection. Active agent '%s'", active_agent.c_str());
         }
     }
 
     // update the active agent
     active_agent = config.active_agent;
     client_ = agent_srv_clients[active_agent];
+
+    config_mutex_.unlock();
 }
 
 std::vector<std::string> rosnav::RosnavLocalPlanner::translateStrToList(std::string str, std::string separator)
@@ -195,4 +210,50 @@ bool rosnav::RosnavLocalPlanner::getServiceClient(std::string service_name, ros:
     }
     return false;
 
+}
+
+void rosnav::RosnavLocalPlanner::saturateVelocity(double& vx, double& vy, double& omega, double max_vel_x, double max_vel_y, double max_vel_trans, double max_vel_theta, double max_vel_x_backwards) const
+{
+    double ratio_x = 1, ratio_omega = 1, ratio_y = 1;
+    // Limit translational velocity for forward driving
+    if (vx > max_vel_x)
+        ratio_x = max_vel_x / vx;
+    
+    // limit strafing velocity
+    if (vy > max_vel_y || vy < -max_vel_y)
+        ratio_y = std::abs(max_vel_y / vy);
+    
+    // Limit angular velocity
+    if (omega > max_vel_theta || omega < -max_vel_theta)
+        ratio_omega = std::abs(max_vel_theta / omega);
+    
+    // Limit backwards velocity
+    if (max_vel_x_backwards<=0)
+    {
+        ROS_WARN_ONCE("RosnavLocalPlanner(): Do not choose max_vel_x_backwards to be <=0. Disable backwards driving by increasing the optimization weight for penalyzing backwards driving.");
+    }
+    else if (vx < -max_vel_x_backwards)
+        ratio_x = - max_vel_x_backwards / vx;
+
+    if (config_.robot.use_proportional_saturation)
+    {
+        double ratio = std::min(std::min(ratio_x, ratio_y), ratio_omega);
+        vx *= ratio;
+        vy *= ratio;
+        omega *= ratio;
+    }
+    else
+    {
+        vx *= ratio_x;
+        vy *= ratio_y;
+        omega *= ratio_omega;
+    }
+
+    double vel_linear = std::hypot(vx, vy);
+    if (vel_linear > max_vel_trans)
+    {
+        double max_vel_trans_ratio = max_vel_trans / vel_linear;
+        vx *= max_vel_trans_ratio;
+        vy *= max_vel_trans_ratio;
+    }
 }

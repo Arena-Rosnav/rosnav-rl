@@ -23,6 +23,7 @@
 
 #include <mbf_msgs/ExePathResult.h>
 
+#include <rosnav_config.h>
 #include <rosnav/GetAction.h>
 
 
@@ -141,6 +142,24 @@ namespace rosnav
         std::vector<std::string> translateStrToList(std::string str, std::string seperator);
 
         /**
+         * @brief Saturate the translational and angular velocity to given limits.
+         * 
+         * The limit of the translational velocity for backwards driving can be changed independently.
+         * Do not choose max_vel_x_backwards <= 0. If no backward driving is desired, change the optimization weight for
+         * penalizing backwards driving instead.
+         * @param[in,out] vx The translational velocity that should be saturated.
+         * @param[in,out] vy Strafing velocity which can be nonzero for holonomic robots
+         * @param[in,out] omega The angular velocity that should be saturated.
+         * @param max_vel_x Maximum translational velocity for forward driving
+         * @param max_vel_y Maximum strafing velocity (for holonomic robots)
+         * @param max_vel_trans Maximum translational velocity for holonomic robots
+         * @param max_vel_theta Maximum (absolute) angular velocity
+         * @param max_vel_x_backwards Maximum translational velocity for backwards driving
+         */
+        void saturateVelocity(double& vx, double& vy, double& omega, double max_vel_x, double max_vel_y,
+                                double max_vel_trans, double max_vel_theta, double max_vel_x_backwards) const;
+
+        /**
          * @brief Return the internal config mutex
         */
         boost::mutex& configMutex() {return config_mutex_;}
@@ -154,6 +173,9 @@ namespace rosnav
 
         bool initialized_; //!< Keeps track about the correct initialization of this class
         
+        // rosnav config
+        RosnavConfig config_;
+
         ros::NodeHandle nh_; // ROS node handle
         ros::ServiceClient client_; // service client for cmd vel retrieval
 

@@ -42,7 +42,8 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
-  src/RosnavLocalPlanner.cpp
+  src/rosnav_local_planner.cpp
+  src/rosnav_config.cpp
 )
 
 add_dependencies(rosnav ${PROJECT_NAME}_gencfg)
