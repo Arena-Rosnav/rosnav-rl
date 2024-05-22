@@ -8,6 +8,10 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_5,
     RESNET_MID_FUSION_EXTRACTOR_6,
     RESNET_MID_FUSION_EXTRACTOR_7,
+    DRL_VO_NAV_EXTRACTOR,
+)
+from rosnav.model.feature_extractors.rgbd.rgbd_feature_nets import (
+    RESNET_RGBD_FUSION_EXTRACTOR_1,
 )
 from rosnav.rosnav_space_manager.default_encoder import DefaultEncoder
 from torch import nn
@@ -530,6 +534,24 @@ class RosnavResNet_7(BaseAgent):
     activation_fn = nn.ReLU
 
 
+@AgentFactory.register("ArenaUnityResNet_1")
+class ArenaUnityResNet_1(BaseAgent):
+
+    type = PolicyType.CNN
+    space_encoder_class = DefaultEncoder
+    observation_spaces = [SPACE_INDEX.RGBD, SPACE_INDEX.GOAL, SPACE_INDEX.LAST_ACTION]
+    observation_space_kwargs = {"image_height": 128, "image_width": 128}
+    features_extractor_class = RESNET_RGBD_FUSION_EXTRACTOR_1
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "num_groups": 4,
+        "image_height": 128,
+        "image_width": 128,
+    }
+    net_arch = dict(pi=[512, 128], vf=[512])
+    activation_fn = nn.ReLU
+
+
 @AgentFactory.register("RosnavResNet_5_norm")
 class RosnavResNet_5_norm(BaseAgent):
     """
@@ -940,3 +962,45 @@ class LSTM_ResNet_norm_7(BaseAgent):
     lstm_hidden_size = 256
     shared_lstm = True
     enable_critic_lstm = False
+
+
+@AgentFactory.register("RosnavResNet_simple")
+class RosnavResNet_simple(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
+    type = PolicyType.CNN
+    space_encoder_class = DefaultEncoder
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 30,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_kwargs = {
+        "features_dim": 256,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 64], vf=[256])
+    activation_fn = nn.ReLU

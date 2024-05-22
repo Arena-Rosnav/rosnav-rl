@@ -16,7 +16,7 @@ Details:
 """
 
 from copy import deepcopy
-from typing import List
+from typing import List, Callable
 
 import gymnasium as gym
 from gymnasium.spaces.box import Box
@@ -466,6 +466,222 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             goal = observations[:, :, -self._goal_size :]
 
         return self._forward_impl(ped_pos, scan, goal)
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the ResNet model.
+
+        Args:
+            observations (torch.Tensor): Input observations.
+
+        Returns:
+            torch.Tensor: Output tensor after the forward pass.
+        """
+        if (
+            self._batch_mode
+            and self._batch_size > 0
+            and observations.shape[0] >= self._batch_size
+        ):
+            # split observations into batches
+            observations = torch.split(observations, self._batch_size, dim=0)
+
+            # concatenate outputs
+            return torch.cat([self._forward(obs) for obs in observations], dim=0)
+
+        return self._forward(observations)
+
+
+class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
+    """
+    Feature extractor class that implements a mid-fusion ResNet-based architecture.
+
+    Args:
+        observation_space (gym.spaces.Box): The observation space of the environment
+        observation_space_manager (ObservationSpaceManager): The observation space manager
+        features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
+        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
+        layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
+        zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
+        groups (int, optional): The number of groups to use in the ResNet architecture. Defaults to 1.
+        width_per_group (int, optional): The width of each group in the ResNet architecture. Defaults to 64.
+        replace_stride_with_dilation (List[bool], optional): Whether to replace stride with dilation in each block of the ResNet architecture. Defaults to None.
+        norm_layer (nn.Module, optional): The normalization layer to use in the ResNet architecture. Defaults to nn.BatchNorm2d.
+    """
+
+    REQUIRED_OBSERVATIONS = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+
+    def __init__(
+        self,
+        observation_space: Box,
+        observation_space_manager: ObservationSpaceManager,
+        features_dim: int = 256,
+        stacked_obs: bool = False,
+        block: Module = Bottleneck,
+        layers: list = [2, 1, 1, 1],
+        zero_init_residual: bool = True,
+        groups: int = 1,
+        width_per_group: int = 64,
+        replace_stride_with_dilation: List[bool] = None,
+        norm_layer: Module = nn.BatchNorm2d,
+        batch_mode: bool = False,
+        batch_size: int = -1,
+    ):
+        super().__init__(
+            observation_space,
+            observation_space_manager,
+            features_dim,
+            stacked_obs,
+            block,
+            layers,
+            zero_init_residual,
+            groups,
+            width_per_group,
+            replace_stride_with_dilation,
+            norm_layer,
+            batch_mode=batch_mode,
+            batch_size=batch_size,
+        )
+
+    def _get_input_sizes(self):
+        """
+        Calculate the input sizes for the feature extraction process.
+
+        This method calculates the input sizes required for the feature extraction process
+        based on the observation space manager. It sets the values for the feature map size,
+        scan map size, pedestrian map size, and goal size.
+
+        Returns:
+            None
+        """
+        super()._get_input_sizes()
+        self._ped_map_size = (
+            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
+            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
+        )
+        self._last_action_size = self._observation_space_manager[
+            SPACE_INDEX.LAST_ACTION
+        ].shape[-1]
+
+    def _setup_network(self, inplanes: int = 64):
+        """
+        Sets up the network architecture for feature extraction.
+        """
+        super()._setup_network(inplanes=inplanes)
+        self.linear_fc = nn.Sequential(
+            nn.Linear(
+                (256 * self._block.expansion + self._goal_size + self._last_action_size)
+                * self._num_stacks,
+                self._features_dim,
+            ),
+            nn.BatchNorm1d(self._features_dim),
+            nn.ReLU(),
+        )
+
+    def _forward_impl(
+        self,
+        ped_pos: torch.Tensor,
+        scan: torch.Tensor,
+        goal: torch.Tensor,
+        last_action: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Implements the forward pass for the feature extractor.
+
+        Args:
+            ped_pos (torch.Tensor): Pedestrian position tensor
+            scan (torch.Tensor): Scan tensor
+            goal (torch.Tensor): Goal tensor
+            last_action (torch.Tensor): Action tensor
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass
+        """
+        ###### Start of fusion net ######
+        ped_in = ped_pos.reshape(
+            -1,
+            self.num_pedestrian_feature_maps,
+            self._feature_map_size,
+            self._feature_map_size,
+        )
+        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
+        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+
+        # See note [TorchScript super()]
+        # extra layer conv, bn, relu
+
+        x = self.conv1(fusion_in)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        identity3 = self.downsample3(x)
+
+        x = self.layer1(x)
+
+        identity2 = self.downsample2(x)
+
+        x = self.layer2(x)
+
+        x = self.conv2_2(x)
+        x += identity2
+        x = self.relu2(x)
+
+        x = self.layer3(x)
+        # x = self.layer4(x)
+
+        x = self.conv3_2(x)
+        x += identity3
+        x = self.relu3(x)
+
+        x = self.avgpool(x)
+        fusion_out = x.squeeze(-1).squeeze(-1)
+        ###### End of fusion net ######
+
+        ###### Start of goal net #######
+        # goal_in = goal.reshape(-1, 2)
+        # goal_out = goal
+        ###### End of goal net #######
+        # Combine
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        x = self.linear_fc(fc_in)
+
+        return x
+
+    def _forward(self, observations: torch.Tensor) -> torch.Tensor:
+        """
+        Performs the forward pass for the feature extractor.
+
+        Args:
+            observations (torch.Tensor): Input observations
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass
+        """
+        # preprocessing:
+        # scan_map = observations[:, :6400]
+        # ped_map = observations[:, 6400:32000]
+        # goal = observations[:, 32000:32002]
+        # last_action = observations[:, 32002:32005]
+        scan = observations[:, : self._scan_map_size]
+        ped_pos = observations[
+            :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
+        ]
+        goal = observations[
+            :, -(self._goal_size + self._last_action_size) : -self._last_action_size
+        ]
+        last_action = observations[:, -self._last_action_size :]
+        return self._forward_impl(ped_pos, scan, goal, last_action)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         """
