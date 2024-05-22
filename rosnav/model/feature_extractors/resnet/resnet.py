@@ -16,7 +16,7 @@ Details:
 """
 
 from copy import deepcopy
-from typing import List
+from typing import List, Callable
 
 import gymnasium as gym
 from gymnasium.spaces.box import Box
