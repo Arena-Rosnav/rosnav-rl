@@ -577,7 +577,140 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         """
         Sets up the network architecture for feature extraction.
         """
-        super()._setup_network(inplanes=inplanes)
+        """
+        Sets up the network architecture for feature extraction.
+        """
+        ################## ped_pos net model: ###################
+        if self._norm_layer is None:
+            self._norm_layer = nn.BatchNorm2d
+
+        self.inplanes = inplanes
+        self.dilation = 1
+        if self._replace_stride_with_dilation is None:
+            # each element in the tuple indicates if we should replace
+            # the 2x2 stride with a dilated convolution instead
+            self._replace_stride_with_dilation = [False] * len(self._layers)
+        if len(self._replace_stride_with_dilation) != len(self._layers):
+            raise ValueError(
+                "replace_stride_with_dilation should be None "
+                f"or a {len(self._layers)}-element tuple, got {self._replace_stride_with_dilation}"
+            )
+        self.base_width = self._width_per_group
+        self.conv1 = nn.Conv2d(
+            self.num_pedestrian_feature_maps + 1,
+            self.inplanes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
+        )
+        self.bn1 = self._norm_layer(self.inplanes)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        self.layer1 = self._make_layer(self._block, 64, self._layers[0])
+        self.layer2 = self._make_layer(
+            self._block,
+            128,
+            self._layers[1],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[0],
+        )
+        self.layer3 = self._make_layer(
+            self._block,
+            256,
+            self._layers[2],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[1],
+        )
+
+        self.conv2_2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=128,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=128,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(1, 1),
+            ),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+        )
+        self.downsample2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(2, 2),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+        )
+        self.relu2 = nn.ReLU(inplace=True)
+
+        self.conv3_2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=512,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=256,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(1, 1),
+            ),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=512,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(512),
+        )
+        self.downsample3 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=512,
+                kernel_size=(1, 1),
+                stride=(4, 4),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(512),
+        )
+        self.relu3 = nn.ReLU(inplace=True)
+
+        self.layer4 = self._make_layer(
+            self._block,
+            512,
+            self._layers[3],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[2],
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
             nn.Linear(
                 (256 * self._block.expansion + self._goal_size + self._last_action_size)
@@ -638,7 +771,6 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         x = self.relu2(x)
 
         x = self.layer3(x)
-        # x = self.layer4(x)
 
         x = self.conv3_2(x)
         x += identity3
@@ -1830,4 +1962,275 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
         fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
         x = self.linear_fc(fc_in)
         x = self.linear_fc_2(x)
+        return x
+
+
+class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
+    REQUIRED_OBSERVATIONS = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_LOCATION,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+
+    def _setup_network(self, inplanes: int = 64):
+        """
+        Sets up the network architecture for feature extraction.
+        """
+        """
+        Sets up the network architecture for feature extraction.
+        """
+        ################## ped_pos net model: ###################
+        if self._norm_layer is None:
+            self._norm_layer = nn.BatchNorm2d
+
+        self.inplanes = inplanes
+        self.dilation = 1
+        if self._replace_stride_with_dilation is None:
+            # each element in the tuple indicates if we should replace
+            # the 2x2 stride with a dilated convolution instead
+            self._replace_stride_with_dilation = [False] * len(self._layers)
+        if len(self._replace_stride_with_dilation) != len(self._layers):
+            raise ValueError(
+                "replace_stride_with_dilation should be None "
+                f"or a {len(self._layers)}-element tuple, got {self._replace_stride_with_dilation}"
+            )
+        self.base_width = self._width_per_group
+        self.conv1 = nn.Conv2d(
+            self.num_pedestrian_feature_maps + 1,
+            self.inplanes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
+        )
+        self.bn1 = self._norm_layer(self.inplanes)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        self.layer1 = self._make_layer(self._block, 64, self._layers[0])
+        self.layer2 = self._make_layer(
+            self._block,
+            128,
+            self._layers[1],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[0],
+        )
+        self.layer3 = self._make_layer(
+            self._block,
+            256,
+            self._layers[2],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[1],
+        )
+
+        self.conv2_2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=128,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=128,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(1, 1),
+            ),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+        )
+        self.downsample2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(2, 2),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+        )
+        self.relu2 = nn.ReLU(inplace=True)
+
+        self.conv3_2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=512,
+                out_channels=256,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=256,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(1, 1),
+            ),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=512,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(512),
+        )
+        self.downsample3 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=256,
+                out_channels=512,
+                kernel_size=(1, 1),
+                stride=(2, 2),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(512),
+        )
+        self.relu3 = nn.ReLU(inplace=True)
+
+        self.conv4_2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=1024,
+                out_channels=512,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=512,
+                out_channels=512,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(1, 1),
+            ),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=512,
+                out_channels=1024,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            ),
+            nn.BatchNorm2d(1024),
+        )
+        self.downsample4 = nn.Sequential(
+            nn.Conv2d(64, 1024, kernel_size=(1, 1), stride=(8, 8), padding=(0, 0)),
+            nn.BatchNorm2d(1024),
+        )
+        self.relu4 = nn.ReLU(inplace=True)
+
+        self.layer4 = self._make_layer(
+            self._block,
+            512,
+            self._layers[3],
+            stride=2,
+            dilate=self._replace_stride_with_dilation[2],
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.linear_fc = nn.Sequential(
+            nn.Linear(
+                (512 * self._block.expansion + self._goal_size + self._last_action_size)
+                * self._num_stacks,
+                self._features_dim,
+            ),
+            # nn.BatchNorm1d(self._features_dim),
+            nn.ReLU(),
+        )
+
+    def _forward_impl(
+        self,
+        ped_pos: torch.Tensor,
+        scan: torch.Tensor,
+        goal: torch.Tensor,
+        last_action: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Implements the forward pass for the feature extractor.
+
+        Args:
+            ped_pos (torch.Tensor): Pedestrian position tensor
+            scan (torch.Tensor): Scan tensor
+            goal (torch.Tensor): Goal tensor
+            last_action (torch.Tensor): Action tensor
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass
+        """
+        ###### Start of fusion net ######
+        ped_in = ped_pos.reshape(
+            -1,
+            self.num_pedestrian_feature_maps,
+            self._feature_map_size,
+            self._feature_map_size,
+        )
+        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
+        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+
+        # See note [TorchScript super()]
+        # extra layer conv, bn, relu
+
+        x = self.conv1(fusion_in)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        identity4 = self.downsample4(x)
+
+        x = self.layer1(x)
+
+        identity2 = self.downsample2(x)
+
+        x = self.layer2(x)
+
+        identity3 = self.downsample3(x)
+
+        x = self.conv2_2(x)
+        x += identity2
+        x = self.relu2(x)
+
+        x = self.layer3(x)
+
+        x = self.conv3_2(x)
+        x += identity3
+        x = self.relu3(x)
+
+        x = self.layer4(x)
+
+        x = self.conv4_2(x)
+        x += identity4
+        x = self.relu4(x)
+
+        x = self.avgpool(x)
+        fusion_out = x.squeeze(-1).squeeze(-1)
+        ###### End of fusion net ######
+
+        ###### Start of goal net #######
+        # goal_in = goal.reshape(-1, 2)
+        # goal_out = goal
+        ###### End of goal net #######
+        # Combine
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        x = self.linear_fc(fc_in)
+
         return x
