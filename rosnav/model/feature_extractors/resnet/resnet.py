@@ -703,13 +703,6 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         )
         self.relu3 = nn.ReLU(inplace=True)
 
-        self.layer4 = self._make_layer(
-            self._block,
-            512,
-            self._layers[3],
-            stride=2,
-            dilate=self._replace_stride_with_dilation[2],
-        )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
             nn.Linear(
