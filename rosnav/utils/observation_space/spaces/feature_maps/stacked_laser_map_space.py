@@ -84,16 +84,13 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         if type(laser_scan) is not np.ndarray:
             return np.zeros((self._feature_map_size * self._feature_map_size,))
 
-        if len(self._laser_queue) == 0:
+        if len(self._laser_queue) == 0 or done:
             self._reset_laser_stack(laser_scan)
 
         self._laser_queue.pop()
         self._laser_queue.appendleft(laser_scan)
 
         laser_map = self._build_laser_map(self._laser_queue)
-
-        if done:
-            self._reset_laser_stack(laser_scan)
 
         return laser_map
 
