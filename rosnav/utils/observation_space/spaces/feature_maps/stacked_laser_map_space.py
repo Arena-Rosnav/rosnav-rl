@@ -171,5 +171,5 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         """
         return self._process_laser_scan(
             observation[OBS_DICT_KEYS.LASER],
-            kwargs.get(OBS_DICT_KEYS.DONE, False),
+            observation.get(OBS_DICT_KEYS.DONE, False),
         ).flatten()
