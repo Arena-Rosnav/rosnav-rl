@@ -993,7 +993,7 @@ class RosnavResNet_simple(BaseAgent):
         SPACE_INDEX.LAST_ACTION,
     ]
     observation_space_kwargs = {
-        "roi_in_m": 30,
+        "roi_in_m": 20,
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
@@ -1003,7 +1003,7 @@ class RosnavResNet_simple(BaseAgent):
         "features_dim": 256,
         "width_per_group": 64,
     }
-    net_arch = dict(pi=[256, 64], vf=[256])
+    net_arch = dict(pi=[256, 64], vf=[256, 64])
     activation_fn = nn.ReLU
 
 
