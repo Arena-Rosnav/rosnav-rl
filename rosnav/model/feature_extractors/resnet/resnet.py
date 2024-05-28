@@ -2227,3 +2227,97 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
         x = self.linear_fc(fc_in)
 
         return x
+
+
+class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
+    REQUIRED_OBSERVATIONS = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.GOAL,
+    ]
+
+    def _get_input_sizes(self):
+        """
+        Calculate the input sizes for the feature extraction process.
+
+        This method calculates the input sizes required for the feature extraction process
+        based on the observation space manager. It sets the values for the feature map size,
+        scan map size, pedestrian map size, and goal size.
+
+        Returns:
+            None
+        """
+        self._feature_map_size = 80
+        self._scan_map_size = self._observation_space_manager[
+            SPACE_INDEX.STACKED_LASER_MAP
+        ].shape[-1]
+        self._goal_size = self._observation_space_manager[SPACE_INDEX.GOAL].shape[-1]
+
+    def _forward_impl(self, scan: torch.Tensor, goal: torch.Tensor) -> torch.Tensor:
+        """
+        Implements the forward pass for the feature extractor.
+
+        Args:
+            ped_pos (torch.Tensor): Pedestrian position tensor
+            scan (torch.Tensor): Scan tensor
+            goal (torch.Tensor): Goal tensor
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass
+        """
+        ###### Start of fusion net ######
+        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
+
+        # See note [TorchScript super()]
+        # extra layer conv, bn, relu
+
+        x = self.conv1(scan_in)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        identity3 = self.downsample3(x)
+
+        x = self.layer1(x)
+
+        identity2 = self.downsample2(x)
+
+        x = self.layer2(x)
+
+        x = self.conv2_2(x)
+        x += identity2
+        x = self.relu2(x)
+
+        x = self.layer3(x)
+        # x = self.layer4(x)
+
+        x = self.conv3_2(x)
+        x += identity3
+        x = self.relu3(x)
+
+        x = self.avgpool(x)
+        fusion_out = x.squeeze(-1).squeeze(-1)
+        ###### End of fusion net ######
+
+        ###### Start of goal net #######
+        # goal_in = goal.reshape(-1, 2)
+        # goal_out = goal
+        ###### End of goal net #######
+        # Combine
+        fc_in = torch.cat((fusion_out, goal), dim=1)
+        x = self.linear_fc(fc_in)
+
+        return x
+
+    def _forward(self, observations: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the feature extractor network.
+
+        Args:
+            observations (torch.Tensor): Input observations tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass.
+        """
+        return self._forward_impl(
+            observations[:, : self._scan_map_size], observations[:, -self._goal_size :]
+        )
