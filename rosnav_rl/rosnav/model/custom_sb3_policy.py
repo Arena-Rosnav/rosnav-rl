@@ -232,8 +232,8 @@ class BarnResNet(BaseAgent):
     space_encoder_class = DefaultEncoder
     observation_spaces = [
         SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
         SPACE_INDEX.GOAL,
     ]
     observation_space_kwargs = {
