@@ -1035,7 +1035,7 @@ class RosnavResNet_deeper(BaseAgent):
         SPACE_INDEX.LAST_ACTION,
     ]
     observation_space_kwargs = {
-        "roi_in_m": 30,
+        "roi_in_m": 20,
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
