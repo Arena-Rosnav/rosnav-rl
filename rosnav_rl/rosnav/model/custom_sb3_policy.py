@@ -10,7 +10,7 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_7,
     DRL_VO_NAV_EXTRACTOR,
     DRL_VO_NAV_EXTRACTOR_TEST,
-    LaserTest,
+    _LaserTest,
 )
 from rosnav.model.feature_extractors.rgbd.rgbd_feature_nets import (
     RESNET_RGBD_FUSION_EXTRACTOR_1,
@@ -1084,7 +1084,7 @@ class LSTM_ResNet_simple(BaseAgent):
 
 
 @AgentFactory.register("LaserTest")
-class _LaserTest(BaseAgent):
+class LaserTest(BaseAgent):
     """
     Custom policy class for ROS navigation using ResNet-based CNN.
 
@@ -1111,7 +1111,7 @@ class _LaserTest(BaseAgent):
         "laser_stack_size": 10,
         "normalize": True,
     }
-    features_extractor_class = LaserTest
+    features_extractor_class = _LaserTest
     features_extractor_kwargs = {
         "features_dim": 128,
         "width_per_group": 64,
