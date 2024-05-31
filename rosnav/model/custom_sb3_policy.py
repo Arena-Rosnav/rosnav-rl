@@ -10,7 +10,7 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_7,
     DRL_VO_NAV_EXTRACTOR,
     DRL_VO_NAV_EXTRACTOR_TEST,
-    LaserTest,
+    _LaserTest,
 )
 from rosnav.model.feature_extractors.rgbd.rgbd_feature_nets import (
     RESNET_RGBD_FUSION_EXTRACTOR_1,
@@ -1084,7 +1084,7 @@ class LSTM_ResNet_simple(BaseAgent):
 
 
 @AgentFactory.register("LaserTest")
-class _LaserTest(BaseAgent):
+class LaserTest(BaseAgent):
     """
     Custom policy class for ROS navigation using ResNet-based CNN.
 
@@ -1111,10 +1111,77 @@ class _LaserTest(BaseAgent):
         "laser_stack_size": 10,
         "normalize": True,
     }
-    features_extractor_class = LaserTest
+    features_extractor_class = _LaserTest
     features_extractor_kwargs = {
         "features_dim": 128,
         "width_per_group": 64,
     }
     net_arch = dict(pi=[64], vf=[64])
     activation_fn = nn.ReLU
+
+
+@AgentFactory.register("LSTM_ResNet_simple_2")
+class LSTM_ResNet_simple_2(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 64], vf=[256])
+    activation_fn = nn.ReLU
+    log_std_init = -2
+    ortho_init = False
+    n_lstm_layers = 2
+    lstm_hidden_size = 256
+    shared_lstm = True
+    enable_critic_lstm = False
+
+
+@AgentFactory.register("LSTM_ResNet_simple_3")
+class LSTM_ResNet_simple_3(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    observation_spaces = [
+        SPACE_INDEX.STACKED_LASER_MAP,
+        SPACE_INDEX.PEDESTRIAN_VEL_X,
+        SPACE_INDEX.PEDESTRIAN_VEL_Y,
+        SPACE_INDEX.PEDESTRIAN_TYPE,
+        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
+        SPACE_INDEX.GOAL,
+        SPACE_INDEX.LAST_ACTION,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_5
+    features_extractor_kwargs = {
+        "features_dim": 256,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 64], vf=[256])
+    activation_fn = nn.ReLU
+    log_std_init = -2
+    ortho_init = False
+    n_lstm_layers = 2
+    lstm_hidden_size = 256
+    shared_lstm = True
+    enable_critic_lstm = False
+
