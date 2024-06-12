@@ -36,6 +36,7 @@ from ..observation_space.spaces.feature_maps.stacked_laser_map_space import (
 from .spaces.feature_maps.pedestrian_social_state_space import (
     PedestrianSocialStateSpace,
 )
+from .spaces.base.goal_in_robot_frame_space import GoalInRobotFrameSpace
 
 
 class SPACE_INDEX(Enum):

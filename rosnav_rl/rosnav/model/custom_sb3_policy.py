@@ -1128,5 +1128,5 @@ class LaserTest(BaseAgent):
         "features_dim": 128,
         "width_per_group": 64,
     }
-    net_arch = dict(pi=[64], vf=[64])
+    net_arch = dict(pi=[128], vf=[64])
     activation_fn = nn.ReLU
