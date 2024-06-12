@@ -3,7 +3,7 @@ import torch as th
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-from rosnav.utils.observation_space.space_index import SPACE_INDEX
+import rosnav.utils.observation_space as SPACE
 from torch import nn
 
 from .base_extractor import RosnavBaseExtractor
@@ -22,12 +22,6 @@ class EXTRACTOR_1(RosnavBaseExtractor):
         **kwargs: Arbitrary keyword arguments.
     """
 
-    REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.LASER,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
-    ]
-
     def __init__(
         self,
         observation_space: gym.spaces.Box,
@@ -38,9 +32,9 @@ class EXTRACTOR_1(RosnavBaseExtractor):
         **kwargs
     ):
         self._laser_size, self._goal_size, self._last_action_size = (
-            observation_space_manager[SPACE_INDEX.LASER].shape[0],
-            observation_space_manager[SPACE_INDEX.GOAL].shape[0],
-            observation_space_manager[SPACE_INDEX.LAST_ACTION].shape[0],
+            observation_space_manager[SPACE.LaserScanSpace].shape[0],
+            observation_space_manager[SPACE.DistAngleToSubgoalSpace].shape[0],
+            observation_space_manager[SPACE.LastActionSpace].shape[0],
         )
 
         self._num_stacks = observation_space.shape[0] if stacked_obs else 1
