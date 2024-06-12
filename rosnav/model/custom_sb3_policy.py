@@ -12,10 +12,12 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     DRL_VO_NAV_EXTRACTOR_TEST,
     _LaserTest,
 )
+import rosnav.utils.observation_space as SPACE
+
 from rosnav.model.feature_extractors.rgbd.rgbd_feature_nets import (
     RESNET_RGBD_FUSION_EXTRACTOR_1,
 )
-from rosnav.rosnav_space_manager.default_encoder import DefaultEncoder
+from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
 from torch import nn
 
 from .agent_factory import AgentFactory
@@ -25,10 +27,15 @@ from .feature_extractors import *
 
 @AgentFactory.register("AGENT_19")
 class AGENT_19(BaseAgent):
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
     type = PolicyType.CNN
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=64)
-    net_arch = [dict(pi=[64, 64], vf=[64, 64])]
+    net_arch = dict(pi=[64, 64], vf=[64, 64])
     activation_fn = nn.ReLU
 
 
@@ -230,17 +237,18 @@ class BarnResNet(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.GOAL,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.DistAngleToSubgoalSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
         "feature_map_size": 80,
         "laser_stack_size": 10,
+        "normalize": True,
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_1
     features_extractor_kwargs = {"features_dim": 256}
@@ -265,14 +273,14 @@ class RosnavResNet_1(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
@@ -310,15 +318,15 @@ class RosnavResNet_2(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -349,14 +357,14 @@ class RosnavResNet_3(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -392,15 +400,15 @@ class RosnavResNet_4(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -430,15 +438,15 @@ class RosnavResNet_5(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -471,15 +479,15 @@ class RosnavResNet_6(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -512,15 +520,15 @@ class RosnavResNet_7(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -540,8 +548,12 @@ class RosnavResNet_7(BaseAgent):
 class ArenaUnityResNet_1(BaseAgent):
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
-    observation_spaces = [SPACE_INDEX.RGBD, SPACE_INDEX.GOAL, SPACE_INDEX.LAST_ACTION]
+    space_encoder_class = BaseSpaceEncoder
+    observation_spaces = [
+        SPACE.RGBDSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
     observation_space_kwargs = {"image_height": 128, "image_width": 128}
     features_extractor_class = RESNET_RGBD_FUSION_EXTRACTOR_1
     features_extractor_kwargs = {
@@ -571,15 +583,15 @@ class RosnavResNet_5_norm(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -613,15 +625,15 @@ class RosnavResNet_6_norm(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -643,13 +655,13 @@ class RosnavResNet_6_norm(BaseAgent):
 class LSTM_ResNet_5_norm(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -674,13 +686,13 @@ class LSTM_ResNet_5_norm(BaseAgent):
 class LSTM_ResNet_norm_1(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -705,13 +717,13 @@ class LSTM_ResNet_norm_1(BaseAgent):
 class LSTM_ResNet_norm_2(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -733,16 +745,16 @@ class LSTM_ResNet_norm_2(BaseAgent):
 
 
 @AgentFactory.register("LSTM_ResNet_norm_3")
-class LSTM_ResNet_norm_1(BaseAgent):
+class LSTM_ResNet_norm_3(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -767,13 +779,13 @@ class LSTM_ResNet_norm_1(BaseAgent):
 class LSTM_ResNet_norm_4(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -798,13 +810,13 @@ class LSTM_ResNet_norm_4(BaseAgent):
 class LSTM_ResNet_norm_5(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -842,15 +854,15 @@ class RosnavResNet_8_norm(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
@@ -871,13 +883,13 @@ class RosnavResNet_8_norm(BaseAgent):
 class LSTM_ResNet_norm_6(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -904,13 +916,13 @@ class LSTM_ResNet_norm_6(BaseAgent):
 class LSTM_ResNet_norm_7(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -934,16 +946,16 @@ class LSTM_ResNet_norm_7(BaseAgent):
 
 
 @AgentFactory.register("LSTM_ResNet_norm_8")
-class LSTM_ResNet_norm_7(BaseAgent):
+class LSTM_ResNet_norm_8(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 30,
@@ -983,15 +995,15 @@ class RosnavResNet_simple(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
@@ -1025,15 +1037,15 @@ class RosnavResNet_deeper(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
@@ -1054,13 +1066,13 @@ class RosnavResNet_deeper(BaseAgent):
 class LSTM_ResNet_simple(BaseAgent):
     type = PolicyType.MLP_LSTM
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
@@ -1100,10 +1112,10 @@ class LaserTest(BaseAgent):
     """
 
     type = PolicyType.CNN
-    space_encoder_class = DefaultEncoder
+    space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.GOAL,
+        SPACE.StackedLaserMapSpace,
+        SPACE.DistAngleToSubgoalSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
