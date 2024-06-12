@@ -1,20 +1,30 @@
 from abc import abstractmethod
-from typing import List
+from typing import List, Union
 
 import numpy as np
 import rospy
+from rl_utils.utils.observation_collector.collectors import (
+    RobotPoseCollector,
+    SemanticLayerCollector,
+)
+from rl_utils.utils.observation_collector.utils.semantic import (
+    get_relative_pos_to_robot,
+)
 
-import crowdsim_msgs.msg as crowdsim_msgs
-from geometry_msgs.msg import Point, Pose2D
-
-
-from ..base_observation_space import BaseObservationSpace
+from ..base_observation_space import (
+    BaseObservationSpace,
+    ObservationCollector,
+    ObservationGenerator,
+)
 
 
 class BaseFeatureMapSpace(BaseObservationSpace):
     """
     Base class for feature map observation spaces.
     """
+
+    name: str
+    required_observations: List[Union[ObservationCollector, ObservationGenerator]] = []
 
     def __init__(
         self,
@@ -72,9 +82,9 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
     def _get_semantic_map(
         self,
-        semantic_data: crowdsim_msgs.SemanticData,
+        semantic_data: SemanticLayerCollector.data_class,
         relative_pos: np.ndarray = None,
-        robot_pose: Pose2D = None,
+        robot_pose: RobotPoseCollector.data_class = None,
         *args,
         **kwargs,
     ) -> np.ndarray:
@@ -98,9 +108,13 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         try:
             # If relative_pos is not provided, calculate it
             if relative_pos is None and len(semantic_data.points) > 0:
-                relative_pos = BaseFeatureMapSpace.get_relative_pos_to_robot(
-                    robot_pose, semantic_data.points
+                ped_points = np.stack(
+                    [
+                        [frame.location.x, frame.location.y, 1]
+                        for frame in semantic_data.points
+                    ]
                 )
+                relative_pos = get_relative_pos_to_robot(robot_pose, ped_points)
 
             for data, pos in zip(
                 semantic_data.points,
@@ -116,34 +130,6 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             rospy.logwarn(e)
 
         return pos_map
-
-    @staticmethod
-    def get_relative_pos_to_robot(
-        robot_pose: Pose2D, distant_frames: crowdsim_msgs.SemanticData
-    ):
-        robot_pose_array = np.array([robot_pose.x, robot_pose.y, robot_pose.theta])
-        # homogeneous transformation matrix: map_T_robot
-        map_T_robot = np.array(
-            [
-                [
-                    np.cos(robot_pose_array[2]),
-                    -np.sin(robot_pose_array[2]),
-                    robot_pose_array[0],
-                ],
-                [
-                    np.sin(robot_pose_array[2]),
-                    np.cos(robot_pose_array[2]),
-                    robot_pose_array[1],
-                ],
-                [0, 0, 1],
-            ]
-        )
-        robot_T_map = np.linalg.inv(map_T_robot)
-
-        ped_pos = np.stack(
-            [[frame.location.x, frame.location.y, 1] for frame in distant_frames]
-        )
-        return np.matmul(robot_T_map, ped_pos.T)
 
     @abstractmethod
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:

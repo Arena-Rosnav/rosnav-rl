@@ -5,7 +5,7 @@ from gymnasium import spaces
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-from rosnav.utils.observation_space.space_index import SPACE_INDEX
+import rosnav.utils.observation_space as SPACE
 from stable_baselines3.common.policies import BaseFeaturesExtractor
 
 
@@ -23,9 +23,9 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.LASER,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
 
     def __init__(
