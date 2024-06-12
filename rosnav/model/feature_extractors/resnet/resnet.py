@@ -27,7 +27,8 @@ import torch.nn as nn
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-from rosnav.utils.observation_space.space_index import SPACE_INDEX
+import rosnav.utils.observation_space as OBSERVATION
+from rosnav.utils.observation_space import SPACE_INDEX
 
 from ..base_extractor import RosnavBaseExtractor
 from .bottleneck import Bottleneck
@@ -60,10 +61,10 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.GOAL,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
     ]
 
     def __init__(
@@ -136,16 +137,18 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             None
         """
         self._feature_map_size = self._observation_space_manager.get_space_container(
-            SPACE_INDEX.PEDESTRIAN_VEL_X
+            OBSERVATION.PedestrianVelXSpace
         ).feature_map_size
         self._scan_map_size = self._observation_space_manager[
-            SPACE_INDEX.STACKED_LASER_MAP
+            OBSERVATION.StackedLaserMapSpace
         ].shape[-1]
         self._ped_map_size = (
-            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
+            self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
         )
-        self._goal_size = self._observation_space_manager[SPACE_INDEX.GOAL].shape[-1]
+        self._goal_size = self._observation_space_manager[
+            OBSERVATION.DistAngleToSubgoalSpace
+        ].shape[-1]
 
     def _setup_network(self, inplanes: int = 64):
         """
@@ -510,13 +513,13 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.PedestrianVelXSpace,
+        OBSERVATION.PedestrianVelYSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
+        OBSERVATION.LastActionSpace,
     ]
 
     def __init__(
@@ -564,13 +567,13 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         """
         super()._get_input_sizes()
         self._ped_map_size = (
-            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
+            self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianVelYSpace].shape[-1]
         )
         self._last_action_size = self._observation_space_manager[
-            SPACE_INDEX.LAST_ACTION
+            OBSERVATION.LastActionSpace
         ].shape[-1]
 
     def _setup_network(self, inplanes: int = 64):
@@ -851,12 +854,12 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.GOAL,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.PedestrianVelXSpace,
+        OBSERVATION.PedestrianVelYSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
     ]
 
     def __init__(
@@ -904,10 +907,10 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         """
         super()._get_input_sizes()
         self._ped_map_size = (
-            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
+            self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianVelYSpace].shape[-1]
         )
 
     def _setup_network(self, inplanes: int = 64):
@@ -1175,13 +1178,13 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianVelXSpace,
+        OBSERVATION.PedestrianVelYSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
+        OBSERVATION.LastActionSpace,
     ]
 
     def __init__(
@@ -1229,7 +1232,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         """
         super()._get_input_sizes()
         self._last_action_size = self._observation_space_manager[
-            SPACE_INDEX.LAST_ACTION
+            OBSERVATION.LastActionSpace
         ].shape[-1]
 
     def _setup_network(self, inplanes: int = 64):
@@ -1565,12 +1568,12 @@ class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.GOAL,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianVelXSpace,
+        OBSERVATION.PedestrianVelYSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
     ]
 
     def _get_input_sizes(self):
@@ -1586,10 +1589,10 @@ class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
         """
         super()._get_input_sizes()
         self._ped_map_size = (
-            self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_X].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_VEL_Y].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
-            + self._observation_space_manager[SPACE_INDEX.PEDESTRIAN_TYPE].shape[-1]
+            self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianVelYSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
+            + self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
         )
 
     def _setup_network(self):
@@ -1615,13 +1618,13 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianVelXSpace,
+        OBSERVATION.PedestrianVelYSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
+        OBSERVATION.LastActionSpace,
     ]
 
     def _setup_network(self):
@@ -1737,13 +1740,13 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianVelXSpace,
+        OBSERVATION.PedestrianVelYSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
+        OBSERVATION.LastActionSpace,
     ]
 
     def _setup_network(self):
@@ -1846,13 +1849,13 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianVelXSpace,
+        OBSERVATION.PedestrianVelYSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
+        OBSERVATION.LastActionSpace,
     ]
 
     def _setup_network(self):
@@ -1960,13 +1963,13 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
 
 class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_LOCATION,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.PedestrianLocationSpace,
+        OBSERVATION.PedestrianTypeSpace,
+        OBSERVATION.PedestrianVelXSpace,
+        OBSERVATION.PedestrianVelYSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
+        OBSERVATION.LastActionSpace,
     ]
 
     def _setup_network(self, inplanes: int = 64):
@@ -2231,8 +2234,8 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
 
 class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.GOAL,
+        OBSERVATION.StackedLaserMapSpace,
+        OBSERVATION.DistAngleToSubgoalSpace,
     ]
 
     def _get_input_sizes(self):
@@ -2248,9 +2251,11 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
         """
         self._feature_map_size = 80
         self._scan_map_size = self._observation_space_manager[
-            SPACE_INDEX.STACKED_LASER_MAP
+            OBSERVATION.StackedLaserMapSpace
         ].shape[-1]
-        self._goal_size = self._observation_space_manager[SPACE_INDEX.GOAL].shape[-1]
+        self._goal_size = self._observation_space_manager[
+            OBSERVATION.DistAngleToSubgoalSpace
+        ].shape[-1]
 
     def _forward_impl(self, scan: torch.Tensor, goal: torch.Tensor) -> torch.Tensor:
         """
