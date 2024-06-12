@@ -7,7 +7,6 @@ from rosnav.rosnav_space_manager.encoder_wrapper.base_encoder_wrapper import (
     BaseEncoderWrapper,
 )
 
-from rosnav.utils.observation_space.space_index import SPACE_INDEX
 from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
     BaseFeatureMapSpace,
 )
@@ -19,7 +18,7 @@ class FeatureMapRecorderWrapper(BaseEncoderWrapper):
     def __init__(
         self,
         encoder: BaseSpaceEncoder,
-        record_features: List[SPACE_INDEX] = None,
+        record_features: List = None,
         save_every_x_obs: int = 10,
     ) -> None:
         super().__init__(encoder)
