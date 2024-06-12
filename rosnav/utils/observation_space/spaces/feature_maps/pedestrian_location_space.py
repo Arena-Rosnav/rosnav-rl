@@ -1,11 +1,15 @@
 import numpy as np
 from gymnasium import spaces
-from crowdsim_agents.utils import SemanticAttribute
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
+
+from rl_utils.utils.observation_collector import (
+    PedestrianLocationCollector,
+    RobotPoseCollector,
+    PedestrianRelativeLocation,
+)
 
 
 @SpaceFactory.register("ped_location")
@@ -29,6 +33,13 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
         get_gym_space: Returns the gym space for the observation.
         encode_observation: Encodes the observation into a numpy array.
     """
+
+    name = "PEDESTRIAN_LOCATION"
+    required_observations = [
+        PedestrianLocationCollector,
+        PedestrianRelativeLocation,
+        RobotPoseCollector,
+    ]
 
     def __init__(
         self,
@@ -74,7 +85,7 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[SemanticAttribute.IS_PEDESTRIAN.value],
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
-            observation[OBS_DICT_KEYS.ROBOT_POSE],
+            observation[PedestrianLocationCollector.name],
+            observation[PedestrianRelativeLocation.name],
+            observation[RobotPoseCollector.name],
         ).flatten()

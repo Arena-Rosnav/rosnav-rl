@@ -1,8 +1,9 @@
 import numpy as np
-import crowdsim_msgs.msg as pedsim_msgs
 from gymnasium import spaces
-from crowdsim_agents.utils import SemanticAttribute
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+from rl_utils.utils.observation_collector import (
+    PedestrianRelativeLocation,
+    PedestrianSocialStateCollector,
+)
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -31,6 +32,9 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         _get_semantic_map: Get the semantic map based on semantic data and relative position.
         encode_observation: Encode the observation into a numpy array.
     """
+
+    name = "PEDESTRIAN_SOCIAL_STATE"
+    required_observations = [PedestrianSocialStateCollector, PedestrianRelativeLocation]
 
     def __init__(
         self,
@@ -66,8 +70,8 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
 
     def _get_semantic_map(
         self,
-        semantic_data: pedsim_msgs.SemanticData,
-        relative_pos: np.ndarray,
+        semantic_data: PedestrianSocialStateCollector.data_class,
+        relative_pos: PedestrianRelativeLocation.data_class,
         *args,
         **kwargs
     ) -> np.ndarray:
@@ -112,6 +116,6 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[OBS_DICT_KEYS.SEMANTIC.PEDESTRIAN_SOCIAL_STATE.value],
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
+            observation[PedestrianSocialStateCollector.name],
+            observation[PedestrianRelativeLocation.name],
         ).flatten()

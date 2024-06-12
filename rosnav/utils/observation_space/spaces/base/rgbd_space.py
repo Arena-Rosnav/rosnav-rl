@@ -1,10 +1,14 @@
 import numpy as np
 from gymnasium import spaces
 from numpy import ndarray
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
+
+from rl_utils.utils.observation_collector import (
+    ImageColorCollector,
+    ImageDepthCollector,
+)
 
 
 @SpaceFactory.register("rgbd")
@@ -15,7 +19,7 @@ class RGBDSpace(BaseObservationSpace):
     Args:
         image_height (int): The spatial height of the RGBD input image.
         image_width (int): The spatial width of the RGBD input image.
-        *args: Variable length argument list. Might be 
+        *args: Variable length argument list. Might be
             used for BaseObservationSpace init.
         **kwargs: Arbitrary keyword arguments. Might be
             used for BaseObservationSpace init.
@@ -25,13 +29,10 @@ class RGBDSpace(BaseObservationSpace):
         _image_width (int): RGBD input iamge width.
     """
 
-    def __init__(
-        self, 
-        image_height: int,
-        image_width: int, 
-        *args, 
-        **kwargs    
-    ) -> None:
+    name: str = "RGBD"
+    required_observations = [ImageColorCollector, ImageDepthCollector]
+
+    def __init__(self, image_height: int, image_width: int, *args, **kwargs) -> None:
         self._image_height = image_height
         self._image_width = image_width
         super().__init__(*args, **kwargs)
@@ -53,7 +54,7 @@ class RGBDSpace(BaseObservationSpace):
 
     def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
         """
-        Encodes the RGBD observation by concatenating the observation 
+        Encodes the RGBD observation by concatenating the observation
         into a 4-channel (4, H, W)-tensor and flattening it.
 
         Args:
@@ -62,8 +63,8 @@ class RGBDSpace(BaseObservationSpace):
         Returns:
             ndarray: The encoded RGBD image of shape (4*H*W,).
         """
-        depth = observation[OBS_DICT_KEYS.IMAGE_DEPTH]  # shape (H, W)
-        color = observation[OBS_DICT_KEYS.IMAGE_COLOR]  # shape (3, H, W)
+        depth = observation[ImageDepthCollector.name]  # shape (H, W)
+        color = observation[ImageColorCollector.name]  # shape (3, H, W)
         # concatenate channel dimension
         depth = np.expand_dims(depth, axis=0)  # shape (1, H, W)
         image = np.concatenate((color, depth), axis=0)
