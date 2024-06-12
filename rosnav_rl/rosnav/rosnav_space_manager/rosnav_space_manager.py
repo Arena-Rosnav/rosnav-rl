@@ -12,8 +12,7 @@ from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space i
 )
 from task_generator.shared import Namespace
 
-from .default_encoder import DefaultEncoder
-from .encoder_factory import BaseSpaceEncoderFactory
+from .base_space_encoder import BaseSpaceEncoder
 from .encoder_wrapper.reduced_laser_wrapper import ReducedLaserWrapper
 
 """
@@ -31,13 +30,13 @@ class RosnavSpaceManager:
 
     def __init__(
         self,
-        space_encoder_class=DefaultEncoder,
+        ns: str = "",
+        space_encoder_class=BaseSpaceEncoder,
         observation_spaces: List[
             Union[BaseObservationSpace, BaseFeatureMapSpace]
         ] = None,
         observation_space_kwargs: Dict[str, Any] = None,
         action_space_kwargs: Dict[str, Any] = None,
-        simulation_ns: str = "",
     ):
         """
         Initializes the RosnavSpaceManager. Retrieves the Agent parameters from the ROS parameter server and initializes the space encoder containing the observation and action spaces.
@@ -51,7 +50,7 @@ class RosnavSpaceManager:
         observation_space_kwargs = observation_space_kwargs or {}
         action_space_kwargs = action_space_kwargs or {}
 
-        simulation_ns = Namespace(simulation_ns)
+        ns = Namespace(ns)
 
         self._stacked = rospy.get_param_cached("rl_agent/frame_stacking/enabled")
         self._laser_num_beams = (
@@ -60,7 +59,7 @@ class RosnavSpaceManager:
             else rospy.get_param("laser/reduced_num_laser_beams")
         )
         self._laser_max_range = rospy.get_param_cached("laser/range")
-        self._radius = rospy.get_param_cached(simulation_ns("robot_radius"))
+        self._radius = rospy.get_param_cached(ns("robot_radius"))
         self._is_holonomic = rospy.get_param_cached("is_holonomic")
 
         # TODO: add num_ped_types to rosparam
@@ -106,6 +105,7 @@ class RosnavSpaceManager:
         }
 
         self._encoder = space_encoder_class(
+            ns=ns,
             action_space_kwargs=_action_space_kwargs,
             observation_list=observation_spaces,
             observation_kwargs=_observation_kwargs,
@@ -164,3 +164,12 @@ class RosnavSpaceManager:
             object: The decoded action.
         """
         return self._encoder.decode_action(action)
+
+    @property
+    def encoder(self):
+        """
+        Gets the encoder.
+        Returns:
+            object: The encoder.
+        """
+        return self._encoder
