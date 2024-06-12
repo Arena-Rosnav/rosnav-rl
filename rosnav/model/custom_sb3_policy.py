@@ -1130,3 +1130,76 @@ class LaserTest(BaseAgent):
     }
     net_arch = dict(pi=[128], vf=[64])
     activation_fn = nn.ReLU
+
+@AgentFactory.register("LSTM_ResNet_simple_3")
+class LSTM_ResNet_simple_3(BaseAgent):
+    type = PolicyType.MLP_LSTM
+    observation_spaces = [
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_5
+    features_extractor_kwargs = {
+        "features_dim": 256,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 64], vf=[256])
+    activation_fn = nn.ReLU
+    log_std_init = -2
+    ortho_init = False
+    n_lstm_layers = 2
+    lstm_hidden_size = 256
+    shared_lstm = True
+    enable_critic_lstm = False
+
+
+@AgentFactory.register("RosnavResNet_mid")
+class RosnavResNet_mid(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
+    type = PolicyType.CNN
+    observation_spaces = [
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_5
+    features_extractor_kwargs = {
+        "features_dim": 256,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 64], vf=[256, 64])
+    activation_fn = nn.ReLU
