@@ -9,7 +9,6 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
 from .constants import BASE_AGENT_ATTR, PolicyType
-from rosnav.rosnav_space_manager.default_encoder import DefaultEncoder
 
 
 class BaseAgent(ABC):
@@ -39,7 +38,7 @@ class BaseAgent(ABC):
         Returns:
             Type[BaseSpaceEncoder]: The class of the space encoder.
         """
-        return DefaultEncoder
+        return BaseSpaceEncoder
 
     @property
     @abstractmethod
