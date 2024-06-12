@@ -1,11 +1,15 @@
 import numpy as np
 from gymnasium import spaces
-from crowdsim_agents.utils import SemanticAttribute
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
+
+
+from rl_utils.utils.observation_collector import (
+    PedestrianRelativeLocation,
+    PedestrianRelativeVelX,
+)
 
 
 @SpaceFactory.register("ped_vel_x")
@@ -32,6 +36,9 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         encode_observation(observation, *args, **kwargs): Encodes the observation into a numpy array.
 
     """
+
+    name = "PEDESTRIAN_VEL_X"
+    required_observations = [PedestrianRelativeLocation, PedestrianRelativeVelX]
 
     def __init__(
         self,
@@ -71,8 +78,8 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
 
     def _get_semantic_map(
         self,
-        relative_x_vel: np.ndarray = None,
-        relative_pos: np.ndarray = None,
+        relative_pos: PedestrianRelativeLocation.data_class = None,
+        relative_x_vel: PedestrianRelativeVelX.data_class = None,
         *args,
         **kwargs
     ) -> np.ndarray:
@@ -116,6 +123,6 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
 
         """
         return self._get_semantic_map(
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_X_VEL.value],
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
+            observation[PedestrianRelativeLocation.name],
+            observation[PedestrianRelativeVelX.name],
         ).flatten()

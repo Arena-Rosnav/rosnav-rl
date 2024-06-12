@@ -1,14 +1,10 @@
-from typing import Tuple
-
 import numpy as np
 from gymnasium import spaces
-from numpy import ndarray
+from rl_utils.utils.observation_collector import LastActionCollector
 
 from ...observation_space_factory import SpaceFactory
 from ...utils import stack_spaces
 from ..base_observation_space import BaseObservationSpace
-
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 
 @SpaceFactory.register("last_action")
@@ -39,6 +35,9 @@ class LastActionSpace(BaseObservationSpace):
         encode_observation(observation, *args, **kwargs): Encodes the observation.
 
     """
+
+    name = "LAST_ACTION"
+    required_observations = [LastActionCollector]
 
     def __init__(
         self,
@@ -89,7 +88,9 @@ class LastActionSpace(BaseObservationSpace):
         return stack_spaces(*_spaces)
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
+    def encode_observation(
+        self, observation: dict, *args, **kwargs
+    ) -> LastActionCollector.data_class:
         """
         Encodes the observation by extracting the last action from the observation dictionary.
 
@@ -99,4 +100,4 @@ class LastActionSpace(BaseObservationSpace):
         Returns:
             ndarray: The encoded observation representing the last action.
         """
-        return observation[OBS_DICT_KEYS.LAST_ACTION]
+        return observation[LastActionCollector.name]

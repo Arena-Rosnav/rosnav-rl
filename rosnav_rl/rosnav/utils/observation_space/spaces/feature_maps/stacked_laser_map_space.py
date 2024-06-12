@@ -1,16 +1,13 @@
 from collections import deque
 
 import numpy as np
-import numpy.matlib
 import rospy
 from gymnasium import spaces
-from numpy import ndarray
-
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+from rl_utils.utils.observation_collector import DoneObservation, LaserCollector
 
 from ...observation_space_factory import SpaceFactory
-from .base_feature_map_space import BaseFeatureMapSpace
 from ..base_observation_space import BaseObservationSpace
+from .base_feature_map_space import BaseFeatureMapSpace
 
 
 @SpaceFactory.register("stacked_laser_map")
@@ -38,6 +35,9 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         encode_observation(observation: dict, *args, **kwargs) -> ndarray: Encodes the observation into a feature map.
 
     """
+
+    name = "STACKED_LASER_MAP"
+    required_observations = [LaserCollector]
 
     def __init__(
         self,
@@ -69,7 +69,9 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         """
         self._laser_queue = deque([np.zeros_like(laser_scan)] * self._laser_stack_size)
 
-    def _process_laser_scan(self, laser_scan: np.ndarray, done: bool) -> np.ndarray:
+    def _process_laser_scan(
+        self, laser_scan: LaserCollector.data_class, done: DoneObservation.data_class
+    ) -> np.ndarray:
         """
         Processes the laser scan and returns the feature map.
 
@@ -131,7 +133,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
                     scan_avg[2 * n + 1, i] = np.mean(scan_tmp[i * 9 : (i + 1) * 9])
 
             scan_avg = scan_avg.reshape(1600)
-            scan_avg_map = np.matlib.repmat(scan_avg, 1, 4).reshape((80, 80))
+            scan_avg_map = np.tile(scan_avg, (4, 1)).reshape((80, 80))
         except Exception as e:
             rospy.logwarn(
                 f"[{rospy.get_name()}, {StackedLaserMapSpace.__name__}]: {e} \n Cannot build laser map. Instead return empty map."
@@ -156,7 +158,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
+    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
         """
         Encodes the observation into a feature map.
 
@@ -170,6 +172,6 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
 
         """
         return self._process_laser_scan(
-            observation[OBS_DICT_KEYS.LASER],
-            observation.get(OBS_DICT_KEYS.DONE, False),
+            observation[LaserCollector.name],
+            observation.get(DoneObservation.name, False),
         ).flatten()

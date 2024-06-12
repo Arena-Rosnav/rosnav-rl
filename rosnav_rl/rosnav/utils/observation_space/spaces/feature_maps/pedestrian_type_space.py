@@ -1,7 +1,10 @@
 import numpy as np
 from gymnasium import spaces
-from crowdsim_agents.utils import SemanticAttribute
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+from rl_utils.utils.observation_collector import (
+    PedestrianRelativeLocation,
+    PedestrianTypeCollector,
+    RobotPoseCollector,
+)
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -30,6 +33,13 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
 
     """
 
+    name = "PEDESTRIAN_TYPE"
+    required_observations = [
+        PedestrianTypeCollector,
+        PedestrianRelativeLocation,
+        RobotPoseCollector,
+    ]
+
     def __init__(
         self,
         num_ped_types: int,
@@ -39,6 +49,18 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         *args,
         **kwargs
     ) -> None:
+        """
+        Initializes a new instance of the PedestrianTypeSpace class.
+
+        Args:
+            num_ped_types (int): The number of pedestrian types.
+            feature_map_size (int): The size of the feature map.
+            roi_in_m (float): The region of interest in meters.
+            flatten (bool, optional): Whether to flatten the feature map. Defaults to True.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        """
         self._num_ped_types = num_ped_types
         super().__init__(
             feature_map_size=feature_map_size,
@@ -78,7 +100,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
 
         """
         return self._get_semantic_map(
-            observation[SemanticAttribute.PEDESTRIAN_TYPE.value],
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
-            observation[OBS_DICT_KEYS.ROBOT_POSE],
+            observation[PedestrianTypeCollector.name],
+            observation[PedestrianRelativeLocation.name],
+            observation[RobotPoseCollector.name],
         ).flatten()
