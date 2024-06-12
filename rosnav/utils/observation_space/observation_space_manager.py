@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Union
 import numpy as np
 from gymnasium import spaces
 
-from .space_index import SPACE_INDEX
 from .spaces.base_observation_space import BaseObservationSpace
 from .spaces.feature_maps.base_feature_map_space import BaseFeatureMapSpace
 from .utils import stack_spaces
@@ -34,21 +33,23 @@ class ObservationSpaceManager:
 
     def __init__(
         self,
-        space_list: List[Union[str, SPACE_INDEX]],
+        ns: str,
+        space_list: List[BaseObservationSpace],
         space_kwargs: Dict[str, Any],
         frame_stacking: bool = False,
         flatten: bool = True,
     ) -> None:
-        self._spacelist = space_list
+        self._ns = ns
+        self._space_cls_list = space_list
         self._space_kwargs = space_kwargs
         self._frame_stacking = frame_stacking
         self._flatten = flatten
 
-        self._setup_spaces()
+        self._space_containers = self._setup_spaces()
 
     @property
     def space_list(self):
-        return self._spacelist
+        return self._space_cls_list
 
     @property
     def observation_space(self) -> spaces.Box:
@@ -61,66 +62,16 @@ class ObservationSpaceManager:
         )
 
     def _setup_spaces(self):
-        self._space_containers = self._generate_space_container(
-            self._spacelist, self._space_kwargs
-        )
-
-    def _generate_space_container(
-        self,
-        space_list: List[Union[str, SPACE_INDEX]],
-        space_kwargs: Dict[str, Any],
-    ) -> Dict[str, Union[BaseObservationSpace, BaseFeatureMapSpace]]:
-        """
-        Generates a container for observation spaces.
-
-        Args:
-            space_list (List[Union[str, SPACE_INDEX]]): A list of space names or space indices.
-            space_kwargs (Dict[str, Any]): Additional keyword arguments for space initialization.
-
-        Returns:
-            Dict[str, Union[BaseObservationSpace, BaseFeatureMapSpace]]: A dictionary containing the generated observation spaces.
-        """
-        space_list = [
-            ObservationSpaceManager.get_space_index(space) for space in space_list
-        ]
         return {
-            space_index.name: space_index.value(flatten=self._flatten, **space_kwargs)
-            for space_index in space_list
+            space_cls.name: space_cls(
+                ns=self._ns, flatten=self._flatten, **self._space_kwargs
+            )
+            for space_cls in self._space_cls_list
         }
 
-    def __getitem__(self, space_name: Union[str, SPACE_INDEX]) -> spaces.Box:
-        if isinstance(space_name, SPACE_INDEX):
-            space_name = space_name.name
+    def __getitem__(self, space: Union[str, BaseObservationSpace]) -> spaces.Box:
+        space_name = space.name if issubclass(space, BaseObservationSpace) else space
         return self._space_containers[space_name.upper()].space
-
-    def add_observation_space(self, space: SPACE_INDEX):
-        """
-        Add a new observation space to the manager.
-
-        Args:
-            space (SPACE_INDEX): The space index of the observation space.
-
-        Raises:
-            AssertionError: If the space type is invalid or if the space was already specified.
-
-        """
-        assert isinstance(space, SPACE_INDEX), "Invalid Space Type"
-        assert (
-            space not in self._spacelist
-        ), f"{space}-ObservationSpace was already specified!"
-        self._spacelist.append(space)
-        self._setup_spaces()
-
-    def add_multiple_observation_spaces(self, space_list: List[SPACE_INDEX]):
-        """
-        Add multiple observation spaces to the manager.
-
-        Args:
-            space_list (List[SPACE_INDEX]): A list of space indices.
-
-        """
-        for space in space_list:
-            self.add_observation_space(space)
 
     def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
         """
@@ -140,7 +91,7 @@ class ObservationSpaceManager:
                 self._space_containers[space.name].encode_observation(
                     observation, **kwargs
                 )
-                for space in self._spacelist
+                for space in self._space_cls_list
             ],
         )
         return (
@@ -150,7 +101,7 @@ class ObservationSpaceManager:
         )
 
     def get_space_container(
-        self, space_name: Union[str, SPACE_INDEX]
+        self, space: Union[str, BaseObservationSpace]
     ) -> Union[BaseObservationSpace, BaseFeatureMapSpace]:
         """
         Get the space container for a specific space.
@@ -162,22 +113,5 @@ class ObservationSpaceManager:
             Union[BaseObservationSpace, BaseFeatureMapSpace]: The space container.
 
         """
-        if isinstance(space_name, SPACE_INDEX):
-            space_name = space_name.name
+        space_name = space.name if issubclass(space, BaseObservationSpace) else space
         return self._space_containers[space_name.upper()]
-
-    @staticmethod
-    def get_space_index(space_name: Union[str, SPACE_INDEX]) -> SPACE_INDEX:
-        """
-        Get the space index for a specific space name.
-
-        Args:
-            space_name (Union[str, SPACE_INDEX]): The name or index of the space.
-
-        Returns:
-            SPACE_INDEX: The space index.
-
-        """
-        if isinstance(space_name, SPACE_INDEX):
-            return space_name
-        return SPACE_INDEX[space_name.upper()]
