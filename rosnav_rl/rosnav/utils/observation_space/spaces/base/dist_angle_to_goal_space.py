@@ -5,7 +5,8 @@ from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 from ...utils import stack_spaces
 
-from rl_utils.utils.observation_collector.generators.generator import DistAngleToGoal
+
+from rl_utils.utils.observation_collector import DistAngleToGoal
 
 
 @SpaceFactory.register("dist_angle_to_goal")
@@ -42,11 +43,11 @@ class DistAngleToGoalSpace(BaseObservationSpace):
             spaces.Space: The Gym space for the goal observation.
 
         """
-        _spaces = (
-            spaces.Box(low=0, high=self._max_dist, shape=(1,), dtype=np.float32),
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
+        return spaces.Box(
+            low=np.array([[0, -np.pi]]),
+            high=np.array([[self._max_dist, np.pi]]),
+            dtype=np.float32,
         )
-        return stack_spaces(*_spaces)
 
     def encode_observation(
         self, observation: dict, *args, **kwargs
@@ -61,4 +62,4 @@ class DistAngleToGoalSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        return observation[DistAngleToGoal.name]
+        return observation[DistAngleToGoal.name][np.newaxis, :]

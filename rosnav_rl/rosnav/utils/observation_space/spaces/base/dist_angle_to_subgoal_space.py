@@ -29,7 +29,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
 
     """
 
-    name = "DIST_ANGLE_TO_GOAL"
+    name = "DIST_ANGLE_TO_SUBGOAL"
     required_observations = [DistAngleToSubgoal]
 
     def __init__(
@@ -49,11 +49,11 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
             spaces.Space: The Gym space for the goal observation.
 
         """
-        _spaces = (
-            spaces.Box(low=0, high=self._max_dist, shape=(1,), dtype=np.float32),
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
+        return spaces.Box(
+            low=np.array([[0, -np.pi]]),
+            high=np.array([[self._max_dist, np.pi]]),
+            dtype=np.float32,
         )
-        return stack_spaces(*_spaces)
 
     def encode_observation(
         self, observation: dict, *args, **kwargs
@@ -68,4 +68,4 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        return observation[DistAngleToSubgoal.name]
+        return observation[DistAngleToSubgoal.name][np.newaxis, :]

@@ -32,7 +32,7 @@ class AGENT_19(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=64)
     net_arch = dict(pi=[64, 64], vf=[64, 64])
@@ -41,7 +41,12 @@ class AGENT_19(BaseAgent):
 
 @AgentFactory.register("AGENT_20")
 class AGENT_20(BaseAgent):
-    type = PolicyType.CNN
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[128], vf=[128])]
@@ -50,7 +55,12 @@ class AGENT_20(BaseAgent):
 
 @AgentFactory.register("AGENT_21")
 class AGENT_21(BaseAgent):
-    type = PolicyType.CNN
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[64, 64], vf=[64, 64])]
@@ -59,7 +69,12 @@ class AGENT_21(BaseAgent):
 
 @AgentFactory.register("AGENT_22")
 class AGENT_22(BaseAgent):
-    type = PolicyType.CNN
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=64)
     net_arch = [dict(pi=[64, 64, 64], vf=[64, 64, 64])]
@@ -68,7 +83,12 @@ class AGENT_22(BaseAgent):
 
 @AgentFactory.register("AGENT_23")
 class AGENT_23(BaseAgent):
-    type = PolicyType.CNN
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_6
     features_extractor_kwargs = dict(features_dim=128)
     net_arch = [128, 64, 64, 64]
@@ -176,7 +196,7 @@ class AGENT_52(BaseAgent):
 # framestacking
 @AgentFactory.register("AGENT_55")
 class AGENT_55(BaseAgent):
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [512, 256, 64]
@@ -186,7 +206,7 @@ class AGENT_55(BaseAgent):
 # framestacking
 @AgentFactory.register("AGENT_57")
 class AGENT_57(BaseAgent):
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_8
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [512, 256, 64, 64]
@@ -196,7 +216,7 @@ class AGENT_57(BaseAgent):
 # framestacking
 @AgentFactory.register("AGENT_58")
 class AGENT_58(BaseAgent):
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_8
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = dict(pi=[256, 256, 64], vf=[256, 64])
@@ -206,7 +226,7 @@ class AGENT_58(BaseAgent):
 # framestacking
 @AgentFactory.register("AGENT_59")
 class AGENT_59(BaseAgent):
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_9
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = dict(pi=[256, 256, 64], vf=[256, 64])
@@ -236,7 +256,7 @@ class BarnResNet(BaseAgent):
         activation_fn (class): The activation function for the hidden layers.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -272,7 +292,7 @@ class RosnavResNet_1(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -317,7 +337,7 @@ class RosnavResNet_2(BaseAgent):
 
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -356,7 +376,7 @@ class RosnavResNet_3(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -399,7 +419,7 @@ class RosnavResNet_4(BaseAgent):
 
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -437,7 +457,7 @@ class RosnavResNet_5(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -478,7 +498,7 @@ class RosnavResNet_6(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -519,7 +539,7 @@ class RosnavResNet_7(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -547,7 +567,7 @@ class RosnavResNet_7(BaseAgent):
 @AgentFactory.register("ArenaUnityResNet_1")
 class ArenaUnityResNet_1(BaseAgent):
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.RGBDSpace,
@@ -582,7 +602,7 @@ class RosnavResNet_5_norm(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -624,7 +644,7 @@ class RosnavResNet_6_norm(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -853,7 +873,7 @@ class RosnavResNet_8_norm(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -994,7 +1014,7 @@ class RosnavResNet_simple(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -1036,7 +1056,7 @@ class RosnavResNet_deeper(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -1111,7 +1131,7 @@ class LaserTest(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -1130,6 +1150,7 @@ class LaserTest(BaseAgent):
     }
     net_arch = dict(pi=[128], vf=[64])
     activation_fn = nn.ReLU
+
 
 @AgentFactory.register("LSTM_ResNet_simple_3")
 class LSTM_ResNet_simple_3(BaseAgent):
@@ -1180,7 +1201,7 @@ class RosnavResNet_mid(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.CNN
+    type = PolicyType.MULTI_INPUT_LSTM
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
         SPACE.PedestrianVelXSpace,

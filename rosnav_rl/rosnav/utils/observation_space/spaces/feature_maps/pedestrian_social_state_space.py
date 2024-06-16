@@ -41,17 +41,12 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         social_state_num: int,
         feature_map_size: int,
         roi_in_m: float,
-        flatten: bool = True,
         *args,
         **kwargs
     ) -> None:
         self._social_state_num = social_state_num
         super().__init__(
-            feature_map_size=feature_map_size,
-            roi_in_m=roi_in_m,
-            flatten=flatten,
-            *args,
-            **kwargs
+            feature_map_size=feature_map_size, roi_in_m=roi_in_m, *args, **kwargs
         )
 
     def get_gym_space(self) -> spaces.Space:
@@ -64,7 +59,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=self._social_state_num,
-            shape=(self._feature_map_size * self._feature_map_size,),
+            shape=(self._feature_map_size, self._feature_map_size),
             dtype=int,
         )
 
@@ -118,4 +113,4 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         return self._get_semantic_map(
             observation[PedestrianSocialStateCollector.name],
             observation[PedestrianRelativeLocation.name],
-        ).flatten()
+        )

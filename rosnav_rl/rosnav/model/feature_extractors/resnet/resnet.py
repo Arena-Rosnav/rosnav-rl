@@ -16,7 +16,7 @@ Details:
 """
 
 from copy import deepcopy
-from typing import List, Callable
+from typing import List, Callable, Tuple
 
 import gymnasium as gym
 from gymnasium.spaces.box import Box
@@ -27,10 +27,9 @@ import torch.nn as nn
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-import rosnav.utils.observation_space as OBSERVATION
-from rosnav.utils.observation_space import SPACE_INDEX
+import rosnav.utils.observation_space as SPACE
 
-from ..base_extractor import RosnavBaseExtractor
+from ..base_extractor import RosnavBaseExtractor, TensorDict
 from .bottleneck import Bottleneck
 from .utils import conv1x1, conv3x3
 
@@ -50,7 +49,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         observation_space (gym.spaces.Box): The observation space of the environment
         observation_space_manager (ObservationSpaceManager): The observation space manager
         features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        stack_size (bool, optional): Whether the observations are stacked. Defaults to False.
         block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
         layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
         zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
@@ -61,10 +60,10 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     """
 
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.DistAngleToSubgoalSpace,
     ]
 
     def __init__(
@@ -72,7 +71,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         observation_space: gym.spaces.Box,
         observation_space_manager: ObservationSpaceManager,
         features_dim: int = 256,
-        stacked_obs: bool = False,
+        stack_size: int = 1,
         block: nn.Module = Bottleneck,
         layers: list = [2, 1, 1],
         zero_init_residual: bool = True,
@@ -80,8 +79,6 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         width_per_group: int = 64,
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: nn.Module = nn.BatchNorm2d,
-        batch_mode: bool = False,
-        batch_size: int = -1,
     ):
         self._block = block
         self._groups = groups
@@ -90,8 +87,6 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         self._replace_stride_with_dilation = replace_stride_with_dilation
         self._norm_layer = norm_layer
         self._zero_init_residual = zero_init_residual
-        self._batch_mode = batch_mode
-        self._batch_size = batch_size
 
         self._observation_space_manager = observation_space_manager
 
@@ -102,7 +97,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             observation_space=observation_space,
             observation_space_manager=observation_space_manager,
             features_dim=features_dim,
-            stacked_obs=stacked_obs,
+            stack_size=stack_size,
         )
 
         self._init_layer_weights()
@@ -136,18 +131,18 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         Returns:
             None
         """
-        self._feature_map_size = self._observation_space_manager.get_space_container(
-            OBSERVATION.PedestrianVelXSpace
-        ).feature_map_size
+        self._feature_map_size = self._observation_space_manager[
+            SPACE.StackedLaserMapSpace
+        ].feature_map_size
         self._scan_map_size = self._observation_space_manager[
-            OBSERVATION.StackedLaserMapSpace
+            SPACE.StackedLaserMapSpace
         ].shape[-1]
         self._ped_map_size = (
-            self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
+            self._observation_space_manager[SPACE.PedestrianVelXSpace].shape[-1]
+            + self._observation_space_manager[SPACE.PedestrianVelXSpace].shape[-1]
         )
         self._goal_size = self._observation_space_manager[
-            OBSERVATION.DistAngleToSubgoalSpace
+            SPACE.DistAngleToSubgoalSpace
         ].shape[-1]
 
     def _setup_network(self, inplanes: int = 64):
@@ -282,7 +277,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
             nn.Linear(
-                (256 * self._block.expansion + self._goal_size) * self._num_stacks,
+                256 * self._block.expansion + self._goal_size,
                 self._features_dim,
             ),
             # nn.BatchNorm1d(features_dim),
@@ -395,14 +390,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(
-            -1,
-            self.num_pedestrian_feature_maps,
-            self._feature_map_size,
-            self._feature_map_size,
-        )
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
-        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(0), ped_pos), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -440,37 +428,31 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
 
-    def _forward(self, observations: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the feature extractor network.
+    def _get_input(
+        self, observations: TensorDict
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        laser_map = observations[SPACE.StackedLaserMapSpace.name]
+        dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name]
+        ped_map = torch.stack(
+            [
+                observations[space.name]
+                for space in self._observation_space_manager.space_list
+                if "PEDESTRIAN" in space.name
+            ],
+            dim=1,
+        )
 
-        Args:
-            observations (torch.Tensor): Input observations tensor.
+        if SPACE.LastActionSpace in self.REQUIRED_OBSERVATIONS:
+            last_action = observations[SPACE.LastActionSpace.name]
+            return ped_map, laser_map, dist_angle_to_goal, last_action
+        return ped_map, laser_map, dist_angle_to_goal
 
-        Returns:
-            torch.Tensor: Output tensor after forward pass.
-        """
-        if not self._stacked_obs:
-            scan = observations[:, : self._scan_map_size]
-            ped_pos = observations[
-                :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
-            ]
-            goal = observations[:, -self._goal_size :]
-        else:
-            scan = observations[:, :, : self._scan_map_size]
-            ped_pos = observations[
-                :, :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
-            ]
-            goal = observations[:, :, -self._goal_size :]
-
-        return self._forward_impl(ped_pos, scan, goal)
-
-    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+    def forward(self, observations: TensorDict) -> torch.Tensor:
         """
         Forward pass of the ResNet model.
 
@@ -480,18 +462,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         Returns:
             torch.Tensor: Output tensor after the forward pass.
         """
-        if (
-            self._batch_mode
-            and self._batch_size > 0
-            and observations.shape[0] >= self._batch_size
-        ):
-            # split observations into batches
-            observations = torch.split(observations, self._batch_size, dim=0)
-
-            # concatenate outputs
-            return torch.cat([self._forward(obs) for obs in observations], dim=0)
-
-        return self._forward(observations)
+        return self._forward_impl(*self._get_input(observations))
 
 
 class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
@@ -502,7 +473,7 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         observation_space (gym.spaces.Box): The observation space of the environment
         observation_space_manager (ObservationSpaceManager): The observation space manager
         features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        stack_size (bool, optional): Whether the observations are stacked. Defaults to False.
         block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
         layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
         zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
@@ -513,13 +484,13 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
     """
 
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.PedestrianVelXSpace,
-        OBSERVATION.PedestrianVelYSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
-        OBSERVATION.LastActionSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
 
     def __init__(
@@ -527,7 +498,7 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         observation_space: Box,
         observation_space_manager: ObservationSpaceManager,
         features_dim: int = 256,
-        stacked_obs: bool = False,
+        stack_size: int = 1,
         block: Module = Bottleneck,
         layers: list = [2, 1, 1, 1],
         zero_init_residual: bool = True,
@@ -535,14 +506,12 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         width_per_group: int = 64,
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: Module = nn.BatchNorm2d,
-        batch_mode: bool = False,
-        batch_size: int = -1,
     ):
         super().__init__(
             observation_space,
             observation_space_manager,
             features_dim,
-            stacked_obs,
+            stack_size,
             block,
             layers,
             zero_init_residual,
@@ -550,8 +519,6 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
             width_per_group,
             replace_stride_with_dilation,
             norm_layer,
-            batch_mode=batch_mode,
-            batch_size=batch_size,
         )
 
     def _get_input_sizes(self):
@@ -566,14 +533,13 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
             None
         """
         super()._get_input_sizes()
-        self._ped_map_size = (
-            self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianVelYSpace].shape[-1]
-        )
+        self._ped_map_size = 0
+        for obs in self.REQUIRED_OBSERVATIONS:
+            if "PEDESTRIAN" in obs.name:
+                self._ped_map_size += self._observation_space_manager[obs].shape[-1]
+
         self._last_action_size = self._observation_space_manager[
-            OBSERVATION.LastActionSpace
+            SPACE.LastActionSpace
         ].shape[-1]
 
     def _setup_network(self, inplanes: int = 64):
@@ -709,8 +675,7 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
             nn.Linear(
-                (256 * self._block.expansion + self._goal_size + self._last_action_size)
-                * self._num_stacks,
+                256 * self._block.expansion + self._goal_size + self._last_action_size,
                 self._features_dim,
             ),
             nn.BatchNorm1d(self._features_dim),
@@ -737,14 +702,7 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(
-            -1,
-            self.num_pedestrian_feature_maps,
-            self._feature_map_size,
-            self._feature_map_size,
-        )
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
-        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(0), ped_pos), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -781,58 +739,10 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
-
-    def _forward(self, observations: torch.Tensor) -> torch.Tensor:
-        """
-        Performs the forward pass for the feature extractor.
-
-        Args:
-            observations (torch.Tensor): Input observations
-
-        Returns:
-            torch.Tensor: Output tensor after forward pass
-        """
-        # preprocessing:
-        # scan_map = observations[:, :6400]
-        # ped_map = observations[:, 6400:32000]
-        # goal = observations[:, 32000:32002]
-        # last_action = observations[:, 32002:32005]
-        scan = observations[:, : self._scan_map_size]
-        ped_pos = observations[
-            :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
-        ]
-        goal = observations[
-            :, -(self._goal_size + self._last_action_size) : -self._last_action_size
-        ]
-        last_action = observations[:, -self._last_action_size :]
-        return self._forward_impl(ped_pos, scan, goal, last_action)
-
-    def forward(self, observations: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the ResNet model.
-
-        Args:
-            observations (torch.Tensor): Input observations.
-
-        Returns:
-            torch.Tensor: Output tensor after the forward pass.
-        """
-        if (
-            self._batch_mode
-            and self._batch_size > 0
-            and observations.shape[0] >= self._batch_size
-        ):
-            # split observations into batches
-            observations = torch.split(observations, self._batch_size, dim=0)
-
-            # concatenate outputs
-            return torch.cat([self._forward(obs) for obs in observations], dim=0)
-
-        return self._forward(observations)
 
 
 class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
@@ -843,7 +753,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         observation_space (gym.spaces.Box): The observation space of the environment
         observation_space_manager (ObservationSpaceManager): The observation space manager
         features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        stack_size (bool, optional): Whether the observations are stacked. Defaults to False.
         block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
         layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
         zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
@@ -854,12 +764,12 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
     """
 
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.PedestrianVelXSpace,
-        OBSERVATION.PedestrianVelYSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
     ]
 
     def __init__(
@@ -867,7 +777,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         observation_space: Box,
         observation_space_manager: ObservationSpaceManager,
         features_dim: int = 256,
-        stacked_obs: bool = False,
+        stack_size: int = 1,
         block: Module = Bottleneck,
         layers: list = [2, 1, 1, 1],
         zero_init_residual: bool = True,
@@ -875,14 +785,12 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         width_per_group: int = 64,
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: Module = nn.BatchNorm2d,
-        batch_mode: bool = False,
-        batch_size: int = -1,
     ):
         super().__init__(
             observation_space,
             observation_space_manager,
             features_dim,
-            stacked_obs,
+            stack_size,
             block,
             layers,
             zero_init_residual,
@@ -890,8 +798,6 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
             width_per_group,
             replace_stride_with_dilation,
             norm_layer,
-            batch_mode=batch_mode,
-            batch_size=batch_size,
         )
 
     def _get_input_sizes(self):
@@ -906,12 +812,10 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
             None
         """
         super()._get_input_sizes()
-        self._ped_map_size = (
-            self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianVelYSpace].shape[-1]
-        )
+        self._ped_map_size = 0
+        for obs in self.REQUIRED_OBSERVATIONS:
+            if "PEDESTRIAN" in obs.name:
+                self._ped_map_size += self._observation_space_manager[obs].shape[-1]
 
     def _setup_network(self, inplanes: int = 64):
         """
@@ -1076,7 +980,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
             nn.Linear(
-                (256 * self._block.expansion + self._goal_size) * self._num_stacks,
+                256 * self._block.expansion + self._goal_size,
                 self._features_dim,
             ),
             # nn.BatchNorm1d(features_dim),
@@ -1098,14 +1002,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(
-            -1,
-            self.num_pedestrian_feature_maps,
-            self._feature_map_size,
-            self._feature_map_size,
-        )
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
-        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(0), ped_pos), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1153,7 +1050,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1167,7 +1064,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         observation_space (gym.spaces.Box): The observation space of the environment
         observation_space_manager (ObservationSpaceManager): The observation space manager
         features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        stack_size (bool, optional): Whether the observations are stacked. Defaults to False.
         block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
         layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
         zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
@@ -1178,13 +1075,13 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
     """
 
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianVelXSpace,
-        OBSERVATION.PedestrianVelYSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
-        OBSERVATION.LastActionSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
 
     def __init__(
@@ -1192,7 +1089,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         observation_space: Box,
         observation_space_manager: ObservationSpaceManager,
         features_dim: int = 256,
-        stacked_obs: bool = False,
+        stack_size: int = 1,
         block: Module = Bottleneck,
         layers: list = [2, 1, 1, 1],
         zero_init_residual: bool = True,
@@ -1200,14 +1097,12 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         width_per_group: int = 64,
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: Module = nn.BatchNorm2d,
-        batch_mode: bool = False,
-        batch_size: int = -1,
     ):
         super().__init__(
             observation_space,
             observation_space_manager,
             features_dim,
-            stacked_obs,
+            stack_size,
             block,
             layers,
             zero_init_residual,
@@ -1215,8 +1110,6 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
             width_per_group,
             replace_stride_with_dilation,
             norm_layer,
-            batch_mode=batch_mode,
-            batch_size=batch_size,
         )
 
     def _get_input_sizes(self):
@@ -1232,7 +1125,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         """
         super()._get_input_sizes()
         self._last_action_size = self._observation_space_manager[
-            OBSERVATION.LastActionSpace
+            SPACE.LastActionSpace
         ].shape[-1]
 
     def _setup_network(self, inplanes: int = 64):
@@ -1398,8 +1291,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
             nn.Linear(
-                (256 * self._block.expansion + self._goal_size + self._last_action_size)
-                * self._num_stacks,
+                256 * self._block.expansion + self._goal_size + self._last_action_size,
                 self._features_dim,
             ),
             # nn.BatchNorm1d(features_dim),
@@ -1408,7 +1300,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
 
     def _forward_impl(
         self,
-        ped_pos: torch.Tensor,
+        ped_map: torch.Tensor,
         scan: torch.Tensor,
         goal: torch.Tensor,
         last_action: torch.Tensor,
@@ -1426,14 +1318,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(
-            -1,
-            self.num_pedestrian_feature_maps,
-            self._feature_map_size,
-            self._feature_map_size,
-        )
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
-        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1483,148 +1368,32 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
 
-    def _forward(self, observations: torch.Tensor) -> torch.Tensor:
-        """
-        Performs the forward pass for the feature extractor.
-
-        Args:
-            observations (torch.Tensor): Input observations
-
-        Returns:
-            torch.Tensor: Output tensor after forward pass
-        """
-        # preprocessing:
-        # scan_map = observations[:, :6400]
-        # ped_map = observations[:, 6400:32000]
-        # goal = observations[:, 32000:32002]
-        # last_action = observations[:, 32002:32005]
-        if not self._stacked_obs:
-            scan = observations[:, : self._scan_map_size]
-            ped_pos = observations[
-                :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
-            ]
-            goal = observations[
-                :, -(self._goal_size + self._last_action_size) : -self._last_action_size
-            ]
-            last_action = observations[:, -self._last_action_size :]
-        else:
-            scan = observations[:, :, : self._scan_map_size]
-            ped_pos = observations[
-                :, :, self._scan_map_size : (self._scan_map_size + self._ped_map_size)
-            ]
-            goal = observations[
-                :,
-                :,
-                -(self._goal_size + self._last_action_size) : -self._last_action_size,
-            ]
-            last_action = observations[:, :, -self._last_action_size :]
-        return self._forward_impl(ped_pos, scan, goal, last_action)
-
-    def forward(self, observations: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the ResNet model.
-
-        Args:
-            observations (torch.Tensor): Input observations.
-
-        Returns:
-            torch.Tensor: Output tensor after the forward pass.
-        """
-        if (
-            self._batch_mode
-            and self._batch_size > 0
-            and observations.shape[0] >= self._batch_size
-        ):
-            # split observations into batches
-            observations = torch.split(observations, self._batch_size, dim=0)
-
-            # concatenate outputs
-            return torch.cat([self._forward(obs) for obs in observations], dim=0)
-
-        return self._forward(observations)
-
 
 class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
-    """
-    Feature extractor class that implements a mid-fusion ResNet-based architecture.
-
-    Args:
-        observation_space (gym.spaces.Box): The observation space of the environment
-        observation_space_manager (ObservationSpaceManager): The observation space manager
-        features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
-        block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
-        layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
-        zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
-        groups (int, optional): The number of groups to use in the ResNet architecture. Defaults to 1.
-        width_per_group (int, optional): The width of each group in the ResNet architecture. Defaults to 64.
-        replace_stride_with_dilation (List[bool], optional): Whether to replace stride with dilation in each block of the ResNet architecture. Defaults to None.
-        norm_layer (nn.Module, optional): The normalization layer to use in the ResNet architecture. Defaults to nn.BatchNorm2d.
-    """
-
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianVelXSpace,
-        OBSERVATION.PedestrianVelYSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
     ]
-
-    def _get_input_sizes(self):
-        """
-        Calculate the input sizes for the feature extraction process.
-
-        This method calculates the input sizes required for the feature extraction process
-        based on the observation space manager. It sets the values for the feature map size,
-        scan map size, pedestrian map size, and goal size.
-
-        Returns:
-            None
-        """
-        super()._get_input_sizes()
-        self._ped_map_size = (
-            self._observation_space_manager[OBSERVATION.PedestrianVelXSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianVelYSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
-            + self._observation_space_manager[OBSERVATION.PedestrianTypeSpace].shape[-1]
-        )
-
-    def _setup_network(self):
-        super()._setup_network()
 
 
 class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
-    """
-    Feature extractor class that implements a mid-fusion ResNet-based architecture.
-
-    Args:
-        observation_space (gym.spaces.Box): The observation space of the environment
-        observation_space_manager (ObservationSpaceManager): The observation space manager
-        features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
-        block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
-        layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
-        zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
-        groups (int, optional): The number of groups to use in the ResNet architecture. Defaults to 1.
-        width_per_group (int, optional): The width of each group in the ResNet architecture. Defaults to 64.
-        replace_stride_with_dilation (List[bool], optional): Whether to replace stride with dilation in each block of the ResNet architecture. Defaults to None.
-        norm_layer (nn.Module, optional): The normalization layer to use in the ResNet architecture. Defaults to nn.BatchNorm2d.
-    """
-
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianVelXSpace,
-        OBSERVATION.PedestrianVelYSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
-        OBSERVATION.LastActionSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
 
     def _setup_network(self):
@@ -1640,7 +1409,7 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
 
     def _forward_impl(
         self,
-        ped_pos: torch.Tensor,
+        ped_map: torch.Tensor,
         scan: torch.Tensor,
         goal: torch.Tensor,
         last_action: torch.Tensor,
@@ -1658,14 +1427,7 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(
-            -1,
-            self.num_pedestrian_feature_maps,
-            self._feature_map_size,
-            self._feature_map_size,
-        )
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
-        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1715,7 +1477,7 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1729,7 +1491,7 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         observation_space (gym.spaces.Box): The observation space of the environment
         observation_space_manager (ObservationSpaceManager): The observation space manager
         features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        stack_size (bool, optional): Whether the observations are stacked. Defaults to False.
         block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
         layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
         zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
@@ -1740,13 +1502,13 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
     """
 
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianVelXSpace,
-        OBSERVATION.PedestrianVelYSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
-        OBSERVATION.LastActionSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
 
     def _setup_network(self):
@@ -1763,7 +1525,7 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
 
     def _forward_impl(
         self,
-        ped_pos: torch.Tensor,
+        ped_map: torch.Tensor,
         scan: torch.Tensor,
         goal: torch.Tensor,
         last_action: torch.Tensor,
@@ -1781,14 +1543,7 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(
-            -1,
-            self.num_pedestrian_feature_maps,
-            self._feature_map_size,
-            self._feature_map_size,
-        )
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
-        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
 
         x = self.conv1(fusion_in)
         x = self.bn1(x)
@@ -1824,7 +1579,7 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1838,7 +1593,7 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
         observation_space (gym.spaces.Box): The observation space of the environment
         observation_space_manager (ObservationSpaceManager): The observation space manager
         features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
+        stack_size (bool, optional): Whether the observations are stacked. Defaults to False.
         block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
         layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
         zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
@@ -1849,13 +1604,13 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
     """
 
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianVelXSpace,
-        OBSERVATION.PedestrianVelYSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
-        OBSERVATION.LastActionSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
 
     def _setup_network(self):
@@ -1880,7 +1635,7 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
 
     def _forward_impl(
         self,
-        ped_pos: torch.Tensor,
+        ped_map: torch.Tensor,
         scan: torch.Tensor,
         goal: torch.Tensor,
         last_action: torch.Tensor,
@@ -1898,14 +1653,7 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(
-            -1,
-            self.num_pedestrian_feature_maps,
-            self._feature_map_size,
-            self._feature_map_size,
-        )
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
-        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1955,7 +1703,7 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
         x = self.linear_fc_2(x)
         return x
@@ -1963,13 +1711,13 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
 
 class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.PedestrianLocationSpace,
-        OBSERVATION.PedestrianTypeSpace,
-        OBSERVATION.PedestrianVelXSpace,
-        OBSERVATION.PedestrianVelYSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
-        OBSERVATION.LastActionSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
 
     def _setup_network(self, inplanes: int = 64):
@@ -2146,8 +1894,7 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_fc = nn.Sequential(
             nn.Linear(
-                (512 * self._block.expansion + self._goal_size + self._last_action_size)
-                * self._num_stacks,
+                512 * self._block.expansion + self._goal_size + self._last_action_size,
                 self._features_dim,
             ),
             # nn.BatchNorm1d(self._features_dim),
@@ -2156,7 +1903,7 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
 
     def _forward_impl(
         self,
-        ped_pos: torch.Tensor,
+        ped_map: torch.Tensor,
         scan: torch.Tensor,
         goal: torch.Tensor,
         last_action: torch.Tensor,
@@ -2174,14 +1921,7 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        ped_in = ped_pos.reshape(
-            -1,
-            self.num_pedestrian_feature_maps,
-            self._feature_map_size,
-            self._feature_map_size,
-        )
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
-        fusion_in = torch.cat((scan_in, ped_in), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -2226,7 +1966,7 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -2234,8 +1974,8 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
 
 class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
     REQUIRED_OBSERVATIONS = [
-        OBSERVATION.StackedLaserMapSpace,
-        OBSERVATION.DistAngleToSubgoalSpace,
+        SPACE.StackedLaserMapSpace,
+        SPACE.DistAngleToSubgoalSpace,
     ]
 
     def _get_input_sizes(self):
@@ -2251,10 +1991,10 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
         """
         self._feature_map_size = 80
         self._scan_map_size = self._observation_space_manager[
-            OBSERVATION.StackedLaserMapSpace
+            SPACE.StackedLaserMapSpace
         ].shape[-1]
         self._goal_size = self._observation_space_manager[
-            OBSERVATION.DistAngleToSubgoalSpace
+            SPACE.DistAngleToSubgoalSpace
         ].shape[-1]
 
     def _forward_impl(self, scan: torch.Tensor, goal: torch.Tensor) -> torch.Tensor:
@@ -2270,12 +2010,11 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        scan_in = scan.reshape(-1, 1, self._feature_map_size, self._feature_map_size)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
 
-        x = self.conv1(scan_in)
+        x = self.conv1(scan.unsqueeze(0))
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
@@ -2308,21 +2047,14 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(0)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
 
-    def _forward(self, observations: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the feature extractor network.
-
-        Args:
-            observations (torch.Tensor): Input observations tensor.
-
-        Returns:
-            torch.Tensor: Output tensor after forward pass.
-        """
-        return self._forward_impl(
-            observations[:, : self._scan_map_size], observations[:, -self._goal_size :]
-        )
+    def _get_input(
+        self, observations: TensorDict
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        laser_map = observations[SPACE.StackedLaserMapSpace.name]
+        dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name]
+        return laser_map, dist_angle_to_goal
