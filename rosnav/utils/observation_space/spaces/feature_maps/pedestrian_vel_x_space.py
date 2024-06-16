@@ -46,19 +46,13 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         max_speed_x: float,
         feature_map_size: int,
         roi_in_m: float,
-        flatten: bool = True,
         *args,
         **kwargs
     ) -> None:
-        self._map_size = feature_map_size
         self._min_speed = min_speed_x
         self._max_speed = max_speed_x
         super().__init__(
-            feature_map_size=feature_map_size,
-            roi_in_m=roi_in_m,
-            flatten=flatten,
-            *args,
-            **kwargs
+            feature_map_size=feature_map_size, roi_in_m=roi_in_m, *args, **kwargs
         )
 
     def get_gym_space(self) -> spaces.Space:
@@ -72,7 +66,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=self._min_speed,
             high=self._max_speed,
-            shape=(self._map_size * self._map_size,),
+            shape=(self._feature_map_size, self._feature_map_size),
             dtype=float,
         )
 
@@ -125,4 +119,4 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         return self._get_semantic_map(
             observation[PedestrianRelativeLocation.name],
             observation[PedestrianRelativeVelX.name],
-        ).flatten()
+        )

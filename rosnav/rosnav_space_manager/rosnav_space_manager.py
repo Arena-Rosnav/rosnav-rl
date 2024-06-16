@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Union
 
+import numpy as np
 import rospy
 from rosnav.rosnav_space_manager.encoder_wrapper.feature_map_recorder import (
     FeatureMapRecorderWrapper,
@@ -12,6 +13,7 @@ from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space i
 )
 from task_generator.shared import Namespace
 
+from ..utils.observation_space import EncodedObservationDict
 from .base_space_encoder import BaseSpaceEncoder
 from .encoder_wrapper.reduced_laser_wrapper import ReducedLaserWrapper
 
@@ -144,7 +146,9 @@ class RosnavSpaceManager:
         """
         return self._encoder.action_space
 
-    def encode_observation(self, observation, *args, **kwargs):
+    def encode_observation(
+        self, observation, *args, **kwargs
+    ) -> EncodedObservationDict:
         """
         Encodes the given observation using the space encoder.
         Args:
@@ -155,7 +159,7 @@ class RosnavSpaceManager:
         encoded_obs = self._encoder.encode_observation(observation, **kwargs)
         return encoded_obs
 
-    def decode_action(self, action):
+    def decode_action(self, action: np.ndarray):
         """
         Decodes the given action using the space encoder.
         Args:

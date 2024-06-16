@@ -1,19 +1,19 @@
-from copy import deepcopy
 from typing import List, Callable
 
 import gymnasium as gym
-from gymnasium.spaces.box import Box
-from torch.nn.modules import BatchNorm2d, Module
-import rospy
 import torch
 import torch.nn as nn
 from torch import Tensor
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-from rosnav.utils.observation_space import SPACE_INDEX
+from rosnav.utils.observation_space import (
+    RGBDSpace,
+    DistAngleToSubgoalSpace,
+    LastActionSpace,
+)
 
-from ..base_extractor import RosnavBaseExtractor
+from ..base_extractor import RosnavBaseExtractor, TensorDict
 from .resnet import resnet50_groupnorm, RgbdPerceptionNet, ResNet
 
 
@@ -42,9 +42,9 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.RGBD,
-        SPACE_INDEX.DIST_ANGLE_TO_SUBGOAL,
-        SPACE_INDEX.LAST_ACTION,
+        RGBDSpace,
+        DistAngleToSubgoalSpace,
+        LastActionSpace,
     ]
 
     def __init__(
@@ -80,12 +80,6 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         )
 
     def _get_input_sizes(self):
-        self._goal_size = self._observation_space_manager[
-            SPACE_INDEX.DIST_ANGLE_TO_SUBGOAL.value
-        ].shape[-1]
-        self._last_action_size = self._observation_space_manager[
-            SPACE_INDEX.LAST_ACTION.value
-        ].shape[-1]
         self._image_size = 4 * self._image_height * self._image_width
 
     def _setup_network(self, *args, **kwargs):
@@ -138,20 +132,11 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         return out
 
-    def _forward(self, observations: Tensor) -> Tensor:
-        # extract seperate inputs
-        image_vector = observations[:, : self._image_size]
-        image = image_vector.reshape(-1, 4, self._image_height, self._image_width)
+    def _get_input(self, observations: dict) -> Tensor:
+        image = observations[RGBDSpace.name].unsqueeze(0)
+        goal = observations[DistAngleToSubgoalSpace.name].squeeze(0)
+        last_action = observations[LastActionSpace.name].squeeze(0)
+        return image, goal, last_action
 
-        goal_vector = observations[
-            :, self._image_size : self._image_size + self._goal_size
-        ]
-        goal = goal_vector.reshape(-1, self._goal_size)
-
-        last_action_vector = observations[:, -self._last_action_size :]
-        last_action = last_action_vector.reshape(-1, self._last_action_size)
-
-        return self._forward_impl(image, goal, last_action)
-
-    def forward(self, observations: Tensor) -> Tensor:
-        return self._forward(observations)
+    def forward(self, observations: TensorDict) -> Tensor:
+        return self._forward_impl(*self._get_input(observations))

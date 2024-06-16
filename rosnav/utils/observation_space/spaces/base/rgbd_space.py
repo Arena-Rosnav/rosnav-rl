@@ -8,6 +8,7 @@ from ..base_observation_space import BaseObservationSpace
 from rl_utils.utils.observation_collector import (
     ImageColorCollector,
     ImageDepthCollector,
+    ObservationDict,
 )
 
 
@@ -48,11 +49,13 @@ class RGBDSpace(BaseObservationSpace):
         return spaces.Box(
             low=np.finfo(np.float32).min,
             high=np.finfo(np.float32).max,
-            shape=(4 * self._image_height * self._image_width,),
+            shape=(4, self._image_height, self._image_width),
             dtype=np.float32,
         )
 
-    def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> ndarray:
         """
         Encodes the RGBD observation by concatenating the observation
         into a 4-channel (4, H, W)-tensor and flattening it.
@@ -68,4 +71,4 @@ class RGBDSpace(BaseObservationSpace):
         # concatenate channel dimension
         depth = np.expand_dims(depth, axis=0)  # shape (1, H, W)
         image = np.concatenate((color, depth), axis=0)
-        return image.flatten()
+        return image

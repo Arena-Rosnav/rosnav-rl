@@ -133,7 +133,7 @@ class BaseSpaceEncoder:
             ns=self._ns,
             space_list=observation_list,
             space_kwargs=observation_kwargs,
-            frame_stacking=stacked_observation,
+            # frame_stacking=stacked_observation,
         )
 
     def decode_action(self, action) -> np.ndarray:

@@ -1,4 +1,8 @@
 from enum import Enum
+from typing import Dict
+
+import numpy as np
+import torch as th
 
 from ..observation_space.spaces.base_observation_space import BaseObservationSpace
 from ..observation_space.spaces.base.dist_angle_to_goal_space import (
@@ -28,6 +32,13 @@ from ..observation_space.spaces.feature_maps.stacked_laser_map_space import (
 from .spaces.feature_maps.pedestrian_social_state_space import (
     PedestrianSocialStateSpace,
 )
+
+TensorDict = Dict[str, th.Tensor]
+
+ObservationSpaceName = str
+ObservationEncoding = np.ndarray
+
+EncodedObservationDict = Dict[ObservationSpaceName, ObservationEncoding]
 
 
 # OLD SPACE INDEX - only keep for old code compatibility

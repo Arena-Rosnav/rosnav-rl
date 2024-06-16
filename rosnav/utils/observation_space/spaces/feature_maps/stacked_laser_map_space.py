@@ -153,7 +153,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=self._roi_in_m,
-            shape=(self._feature_map_size * self._feature_map_size,),
+            shape=(self._feature_map_size, self._feature_map_size),
             dtype=np.float32,
         )
 
@@ -174,4 +174,4 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         return self._process_laser_scan(
             observation[LaserCollector.name],
             observation.get(DoneObservation.name, False),
-        ).flatten()
+        )

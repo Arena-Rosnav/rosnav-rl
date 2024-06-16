@@ -42,7 +42,7 @@ class LaserScanSpace(BaseObservationSpace):
         return spaces.Box(
             low=0,
             high=self._max_range,
-            shape=(self._num_beams,),
+            shape=(1, self._num_beams),
             dtype=np.float32,
         )
 
@@ -59,4 +59,4 @@ class LaserScanSpace(BaseObservationSpace):
         Returns:
             ndarray: The encoded laser scan observation.
         """
-        return observation[LaserCollector.name]
+        return observation[LaserCollector.name][np.newaxis, :]

@@ -30,7 +30,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         self,
         feature_map_size: int,
         roi_in_m: float,
-        flatten: bool = True,
+        flatten: bool = False,
         *args,
         **kwargs,
     ) -> None:

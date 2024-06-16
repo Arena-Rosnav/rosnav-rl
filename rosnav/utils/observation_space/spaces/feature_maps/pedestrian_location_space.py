@@ -67,7 +67,7 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=1,
-            shape=(self._feature_map_size * self._feature_map_size,),
+            shape=(self._feature_map_size, self._feature_map_size),
             dtype=int,
         )
 
@@ -88,4 +88,4 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
             observation[PedestrianLocationCollector.name],
             observation[PedestrianRelativeLocation.name],
             observation[RobotPoseCollector.name],
-        ).flatten()
+        )

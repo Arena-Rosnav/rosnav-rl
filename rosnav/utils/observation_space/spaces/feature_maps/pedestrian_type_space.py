@@ -45,7 +45,6 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         num_ped_types: int,
         feature_map_size: int,
         roi_in_m: float,
-        flatten: bool = True,
         *args,
         **kwargs
     ) -> None:
@@ -63,11 +62,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         """
         self._num_ped_types = num_ped_types
         super().__init__(
-            feature_map_size=feature_map_size,
-            roi_in_m=roi_in_m,
-            flatten=flatten,
-            *args,
-            **kwargs
+            feature_map_size=feature_map_size, roi_in_m=roi_in_m, *args, **kwargs
         )
 
     def get_gym_space(self) -> spaces.Space:
@@ -81,7 +76,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=self._num_ped_types,
-            shape=(self._feature_map_size * self._feature_map_size,),
+            shape=(self._feature_map_size, self._feature_map_size),
             dtype=int,
         )
 
@@ -103,4 +98,4 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
             observation[PedestrianTypeCollector.name],
             observation[PedestrianRelativeLocation.name],
             observation[RobotPoseCollector.name],
-        ).flatten()
+        )
