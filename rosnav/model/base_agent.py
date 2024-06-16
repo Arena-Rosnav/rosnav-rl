@@ -120,10 +120,14 @@ class BaseAgent(ABC):
         pass
 
     def get_kwargs(
-        self, observation_space_manager: ObservationSpaceManager, stacked: bool = False
+        self, observation_space_manager: ObservationSpaceManager, stack_size: int = 1
     ) -> dict:
         """
         Get the keyword arguments for the agent.
+
+        Args:
+            observation_space_manager (ObservationSpaceManager): The observation space manager.
+            stack_size (int, optional): The stack size. Defaults to 1.
 
         Returns:
             dict: Keyword arguments for the agent.
@@ -136,7 +140,7 @@ class BaseAgent(ABC):
                     kwargs[key] = val
 
         update_features_extractor_kwargs(
-            kwargs["features_extractor_kwargs"], observation_space_manager, stacked
+            kwargs["features_extractor_kwargs"], observation_space_manager, stack_size
         )
         return kwargs
 
@@ -158,4 +162,4 @@ def update_features_extractor_kwargs(
         None
     """
     features_extractor_kwargs["observation_space_manager"] = observation_space_manager
-    features_extractor_kwargs["stacked_obs"] = stacked
+    features_extractor_kwargs["stack_size"] = stacked
