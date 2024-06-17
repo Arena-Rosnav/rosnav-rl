@@ -21,7 +21,6 @@ class BaseSpaceEncoder:
         action_space_kwargs: dict = None,
         observation_list: List[OBS_SPACE.BaseObservationSpace] = None,
         observation_kwargs: dict = None,
-        stacked_observation: bool = False,
         *args,
         **kwargs
     ):
@@ -37,15 +36,12 @@ class BaseSpaceEncoder:
         """
         self._ns = ns
         self._observation_list = observation_list
-        self._observation_kwargs = observation_kwargs
-        self._stacked_observation = stacked_observation
+        self._observation_kwargs = observation_kwargs or {}
 
         action_space_kwargs = action_space_kwargs or {}
 
         self.setup_action_space(action_space_kwargs)
-        self.setup_observation_space(
-            stacked_observation, observation_list, observation_kwargs
-        )
+        self.setup_observation_space(observation_list, observation_kwargs)
 
     @property
     def observation_space(self) -> spaces.Space:
@@ -118,7 +114,6 @@ class BaseSpaceEncoder:
 
     def setup_observation_space(
         self,
-        stacked_observation: bool,
         observation_list: List[OBS_SPACE.BaseObservationSpace] = None,
         observation_kwargs: dict = None,
     ):

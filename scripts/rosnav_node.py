@@ -98,6 +98,9 @@ class RosnavNode:
             checkpoint_name=self._hyperparams["rl_agent"]["checkpoint"],
             agent_path=self.agent_path,
         )
+        self._agent.observation_space = (
+            self._encoder.observation_space_manager.observation_space
+        )
 
         obs_unit_kwargs = {
             # "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
@@ -202,7 +205,6 @@ class RosnavNode:
             dict: The observation dictionary.
         """
         observation = self._observation_manager.get_observations()
-        observation[OBS_DICT_KEYS.LAST_ACTION] = self._last_action
         return observation
 
     def get_action(self):
@@ -321,22 +323,23 @@ class RosnavNode:
         net_type: PolicyType = agent_description.type
         model_path = os.path.join(agent_path, f"{checkpoint_name}.zip")
 
-        if not net_type or net_type != PolicyType.MLP_LSTM:
+        custom_objects = {
+            "policy_kwargs": agent_description.get_kwargs(
+                observation_space_manager=self._encoder.observation_space_manager,
+                stack_size=(
+                    self._hyperparams["rl_agent"]["frame_stacking"]["stack_size"]
+                    if self._hyperparams["rl_agent"]["frame_stacking"]["enabled"]
+                    else 1
+                ),
+            )
+        }
+
+        if not net_type or net_type != PolicyType.MULTI_INPUT:
             self._recurrent_arch = False
-            return PPO.load(
-                model_path,
-                custom_objects={
-                    "policy_kwargs": agent_description.get_kwargs(
-                        observation_space_manager=self._encoder.observation_space_manager,
-                        stacked=self._hyperparams["rl_agent"]["frame_stacking"][
-                            "enabled"
-                        ],
-                    )
-                },
-            ).policy
+            return PPO.load(model_path, custom_objects=custom_objects).policy
         else:
             self._recurrent_arch = True
-            return RecurrentPPO.load(model_path).policy
+            return RecurrentPPO.load(model_path, custom_objects=custom_objects).policy
 
     @staticmethod
     def _get_model_path(model_name):
