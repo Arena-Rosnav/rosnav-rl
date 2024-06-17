@@ -3,9 +3,10 @@ from typing import List, Union
 
 import numpy as np
 import rospy
-from rl_utils.utils.observation_collector.collectors import (
+from rl_utils.utils.observation_collector import (
     RobotPoseCollector,
     SemanticLayerCollector,
+    ObservationDict,
 )
 from rl_utils.utils.observation_collector.utils.semantic import (
     get_relative_pos_to_robot,
@@ -132,7 +133,9 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         return pos_map
 
     @abstractmethod
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encodes the observation into a numpy array.
 

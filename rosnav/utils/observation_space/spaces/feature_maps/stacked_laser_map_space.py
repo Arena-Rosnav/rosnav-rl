@@ -3,7 +3,11 @@ from collections import deque
 import numpy as np
 import rospy
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import DoneObservation, LaserCollector
+from rl_utils.utils.observation_collector import (
+    DoneObservation,
+    LaserCollector,
+    ObservationDict,
+)
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -158,12 +162,14 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encodes the observation into a feature map.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
 

@@ -3,6 +3,7 @@ from gymnasium import spaces
 from rl_utils.utils.observation_collector import (
     PedestrianRelativeLocation,
     PedestrianSocialStateCollector,
+    ObservationDict,
 )
 
 from ...observation_space_factory import SpaceFactory
@@ -100,7 +101,9 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         return social_state_map
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encode the observation into a numpy array.
 

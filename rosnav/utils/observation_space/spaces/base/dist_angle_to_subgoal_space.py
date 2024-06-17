@@ -2,7 +2,7 @@ import numpy as np
 import rospy
 
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import DistAngleToSubgoal
+from rl_utils.utils.observation_collector import DistAngleToSubgoal, ObservationDict
 from task_generator.shared import Namespace
 
 from ...observation_space_factory import SpaceFactory
@@ -56,13 +56,13 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
         )
 
     def encode_observation(
-        self, observation: dict, *args, **kwargs
+        self, observation: ObservationDict, *args, **kwargs
     ) -> DistAngleToSubgoal.data_class:
         """
         Encodes the goal observation.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
 
         Returns:
             ndarray: The encoded goal observation.

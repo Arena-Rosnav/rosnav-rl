@@ -1,6 +1,6 @@
 import numpy as np
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import LaserCollector
+from rl_utils.utils.observation_collector import LaserCollector, ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -48,13 +48,13 @@ class LaserScanSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
-        self, observation: dict, *args, **kwargs
+        self, observation: ObservationDict, *args, **kwargs
     ) -> LaserCollector.data_class:
         """
         Encodes the laser scan observation.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
 
         Returns:
             ndarray: The encoded laser scan observation.

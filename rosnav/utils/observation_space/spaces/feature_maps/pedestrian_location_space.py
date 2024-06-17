@@ -9,6 +9,7 @@ from rl_utils.utils.observation_collector import (
     PedestrianLocationCollector,
     RobotPoseCollector,
     PedestrianRelativeLocation,
+    ObservationDict,
 )
 
 
@@ -72,7 +73,9 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
         )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encodes the observation into a numpy array.
 
