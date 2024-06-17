@@ -1427,7 +1427,7 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
+        fusion_in = torch.cat((scan.unsqueeze(1), ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1477,7 +1477,7 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal.squeeze(1), last_action.squeeze(1)), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
