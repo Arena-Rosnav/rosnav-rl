@@ -9,6 +9,7 @@ from .base_feature_map_space import BaseFeatureMapSpace
 from rl_utils.utils.observation_collector import (
     PedestrianRelativeLocation,
     PedestrianRelativeVelX,
+    ObservationDict,
 )
 
 
@@ -103,12 +104,14 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         return x_vel_map
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encodes the observation into a numpy array.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
 

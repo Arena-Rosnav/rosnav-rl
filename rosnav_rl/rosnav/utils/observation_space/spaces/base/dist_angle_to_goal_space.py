@@ -6,7 +6,7 @@ from ..base_observation_space import BaseObservationSpace
 from ...utils import stack_spaces
 
 
-from rl_utils.utils.observation_collector import DistAngleToGoal
+from rl_utils.utils.observation_collector import DistAngleToGoal, ObservationDict
 
 
 @SpaceFactory.register("dist_angle_to_goal")
@@ -50,7 +50,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
         )
 
     def encode_observation(
-        self, observation: dict, *args, **kwargs
+        self, observation: ObservationDict, *args, **kwargs
     ) -> DistAngleToGoal.data_class:
         """
         Encodes the goal observation.

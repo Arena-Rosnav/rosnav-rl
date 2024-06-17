@@ -1,6 +1,6 @@
 import numpy as np
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import LastActionCollector
+from rl_utils.utils.observation_collector import LastActionCollector, ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ...utils import stack_spaces
@@ -89,13 +89,13 @@ class LastActionSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
-        self, observation: dict, *args, **kwargs
+        self, observation: ObservationDict, *args, **kwargs
     ) -> LastActionCollector.data_class:
         """
         Encodes the observation by extracting the last action from the observation dictionary.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
 
         Returns:
             ndarray: The encoded observation representing the last action.
