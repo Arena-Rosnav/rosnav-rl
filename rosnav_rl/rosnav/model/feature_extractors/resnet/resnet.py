@@ -390,7 +390,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(0), ped_pos), dim=1)
+        fusion_in = torch.cat((scan, ped_pos), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -428,7 +428,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -436,8 +436,12 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     def _get_input(
         self, observations: TensorDict
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        laser_map = observations[SPACE.StackedLaserMapSpace.name]
-        dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name]
+        laser_map = observations[SPACE.StackedLaserMapSpace.name].unsqueeze(
+            1
+        )  # (num_envs, 1, 80, 80)
+        dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name].squeeze(
+            1
+        )  # (num_envs, 2)
         ped_map = torch.stack(
             [
                 observations[space.name]
@@ -445,10 +449,12 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
                 if "PEDESTRIAN" in space.name
             ],
             dim=1,
-        )
+        )  # (num_envs, num_semantic_layers, 80, 80)
 
         if SPACE.LastActionSpace in self.REQUIRED_OBSERVATIONS:
-            last_action = observations[SPACE.LastActionSpace.name]
+            last_action = observations[SPACE.LastActionSpace.name].squeeze(
+                1
+            )  # (num_envs, 3)
             return ped_map, laser_map, dist_angle_to_goal, last_action
         return ped_map, laser_map, dist_angle_to_goal
 
@@ -702,7 +708,7 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(0), ped_pos), dim=1)
+        fusion_in = torch.cat((scan, ped_pos), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -739,7 +745,7 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1002,7 +1008,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(0), ped_pos), dim=1)
+        fusion_in = torch.cat((scan, ped_pos), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1050,7 +1056,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1318,7 +1324,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1368,7 +1374,7 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1427,7 +1433,7 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(1), ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1477,7 +1483,7 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(1), last_action.squeeze(1)), dim=1)
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1543,7 +1549,7 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1)
 
         x = self.conv1(fusion_in)
         x = self.bn1(x)
@@ -1579,7 +1585,7 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -1653,7 +1659,7 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1703,7 +1709,7 @@ class RESNET_MID_FUSION_EXTRACTOR_7(RESNET_MID_FUSION_EXTRACTOR_5):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
         x = self.linear_fc(fc_in)
         x = self.linear_fc_2(x)
         return x
@@ -1921,7 +1927,7 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan.unsqueeze(0), ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1)
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1966,7 +1972,7 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0), last_action.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal, last_action), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -2014,7 +2020,7 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
 
-        x = self.conv1(scan.unsqueeze(0))
+        x = self.conv1(scan)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
@@ -2047,7 +2053,7 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        fc_in = torch.cat((fusion_out, goal.squeeze(0)), dim=1)
+        fc_in = torch.cat((fusion_out, goal), dim=1)
         x = self.linear_fc(fc_in)
 
         return x
@@ -2055,6 +2061,6 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
     def _get_input(
         self, observations: TensorDict
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        laser_map = observations[SPACE.StackedLaserMapSpace.name]
-        dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name]
+        laser_map = observations[SPACE.StackedLaserMapSpace.name].unsqueeze(1)
+        dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name].squeeze(1)
         return laser_map, dist_angle_to_goal
