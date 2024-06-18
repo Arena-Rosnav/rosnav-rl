@@ -13,6 +13,8 @@ class ResNet(nn.Module):
         block_type: Union[BasicBlock, Bottleneck],
         cardinality: int = 1,
         norm_layer: Optional[Callable] = None,
+        *args,
+        **kwargs
     ):
         super(ResNet, self).__init__()
 

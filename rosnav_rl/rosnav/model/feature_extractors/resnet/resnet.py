@@ -79,6 +79,8 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         width_per_group: int = 64,
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: nn.Module = nn.BatchNorm2d,
+        *arg,
+        **kwargs
     ):
         self._block = block
         self._groups = groups
@@ -1999,9 +2001,7 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
         self._scan_map_size = self._observation_space_manager[
             SPACE.StackedLaserMapSpace
         ].shape[-1]
-        self._goal_size = self._observation_space_manager[
-            SPACE.DistAngleToSubgoalSpace
-        ].shape[-1]
+        self._goal_size = 2
 
     def _forward_impl(self, scan: torch.Tensor, goal: torch.Tensor) -> torch.Tensor:
         """
