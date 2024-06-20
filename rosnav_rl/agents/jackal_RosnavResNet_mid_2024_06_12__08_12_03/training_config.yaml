@@ -1,18 +1,18 @@
 agent_name: jackal_RosnavResNet_mid_2024_06_12__08_12_03
 callbacks:
   periodic_eval:
-    eval_freq: 10000
+    eval_freq: 20000
     max_num_moves_per_eps: 300
-    n_eval_episodes: 20
+    n_eval_episodes: 30
   stop_training:
     threshold: 0.985
     threshold_type: succ
   training_curriculum:
     curr_stage: 0
-    lower_threshold: 0.5
+    lower_threshold: 0.35
     threshold_type: succ
     training_curriculum_file: semantic.yaml
-    upper_threshold: 0.9
+    upper_threshold: 0.8
 debug_mode: false
 goal_radius: 0.3
 max_num_moves_per_eps: 200
@@ -49,7 +49,7 @@ rl_agent:
     enabled: true
     settings:
       final_value: 0.0002
-      initial_value: 0.001
+      initial_value: 0.0005
     type: linear
   normalize:
     enabled: false
