@@ -135,7 +135,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         return out
 
     def _get_input(self, observations: dict) -> Tensor:
-        image = observations[RGBDSpace.name].unsqueeze(0)
+        image = observations[RGBDSpace.name]
         goal = observations[DistAngleToSubgoalSpace.name].squeeze(0)
         last_action = observations[LastActionSpace.name].squeeze(0)
         return image, goal, last_action
