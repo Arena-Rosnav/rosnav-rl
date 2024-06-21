@@ -140,7 +140,7 @@ class AGENT_36(BaseAgent):
 # lstm + framestacking
 @AgentFactory.register("AGENT_38")
 class AGENT_38(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [256, 256, 256]
@@ -154,7 +154,7 @@ class AGENT_38(BaseAgent):
 # lstm
 @AgentFactory.register("AGENT_39")
 class AGENT_39(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = dict(pi=[256, 256, 64], vf=[256, 256])
@@ -168,7 +168,7 @@ class AGENT_39(BaseAgent):
 # lstm + framestacking
 @AgentFactory.register("AGENT_41")
 class AGENT_41(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = [128, 64, 64]
@@ -182,7 +182,7 @@ class AGENT_41(BaseAgent):
 # lstm + framestacking
 @AgentFactory.register("AGENT_52")
 class AGENT_52(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = [64, 64, 64, 64]
@@ -196,7 +196,7 @@ class AGENT_52(BaseAgent):
 # framestacking
 @AgentFactory.register("AGENT_55")
 class AGENT_55(BaseAgent):
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [512, 256, 64]
@@ -206,7 +206,7 @@ class AGENT_55(BaseAgent):
 # framestacking
 @AgentFactory.register("AGENT_57")
 class AGENT_57(BaseAgent):
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_8
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [512, 256, 64, 64]
@@ -216,7 +216,7 @@ class AGENT_57(BaseAgent):
 # framestacking
 @AgentFactory.register("AGENT_58")
 class AGENT_58(BaseAgent):
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_8
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = dict(pi=[256, 256, 64], vf=[256, 64])
@@ -226,7 +226,7 @@ class AGENT_58(BaseAgent):
 # framestacking
 @AgentFactory.register("AGENT_59")
 class AGENT_59(BaseAgent):
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_9
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = dict(pi=[256, 256, 64], vf=[256, 64])
@@ -256,7 +256,7 @@ class BarnResNet(BaseAgent):
         activation_fn (class): The activation function for the hidden layers.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -292,7 +292,7 @@ class RosnavResNet_1(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -337,7 +337,7 @@ class RosnavResNet_2(BaseAgent):
 
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -376,7 +376,7 @@ class RosnavResNet_3(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -419,7 +419,7 @@ class RosnavResNet_4(BaseAgent):
 
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -457,7 +457,7 @@ class RosnavResNet_5(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -498,7 +498,7 @@ class RosnavResNet_6(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -539,7 +539,7 @@ class RosnavResNet_7(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -566,8 +566,7 @@ class RosnavResNet_7(BaseAgent):
 
 @AgentFactory.register("ArenaUnityResNet_1")
 class ArenaUnityResNet_1(BaseAgent):
-
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.RGBDSpace,
@@ -828,7 +827,7 @@ class LSTM_ResNet_norm_4(BaseAgent):
 
 @AgentFactory.register("LSTM_ResNet_norm_5")
 class LSTM_ResNet_norm_5(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    type = PolicyType.MULTI_INPUT_LSTM
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
         SPACE.PedestrianVelXSpace,
@@ -873,7 +872,7 @@ class RosnavResNet_8_norm(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -967,7 +966,7 @@ class LSTM_ResNet_norm_7(BaseAgent):
 
 @AgentFactory.register("LSTM_ResNet_norm_8")
 class LSTM_ResNet_norm_8(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    type = PolicyType.MULTI_INPUT_LSTM
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
         SPACE.PedestrianVelXSpace,
@@ -1014,7 +1013,7 @@ class RosnavResNet_simple(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -1056,7 +1055,7 @@ class RosnavResNet_deeper(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
@@ -1084,7 +1083,7 @@ class RosnavResNet_deeper(BaseAgent):
 
 @AgentFactory.register("LSTM_ResNet_simple")
 class LSTM_ResNet_simple(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    type = PolicyType.MULTI_INPUT_LSTM
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
         SPACE.PedestrianVelXSpace,
@@ -1154,7 +1153,7 @@ class LaserTest(BaseAgent):
 
 @AgentFactory.register("LSTM_ResNet_simple_3")
 class LSTM_ResNet_simple_3(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    type = PolicyType.MULTI_INPUT_LSTM
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
         SPACE.PedestrianVelXSpace,
@@ -1201,7 +1200,7 @@ class RosnavResNet_mid(BaseAgent):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     observation_spaces = [
         SPACE.StackedLaserMapSpace,
         SPACE.PedestrianVelXSpace,
@@ -1224,70 +1223,3 @@ class RosnavResNet_mid(BaseAgent):
     }
     net_arch = dict(pi=[256, 64], vf=[256, 64])
     activation_fn = nn.ReLU
-
-
-@AgentFactory.register("LSTM_ResNet_simple_2")
-class LSTM_ResNet_simple_2(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
-    ]
-    observation_space_kwargs = {
-        "roi_in_m": 20,
-        "feature_map_size": 80,
-        "laser_stack_size": 10,
-        "normalize": True,
-    }
-    features_extractor_class = DRL_VO_NAV_EXTRACTOR
-    features_extractor_kwargs = {
-        "features_dim": 512,
-        "width_per_group": 64,
-    }
-    net_arch = dict(pi=[256, 64], vf=[256])
-    activation_fn = nn.ReLU
-    log_std_init = -2
-    ortho_init = False
-    n_lstm_layers = 2
-    lstm_hidden_size = 256
-    shared_lstm = True
-    enable_critic_lstm = False
-
-
-@AgentFactory.register("LSTM_ResNet_simple_3")
-class LSTM_ResNet_simple_3(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    observation_spaces = [
-        SPACE_INDEX.STACKED_LASER_MAP,
-        SPACE_INDEX.PEDESTRIAN_VEL_X,
-        SPACE_INDEX.PEDESTRIAN_VEL_Y,
-        SPACE_INDEX.PEDESTRIAN_TYPE,
-        SPACE_INDEX.PEDESTRIAN_SOCIAL_STATE,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
-    ]
-    observation_space_kwargs = {
-        "roi_in_m": 20,
-        "feature_map_size": 80,
-        "laser_stack_size": 10,
-        "normalize": True,
-    }
-    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_5
-    features_extractor_kwargs = {
-        "features_dim": 256,
-        "width_per_group": 64,
-    }
-    net_arch = dict(pi=[256, 64], vf=[256])
-    activation_fn = nn.ReLU
-    log_std_init = -2
-    ortho_init = False
-    n_lstm_layers = 2
-    lstm_hidden_size = 256
-    shared_lstm = True
-    enable_critic_lstm = False
-
