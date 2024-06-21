@@ -15,6 +15,7 @@ from rosnav.utils.observation_space import (
 
 from ..base_extractor import RosnavBaseExtractor, TensorDict
 from .resnet import resnet50_groupnorm, RgbdPerceptionNet, ResNet
+import rospy
 
 
 class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
@@ -136,8 +137,8 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
     def _get_input(self, observations: dict) -> Tensor:
         image = observations[RGBDSpace.name]
-        goal = observations[DistAngleToSubgoalSpace.name].squeeze(0)
-        last_action = observations[LastActionSpace.name].squeeze(0)
+        goal = observations[DistAngleToSubgoalSpace.name].squeeze(1)
+        last_action = observations[LastActionSpace.name].squeeze(1)
         return image, goal, last_action
 
     def forward(self, observations: TensorDict) -> Tensor:
