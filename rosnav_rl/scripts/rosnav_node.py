@@ -111,6 +111,7 @@ class RosnavNode:
             Namespace(self.ns),
             obs_structur=list(self._encoder.encoder.required_observations),
             obs_unit_kwargs=obs_unit_kwargs,
+            is_single_env=True,
         )
 
         if Utils.get_simulator() == Constants.Simulator.UNITY:
@@ -334,7 +335,7 @@ class RosnavNode:
             )
         }
 
-        if not net_type or net_type != PolicyType.MULTI_INPUT:
+        if not net_type or net_type == PolicyType.MULTI_INPUT:
             self._recurrent_arch = False
             return PPO.load(model_path, custom_objects=custom_objects).policy
         else:
