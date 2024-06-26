@@ -1,11 +1,13 @@
 from typing import List
 
 import numpy as np
+import rosnav.utils.observation_space as OBS_SPACE
 from gymnasium import spaces
+from rl_utils.utils.observation_collector.traversal import get_required_observations
+from task_generator.shared import Namespace
 
 from ..utils.action_space.action_space_manager import ActionSpaceManager
 from ..utils.observation_space.observation_space_manager import ObservationSpaceManager
-from ..utils.observation_space.space_index import SPACE_INDEX
 
 
 class BaseSpaceEncoder:
@@ -15,10 +17,10 @@ class BaseSpaceEncoder:
 
     def __init__(
         self,
-        action_space_kwargs: dict,
-        observation_list: List[SPACE_INDEX] = None,
+        ns: str = Namespace(""),
+        action_space_kwargs: dict = None,
+        observation_list: List[OBS_SPACE.BaseObservationSpace] = None,
         observation_kwargs: dict = None,
-        stacked_observation: bool = False,
         *args,
         **kwargs
     ):
@@ -32,14 +34,14 @@ class BaseSpaceEncoder:
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
+        self._ns = ns
         self._observation_list = observation_list
-        self._observation_kwargs = observation_kwargs
-        self._stacked_observation = stacked_observation
+        self._observation_kwargs = observation_kwargs or {}
+
+        action_space_kwargs = action_space_kwargs or {}
 
         self.setup_action_space(action_space_kwargs)
-        self.setup_observation_space(
-            stacked_observation, observation_list, observation_kwargs
-        )
+        self.setup_observation_space(observation_list, observation_kwargs)
 
     @property
     def observation_space(self) -> spaces.Space:
@@ -87,7 +89,7 @@ class BaseSpaceEncoder:
         Gets the list of observation spaces.
 
         Returns:
-            List[SPACE_INDEX]: The list of observation spaces.
+            List[OBS_SPACE.BaseObservationSpace]: The list of observation spaces.
         """
         return self._observation_list
 
@@ -112,8 +114,7 @@ class BaseSpaceEncoder:
 
     def setup_observation_space(
         self,
-        stacked_observation: bool,
-        observation_list: List[SPACE_INDEX] = None,
+        observation_list: List[OBS_SPACE.BaseObservationSpace] = None,
         observation_kwargs: dict = None,
     ):
         """
@@ -124,9 +125,10 @@ class BaseSpaceEncoder:
             observation_kwargs (dict, optional): Keyword arguments for configuring the observation space manager. Defaults to None.
         """
         self._observation_space_manager = ObservationSpaceManager(
-            observation_list,
+            ns=self._ns,
+            space_list=observation_list,
             space_kwargs=observation_kwargs,
-            frame_stacking=stacked_observation,
+            # frame_stacking=stacked_observation,
         )
 
     def decode_action(self, action) -> np.ndarray:
@@ -152,3 +154,7 @@ class BaseSpaceEncoder:
             np.ndarray: The encoded observation.
         """
         return self._observation_space_manager.encode_observation(observation, **kwargs)
+
+    @property
+    def required_observations(self):
+        return get_required_observations(self.observation_list)

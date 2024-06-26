@@ -1,11 +1,15 @@
 import numpy as np
 from gymnasium import spaces
-from crowdsim_agents.utils import SemanticAttribute
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
+
+from rl_utils.utils.observation_collector import (
+    PedestrianRelativeLocation,
+    PedestrianRelativeVelY,
+    ObservationDict,
+)
 
 
 @SpaceFactory.register("ped_vel_y")
@@ -28,25 +32,22 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         _max_speed (float): The maximum y-component of pedestrian velocity.
     """
 
+    name = "PEDESTRIAN_VEL_Y"
+    required_observations = [PedestrianRelativeLocation, PedestrianRelativeVelY]
+
     def __init__(
         self,
         min_speed_y: float,
         max_speed_y: float,
         feature_map_size: int,
         roi_in_m: float,
-        flatten: bool = True,
         *args,
         **kwargs
     ) -> None:
-        self._map_size = feature_map_size
         self._min_speed = min_speed_y
         self._max_speed = max_speed_y
         super().__init__(
-            feature_map_size=feature_map_size,
-            roi_in_m=roi_in_m,
-            flatten=flatten,
-            *args,
-            **kwargs
+            feature_map_size=feature_map_size, roi_in_m=roi_in_m, *args, **kwargs
         )
 
     def get_gym_space(self) -> spaces.Space:
@@ -59,13 +60,29 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=self._min_speed,
             high=self._max_speed,
-            shape=(self._map_size * self._map_size,),
+            shape=(self._feature_map_size, self._feature_map_size),
             dtype=float,
         )
 
     def _get_semantic_map(
-        self, relative_y_vel: np.ndarray, relative_pos: np.ndarray, *args, **kwargs
+        self,
+        relative_pos: PedestrianRelativeLocation.data_class = None,
+        relative_y_vel: PedestrianRelativeVelY.data_class = None,
+        *args,
+        **kwargs
     ) -> np.ndarray:
+        """
+        Generates a semantic map based on the relative x velocity and position of pedestrians.
+
+        Args:
+            relative_x_vel (np.ndarray): Array of relative x velocities of pedestrians.
+            relative_pos (np.ndarray): Array of relative positions of pedestrians.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            np.ndarray: Semantic map representing the x velocity of pedestrians.
+        """
         y_vel_map = np.zeros((self.feature_map_size, self.feature_map_size))
 
         if relative_y_vel is not None and relative_pos is not None:
@@ -80,17 +97,19 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         return y_vel_map
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encode the observation into a numpy array.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
 
         Returns:
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_Y_VEL.value],
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
-        ).flatten()
+            observation[PedestrianRelativeLocation.name],
+            observation[PedestrianRelativeVelY.name],
+        )

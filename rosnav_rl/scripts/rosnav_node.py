@@ -1,17 +1,14 @@
-import contextlib
-import json
+import argparse
 import os
 import sys
-import argparse
 from time import sleep
+from typing import Any, Dict, List
 
 import numpy as np
 import rospkg
-from rl_utils.envs.utils import get_obs_structure
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 import rospy
+from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
-from rosnav import *
 from rosnav.model.agent_factory import AgentFactory
 from rosnav.model.base_agent import PolicyType
 from rosnav.model.custom_sb3_policy import *
@@ -30,23 +27,15 @@ from rosnav.utils.utils import (
 )
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
-from tools.ros_param_distributor import (
-    determine_space_encoder,
-    populate_discrete_action_space,
-    populate_laser_params,
-    populate_rgbd_params
-)
 from std_msgs.msg import Int16
-
-
-sys.modules["rl_agent"] = sys.modules["rosnav"]
-sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
-
-from typing import Any, Dict, List
-
+from task_generator.constants import Constants
 from task_generator.shared import Namespace
 from task_generator.utils import Utils
-from task_generator.constants import Constants
+from tools.ros_param_distributor import (
+    populate_discrete_action_space,
+    populate_laser_params,
+    populate_rgbd_params,
+)
 
 
 class RosnavNode:
@@ -98,7 +87,6 @@ class RosnavNode:
 
         # Set RosnavSpaceEncoder as Middleware
         self._encoder = RosnavSpaceManager(
-            space_encoder_class=DefaultEncoder,
             observation_spaces=observation_spaces,
             observation_space_kwargs=observation_spaces_kwargs,
             action_space_kwargs=None,
@@ -106,25 +94,28 @@ class RosnavNode:
 
         # Load the model
         self._agent = self._get_model(
-            architecture_name=architecture_name,
+            agent_description=agent,
             checkpoint_name=self._hyperparams["rl_agent"]["checkpoint"],
             agent_path=self.agent_path,
         )
-
-        obs_unit_kwargs = {
-            "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
-            "ns_to_semantic_topic": rospy.get_param("/train_mode", False),
-        }
-        
-        obs_structur = get_obs_structure()
-
-        self._observation_manager = ObservationManager(
-            Namespace(self.ns), 
-            obs_structur=obs_structur,
-            obs_unit_kwargs=obs_unit_kwargs
+        self._agent.observation_space = (
+            self._encoder.observation_space_manager.observation_space
         )
 
-        sleep(5)  # wait for unity collector unit to set itself up
+        obs_unit_kwargs = {
+            # "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
+            "ns_to_semantic_topic": rospy.get_param("/train_mode", False),
+        }
+
+        self._observation_manager = ObservationManager(
+            Namespace(self.ns),
+            obs_structur=list(self._encoder.encoder.required_observations),
+            obs_unit_kwargs=obs_unit_kwargs,
+            is_single_env=True,
+        )
+
+        if Utils.get_simulator() == Constants.Simulator.UNITY:
+            sleep(5)  # wait for unity collector unit to set itself up
 
         rospy.loginfo("[RosnavNode] Loaded model and ObsManager.")
 
@@ -215,7 +206,6 @@ class RosnavNode:
             dict: The observation dictionary.
         """
         observation = self._observation_manager.get_observations()
-        observation[OBS_DICT_KEYS.LAST_ACTION] = self._last_action
         return observation
 
     def get_action(self):
@@ -317,7 +307,9 @@ class RosnavNode:
             )
             self._stacked_obs_container.reset(observation)
 
-    def _get_model(self, architecture_name: str, checkpoint_name: str, agent_path: str):
+    def _get_model(
+        self, agent_description: BaseAgent, checkpoint_name: str, agent_path: str
+    ):
         """
         Get the model based on the given architecture name, checkpoint name, and agent path.
 
@@ -329,15 +321,26 @@ class RosnavNode:
         Returns:
             policy: The loaded policy model.
         """
-        net_type: PolicyType = AgentFactory.registry[architecture_name].type
+        net_type: PolicyType = agent_description.type
         model_path = os.path.join(agent_path, f"{checkpoint_name}.zip")
 
-        if not net_type or net_type != PolicyType.MLP_LSTM:
+        custom_objects = {
+            "policy_kwargs": agent_description.get_kwargs(
+                observation_space_manager=self._encoder.observation_space_manager,
+                stack_size=(
+                    self._hyperparams["rl_agent"]["frame_stacking"]["stack_size"]
+                    if self._hyperparams["rl_agent"]["frame_stacking"]["enabled"]
+                    else 1
+                ),
+            )
+        }
+
+        if not net_type or net_type == PolicyType.MULTI_INPUT:
             self._recurrent_arch = False
-            return PPO.load(model_path).policy
+            return PPO.load(model_path, custom_objects=custom_objects).policy
         else:
             self._recurrent_arch = True
-            return RecurrentPPO.load(model_path).policy
+            return RecurrentPPO.load(model_path, custom_objects=custom_objects).policy
 
     @staticmethod
     def _get_model_path(model_name):

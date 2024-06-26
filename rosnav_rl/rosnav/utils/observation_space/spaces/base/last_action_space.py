@@ -1,14 +1,10 @@
-from typing import Tuple
-
 import numpy as np
 from gymnasium import spaces
-from numpy import ndarray
+from rl_utils.utils.observation_collector import LastActionCollector, ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ...utils import stack_spaces
 from ..base_observation_space import BaseObservationSpace
-
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 
 @SpaceFactory.register("last_action")
@@ -40,6 +36,9 @@ class LastActionSpace(BaseObservationSpace):
 
     """
 
+    name = "LAST_ACTION"
+    required_observations = [LastActionCollector]
+
     def __init__(
         self,
         min_linear_vel: float,
@@ -66,37 +65,39 @@ class LastActionSpace(BaseObservationSpace):
         Returns:
             A tuple of gym spaces representing the last action space.
         """
-        _spaces = (
-            spaces.Box(
-                low=self._min_linear_vel,
-                high=self._max_linear_vel,
-                shape=(1,),
-                dtype=np.float32,
+        return spaces.Box(
+            low=np.array(
+                [
+                    [
+                        self._min_linear_vel,
+                        self._min_translational_vel,
+                        self._min_angular_vel,
+                    ]
+                ]
             ),
-            spaces.Box(
-                low=self._min_translational_vel,
-                high=self._max_translational_vel,
-                shape=(1,),
-                dtype=np.float32,
+            high=np.array(
+                [
+                    [
+                        self._max_linear_vel,
+                        self._max_translational_vel,
+                        self._max_angular_vel,
+                    ]
+                ]
             ),
-            spaces.Box(
-                low=self._min_angular_vel,
-                high=self._max_angular_vel,
-                shape=(1,),
-                dtype=np.float32,
-            ),
+            dtype=np.float32,
         )
-        return stack_spaces(*_spaces)
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> LastActionCollector.data_class:
         """
         Encodes the observation by extracting the last action from the observation dictionary.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
 
         Returns:
             ndarray: The encoded observation representing the last action.
         """
-        return observation[OBS_DICT_KEYS.LAST_ACTION]
+        return observation[LastActionCollector.name][np.newaxis, :]
