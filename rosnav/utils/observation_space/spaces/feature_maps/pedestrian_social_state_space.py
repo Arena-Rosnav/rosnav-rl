@@ -1,8 +1,10 @@
 import numpy as np
-import crowdsim_msgs.msg as pedsim_msgs
 from gymnasium import spaces
-from crowdsim_agents.utils import SemanticAttribute
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+from rl_utils.utils.observation_collector import (
+    PedestrianRelativeLocation,
+    PedestrianSocialStateCollector,
+    ObservationDict,
+)
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -32,22 +34,20 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         encode_observation: Encode the observation into a numpy array.
     """
 
+    name = "PEDESTRIAN_SOCIAL_STATE"
+    required_observations = [PedestrianSocialStateCollector, PedestrianRelativeLocation]
+
     def __init__(
         self,
         social_state_num: int,
         feature_map_size: int,
         roi_in_m: float,
-        flatten: bool = True,
         *args,
         **kwargs
     ) -> None:
         self._social_state_num = social_state_num
         super().__init__(
-            feature_map_size=feature_map_size,
-            roi_in_m=roi_in_m,
-            flatten=flatten,
-            *args,
-            **kwargs
+            feature_map_size=feature_map_size, roi_in_m=roi_in_m, *args, **kwargs
         )
 
     def get_gym_space(self) -> spaces.Space:
@@ -60,14 +60,14 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=self._social_state_num,
-            shape=(self._feature_map_size * self._feature_map_size,),
+            shape=(self._feature_map_size, self._feature_map_size),
             dtype=int,
         )
 
     def _get_semantic_map(
         self,
-        semantic_data: pedsim_msgs.SemanticData,
-        relative_pos: np.ndarray,
+        semantic_data: PedestrianSocialStateCollector.data_class,
+        relative_pos: PedestrianRelativeLocation.data_class,
         *args,
         **kwargs
     ) -> np.ndarray:
@@ -101,7 +101,9 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         return social_state_map
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encode the observation into a numpy array.
 
@@ -112,6 +114,6 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[OBS_DICT_KEYS.SEMANTIC.PEDESTRIAN_SOCIAL_STATE.value],
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
-        ).flatten()
+            observation[PedestrianSocialStateCollector.name],
+            observation[PedestrianRelativeLocation.name],
+        )

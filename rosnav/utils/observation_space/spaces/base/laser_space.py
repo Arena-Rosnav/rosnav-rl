@@ -1,7 +1,6 @@
 import numpy as np
 from gymnasium import spaces
-from numpy import ndarray
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+from rl_utils.utils.observation_collector import LaserCollector, ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -23,6 +22,9 @@ class LaserScanSpace(BaseObservationSpace):
         _max_range (float): The maximum range of the laser.
     """
 
+    name = "LASER"
+    required_observations = [LaserCollector]
+
     def __init__(
         self, laser_num_beams: int, laser_max_range: float, *args, **kwargs
     ) -> None:
@@ -40,19 +42,21 @@ class LaserScanSpace(BaseObservationSpace):
         return spaces.Box(
             low=0,
             high=self._max_range,
-            shape=(self._num_beams,),
+            shape=(1, self._num_beams),
             dtype=np.float32,
         )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> LaserCollector.data_class:
         """
         Encodes the laser scan observation.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
 
         Returns:
             ndarray: The encoded laser scan observation.
         """
-        return observation[OBS_DICT_KEYS.LASER]
+        return observation[LaserCollector.name][np.newaxis, :]

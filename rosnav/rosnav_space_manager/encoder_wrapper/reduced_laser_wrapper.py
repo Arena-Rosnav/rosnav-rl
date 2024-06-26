@@ -1,8 +1,9 @@
 import numpy as np
-import rospy
 
 from ..base_space_encoder import BaseSpaceEncoder
 from .base_encoder_wrapper import BaseEncoderWrapper
+
+from rl_utils.utils.observation_collector import ObservationDict, LaserCollector
 
 
 class ReducedLaserWrapper(BaseEncoderWrapper):
@@ -26,7 +27,9 @@ class ReducedLaserWrapper(BaseEncoderWrapper):
         self._reduced_num_laser_beams = desired_num_beams
         super().__init__(encoder)
 
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encodes the observation by reducing the number of laser beams.
 
@@ -39,8 +42,8 @@ class ReducedLaserWrapper(BaseEncoderWrapper):
             np.ndarray: The encoded observation.
 
         """
-        observation["laser_scan"] = ReducedLaserWrapper.reduce_laserbeams(
-            observation["laser_scan"], self._reduced_num_laser_beams
+        observation[LaserCollector.name] = ReducedLaserWrapper.reduce_laserbeams(
+            observation[LaserCollector.name], self._reduced_num_laser_beams
         )
 
         return self._encoder.encode_observation(observation)

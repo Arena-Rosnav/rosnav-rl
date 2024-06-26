@@ -9,7 +9,9 @@ from torch import Tensor
 # since the torchvision package has incompatible dependencies with arena rosnav dependencies.
 
 
-def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
+def conv3x3(
+    in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1
+) -> nn.Conv2d:
     """3x3 convolution with padding"""
     return nn.Conv2d(
         in_planes,
@@ -32,6 +34,7 @@ class BasicBlock(nn.Module):
     """This `BasicBlock` class is a module from the torchvision library that implements the building
     blocks for ResNet18 and ResNet32.
     """
+
     expansion: int = 1
 
     def __init__(
@@ -92,7 +95,7 @@ class Bottleneck(nn.Module):
         This variant is also known as ResNet V1.5 and improves accuracy according to
         https://ngc.nvidia.com/catalog/model-scripts/nvidia:resnet_50_v1_5_for_pytorch.
     """
-    
+
     expansion: int = 4
 
     def __init__(

@@ -94,14 +94,15 @@ def make_mock_env(ns: str, agent_description) -> DummyVecEnv:
             ns=ns,
             agent_description=agent_description,
             reward_fnc=None,
-            trigger_init=False,
+            init_by_call=False,
         )
+
     def _init_arena_unity_env():
         return arena_unity_env.ArenaUnityEnv(
             ns=ns,
             agent_description=agent_description,
             reward_fnc=None,
-            trigger_init=False,
+            init_by_call=False,
         )
 
     sim = Utils.get_simulator()
@@ -110,7 +111,9 @@ def make_mock_env(ns: str, agent_description) -> DummyVecEnv:
     elif sim == Constants.Simulator.FLATLAND:
         return DummyVecEnv([_init_flatland_env])
     else:
-        raise RuntimeError(f"Training environemnts only supported for simulators Arena Unity and Flatland but got {sim}")
+        raise RuntimeError(
+            f"Training environemnts only supported for simulators Arena Unity and Flatland but got {sim}"
+        )
 
 
 def wrap_vec_framestack(env: DummyVecEnv, stack_size: int) -> VecFrameStack:
