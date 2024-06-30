@@ -1264,3 +1264,45 @@ class RosnavResNet_mid_2(BaseAgent):
     }
     net_arch = dict(pi=[256, 128], vf=[256, 64])
     activation_fn = nn.ReLU
+
+
+@AgentFactory.register("RosnavResNet")
+class RosnavResNet(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
+    type = PolicyType.MULTI_INPUT
+    space_encoder_class = BaseSpaceEncoder
+    observation_spaces = [
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 128], vf=[256, 64])
+    activation_fn = nn.ReLU
