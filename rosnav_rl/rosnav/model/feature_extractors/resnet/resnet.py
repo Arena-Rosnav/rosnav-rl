@@ -80,7 +80,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         replace_stride_with_dilation: List[bool] = None,
         norm_layer: nn.Module = nn.BatchNorm2d,
         *arg,
-        **kwargs
+        **kwargs,
     ):
         self._block = block
         self._groups = groups
@@ -2064,3 +2064,214 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
         laser_map = observations[SPACE.StackedLaserMapSpace.name].unsqueeze(1)
         dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name].squeeze(1)
         return laser_map, dist_angle_to_goal
+
+
+class _LaserTest_deep(DRL_VO_NAV_EXTRACTOR_TEST):
+    REQUIRED_OBSERVATIONS = [
+        SPACE.StackedLaserMapSpace,
+        SPACE.DistAngleToSubgoalSpace,
+    ]
+
+    def _get_input_sizes(self):
+        """
+        Calculate the input sizes for the feature extraction process.
+
+        This method calculates the input sizes required for the feature extraction process
+        based on the observation space manager. It sets the values for the feature map size,
+        scan map size, pedestrian map size, and goal size.
+
+        Returns:
+            None
+        """
+        self._feature_map_size = 80
+        self._scan_map_size = self._observation_space_manager[
+            SPACE.StackedLaserMapSpace
+        ].shape[-1]
+        self._goal_size = 2
+        self._last_action_size = 0
+
+    def _forward_impl(
+        self,
+        scan: torch.Tensor,
+        goal: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Implements the forward pass for the feature extractor.
+
+        Args:
+            ped_pos (torch.Tensor): Pedestrian position tensor
+            scan (torch.Tensor): Scan tensor
+            goal (torch.Tensor): Goal tensor
+            last_action (torch.Tensor): Action tensor
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass
+        """
+        # See note [TorchScript super()]
+        # extra layer conv, bn, relu
+
+        x = self.conv1(scan)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        identity4 = self.downsample4(x)
+
+        x = self.layer1(x)
+
+        identity2 = self.downsample2(x)
+
+        x = self.layer2(x)
+
+        identity3 = self.downsample3(x)
+
+        x = self.conv2_2(x)
+        x += identity2
+        x = self.relu2(x)
+
+        x = self.layer3(x)
+
+        x = self.conv3_2(x)
+        x += identity3
+        x = self.relu3(x)
+
+        x = self.layer4(x)
+
+        x = self.conv4_2(x)
+        x += identity4
+        x = self.relu4(x)
+
+        x = self.avgpool(x)
+        fusion_out = x.squeeze(-1).squeeze(-1)
+        ###### End of fusion net ######
+
+        ###### Start of goal net #######
+        # goal_in = goal.reshape(-1, 2)
+        # goal_out = goal
+        ###### End of goal net #######
+        # Combine
+        fc_in = torch.cat((fusion_out, goal), dim=1)
+        x = self.linear_fc(fc_in)
+
+        return x
+
+    def _get_input(
+        self, observations: TensorDict
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        laser_map = observations[SPACE.StackedLaserMapSpace.name].unsqueeze(1)
+        dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name].squeeze(1)
+        return laser_map, dist_angle_to_goal
+
+
+class DRL_VO_DEEP(DRL_VO_NAV_EXTRACTOR_TEST):
+    REQUIRED_OBSERVATIONS = [
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+    ]
+
+    def _setup_network(self):
+        super()._setup_network()
+        self.linear_fc = nn.Sequential(
+            nn.Linear(
+                512 * self._block.expansion + self._goal_size,
+                self._features_dim,
+            ),
+            # nn.BatchNorm1d(self._features_dim),
+            nn.ReLU(),
+        )
+
+    def _get_input_sizes(self):
+        """
+        Calculate the input sizes for the feature extraction process.
+
+        This method calculates the input sizes required for the feature extraction process
+        based on the observation space manager. It sets the values for the feature map size,
+        scan map size, pedestrian map size, and goal size.
+
+        Returns:
+            None
+        """
+        self._ped_map_size = 0
+        for obs in self.REQUIRED_OBSERVATIONS:
+            if "PEDESTRIAN" in obs.name:
+                self._ped_map_size += self._observation_space_manager[obs].shape[-1]
+
+        self._feature_map_size = 80
+        self._scan_map_size = self._observation_space_manager[
+            SPACE.StackedLaserMapSpace
+        ].shape[-1]
+        self._goal_size = 2
+        self._last_action_size = 0
+
+    def _forward_impl(
+        self,
+        ped_map: torch.Tensor,
+        scan: torch.Tensor,
+        goal: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Implements the forward pass for the feature extractor.
+
+        Args:
+            ped_pos (torch.Tensor): Pedestrian position tensor
+            scan (torch.Tensor): Scan tensor
+            goal (torch.Tensor): Goal tensor
+            last_action (torch.Tensor): Action tensor
+
+        Returns:
+            torch.Tensor: Output tensor after forward pass
+        """
+        ###### Start of fusion net ######
+        fusion_in = torch.cat((scan, ped_map), dim=1)
+
+        # See note [TorchScript super()]
+        # extra layer conv, bn, relu
+
+        x = self.conv1(fusion_in)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        identity4 = self.downsample4(x)
+
+        x = self.layer1(x)
+
+        identity2 = self.downsample2(x)
+
+        x = self.layer2(x)
+
+        identity3 = self.downsample3(x)
+
+        x = self.conv2_2(x)
+        x += identity2
+        x = self.relu2(x)
+
+        x = self.layer3(x)
+
+        x = self.conv3_2(x)
+        x += identity3
+        x = self.relu3(x)
+
+        x = self.layer4(x)
+
+        x = self.conv4_2(x)
+        x += identity4
+        x = self.relu4(x)
+
+        x = self.avgpool(x)
+        fusion_out = x.squeeze(-1).squeeze(-1)
+        ###### End of fusion net ######
+
+        ###### Start of goal net #######
+        # goal_in = goal.reshape(-1, 2)
+        # goal_out = goal
+        ###### End of goal net #######
+        # Combine
+        fc_in = torch.cat((fusion_out, goal), dim=1)
+        x = self.linear_fc(fc_in)
+
+        return x
