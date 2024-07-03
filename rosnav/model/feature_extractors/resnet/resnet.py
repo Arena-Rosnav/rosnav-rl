@@ -528,6 +528,17 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
         SPACE.LastActionSpace,
     ]
 
+    def _setup_network(self, inplanes: int = 64):
+        super()._setup_network(inplanes)
+        self.linear_fc = nn.Sequential(
+            nn.Linear(
+                256 * self._block.expansion + self._goal_size + self._last_action_size,
+                self._features_dim,
+            ),
+            nn.BatchNorm1d(self._features_dim),
+            nn.ReLU(),
+        )
+
 
 class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
     """
