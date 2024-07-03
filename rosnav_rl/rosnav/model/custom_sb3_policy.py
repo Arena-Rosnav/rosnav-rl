@@ -7,7 +7,6 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_4,
     RESNET_MID_FUSION_EXTRACTOR_5,
     RESNET_MID_FUSION_EXTRACTOR_6,
-    RESNET_MID_FUSION_EXTRACTOR_7,
     DRL_VO_NAV_EXTRACTOR,
     DRL_VO_NAV_EXTRACTOR_TEST,
     _LaserTest,
@@ -724,37 +723,6 @@ class LSTM_ResNet_norm_1(BaseAgent):
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_5
     features_extractor_kwargs = {
         "features_dim": 512,
-        "width_per_group": 64,
-    }
-    net_arch = []
-    activation_fn = nn.ReLU
-    n_lstm_layers = 2
-    lstm_hidden_size = 512
-    shared_lstm = True
-    enable_critic_lstm = False
-
-
-@AgentFactory.register("LSTM_ResNet_norm_2")
-class LSTM_ResNet_norm_2(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    observation_spaces = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
-    ]
-    observation_space_kwargs = {
-        "roi_in_m": 30,
-        "feature_map_size": 80,
-        "laser_stack_size": 10,
-        "normalize": True,
-    }
-    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_7
-    features_extractor_kwargs = {
-        "features_dim": 256,
         "width_per_group": 64,
     }
     net_arch = []
