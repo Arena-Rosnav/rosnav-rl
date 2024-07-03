@@ -1357,7 +1357,7 @@ class DeepDRLVOTest(BaseAgent):
 
 
 @AgentFactory.register("RosnavResNet_LSTM")
-class RosnavResNet(BaseAgent):
+class RosnavResNet_LSTM(BaseAgent):
     """
     Custom policy class for ROS navigation using ResNet-based CNN.
 
