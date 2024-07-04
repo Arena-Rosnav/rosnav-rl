@@ -106,8 +106,8 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
     def _get_num_pedestrian_feature_maps(self):
         num_pedestrian_feature_maps = 0
-        for obs in self.REQUIRED_OBSERVATIONS:
-            if "PEDESTRIAN" in obs.name:
+        for space in self._observation_space_manager:
+            if "PEDESTRIAN" in space.name:
                 num_pedestrian_feature_maps += 1
 
         return num_pedestrian_feature_maps
@@ -145,13 +145,13 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         ].shape[-1]
 
         self._last_action_size = 0
-        if SPACE.LastActionSpace in self.REQUIRED_OBSERVATIONS:
+        if SPACE.LastActionSpace in self._observation_space_manager:
             self._last_action_size = self._observation_space_manager[
                 SPACE.LastActionSpace
             ].shape[-1]
 
         self._ped_map_size = 0
-        for obs in self.REQUIRED_OBSERVATIONS:
+        for obs in self._observation_space_manager:
             if "PEDESTRIAN" in obs.name:
                 self._ped_map_size += self._observation_space_manager[obs].shape[-1]
 
@@ -475,7 +475,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
                 dim=1,
             )  # (num_envs, num_semantic_layers, 80, 80)
 
-        if SPACE.LastActionSpace in self.REQUIRED_OBSERVATIONS:
+        if SPACE.LastActionSpace in self._observation_space_manager:
             last_action = observations[SPACE.LastActionSpace.name].squeeze(
                 1
             )  # (num_envs, 3)
