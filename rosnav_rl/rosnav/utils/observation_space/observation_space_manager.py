@@ -58,7 +58,7 @@ class ObservationSpaceManager:
         }
 
     def __getitem__(
-        self, space: Union[str, BaseObservationSpace]
+        self, space: Union[str, BaseObservationSpace, Type[BaseObservationSpace]]
     ) -> BaseObservationSpace:
         """
         Retrieve the observation space with the given name or instance.
@@ -69,7 +69,7 @@ class ObservationSpaceManager:
         Returns:
             spaces.Box: The observation space.
         """
-        space_name = space.name if issubclass(space, BaseObservationSpace) else space
+        space_name = space if isinstance(space, str) else space.name
         return self._space_containers[space_name.upper()]
 
     def encode_observation(
@@ -90,3 +90,25 @@ class ObservationSpaceManager:
             name: space.encode_observation(observation, **kwargs)
             for name, space in self._space_containers.items()
         }
+
+    def __contains__(self, space: Union[str, BaseObservationSpace]) -> bool:
+        """
+        Check if the observation space with the given name or instance exists.
+
+        Parameters:
+            space (Union[str, BaseObservationSpace]): The name or instance of the observation space.
+
+        Returns:
+            bool: Whether the observation space exists.
+        """
+        space_name = space.name if issubclass(space, BaseObservationSpace) else space
+        return space_name.upper() in self._space_containers
+
+    def __iter__(self):
+        """
+        Iterate over the observation space containers.
+
+        Returns:
+            Iterator: An iterator over the observation space containers.
+        """
+        return iter(self._space_containers.values())
