@@ -1403,8 +1403,8 @@ class RosnavResNet_LSTM(BaseAgent):
     enable_critic_lstm = True
 
 
-@AgentFactory.register("RosnavResNet_1")
-class RosnavResNet_1(BaseAgent):
+@AgentFactory.register("RosnavResNet__1")
+class RosnavResNet__1(BaseAgent):
     """
     Custom policy class for ROS navigation using ResNet-based CNN.
 
