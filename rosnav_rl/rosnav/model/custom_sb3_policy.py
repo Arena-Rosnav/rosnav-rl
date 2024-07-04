@@ -1396,9 +1396,8 @@ class RosnavResNet_LSTM(BaseAgent):
     }
     net_arch = dict(pi=[256, 128], vf=[256, 64])
     activation_fn = nn.ReLU
-    log_std_init = -2
     ortho_init = False
     n_lstm_layers = 2
     lstm_hidden_size = 256
-    shared_lstm = True
-    enable_critic_lstm = False
+    shared_lstm = False
+    enable_critic_lstm = True
