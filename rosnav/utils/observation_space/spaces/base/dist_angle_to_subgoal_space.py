@@ -3,7 +3,7 @@ import rospy
 
 from gymnasium import spaces
 from rl_utils.utils.observation_collector import DistAngleToSubgoal, ObservationDict
-from task_generator.shared import Namespace
+from rl_utils.topic import Namespace
 
 from ...observation_space_factory import SpaceFactory
 from ...utils import stack_spaces
@@ -55,6 +55,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
             dtype=np.float32,
         )
 
+    @BaseObservationSpace.apply_normalization
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
     ) -> DistAngleToSubgoal.data_class:
