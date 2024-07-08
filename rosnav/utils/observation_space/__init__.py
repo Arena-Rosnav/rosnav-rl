@@ -14,6 +14,8 @@ from ..observation_space.spaces.base.dist_angle_to_subgoal_space import (
 from ..observation_space.spaces.base.laser_space import LaserScanSpace
 from ..observation_space.spaces.base.last_action_space import LastActionSpace
 from ..observation_space.spaces.base.rgbd_space import RGBDSpace
+from .spaces.base.subgoal_in_robot_frame import SubgoalInRobotFrameSpace
+
 from ..observation_space.spaces.feature_maps.pedestrian_location_space import (
     PedestrianLocationSpace,
 )
