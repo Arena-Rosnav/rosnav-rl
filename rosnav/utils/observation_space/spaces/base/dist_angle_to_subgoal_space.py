@@ -3,10 +3,9 @@ import rospy
 
 from gymnasium import spaces
 from rl_utils.utils.observation_collector import DistAngleToSubgoal, ObservationDict
-from rl_utils.topic import Namespace
+# from rl_utils.topic import Namespace
 
 from ...observation_space_factory import SpaceFactory
-from ...utils import stack_spaces
 from ..base_observation_space import BaseObservationSpace
 
 
@@ -33,7 +32,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
     required_observations = [DistAngleToSubgoal]
 
     def __init__(
-        self, ns: Namespace, goal_max_dist: float = 30, *args, **kwargs
+        self, ns, goal_max_dist: float = 30, *args, **kwargs
     ) -> None:
         self._ns = ns
         self._max_dist = goal_max_dist
