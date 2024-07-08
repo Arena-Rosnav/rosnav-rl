@@ -140,9 +140,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             SPACE.StackedLaserMapSpace
         ].shape[-1]
 
-        self._goal_size = self._observation_space_manager[
-            SPACE.DistAngleToSubgoalSpace
-        ].shape[-1]
+        self._goal_size = 2
 
         self._last_action_size = 0
         if SPACE.LastActionSpace in self._observation_space_manager:
@@ -460,9 +458,13 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         laser_map = observations[SPACE.StackedLaserMapSpace.name].unsqueeze(
             1
         )  # (num_envs, 1, 80, 80)
-        dist_angle_to_goal = observations[SPACE.DistAngleToSubgoalSpace.name].squeeze(
-            1
-        )  # (num_envs, 2)
+
+        goal_key = (
+            SPACE.DistAngleToSubgoalSpace.name
+            if SPACE.DistAngleToSubgoalSpace in observations
+            else SPACE.SubgoalInRobotFrameSpace.name
+        )
+        dist_angle_to_goal = observations[goal_key].squeeze(1)  # (num_envs, 2)
 
         ped_map = None
         if self.num_pedestrian_feature_maps > 0:
