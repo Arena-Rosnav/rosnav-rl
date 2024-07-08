@@ -1503,3 +1503,15 @@ class DRL_VO_DEEP(DRL_VO_NAV_EXTRACTOR_TEST):
         SPACE.PedestrianSocialStateSpace,
         SPACE.DistAngleToSubgoalSpace,
     ]
+
+
+class DRL_VO_ROSNAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
+    def _setup_network(self, inplanes: int = 64):
+        super()._setup_network(inplanes)
+        self.linear_fc = nn.Sequential(
+            nn.Linear(
+                256 * self._block.expansion + self._goal_size + self._last_action_size,
+                self._features_dim,
+            ),
+            nn.ReLU(),
+        )
