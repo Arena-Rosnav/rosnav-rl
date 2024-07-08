@@ -1399,8 +1399,8 @@ class RosnavResNet_LSTM(BaseAgent):
     ortho_init = False
     n_lstm_layers = 2
     lstm_hidden_size = 256
-    shared_lstm = False
-    enable_critic_lstm = True
+    shared_lstm = True
+    enable_critic_lstm = False
 
 
 @AgentFactory.register("RosnavResNet__1")
