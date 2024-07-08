@@ -1,16 +1,20 @@
 import numpy as np
+import rospy
+
 from gymnasium import spaces
+from rl_utils.utils.observation_collector import (
+    SubgoalLocationInRobotFrame,
+    ObservationDict,
+)
+from rl_utils.topic import Namespace
 
 from ...observation_space_factory import SpaceFactory
-from ..base_observation_space import BaseObservationSpace
 from ...utils import stack_spaces
+from ..base_observation_space import BaseObservationSpace
 
 
-from rl_utils.utils.observation_collector import DistAngleToGoal, ObservationDict
-
-
-@SpaceFactory.register("dist_angle_to_goal")
-class DistAngleToGoalSpace(BaseObservationSpace):
+@SpaceFactory.register("subgoal_in_robot_frame")
+class SubgoalInRobotFrameSpace(BaseObservationSpace):
     """
     Represents the observation space for the goal in a navigation task.
 
@@ -28,12 +32,17 @@ class DistAngleToGoalSpace(BaseObservationSpace):
 
     """
 
-    name = "DIST_ANGLE_TO_GOAL"
-    required_observations = [DistAngleToGoal]
+    name = "SUBGOAL_IN_ROBOT_FRAME"
+    required_observations = [SubgoalLocationInRobotFrame]
 
-    def __init__(self, goal_max_dist: float = 30, *args, **kwargs) -> None:
+    def __init__(
+        self, ns: Namespace, goal_max_dist: float = 30, *args, **kwargs
+    ) -> None:
+        self._ns = ns
         self._max_dist = goal_max_dist
         super().__init__(*args, **kwargs)
+
+        rospy.set_param(f"{self._ns}/follow_subgoal", True)
 
     def get_gym_space(self) -> spaces.Space:
         """
@@ -44,23 +53,23 @@ class DistAngleToGoalSpace(BaseObservationSpace):
 
         """
         return spaces.Box(
-            low=np.array([[0, -np.pi]]),
-            high=np.array([[self._max_dist, np.pi]]),
+            low=np.array([[-self._max_dist, -self._max_dist]]),
+            high=np.array([[self._max_dist, self._max_dist]]),
             dtype=np.float32,
         )
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
-    ) -> DistAngleToGoal.data_class:
+    ) -> SubgoalLocationInRobotFrame.data_class:
         """
         Encodes the goal observation.
 
         Args:
-            observation (dict): The observation dictionary.
+            observation (ObservationDict): The observation dictionary.
 
         Returns:
             ndarray: The encoded goal observation.
 
         """
-        return observation[DistAngleToGoal.name][np.newaxis, :]
+        return observation[SubgoalLocationInRobotFrame.name][np.newaxis, :]
