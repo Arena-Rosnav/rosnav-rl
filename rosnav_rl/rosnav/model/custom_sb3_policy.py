@@ -34,7 +34,7 @@ class AGENT_19(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=64)
     net_arch = dict(pi=[64, 64], vf=[64, 64])
@@ -48,7 +48,7 @@ class AGENT_20(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[128], vf=[128])]
@@ -62,7 +62,7 @@ class AGENT_21(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[64, 64], vf=[64, 64])]
@@ -76,7 +76,7 @@ class AGENT_22(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=64)
     net_arch = [dict(pi=[64, 64, 64], vf=[64, 64, 64])]
@@ -90,7 +90,7 @@ class AGENT_23(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_6
     features_extractor_kwargs = dict(features_dim=128)
     net_arch = [128, 64, 64, 64]
