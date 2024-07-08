@@ -12,6 +12,7 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     _LaserTest,
     _LaserTest_deep,
     DRL_VO_DEEP,
+    DRL_VO_ROSNAV_EXTRACTOR,
 )
 import rosnav.utils.observation_space as SPACE
 
@@ -1399,8 +1400,8 @@ class RosnavResNet_LSTM(BaseAgent):
     ortho_init = False
     n_lstm_layers = 2
     lstm_hidden_size = 256
-    shared_lstm = False
-    enable_critic_lstm = True
+    shared_lstm = True
+    enable_critic_lstm = False
 
 
 @AgentFactory.register("RosnavResNet__1")
@@ -1475,11 +1476,12 @@ class RosnavResNet__2(BaseAgent):
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
+        "goal_max_dist": 5,
     }
-    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
     features_extractor_kwargs = {
         "features_dim": 512,
         "width_per_group": 64,
     }
-    net_arch = dict(pi=[256, 128], vf=[256, 64])
+    net_arch = dict(pi=[256, 64], vf=[256, 64])
     activation_fn = nn.ReLU
