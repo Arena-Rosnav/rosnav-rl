@@ -6,7 +6,6 @@ from rl_utils.utils.observation_collector import (
     SubgoalLocationInRobotFrame,
     ObservationDict,
 )
-from rl_utils.topic import Namespace
 
 from ...observation_space_factory import SpaceFactory
 from ...utils import stack_spaces
@@ -36,7 +35,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
     required_observations = [SubgoalLocationInRobotFrame]
 
     def __init__(
-        self, ns: Namespace, goal_max_dist: float = 30, *args, **kwargs
+        self, ns, goal_max_dist: float = 5, *args, **kwargs
     ) -> None:
         self._ns = ns
         self._max_dist = goal_max_dist
