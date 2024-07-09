@@ -29,7 +29,7 @@ from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from std_msgs.msg import Int16
 from task_generator.constants import Constants
-from task_generator.shared import Namespace
+from rl_utils.topic import Namespace
 from task_generator.utils import Utils
 from tools.ros_param_distributor import (
     populate_discrete_action_space,
@@ -108,7 +108,7 @@ class RosnavNode:
         }
 
         self._observation_manager = ObservationManager(
-            Namespace(self.ns),
+            self.ns,
             obs_structur=list(self._encoder.encoder.required_observations),
             obs_unit_kwargs=obs_unit_kwargs,
             is_single_env=True,
@@ -120,7 +120,7 @@ class RosnavNode:
         rospy.loginfo("[RosnavNode] Loaded model and ObsManager.")
 
         self._get_next_action_srv = rospy.Service(
-            self.ns("rosnav/get_action"), GetAction, self._handle_next_action_srv
+            str(self.ns("rosnav/get_action")), GetAction, self._handle_next_action_srv
         )
         self._sub_reset_stacked_obs = rospy.Subscriber(
             "/scenario_reset", Int16, self._on_scene_reset
@@ -381,7 +381,7 @@ class RosnavNode:
             object: Vector normalizer for the RL agent.
         """
         if venv is None:
-            venv = make_mock_env(ns, agent_description)
+            venv = make_mock_env(str(ns), agent_description)
         rospy.loginfo("[RosnavNode] Loaded mock env.")
         checkpoint = hyperparams["rl_agent"]["checkpoint"]
         vec_normalize_path = os.path.join(agent_path, f"vec_normalize_{checkpoint}.pkl")
@@ -403,7 +403,7 @@ class RosnavNode:
         Returns:
             Vectorized environment with frame stacking.
         """
-        venv = make_mock_env(ns, agent_description)
+        venv = make_mock_env(str(ns), agent_description)
         return wrap_vec_framestack(
             venv, hyperparams["rl_agent"]["frame_stacking"]["stack_size"]
         )

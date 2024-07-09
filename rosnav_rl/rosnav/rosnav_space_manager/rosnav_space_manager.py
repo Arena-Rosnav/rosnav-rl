@@ -11,7 +11,7 @@ from rosnav.utils.observation_space.spaces.base_observation_space import (
 from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
     BaseFeatureMapSpace,
 )
-from task_generator.shared import Namespace
+from rl_utils.topic import Namespace
 
 from ..utils.observation_space import EncodedObservationDict
 from .base_space_encoder import BaseSpaceEncoder
@@ -61,7 +61,7 @@ class RosnavSpaceManager:
             else rospy.get_param("laser/reduced_num_laser_beams")
         )
         self._laser_max_range = rospy.get_param_cached("laser/range")
-        self._radius = rospy.get_param_cached(ns("robot_radius"))
+        self._radius = rospy.get_param_cached(str(ns("robot_radius")))
         self._is_holonomic = rospy.get_param_cached("is_holonomic")
 
         # TODO: add num_ped_types to rosparam
