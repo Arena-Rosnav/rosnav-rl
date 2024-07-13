@@ -461,7 +461,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         goal_key = (
             SPACE.DistAngleToSubgoalSpace.name
-            if SPACE.DistAngleToSubgoalSpace in observations
+            if SPACE.DistAngleToSubgoalSpace.name in observations
             else SPACE.SubgoalInRobotFrameSpace.name
         )
         dist_angle_to_goal = observations[goal_key].squeeze(1)  # (num_envs, 2)
