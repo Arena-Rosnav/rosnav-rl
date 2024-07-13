@@ -49,6 +49,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
             dtype=np.float32,
         )
 
+    @BaseObservationSpace.apply_normalization
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
     ) -> DistAngleToGoal.data_class:

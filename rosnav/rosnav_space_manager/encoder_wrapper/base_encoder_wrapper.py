@@ -68,3 +68,13 @@ class BaseEncoderWrapper(ABC):
 
     def decode_action(self, action) -> np.ndarray:
         return self._encoder.decode_action(action)
+
+    @property
+    def required_observations(self):
+        """
+        Get the required observations.
+
+        Returns:
+            List[str]: The required observations.
+        """
+        return self._encoder.required_observations
