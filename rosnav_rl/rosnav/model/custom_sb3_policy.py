@@ -7,12 +7,12 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_4,
     RESNET_MID_FUSION_EXTRACTOR_5,
     RESNET_MID_FUSION_EXTRACTOR_6,
-    RESNET_MID_FUSION_EXTRACTOR_7,
     DRL_VO_NAV_EXTRACTOR,
     DRL_VO_NAV_EXTRACTOR_TEST,
     _LaserTest,
     _LaserTest_deep,
     DRL_VO_DEEP,
+    DRL_VO_ROSNAV_EXTRACTOR,
 )
 import rosnav.utils.observation_space as SPACE
 
@@ -34,7 +34,7 @@ class AGENT_19(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=64)
     net_arch = dict(pi=[64, 64], vf=[64, 64])
@@ -48,7 +48,7 @@ class AGENT_20(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=512)
     net_arch = [dict(pi=[128], vf=[128])]
@@ -57,14 +57,36 @@ class AGENT_20(BaseAgent):
 
 @AgentFactory.register("AGENT_21")
 class AGENT_21(BaseAgent):
+    observation_space_kwargs = {
+        "normalize": True,
+        "goal_max_dist": 5,
+    }
     observation_spaces = [
         SPACE.LaserScanSpace,
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=512)
+    net_arch = [dict(pi=[64, 64], vf=[64, 64])]
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("AGENT_24")
+class AGENT_24(BaseAgent):
+    observation_space_kwargs = {
+        "normalize": True,
+        "goal_max_dist": 5,
+    }
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT
+    features_extractor_class = EXTRACTOR_5
+    features_extractor_kwargs = dict(features_dim=256)
     net_arch = [dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
 
@@ -76,7 +98,7 @@ class AGENT_22(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=64)
     net_arch = [dict(pi=[64, 64, 64], vf=[64, 64, 64])]
@@ -90,7 +112,7 @@ class AGENT_23(BaseAgent):
         SPACE.DistAngleToSubgoalSpace,
         SPACE.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
+    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_6
     features_extractor_kwargs = dict(features_dim=128)
     net_arch = [128, 64, 64, 64]
@@ -734,37 +756,6 @@ class LSTM_ResNet_norm_1(BaseAgent):
     enable_critic_lstm = False
 
 
-@AgentFactory.register("LSTM_ResNet_norm_2")
-class LSTM_ResNet_norm_2(BaseAgent):
-    type = PolicyType.MLP_LSTM
-    observation_spaces = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
-    ]
-    observation_space_kwargs = {
-        "roi_in_m": 30,
-        "feature_map_size": 80,
-        "laser_stack_size": 10,
-        "normalize": True,
-    }
-    features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_7
-    features_extractor_kwargs = {
-        "features_dim": 256,
-        "width_per_group": 64,
-    }
-    net_arch = []
-    activation_fn = nn.ReLU
-    n_lstm_layers = 2
-    lstm_hidden_size = 512
-    shared_lstm = True
-    enable_critic_lstm = False
-
-
 @AgentFactory.register("LSTM_ResNet_norm_3")
 class LSTM_ResNet_norm_3(BaseAgent):
     type = PolicyType.MLP_LSTM
@@ -1300,13 +1291,14 @@ class RosnavResNet(BaseAgent):
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
+        "goal_max_dist": 5,
     }
-    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
     features_extractor_kwargs = {
         "features_dim": 512,
         "width_per_group": 64,
     }
-    net_arch = dict(pi=[256, 128], vf=[256, 64])
+    net_arch = dict(pi=[256, 64], vf=[256])
     activation_fn = nn.ReLU
 
 
@@ -1385,4 +1377,134 @@ class DeepDRLVOTest(BaseAgent):
         "width_per_group": 64,
     }
     net_arch = dict(pi=[256, 64], vf=[256])
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("RosnavResNet_LSTM")
+class RosnavResNet_LSTM(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
+    type = PolicyType.MULTI_INPUT_LSTM
+    space_encoder_class = BaseSpaceEncoder
+    observation_spaces = [
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 128], vf=[256, 64])
+    activation_fn = nn.ReLU
+    ortho_init = False
+    n_lstm_layers = 2
+    lstm_hidden_size = 256
+    shared_lstm = True
+    enable_critic_lstm = False
+
+
+@AgentFactory.register("RosnavResNet__1")
+class RosnavResNet__1(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
+    type = PolicyType.MULTI_INPUT
+    space_encoder_class = BaseSpaceEncoder
+    observation_spaces = [
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.DistAngleToSubgoalSpace,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+    }
+    features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 128], vf=[256, 64])
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("RosnavResNet__2")
+class RosnavResNet__2(BaseAgent):
+    """
+    Custom policy class for ROS navigation using ResNet-based CNN.
+
+    Attributes:
+        type (PolicyType): The type of the policy.
+        space_encoder_class (class): The class for encoding the observation space.
+        observation_spaces (list): The list of observation spaces.
+        observation_space_kwargs (dict): The keyword arguments for the observation space.
+        features_extractor_class (class): The class for extracting features.
+        features_extractor_kwargs (dict): The keyword arguments for the features extractor.
+        net_arch (list): The architecture of the neural network.
+        activation_fn (function): The activation function used in the neural network.
+    """
+
+    type = PolicyType.MULTI_INPUT
+    space_encoder_class = BaseSpaceEncoder
+    observation_spaces = [
+        SPACE.StackedLaserMapSpace,
+        SPACE.PedestrianVelXSpace,
+        SPACE.PedestrianVelYSpace,
+        SPACE.PedestrianTypeSpace,
+        SPACE.PedestrianSocialStateSpace,
+        SPACE.SubgoalInRobotFrameSpace,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+        "goal_max_dist": 5,
+    }
+    features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "width_per_group": 64,
+    }
+    net_arch = dict(pi=[256, 64], vf=[256, 64])
     activation_fn = nn.ReLU
