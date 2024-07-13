@@ -1298,7 +1298,7 @@ class RosnavResNet(BaseAgent):
         "features_dim": 512,
         "width_per_group": 64,
     }
-    net_arch = dict(pi=[256, 128], vf=[256, 64])
+    net_arch = dict(pi=[256, 64], vf=[256])
     activation_fn = nn.ReLU
 
 
