@@ -1269,8 +1269,9 @@ class RosnavResNet(BaseAgent):
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
+        "goal_max_dist": 5,
     }
-    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
     features_extractor_kwargs = {
         "features_dim": 512,
         "width_per_group": 64,
@@ -1436,7 +1437,7 @@ class RosnavResNet__1(BaseAgent):
         "laser_stack_size": 10,
         "normalize": True,
     }
-    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
     features_extractor_kwargs = {
         "features_dim": 512,
         "width_per_group": 64,
