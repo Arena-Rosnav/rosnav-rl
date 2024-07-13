@@ -12,6 +12,7 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     _LaserTest,
     _LaserTest_deep,
     DRL_VO_DEEP,
+    DRL_VO_ROSNAV_EXTRACTOR
 )
 import rosnav.utils.observation_space as SPACE
 
@@ -1477,10 +1478,10 @@ class RosnavResNet__2(BaseAgent):
         "normalize": True,
         "goal_max_dist": 5,
     }
-    features_extractor_class = DRL_VO_NAV_EXTRACTOR
+    features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
     features_extractor_kwargs = {
         "features_dim": 512,
         "width_per_group": 64,
     }
-    net_arch = dict(pi=[256, 64], vf=[256])
+    net_arch = dict(pi=[256, 64], vf=[256, 64])
     activation_fn = nn.ReLU
