@@ -87,6 +87,7 @@ class RosnavNode:
 
         # Set RosnavSpaceEncoder as Middleware
         self._encoder = RosnavSpaceManager(
+            ns=self.ns,
             observation_spaces=observation_spaces,
             observation_space_kwargs=observation_spaces_kwargs,
             action_space_kwargs=None,
