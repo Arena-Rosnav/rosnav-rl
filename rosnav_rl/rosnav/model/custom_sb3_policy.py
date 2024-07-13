@@ -57,6 +57,10 @@ class AGENT_20(BaseAgent):
 
 @AgentFactory.register("AGENT_21")
 class AGENT_21(BaseAgent):
+    observation_space_kwargs = {
+        "normalize": True,
+        "goal_max_dist": 5,
+    }
     observation_spaces = [
         SPACE.LaserScanSpace,
         SPACE.DistAngleToSubgoalSpace,
@@ -65,6 +69,24 @@ class AGENT_21(BaseAgent):
     type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=512)
+    net_arch = [dict(pi=[64, 64], vf=[64, 64])]
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("AGENT_24")
+class AGENT_24(BaseAgent):
+    observation_space_kwargs = {
+        "normalize": True,
+        "goal_max_dist": 5,
+    }
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT
+    features_extractor_class = EXTRACTOR_5
+    features_extractor_kwargs = dict(features_dim=256)
     net_arch = [dict(pi=[64, 64], vf=[64, 64])]
     activation_fn = nn.ReLU
 
