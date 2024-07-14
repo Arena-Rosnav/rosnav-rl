@@ -2,7 +2,7 @@ agent_name: jackal_AGENT_24_2024_07_12__02_59_28
 callbacks:
   periodic_eval:
     eval_freq: 40000
-    max_num_moves_per_eps: 250
+    max_num_moves_per_eps: 300
     n_eval_episodes: 40
   stop_training:
     threshold: 0.985
@@ -15,7 +15,7 @@ callbacks:
     upper_threshold: 0.9
 debug_mode: false
 goal_radius: 0.3
-max_num_moves_per_eps: 175
+max_num_moves_per_eps: 200
 monitoring:
   cmd_line_logging:
     episode_statistics:
@@ -49,7 +49,7 @@ rl_agent:
     enabled: true
     settings:
       final_value: 0.0002
-      initial_value: 0.0006
+      initial_value: 0.0005
     type: linear
   normalize:
     enabled: false
@@ -61,7 +61,7 @@ rl_agent:
       norm_reward: true
   ppo:
     batch_size: 1024
-    clip_range: 0.225
+    clip_range: 0.2
     ent_coef: 0.005
     gae_lambda: 0.95
     gamma: 0.99
