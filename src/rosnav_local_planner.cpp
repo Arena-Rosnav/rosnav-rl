@@ -53,7 +53,7 @@ bool rosnav::RosnavLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseSt
     // check if plugin is initialized
     if (!initialized_)
     {
-        ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
+        ROS_ERROR("[ROSNAV] This planner has not been initialized, please call initialize() before using this planner");
         return false;
     }
     ROS_DEBUG("Setting plan...");
@@ -65,7 +65,7 @@ bool rosnav::RosnavLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& c
     // check if plugin is initialized
     if (!initialized_)
     {
-        ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
+        ROS_ERROR("[ROSNAV] This planner has not been initialized, please call initialize() before using this planner");
         return false;
     }
     ROS_ERROR("Method not implemented yet!");
@@ -79,7 +79,7 @@ u_int32_t rosnav::RosnavLocalPlanner::computeVelocityCommands(const geometry_msg
     // check if plugin is initialized
     if (!initialized_)
     {
-        ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
+        ROS_ERROR("[ROSNAV] This planner has not been initialized, please call initialize() before using this planner");
         return mbf_msgs::ExePathResult::INTERNAL_ERROR;
     }
     bool succ = retrieveVelocityCommands(cmd_vel);
@@ -123,7 +123,7 @@ bool rosnav::RosnavLocalPlanner::isGoalReached()
     // check if plugin is initialized
     if (!initialized_)
     {
-        ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
+        ROS_ERROR("[ROSNAV] This planner has not been initialized, please call initialize() before using this planner");
         return false;
     }
     ROS_DEBUG("isGoalReached(): Not implemented yet! (not needed for now)");
@@ -133,13 +133,14 @@ bool rosnav::RosnavLocalPlanner::isGoalReached()
 void rosnav::RosnavLocalPlanner::reconfigureCB(RosnavLocalPlannerReconfigureConfig& config, uint32_t level)
 {
     boost::mutex::scoped_lock l(config_mutex_);
+    config_mutex_.lock();
 
     config_.reconfigure(config);
 
     // check if plugin is initialized
     if (!initialized_)
     {
-        ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
+        ROS_ERROR("[ROSNAV] This planner has not been initialized, please call initialize() before using this planner");
         return;
     }
 
