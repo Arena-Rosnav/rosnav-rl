@@ -151,7 +151,7 @@ class RosnavNode:
 
     def _setup_observation_manager(self):
         obs_unit_kwargs = {
-            "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
+            "subgoal_mode": self._hyperparams.get("subgoal_mode", False),
             "ns_to_semantic_topic": rospy.get_param("/train_mode", False),
         }
 
