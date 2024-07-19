@@ -286,7 +286,7 @@ class BarnResNet(BaseAgent):
         SPACE.StackedLaserMapSpace,
         SPACE.PedestrianVelXSpace,
         SPACE.PedestrianVelYSpace,
-        SPACE.DistAngleToSubgoalSpace,
+        SPACE.SubgoalInRobotFrameSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
