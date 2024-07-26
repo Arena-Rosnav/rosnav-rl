@@ -287,12 +287,14 @@ class BarnResNet(BaseAgent):
         SPACE.PedestrianVelXSpace,
         SPACE.PedestrianVelYSpace,
         SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
+        "goal_max_dist": 10,
     }
     features_extractor_class = RESNET_MID_FUSION_EXTRACTOR_1
     features_extractor_kwargs = {"features_dim": 256}

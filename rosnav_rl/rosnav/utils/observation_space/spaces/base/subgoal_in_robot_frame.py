@@ -34,9 +34,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
     name = "SUBGOAL_IN_ROBOT_FRAME"
     required_observations = [SubgoalLocationInRobotFrame]
 
-    def __init__(
-        self, ns, goal_max_dist: float = 5, *args, **kwargs
-    ) -> None:
+    def __init__(self, ns, goal_max_dist: float = 5, *args, **kwargs) -> None:
         self._ns = ns
         self._max_dist = goal_max_dist
         super().__init__(*args, **kwargs)
@@ -71,4 +69,9 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        return observation[SubgoalLocationInRobotFrame.name][np.newaxis, :]
+        subgoal_dist_angle = observation[SubgoalLocationInRobotFrame.name][
+            np.newaxis, :
+        ]
+        if not np.isfinite(subgoal_dist_angle).all():
+            return np.zeros_like(subgoal_dist_angle)
+        return subgoal_dist_angle

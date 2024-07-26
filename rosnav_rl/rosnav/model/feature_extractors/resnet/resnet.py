@@ -477,17 +477,18 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
                 dim=1,
             )  # (num_envs, num_semantic_layers, 80, 80)
 
+        last_action = None
         if SPACE.LastActionSpace in self._observation_space_manager:
             last_action = observations[SPACE.LastActionSpace.name].squeeze(
                 1
             )  # (num_envs, 3)
-            return {
-                "ped_map": ped_map,
-                "scan": laser_map,
-                "goal": dist_angle_to_goal,
-                "last_action": last_action,
-            }
-        return {"ped_map": ped_map, "scan": laser_map, "goal": dist_angle_to_goal}
+
+        return {
+            "ped_map": ped_map,
+            "scan": laser_map,
+            "goal": dist_angle_to_goal,
+            "last_action": last_action,
+        }
 
     def forward(self, observations: TensorDict) -> torch.Tensor:
         """
@@ -1503,6 +1504,7 @@ class DRL_VO_DEEP(DRL_VO_NAV_EXTRACTOR_TEST):
         SPACE.PedestrianSocialStateSpace,
         SPACE.DistAngleToSubgoalSpace,
     ]
+
 
 class DRL_VO_ROSNAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
     def _setup_network(self, inplanes: int = 64):
