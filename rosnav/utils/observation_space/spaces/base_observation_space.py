@@ -11,6 +11,8 @@ from rosnav.utils.observation_space.normalization import *
 ObservationCollector = TypeVar("ObservationCollector", bound=ObservationCollectorUnit)
 ObservationGenerator = TypeVar("ObservationGenerator", bound=ObservationGeneratorUnit)
 
+from warnings import warn
+
 
 class BaseObservationSpace(ABC):
     """
@@ -67,7 +69,9 @@ class BaseObservationSpace(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Abstract method to encode the observation into a numpy array.
         """
@@ -76,7 +80,7 @@ class BaseObservationSpace(ABC):
     @staticmethod
     def apply_normalization(func):
         def wrapper(
-            self: BaseObservationSpace, observation: dict, *args, **kwargs
+            self: BaseObservationSpace, observation: ObservationDict, *args, **kwargs
         ) -> np.ndarray:
             """
             Apply max absolute scaling to the observation array.
@@ -84,6 +88,30 @@ class BaseObservationSpace(ABC):
             observation_arr = func(self, observation, **kwargs)
             if self._normalize:
                 return self._norm_func(observation_arr, self.space.low, self.space.high)
+            return observation_arr
+
+        return wrapper
+
+    @staticmethod
+    def check_dtype(func):
+        def wrapper(
+            self: BaseObservationSpace, observation: ObservationDict, *args, **kwargs
+        ) -> np.ndarray:
+            """
+            Apply max absolute scaling to the observation array.
+            """
+            observation_arr = func(self, observation, **kwargs)
+
+            if (
+                not np.isfinite(observation_arr).all()
+                or not np.isreal(observation_arr).all()
+            ):
+                warn(f"[{self.name}] Invalid observation array: {observation_arr}")
+                observation_arr = np.zeros_like(observation_arr, dtype=np.float32)
+
+            # Check if the observation array is of the correct dtype
+            # if not np.issubdtype(observation_arr.dtype, np.float32):
+            #     observation_arr = observation_arr.astype(np.float32)
             return observation_arr
 
         return wrapper

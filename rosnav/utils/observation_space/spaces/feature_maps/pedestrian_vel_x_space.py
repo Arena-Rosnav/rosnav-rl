@@ -104,6 +104,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         return x_vel_map
 
     @BaseObservationSpace.apply_normalization
+    @BaseObservationSpace.check_dtype
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
     ) -> np.ndarray:
