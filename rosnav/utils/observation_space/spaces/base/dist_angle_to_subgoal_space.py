@@ -69,4 +69,13 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        return observation[DistAngleToSubgoal.name][np.newaxis, :]
+        subgoal_dist_angle = observation[DistAngleToSubgoal.name][np.newaxis, :]
+        if (
+            not np.isfinite(subgoal_dist_angle).all()
+            or not np.isreal(subgoal_dist_angle).all()
+        ):
+            rospy.logerr(
+                f"SubgoalInRobotFrameSpace: Invalid subgoal_dist_angle: {subgoal_dist_angle}"
+            )
+            return np.zeros_like(subgoal_dist_angle, dtype=np.float32)
+        return subgoal_dist_angle
