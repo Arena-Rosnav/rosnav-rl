@@ -72,6 +72,9 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
         subgoal_dist_angle = observation[SubgoalLocationInRobotFrame.name][
             np.newaxis, :
         ]
-        if not np.isfinite(subgoal_dist_angle).all():
-            return np.zeros_like(subgoal_dist_angle)
+        if (
+            not np.isfinite(subgoal_dist_angle).all()
+            or not np.isreal(subgoal_dist_angle).all()
+        ):
+            return np.zeros_like(subgoal_dist_angle, dtype=np.float32)
         return subgoal_dist_angle
