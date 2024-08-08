@@ -12,6 +12,8 @@ class PolicyType(Enum):
     CNN = "CnnPolicy"
     MLP = "MlpPolicy"
     MLP_LSTM = "MlpLstmPolicy"
+    MULTI_INPUT = "MultiInputPolicy"
+    MULTI_INPUT_LSTM = "MultiInputLstmPolicy"
 
 
 # Parsed as ppo_kwargs to sb3 ppo class

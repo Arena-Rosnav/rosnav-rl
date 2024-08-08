@@ -1,17 +1,24 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Type, TypeVar, Union, Set
 
 import numpy as np
 from gym import spaces
 from gymnasium import spaces
 
-from ..normalization import *
+from rl_utils.utils.observation_collector import *
+from rosnav.utils.observation_space.normalization import *
+
+ObservationCollector = TypeVar("ObservationCollector", bound=ObservationCollectorUnit)
+ObservationGenerator = TypeVar("ObservationGenerator", bound=ObservationGeneratorUnit)
 
 
 class BaseObservationSpace(ABC):
     """
     Base class for defining observation spaces in reinforcement learning environments.
     """
+
+    name: str = "BASE_OBSERVATION_SPACE"
+    required_observations: List[Union[ObservationCollector, ObservationGenerator]] = []
 
     def __init__(
         self,
@@ -23,6 +30,9 @@ class BaseObservationSpace(ABC):
         self._space = self.get_gym_space()
         self._normalize = normalize
         self._setup_normaliization(normalize, norm_func)
+
+    def __repr__(self):
+        return f"{self.name}"
 
     def _setup_normaliization(self, normalize: bool, norm_func: str):
         try:

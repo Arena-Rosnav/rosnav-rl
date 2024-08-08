@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from typing import List, Type
 
 from rosnav.rosnav_space_manager.encoder.base_space_encoder import BaseSpaceEncoder
+from rosnav.utils.observation_space.observation_space_manager import (
+    ObservationSpaceManager,
+)
 from rosnav.utils.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
@@ -9,7 +12,6 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
 from .constants import BASE_AGENT_ATTR, PolicyType
-from rosnav.rosnav_space_manager.encoder.default_encoder import DefaultEncoder
 
 
 class BaseAgent(ABC):
@@ -39,7 +41,7 @@ class BaseAgent(ABC):
         Returns:
             Type[BaseSpaceEncoder]: The class of the space encoder.
         """
-        return DefaultEncoder
+        return BaseSpaceEncoder
 
     @property
     @abstractmethod
@@ -117,9 +119,15 @@ class BaseAgent(ABC):
         """
         pass
 
-    def get_kwargs(self):
+    def get_kwargs(
+        self, observation_space_manager: ObservationSpaceManager, stack_size: int = 1
+    ) -> dict:
         """
         Get the keyword arguments for the agent.
+
+        Args:
+            observation_space_manager (ObservationSpaceManager): The observation space manager.
+            stack_size (int, optional): The stack size. Defaults to 1.
 
         Returns:
             dict: Keyword arguments for the agent.
@@ -130,4 +138,28 @@ class BaseAgent(ABC):
                 val = getattr(self, key)
                 if val is not None:
                     kwargs[key] = val
+
+        update_features_extractor_kwargs(
+            kwargs["features_extractor_kwargs"], observation_space_manager, stack_size
+        )
         return kwargs
+
+
+def update_features_extractor_kwargs(
+    features_extractor_kwargs: dict,
+    observation_space_manager: ObservationSpaceManager,
+    stacked: bool = False,
+):
+    """
+    This method updates dynamic components and parameters that should be parsed to the features extractor.
+
+    Args:
+        config (dict): The configuration dictionary.
+        features_extractor_kwargs (dict): The dictionary containing the features extractor keyword arguments.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        None
+    """
+    features_extractor_kwargs["observation_space_manager"] = observation_space_manager
+    features_extractor_kwargs["stack_size"] = stacked

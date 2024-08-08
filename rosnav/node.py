@@ -1,9 +1,12 @@
 import os
 import sys
+from time import sleep
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import rospkg
 import rospy
+import torch
 from geometry_msgs.msg import TwistStamped
 from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
@@ -30,6 +33,9 @@ from rosnav.utils.utils import (
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from std_msgs.msg import Int16
+from task_generator.constants import Constants
+from task_generator.shared import Namespace
+from task_generator.utils import Utils
 from tools.ros_param_distributor import (
     populate_discrete_action_space,
     populate_laser_params,
@@ -37,11 +43,6 @@ from tools.ros_param_distributor import (
 
 sys.modules["rl_agent"] = sys.modules["rosnav"]
 sys.modules["rl_utils.rl_utils.utils"] = sys.modules["rosnav.utils"]
-
-from typing import Any, Dict, List, Union
-
-import torch
-from task_generator.shared import Namespace
 
 
 class RosnavNode:
@@ -79,7 +80,7 @@ class RosnavNode:
 
         # Load hyperparams
         self._hyperparams = RosnavNode._load_hyperparams(self.agent_path)
-        rospy.set_param(f"{self.agent_name}/rl_agent", self._hyperparams["rl_agent"])
+        rospy.set_param(f"/{self.agent_name}/rl_agent", self._hyperparams["rl_agent"])
 
         self._setup_action_space(self._hyperparams)
 
@@ -107,8 +108,11 @@ class RosnavNode:
         )
         self._setup_observation_manager()
 
+        if Utils.get_simulator() == Constants.Simulator.UNITY:
+            sleep(5)  # wait for unity collector unit to set itself up
+
         self._get_next_action_srv = rospy.Service(
-            self.ns(f"rosnav/{self.agent_name}/get_action"),
+            str(self.ns(f"rosnav/{self.agent_name}/get_action")),
             GetAction,
             self._handle_next_action_srv,
         )
@@ -127,9 +131,8 @@ class RosnavNode:
         observation_spaces_kwargs: Dict[str, Any],
     ):
         self._encoder = RosnavSpaceManager(
-            simulation_ns=self.ns,
+            ns=self.ns,
             agent_parameter_ns=self.agent_name,
-            space_encoder_class=DefaultEncoder,
             observation_spaces=observation_spaces,
             observation_space_kwargs=observation_spaces_kwargs,
             action_space_kwargs=None,
@@ -142,7 +145,7 @@ class RosnavNode:
             else self._hyperparams["rl_agent"]["action_space"]["discrete"]
         )
         rospy.set_param(
-            f"{self.agent_name}/rl_agent/action_space/discrete",
+            f"/{self.agent_name}/rl_agent/action_space/discrete",
             is_action_space_discrete,
         )
 
@@ -151,12 +154,14 @@ class RosnavNode:
 
     def _setup_observation_manager(self):
         obs_unit_kwargs = {
-            "subgoal_mode": self._hyperparams.get("subgoal_mode", False),
             "ns_to_semantic_topic": rospy.get_param("/train_mode", False),
         }
 
         self._observation_manager = ObservationManager(
-            self.ns, obs_unit_kwargs=obs_unit_kwargs
+            self.ns,
+            obs_structur=list(self._encoder.encoder.required_observations),
+            obs_unit_kwargs=obs_unit_kwargs,
+            is_single_env=True,
         )
 
         rospy.loginfo("[RosnavNode] Setup observation manager.")
@@ -338,7 +343,7 @@ class RosnavNode:
             policy: The loaded policy model.
         """
         net_type: PolicyType = AgentFactory.registry[architecture_name].type
-        model_path = os.path.join(agent_path, f"{checkpoint_name}.zip")
+        model_path = os.path.join(agent_path, f"{checkpoint_name}")
 
         if not net_type or net_type != PolicyType.MLP_LSTM:
             self._recurrent_arch = False
@@ -423,7 +428,6 @@ class RosnavNode:
 class MBFRosnavNode(RosnavNode):
     def _setup_observation_manager(self):
         obs_unit_kwargs = {
-            "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
             "ns_to_semantic_topic": False,
         }
 

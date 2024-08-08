@@ -1,12 +1,15 @@
 from abc import ABC, abstractmethod
+from typing import Dict, Union
 
+import rosnav.utils.observation_space as SPACE
 import torch as th
 from gymnasium import spaces
 from rosnav.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-from rosnav.utils.observation_space.space_index import SPACE_INDEX
 from stable_baselines3.common.policies import BaseFeaturesExtractor
+
+TensorDict = Dict[str, th.Tensor]
 
 
 class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
@@ -23,9 +26,9 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE_INDEX.LASER,
-        SPACE_INDEX.GOAL,
-        SPACE_INDEX.LAST_ACTION,
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
 
     def __init__(
@@ -33,7 +36,7 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
         observation_space: spaces.Box,
         observation_space_manager: ObservationSpaceManager,
         features_dim: int,
-        stacked_obs: bool = False,
+        stack_size: int,
         *args,
         **kwargs
     ):
@@ -47,8 +50,7 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
             stacked_obs (bool, optional): Whether the observations are stacked. Defaults to False.
         """
         self._observation_space_manager = observation_space_manager
-        self._stacked_obs = stacked_obs
-        self._num_stacks = observation_space.shape[0] if self._stacked_obs else 1
+        self._stack_size = stack_size
 
         super(RosnavBaseExtractor, self).__init__(
             observation_space=observation_space,
@@ -65,7 +67,7 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def forward(self, observations: th.Tensor) -> th.Tensor:
+    def forward(self, observations: Union[th.Tensor, SPACE.TensorDict]) -> th.Tensor:
         """
         Forward pass of the feature extractor.
 

@@ -1,11 +1,16 @@
 import numpy as np
 from gymnasium import spaces
-from crowdsim_agents.utils import SemanticAttribute
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
+
+from rl_utils.utils.observation_collector import (
+    PedestrianLocationCollector,
+    RobotPoseCollector,
+    PedestrianRelativeLocation,
+    ObservationDict,
+)
 
 
 @SpaceFactory.register("ped_location")
@@ -29,6 +34,13 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
         get_gym_space: Returns the gym space for the observation.
         encode_observation: Encodes the observation into a numpy array.
     """
+
+    name = "PEDESTRIAN_LOCATION"
+    required_observations = [
+        PedestrianLocationCollector,
+        PedestrianRelativeLocation,
+        RobotPoseCollector,
+    ]
 
     def __init__(
         self,
@@ -56,12 +68,14 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=1,
-            shape=(self._feature_map_size * self._feature_map_size,),
+            shape=(self._feature_map_size, self._feature_map_size),
             dtype=int,
         )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: dict, *args, **kwargs) -> np.ndarray:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> np.ndarray:
         """
         Encodes the observation into a numpy array.
 
@@ -74,7 +88,7 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[SemanticAttribute.IS_PEDESTRIAN.value],
-            observation[OBS_DICT_KEYS.SEMANTIC.RELATIVE_LOCATION.value],
-            observation[OBS_DICT_KEYS.ROBOT_POSE],
-        ).flatten()
+            observation[PedestrianLocationCollector.name],
+            observation[PedestrianRelativeLocation.name],
+            observation[RobotPoseCollector.name],
+        )
