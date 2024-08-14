@@ -132,7 +132,6 @@ bool rosnav::RosnavLocalPlanner::isGoalReached()
 
 void rosnav::RosnavLocalPlanner::reconfigureCB(RosnavLocalPlannerReconfigureConfig& config, uint32_t level)
 {
-    boost::mutex::scoped_lock l(config_mutex_);
     config_mutex_.lock();
 
     config_.reconfigure(config);
