@@ -5,6 +5,9 @@ import numpy as np
 import torch as th
 
 from ..observation_space.spaces.base_observation_space import BaseObservationSpace
+from ..observation_space.spaces.feature_maps.base_feature_map_space import (
+    BaseFeatureMapSpace,
+)
 from ..observation_space.spaces.base.dist_angle_to_goal_space import (
     DistAngleToGoalSpace,
 )
