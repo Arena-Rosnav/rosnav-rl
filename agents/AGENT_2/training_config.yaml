@@ -1,0 +1,92 @@
+agent_name: jackal_AGENT_24_lstm_2024_08_17__13_29_27
+callbacks:
+  periodic_eval:
+    eval_freq: 40000
+    max_num_moves_per_eps: 350
+    n_eval_episodes: 40
+  stop_training:
+    threshold: 0.985
+    threshold_type: succ
+  training_curriculum:
+    curr_stage: 0
+    lower_threshold: 0.2
+    threshold_type: succ
+    training_curriculum_file: semantic.yaml
+    upper_threshold: 0.85
+debug_mode: false
+goal_radius: 0.3
+max_num_moves_per_eps: 250
+monitoring:
+  cmd_line_logging:
+    episode_statistics:
+      enabled: true
+      last_n_eps: 20
+      record_actions: true
+    training_metrics:
+      enabled: true
+  eval_log: false
+  use_wandb: true
+n_envs: 8
+n_timesteps: 3000000
+no_gpu: false
+rl_agent:
+  action_space:
+    custom_discretization:
+      buckets_angular_vel: 16
+      buckets_linear_vel: 12
+      enabled: true
+    discrete: false
+  architecture_name: AGENT_24_lstm
+  checkpoint: last_model
+  frame_stacking:
+    enabled: false
+    stack_size: 10
+  laser:
+    full_range_laser: true
+    reduce_num_beams:
+      enabled: true
+      num_beams: 360
+  lr_schedule:
+    enabled: true
+    settings:
+      final_value: 1.0e-05
+      initial_value: 0.0001
+    type: linear
+  normalize:
+    enabled: false
+    settings:
+      clip_obs: 30.0
+      clip_reward: 40.0
+      gamma: 0.99
+      norm_obs: false
+      norm_reward: true
+  ppo:
+    batch_size: 1024
+    clip_range: 0.15
+    ent_coef: 0.015
+    gae_lambda: 0.95
+    gamma: 0.999
+    learning_rate: 0.0003
+    m_batch_size: 256
+    max_grad_norm: 0.5
+    n_epochs: 5
+    n_steps: 128
+    sde_sample_freq: 100
+    use_sde: false
+    vf_coef: 0.33
+  resume: jackal_AGENT_24_lstm_2024_08_17__13_29_27
+  reward_fnc: barn
+  reward_fnc_kwargs:
+    placeholder: 0
+  space_encoder: RobotSpecificEncoder
+  weight_transfer:
+    exclude:
+    - ''
+    include:
+    - ^features_extractor
+    model_path: /home/linh/tuananh/arena_ws/src/planners/rosnav/agents/jackal_AGENT_24_stacked_2024_08_21__20_26_14/best_model.zip
+robot: jackal
+safety_distance: 0.6
+tm_modules: staged
+tm_obstacles: random
+tm_robots: random
