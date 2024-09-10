@@ -26,6 +26,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
     name: str
     required_observations: List[Union[ObservationCollector, ObservationGenerator]] = []
+    background_value: int = 0
 
     def __init__(
         self,
@@ -101,7 +102,10 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             np.ndarray: The semantic map.
         """
 
-        pos_map = np.zeros((self._feature_map_size, self._feature_map_size))
+        pos_map = (
+            np.zeros((self._feature_map_size, self._feature_map_size))
+            + self.background_value
+        )
 
         if relative_pos is None and len(semantic_data.points) == 0:
             return pos_map
