@@ -40,6 +40,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         PedestrianRelativeLocation,
         RobotPoseCollector,
     ]
+    background_value = -1
 
     def __init__(
         self,
@@ -75,7 +76,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
 
         """
         return spaces.Box(
-            low=0,
+            low=-1,
             high=self._num_ped_types,
             shape=(self._feature_map_size, self._feature_map_size),
             dtype=int,
