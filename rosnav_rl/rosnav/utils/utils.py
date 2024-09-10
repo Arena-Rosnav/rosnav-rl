@@ -87,7 +87,7 @@ def load_yaml(file_path: str) -> dict:
 
 def make_mock_env(ns: str, agent_description) -> DummyVecEnv:
     import rl_utils.envs.flatland_gymnasium_env as flatland_gym_env
-    import rl_utils.envs.arena_unity_env as arena_unity_env
+    import rl_utils.envs.unity as arena_unity_env
 
     def _init_flatland_env():
         return flatland_gym_env.FlatlandEnv(

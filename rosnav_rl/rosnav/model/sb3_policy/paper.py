@@ -33,9 +33,9 @@ class AGENT_2(BaseAgent):
         "goal_max_dist": 10,
     }
     observation_spaces = [
-        SPACE.LaserScanSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        spaces.LaserScanSpace,
+        spaces.DistAngleToSubgoalSpace,
+        spaces.LastActionSpace,
     ]
     type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_5
@@ -56,9 +56,9 @@ class AGENT_3(BaseAgent):
         "goal_max_dist": 10,
     }
     observation_spaces = [
-        SPACE.LaserScanSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        spaces.LaserScanSpace,
+        spaces.DistAngleToSubgoalSpace,
+        spaces.LastActionSpace,
     ]
     type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5_extended
@@ -75,9 +75,9 @@ class AGENT_4(BaseAgent):
         "goal_max_dist": 10,
     }
     observation_spaces = [
-        SPACE.LaserScanSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        spaces.LaserScanSpace,
+        spaces.DistAngleToSubgoalSpace,
+        spaces.LastActionSpace,
     ]
     type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_5
@@ -110,13 +110,13 @@ class AGENT_5(BaseAgent):
     type = PolicyType.MULTI_INPUT
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        spaces.StackedLaserMapSpace,
+        spaces.PedestrianVelXSpace,
+        spaces.PedestrianVelYSpace,
+        spaces.PedestrianTypeSpace,
+        spaces.PedestrianSocialStateSpace,
+        spaces.DistAngleToSubgoalSpace,
+        spaces.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
@@ -153,13 +153,13 @@ class AGENT_6(BaseAgent):
     type = PolicyType.MULTI_INPUT_LSTM
     space_encoder_class = BaseSpaceEncoder
     observation_spaces = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        spaces.StackedLaserMapSpace,
+        spaces.PedestrianVelXSpace,
+        spaces.PedestrianVelYSpace,
+        spaces.PedestrianTypeSpace,
+        spaces.PedestrianSocialStateSpace,
+        spaces.DistAngleToSubgoalSpace,
+        spaces.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
@@ -178,6 +178,6 @@ class AGENT_6(BaseAgent):
     log_std_init = -2
     ortho_init = False
     n_lstm_layers = 2
-    lstm_hidden_size = 256
+    lstm_hidden_size = 128
     shared_lstm = False
     enable_critic_lstm = True

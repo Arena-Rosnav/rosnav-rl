@@ -54,15 +54,15 @@ class RosnavSpaceManager:
 
         ns = Namespace(ns)
 
-        self._stacked = rospy.get_param_cached("rl_agent/frame_stacking/enabled")
+        self._stacked = rospy.get_param("rl_agent/frame_stacking/enabled", True)
         self._laser_num_beams = (
-            rospy.get_param_cached("laser/num_beams")
-            if not rospy.get_param("laser/reduce_num_beams")
+            rospy.get_param("laser/num_beams", 0)
+            if not rospy.get_param("laser/reduce_num_beams", False)
             else rospy.get_param("laser/reduced_num_laser_beams")
         )
-        self._laser_max_range = rospy.get_param_cached("laser/range")
-        self._radius = rospy.get_param_cached(str(ns("robot_radius")))
-        self._is_holonomic = rospy.get_param_cached("is_holonomic")
+        self._laser_max_range = rospy.get_param("laser/range", 0.0)
+        self._radius = rospy.get_param(str(ns("robot_radius")), 0.0)
+        self._is_holonomic = rospy.get_param("is_holonomic", False)
 
         # TODO: add num_ped_types to rosparam
         self._num_ped_types = 5
@@ -72,13 +72,13 @@ class RosnavSpaceManager:
         self._ped_max_speed_y = 5.0
         self._social_state_num = 99
 
-        is_action_space_discrete = rospy.get_param_cached(
+        is_action_space_discrete = rospy.get_param(
             "rl_agent/action_space/discrete", False
         )
         actions = (
-            rospy.get_param_cached("actions/discrete")
+            rospy.get_param("actions/discrete")
             if is_action_space_discrete
-            else rospy.get_param_cached("actions/continuous")
+            else rospy.get_param("actions/continuous")
         )
 
         _action_space_kwargs = {
@@ -113,7 +113,7 @@ class RosnavSpaceManager:
             observation_kwargs=_observation_kwargs,
         )
 
-        if rospy.get_param("laser/reduce_num_beams"):
+        if rospy.get_param("laser/reduce_num_beams", False):
             self._encoder = ReducedLaserWrapper(self._encoder, self._laser_num_beams)
 
         if rospy.get_param("record_feature_maps", False):
