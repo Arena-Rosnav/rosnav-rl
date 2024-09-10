@@ -116,6 +116,7 @@ class AGENT_5(BaseAgent):
         SPACE.PedestrianTypeSpace,
         SPACE.PedestrianSocialStateSpace,
         SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,

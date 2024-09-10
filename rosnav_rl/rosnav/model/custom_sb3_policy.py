@@ -87,8 +87,73 @@ class AGENT_24(BaseAgent):
     type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=256)
-    net_arch = [dict(pi=[64, 64], vf=[64, 64])]
+    net_arch = dict(pi=[64, 64], vf=[64, 64])
     activation_fn = nn.ReLU
+
+
+@AgentFactory.register("AGENT_24_stacked")
+class AGENT_24_stacked(BaseAgent):
+    observation_space_kwargs = {
+        "normalize": True,
+        "goal_max_dist": 10,
+    }
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT
+    features_extractor_class = EXTRACTOR_5_extended
+    features_extractor_kwargs = dict(features_dim=256)
+    net_arch = dict(pi=[64, 64], vf=[64, 64])
+    activation_fn = nn.ReLU
+    log_std_init = -2.0
+
+
+@AgentFactory.register("AGENT_24_stacked_lstm")
+class AGENT_24_stacked_lstm(BaseAgent):
+    observation_space_kwargs = {
+        "normalize": True,
+        "goal_max_dist": 10,
+    }
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT_LSTM
+    features_extractor_class = EXTRACTOR_5
+    features_extractor_kwargs = dict(features_dim=512)
+    net_arch = dict(pi=[128, 64], vf=[128, 64])
+    activation_fn = nn.GELU
+    n_lstm_layers = 2
+    lstm_hidden_size = 128
+    shared_lstm = False
+    enable_critic_lstm = True
+    log_std_init = -2.0
+
+
+@AgentFactory.register("AGENT_24_lstm")
+class AGENT_24_lstm(BaseAgent):
+    observation_space_kwargs = {
+        "normalize": True,
+        "goal_max_dist": 10,
+    }
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT_LSTM
+    features_extractor_class = EXTRACTOR_5
+    features_extractor_kwargs = dict(features_dim=256)
+    net_arch = dict(pi=[64, 64], vf=[64, 64])
+    activation_fn = nn.ReLU
+    n_lstm_layers = 2
+    lstm_hidden_size = 128
+    shared_lstm = False
+    enable_critic_lstm = True
+    log_std_init = -2.0
 
 
 @AgentFactory.register("AGENT_22")
@@ -122,15 +187,20 @@ class AGENT_23(BaseAgent):
 # lstm
 @AgentFactory.register("AGENT_32")
 class AGENT_32(BaseAgent):
-    type = PolicyType.MLP_LSTM
+    observation_spaces = [
+        SPACE.LaserScanSpace,
+        SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
+    ]
+    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_7
     features_extractor_kwargs = dict(features_dim=512)
-    net_arch = dict(pi=[512, 256], vf=[256, 256])
+    net_arch = dict(pi=[64, 64], vf=[64, 64])
     activation_fn = nn.ReLU
-    n_lstm_layers = 6
-    lstm_hidden_size = 64
-    shared_lstm = False
-    enable_critic_lstm = True
+    n_lstm_layers = 2
+    lstm_hidden_size = 256
+    shared_lstm = True
+    enable_critic_lstm = False
 
 
 # lstm + framestacking
@@ -1454,12 +1524,14 @@ class RosnavResNet__1(BaseAgent):
         SPACE.PedestrianTypeSpace,
         SPACE.PedestrianSocialStateSpace,
         SPACE.DistAngleToSubgoalSpace,
+        SPACE.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
+        "goal_max_dist": 10,
     }
     features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
     features_extractor_kwargs = {
