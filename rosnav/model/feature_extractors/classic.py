@@ -323,6 +323,52 @@ class EXTRACTOR_5(EXTRACTOR_1):
         )
 
 
+class EXTRACTOR_5_extended(EXTRACTOR_1):
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        observation_space_manager: ObservationSpaceManager,
+        features_dim: int = 128,
+        stack_size: int = 1,
+        *args,
+        **kwargs
+    ):
+        super().__init__(
+            observation_space=observation_space,
+            observation_space_manager=observation_space_manager,
+            features_dim=features_dim,
+            stack_size=stack_size,
+        )
+
+    def _setup_network(self):
+        self.cnn = nn.Sequential(
+            nn.Conv1d(self._stack_size, 32, 8, 4),
+            nn.ReLU(),
+            nn.Conv1d(32, 64, 4, 2),
+            nn.ReLU(),
+            nn.Conv1d(64, 64, 3, 1),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+
+        # Compute shape by doing one forward pass
+        with th.no_grad():
+            desired_shape = (1, self._stack_size, self._laser_size)
+            tensor_forward = th.randn(desired_shape)
+            n_flatten = self.cnn(tensor_forward).shape[-1]
+
+        self.fc = nn.Sequential(
+            nn.Linear(
+                n_flatten
+                + (self._goal_size + self._last_action_size) * self._stack_size,
+                512,
+            ),
+            nn.ReLU(),
+            nn.Linear(512, self._features_dim),
+            nn.ReLU(),
+        )
+
+
 class EXTRACTOR_6(EXTRACTOR_1):
     def __init__(
         self,
