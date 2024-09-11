@@ -3,10 +3,11 @@ from typing import List, Union
 
 import numpy as np
 import rospy
+from gymnasium import spaces
 from rl_utils.utils.observation_collector import (
+    ObservationDict,
     RobotPoseCollector,
     SemanticLayerCollector,
-    ObservationDict,
 )
 from rl_utils.utils.observation_collector.utils.semantic import (
     get_relative_pos_to_robot,
@@ -50,6 +51,12 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         self._roi_in_m = roi_in_m
         self._flatten = flatten
 
+        if self.background_value < self.get_gym_space().low:
+            raise ValueError(
+                f"Background value {self.background_value} is less than"
+                " the lower bound of the corresponding Observation space!"
+            )
+
         super().__init__(*args, **kwargs)
 
     @property
@@ -61,6 +68,10 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             int: The size of the feature map.
         """
         return self._feature_map_size
+
+    @abstractmethod
+    def get_gym_space(self) -> spaces.Space:
+        raise NotImplementedError()
 
     def _get_map_index(self, position: tuple) -> tuple:
         """
@@ -101,7 +112,6 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         Returns:
             np.ndarray: The semantic map.
         """
-
         pos_map = (
             np.zeros((self._feature_map_size, self._feature_map_size))
             + self.background_value
