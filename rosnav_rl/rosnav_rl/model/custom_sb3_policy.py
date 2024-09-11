@@ -1,6 +1,6 @@
 """Custom policies built by SB3 during runtime through parsing 'policy_kwargs'"""
 
-from rosnav.model.feature_extractors.resnet.resnet import (
+from rosnav_rl.model.feature_extractors.resnet.resnet import (
     RESNET_MID_FUSION_EXTRACTOR_1,
     RESNET_MID_FUSION_EXTRACTOR_2,
     RESNET_MID_FUSION_EXTRACTOR_3,
@@ -14,12 +14,12 @@ from rosnav.model.feature_extractors.resnet.resnet import (
     DRL_VO_DEEP,
     DRL_VO_ROSNAV_EXTRACTOR,
 )
-import rosnav.utils.observation_space as SPACE
+import rosnav_rl.utils.observation_space as SPACE
 
-from rosnav.model.feature_extractors.rgbd.rgbd_feature_nets import (
+from rosnav_rl.model.feature_extractors.rgbd.rgbd_feature_nets import (
     RESNET_RGBD_FUSION_EXTRACTOR_1,
 )
-from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
+from rosnav_rl.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
 from torch import nn
 
 from .agent_factory import AgentFactory

@@ -1,7 +1,7 @@
 from typing import List
 
 import numpy as np
-import rosnav.utils.observation_space as OBS_SPACE
+import rosnav_rl.utils.observation_space as OBS_SPACE
 from gymnasium import spaces
 from rl_utils.utils.observation_collector.traversal import get_required_observations
 from task_generator.shared import Namespace

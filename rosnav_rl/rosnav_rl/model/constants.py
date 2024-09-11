@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Type, Union
 
-from rosnav.utils.observation_space.observation_space_manager import (
+from rosnav_rl.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor

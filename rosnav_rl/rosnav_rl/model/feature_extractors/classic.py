@@ -1,9 +1,9 @@
 from typing import Tuple, Union
 
 import gymnasium as gym
-import rosnav.utils.observation_space as SPACE
+import rosnav_rl.utils.observation_space as SPACE
 import torch as th
-from rosnav.utils.observation_space.observation_space_manager import (
+from rosnav_rl.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
 from torch import nn

@@ -1,5 +1,5 @@
-import rosnav.utils.observation_space as spaces
-from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
+import rosnav_rl.utils.observation_space as spaces
+from rosnav_rl.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
 from torch import nn
 
 from ..agent_factory import AgentFactory

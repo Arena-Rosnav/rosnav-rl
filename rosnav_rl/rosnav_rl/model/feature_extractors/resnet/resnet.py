@@ -24,10 +24,10 @@ from torch.nn.modules import BatchNorm2d, Module
 import rospy
 import torch
 import torch.nn as nn
-from rosnav.utils.observation_space.observation_space_manager import (
+from rosnav_rl.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-import rosnav.utils.observation_space as SPACE
+import rosnav_rl.utils.observation_space as SPACE
 
 from ..base_extractor import RosnavBaseExtractor, TensorDict
 from .bottleneck import Bottleneck

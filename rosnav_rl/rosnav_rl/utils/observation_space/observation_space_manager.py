@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Type, Union
 
 from gymnasium import spaces
 from rl_utils.utils.observation_collector import ObservationDict
-from rosnav.utils.observation_space import EncodedObservationDict
+from rosnav_rl.utils.observation_space import EncodedObservationDict
 
 from .spaces.base_observation_space import BaseObservationSpace
 

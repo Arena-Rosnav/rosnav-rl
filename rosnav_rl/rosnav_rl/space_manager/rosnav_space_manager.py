@@ -2,13 +2,13 @@ from typing import Any, Dict, List, Union
 
 import numpy as np
 import rospy
-from rosnav.rosnav_space_manager.encoder_wrapper.feature_map_recorder import (
+from rosnav_rl.rosnav_space_manager.encoder_wrapper.feature_map_recorder import (
     FeatureMapRecorderWrapper,
 )
-from rosnav.utils.observation_space.spaces.base_observation_space import (
+from rosnav_rl.utils.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
-from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
+from rosnav_rl.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
     BaseFeatureMapSpace,
 )
 from rl_utils.topic import Namespace

@@ -6,7 +6,7 @@ from gym import spaces
 from gymnasium import spaces
 
 from rl_utils.utils.observation_collector import *
-from rosnav.utils.observation_space.normalization import *
+from rosnav_rl.utils.observation_space.normalization import *
 
 ObservationCollector = TypeVar("ObservationCollector", bound=ObservationCollectorUnit)
 ObservationGenerator = TypeVar("ObservationGenerator", bound=ObservationGeneratorUnit)

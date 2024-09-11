@@ -4,7 +4,7 @@ import numpy as np
 from gymnasium import spaces
 
 from ..base_space_encoder import BaseSpaceEncoder
-from rosnav.utils.observation_space.observation_space_manager import (
+from rosnav_rl.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
 
