@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import List, Type
 
-from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
-from rosnav.utils.observation_space.observation_space_manager import (
+from rosnav_rl.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
+from rosnav_rl.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-from rosnav.utils.observation_space.spaces.base_observation_space import (
+from rosnav_rl.utils.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor

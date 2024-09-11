@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Union
 
-import rosnav.utils.observation_space as SPACE
+import rosnav_rl.utils.observation_space as SPACE
 import torch as th
 from gymnasium import spaces
-from rosnav.utils.observation_space.observation_space_manager import (
+from rosnav_rl.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
 from stable_baselines3.common.policies import BaseFeaturesExtractor

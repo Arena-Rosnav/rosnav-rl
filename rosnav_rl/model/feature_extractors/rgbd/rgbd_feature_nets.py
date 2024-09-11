@@ -4,10 +4,10 @@ import gymnasium as gym
 import torch
 import torch.nn as nn
 from torch import Tensor
-from rosnav.utils.observation_space.observation_space_manager import (
+from rosnav_rl.utils.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-from rosnav.utils.observation_space import (
+from rosnav_rl.utils.observation_space import (
     RGBDSpace,
     DistAngleToSubgoalSpace,
     LastActionSpace,
@@ -81,8 +81,12 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         )
 
     def _get_input_sizes(self):
-        self._goal_size = self._observation_space_manager[DistAngleToSubgoalSpace].space.shape[-1]
-        self._last_action_size = self._observation_space_manager[LastActionSpace].space.shape[-1]
+        self._goal_size = self._observation_space_manager[
+            DistAngleToSubgoalSpace
+        ].space.shape[-1]
+        self._last_action_size = self._observation_space_manager[
+            LastActionSpace
+        ].space.shape[-1]
         self._image_size = 4 * self._image_height * self._image_width
 
     def _setup_network(self, *args, **kwargs):

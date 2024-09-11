@@ -2,12 +2,12 @@ from typing import Union, List, Dict
 
 import numpy as np
 
-from rosnav.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
-from rosnav.rosnav_space_manager.encoder_wrapper.base_encoder_wrapper import (
+from rosnav_rl.rosnav_space_manager.base_space_encoder import BaseSpaceEncoder
+from rosnav_rl.rosnav_space_manager.encoder_wrapper.base_encoder_wrapper import (
     BaseEncoderWrapper,
 )
 
-from rosnav.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
+from rosnav_rl.utils.observation_space.spaces.feature_maps.base_feature_map_space import (
     BaseFeatureMapSpace,
 )
 
