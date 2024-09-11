@@ -51,7 +51,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         self._roi_in_m = roi_in_m
         self._flatten = flatten
 
-        if self.background_value < self.get_gym_space().low:
+        if (self.background_value < self.get_gym_space().low).any():
             raise ValueError(
                 f"Background value {self.background_value} is less than"
                 " the lower bound of the corresponding Observation space!"
