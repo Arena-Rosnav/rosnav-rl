@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import rospkg
 import rospy
+import torch as th
 from rl_utils.topic import Namespace
 from rl_utils.utils.observation_collector import ObservationDict
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
@@ -29,7 +30,9 @@ from rosnav.utils.utils import (
     wrap_vec_framestack,
 )
 from sb3_contrib import RecurrentPPO
+from sb3_contrib.common.recurrent.policies import RecurrentActorCriticPolicy
 from stable_baselines3 import PPO
+from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.utils import obs_as_tensor
 from std_msgs.msg import Int16
 from task_generator.constants import Constants
@@ -45,6 +48,7 @@ class RosnavNode:
     DEFAULT_DONES = np.array([[False]])
     DEFAULT_INFOS = [{}]
     DEFAULT_EPS_START = np.array([True])
+    DEFAULT_EPS_NO_START = np.array([False])
 
     def __init__(self, ns: Namespace = None):
         """
@@ -132,6 +136,8 @@ class RosnavNode:
         )
 
         self.state = None
+        self._episode_start = np.array([False for _ in range(1)])
+
         self._last_action = [0, 0, 0]
         self._reset_state = True
         self._is_reset = False
@@ -247,7 +253,9 @@ class RosnavNode:
                 {
                     "state": self.state,
                     "episode_start": (
-                        RosnavNode.DEFAULT_EPS_START if self._reset_state else None
+                        RosnavNode.DEFAULT_EPS_START
+                        if self._reset_state
+                        else RosnavNode.DEFAULT_EPS_NO_START
                     ),
                 }
             )
@@ -315,7 +323,7 @@ class RosnavNode:
 
     def _get_model(
         self, agent_description: BaseAgent, checkpoint_name: str, agent_path: str
-    ):
+    ) -> Union[ActorCriticPolicy, RecurrentActorCriticPolicy]:
         """
         Get the model based on the given architecture name, checkpoint name, and agent path.
 
@@ -422,20 +430,20 @@ class RosnavNode:
         deterministic: bool = True,
     ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
         if self._recurrent_arch:
-            return self._agent.predict(
+            return self._predict_recurrent(
                 observation=observation,
                 state=state,
                 episode_start=episode_start,
                 deterministic=deterministic,
             )
-        return self._predict_without_sb3(
+        return self._predict(
             observation=observation,
             state=state,
             episode_start=episode_start,
             deterministic=deterministic,
         )
 
-    def _predict_without_sb3(
+    def _predict(
         self,
         observation: Union[np.ndarray, Dict[str, np.ndarray]],
         state: Optional[Tuple[np.ndarray, ...]] = None,
@@ -455,6 +463,53 @@ class RosnavNode:
                 .cpu()
                 .numpy()
             )
+
+        actions = np.clip(
+            actions, self._agent.action_space.low, self._agent.action_space.high
+        )
+
+        return actions.squeeze(axis=0), self.state
+
+    def _predict_recurrent(
+        self,
+        observation: Union[np.ndarray, Dict[str, np.ndarray]],
+        state: Optional[Tuple[np.ndarray, ...]] = None,
+        episode_start: Optional[np.ndarray] = None,
+        deterministic: bool = True,
+    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        for key, value in observation.items():
+            if value.ndim == 2:
+                observation[key] = np.expand_dims(value, axis=0)
+
+        if state is None:
+            # Initialize hidden states to zeros
+            state = np.concatenate(
+                [np.zeros(self._agent.lstm_hidden_state_shape) for _ in range(1)],
+                axis=1,
+            )
+            state = (state, state)
+
+        if episode_start is None:
+            episode_start = np.array([False for _ in range(1)])
+
+        with th.no_grad():
+            # Convert to PyTorch tensors
+            states = th.tensor(
+                state[0], dtype=th.float32, device=self._agent.device
+            ), th.tensor(state[1], dtype=th.float32, device=self._agent.device)
+            episode_starts = th.tensor(
+                episode_start, dtype=th.float32, device=self._agent.device
+            )
+            actions, states = self._agent._predict(
+                obs_as_tensor(observation, self._agent.device),
+                lstm_states=states,
+                episode_starts=episode_starts,
+                deterministic=deterministic,
+            )
+            states = (states[0].cpu().numpy(), states[1].cpu().numpy())
+
+        # Convert to numpy
+        actions = actions.cpu().numpy()
 
         actions = np.clip(
             actions, self._agent.action_space.low, self._agent.action_space.high
