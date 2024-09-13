@@ -71,7 +71,7 @@ rl_agent:
     n_epochs: 5
     n_steps: 32
     vf_coef: 0.22
-  resume: null
+  resume: ""
   reward_fnc: base_semantic
   reward_fnc_kwargs:
     placeholder: 0
