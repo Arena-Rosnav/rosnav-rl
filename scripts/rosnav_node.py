@@ -10,18 +10,18 @@ import rospy
 from rl_utils.topic import Namespace
 from rl_utils.utils.observation_collector import ObservationDict
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
-from rosnav.model.agent_factory import AgentFactory
-from rosnav.model.base_agent import PolicyType
-from rosnav.model.custom_sb3_policy import *
-from rosnav.model.sb3_policy.paper import *
-from rosnav.rosnav_space_manager.rosnav_space_manager import RosnavSpaceManager
+from rosnav_rl.model.agent_factory import AgentFactory
+from rosnav_rl.model.base_agent import PolicyType
+from rosnav_rl.model.custom_sb3_policy import *
+from rosnav_rl.model.sb3_policy.paper import *
+from rosnav_rl.space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav.srv import GetAction, GetActionResponse
-from rosnav.utils.constants import VALID_CONFIG_NAMES
+from rosnav_rl.utils.constants import VALID_CONFIG_NAMES
 from rosnav.utils.observation_space import EncodedObservationDict
-from rosnav.utils.observation_space.spaces.base_observation_space import (
+from rosnav_rl.utils.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
-from rosnav.utils.utils import (
+from rosnav_rl.utils.utils import (
     load_json,
     load_vec_normalize,
     load_yaml,
