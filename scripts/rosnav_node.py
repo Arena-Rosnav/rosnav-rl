@@ -2,19 +2,23 @@ import argparse
 import os
 import sys
 from time import sleep
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import rospkg
 import rospy
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+import torch as th
+from rl_utils.topic import Namespace
+from rl_utils.utils.observation_collector import ObservationDict
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
 from rosnav.model.agent_factory import AgentFactory
 from rosnav.model.base_agent import PolicyType
 from rosnav.model.custom_sb3_policy import *
+from rosnav.model.sb3_policy.paper import *
 from rosnav.rosnav_space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav.srv import GetAction, GetActionResponse
 from rosnav.utils.constants import VALID_CONFIG_NAMES
+from rosnav.utils.observation_space import EncodedObservationDict
 from rosnav.utils.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
@@ -26,10 +30,12 @@ from rosnav.utils.utils import (
     wrap_vec_framestack,
 )
 from sb3_contrib import RecurrentPPO
+from sb3_contrib.common.recurrent.policies import RecurrentActorCriticPolicy
 from stable_baselines3 import PPO
+from stable_baselines3.common.policies import ActorCriticPolicy
+from stable_baselines3.common.utils import obs_as_tensor
 from std_msgs.msg import Int16
 from task_generator.constants import Constants
-from rl_utils.topic import Namespace
 from task_generator.utils import Utils
 from tools.ros_param_distributor import (
     populate_discrete_action_space,
@@ -42,6 +48,7 @@ class RosnavNode:
     DEFAULT_DONES = np.array([[False]])
     DEFAULT_INFOS = [{}]
     DEFAULT_EPS_START = np.array([True])
+    DEFAULT_EPS_NO_START = np.array([False])
 
     def __init__(self, ns: Namespace = None):
         """
@@ -50,8 +57,8 @@ class RosnavNode:
         Args:
             ns (Namespace, optional): The namespace for the node. Defaults to "".
         """
-        self.ns = Namespace(ns) if ns else Namespace(rospy.get_namespace()[:-1])
-        # self.ns = Namespace(ns) if ns else Namespace("/jackal")
+        # self.ns = Namespace(ns) if ns else Namespace(rospy.get_namespace()[:-1])
+        self.ns = Namespace(ns) if ns else Namespace("/jackal")
 
         rospy.loginfo(f"Starting Rosnav-Node on {self.ns}")
 
@@ -102,6 +109,7 @@ class RosnavNode:
         self._agent.observation_space = (
             self._encoder.observation_space_manager.observation_space
         )
+        self._agent.set_training_mode(False)
 
         obs_unit_kwargs = {
             # "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
@@ -128,6 +136,8 @@ class RosnavNode:
         )
 
         self.state = None
+        self._episode_start = np.array([False for _ in range(1)])
+
         self._last_action = [0, 0, 0]
         self._reset_state = True
         self._is_reset = False
@@ -187,7 +197,9 @@ class RosnavNode:
                 ns=self.ns,
             )
 
-    def _encode_observation(self, observation: Dict[str, Any], *args, **kwargs):
+    def _encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> EncodedObservationDict:
         """
         Encodes the given observation using the encoder.
 
@@ -199,15 +211,14 @@ class RosnavNode:
         """
         return self._encoder.encode_observation(observation, **kwargs)
 
-    def _get_observation(self):
+    def _get_observation(self) -> ObservationDict:
         """
         Get the observation from the observation manager and append the last action.
 
         Returns:
             dict: The observation dictionary.
         """
-        observation = self._observation_manager.get_observations()
-        return observation
+        return self._observation_manager.get_observations()
 
     def get_action(self):
         """
@@ -216,7 +227,7 @@ class RosnavNode:
         Returns:
             The decoded action to be taken.
         """
-        observation = self._encode_observation(
+        observation: EncodedObservationDict = self._encode_observation(
             self._get_observation(), is_done=self._is_reset
         )
 
@@ -242,13 +253,15 @@ class RosnavNode:
                 {
                     "state": self.state,
                     "episode_start": (
-                        RosnavNode.DEFAULT_EPS_START if self._reset_state else None
+                        RosnavNode.DEFAULT_EPS_START
+                        if self._reset_state
+                        else RosnavNode.DEFAULT_EPS_NO_START
                     ),
                 }
             )
             self._reset_state = False
 
-        action, self.state = self._agent.predict(**predict_dict)
+        action, self.state = self.predict(**predict_dict)
 
         decoded_action = self._encoder.decode_action(action)
 
@@ -310,7 +323,7 @@ class RosnavNode:
 
     def _get_model(
         self, agent_description: BaseAgent, checkpoint_name: str, agent_path: str
-    ):
+    ) -> Union[ActorCriticPolicy, RecurrentActorCriticPolicy]:
         """
         Get the model based on the given architecture name, checkpoint name, and agent path.
 
@@ -408,6 +421,101 @@ class RosnavNode:
         return wrap_vec_framestack(
             venv, hyperparams["rl_agent"]["frame_stacking"]["stack_size"]
         )
+
+    def predict(
+        self,
+        observation: Union[np.ndarray, Dict[str, np.ndarray]],
+        state: Optional[Tuple[np.ndarray, ...]] = None,
+        episode_start: Optional[np.ndarray] = None,
+        deterministic: bool = True,
+    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        if self._recurrent_arch:
+            return self._predict_recurrent(
+                observation=observation,
+                state=state,
+                episode_start=episode_start,
+                deterministic=deterministic,
+            )
+        return self._predict(
+            observation=observation,
+            state=state,
+            episode_start=episode_start,
+            deterministic=deterministic,
+        )
+
+    def _predict(
+        self,
+        observation: Union[np.ndarray, Dict[str, np.ndarray]],
+        state: Optional[Tuple[np.ndarray, ...]] = None,
+        episode_start: Optional[np.ndarray] = None,
+        deterministic: bool = True,
+    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        for key, value in observation.items():
+            if value.ndim == 2:
+                observation[key] = np.expand_dims(value, axis=0)
+
+        with th.no_grad():
+            actions = (
+                self._agent._predict(
+                    obs_as_tensor(observation, self._agent.device),
+                    deterministic=deterministic,
+                )
+                .cpu()
+                .numpy()
+            )
+
+        actions = np.clip(
+            actions, self._agent.action_space.low, self._agent.action_space.high
+        )
+
+        return actions.squeeze(axis=0), self.state
+
+    def _predict_recurrent(
+        self,
+        observation: Union[np.ndarray, Dict[str, np.ndarray]],
+        state: Optional[Tuple[np.ndarray, ...]] = None,
+        episode_start: Optional[np.ndarray] = None,
+        deterministic: bool = True,
+    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        for key, value in observation.items():
+            if value.ndim == 2:
+                observation[key] = np.expand_dims(value, axis=0)
+
+        if state is None:
+            # Initialize hidden states to zeros
+            state = np.concatenate(
+                [np.zeros(self._agent.lstm_hidden_state_shape) for _ in range(1)],
+                axis=1,
+            )
+            state = (state, state)
+
+        if episode_start is None:
+            episode_start = np.array([False for _ in range(1)])
+
+        with th.no_grad():
+            # Convert to PyTorch tensors
+            states = th.tensor(
+                state[0], dtype=th.float32, device=self._agent.device
+            ), th.tensor(state[1], dtype=th.float32, device=self._agent.device)
+            episode_starts = th.tensor(
+                episode_start, dtype=th.float32, device=self._agent.device
+            )
+            actions, states = self._agent._predict(
+                obs_as_tensor(observation, self._agent.device),
+                lstm_states=states,
+                episode_starts=episode_starts,
+                deterministic=deterministic,
+            )
+            states = (states[0].cpu().numpy(), states[1].cpu().numpy())
+
+        # Convert to numpy
+        actions = actions.cpu().numpy()
+
+        actions = np.clip(
+            actions, self._agent.action_space.low, self._agent.action_space.high
+        )
+
+        return actions.squeeze(axis=0), self.state
 
 
 def parse_args():
