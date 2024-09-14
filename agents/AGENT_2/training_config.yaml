@@ -36,7 +36,7 @@ rl_agent:
       buckets_linear_vel: 12
       enabled: true
     discrete: false
-  architecture_name: AGENT_24_lstm
+  architecture_name: AGENT_2
   checkpoint: last_model
   frame_stacking:
     enabled: false
