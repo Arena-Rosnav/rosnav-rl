@@ -37,7 +37,7 @@ rl_agent:
       enabled: true
     discrete: false
   architecture_name: RosnavResNet__1
-  checkpoint: last_model
+  checkpoint: best_model
   frame_stacking:
     enabled: false
     stack_size: 6

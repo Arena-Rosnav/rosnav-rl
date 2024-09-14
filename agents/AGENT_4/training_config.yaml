@@ -37,7 +37,7 @@ rl_agent:
       enabled: true
     discrete: false
   architecture_name: AGENT_4
-  checkpoint: best_model
+  checkpoint: last_model
   frame_stacking:
     enabled: true
     stack_size: 10
