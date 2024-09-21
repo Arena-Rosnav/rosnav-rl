@@ -515,7 +515,9 @@ class RosnavNode:
             actions, self._agent.action_space.low, self._agent.action_space.high
         )
 
-        return actions.squeeze(axis=0), self.state
+        return actions.squeeze(axis=0), state
+        # return self._agent.predict(observation=observation, state=state, episode_start=episode_start, deterministic=deterministic)
+        
 
 
 def parse_args():
