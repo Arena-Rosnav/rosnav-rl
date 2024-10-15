@@ -1,8 +1,7 @@
 import argparse
 import os
-import sys
 from time import sleep
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import rospkg
@@ -10,15 +9,13 @@ import rospy
 from rl_utils.topic import Namespace
 from rl_utils.utils.observation_collector import ObservationDict
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
-from rosnav_rl.model.agent_factory import AgentFactory
-from rosnav_rl.model.base_agent import PolicyType
-from rosnav_rl.model.custom_sb3_policy import *
-from rosnav_rl.model.sb3_policy.paper import *
-from rosnav_rl.space_manager.rosnav_space_manager import RosnavSpaceManager
+from rosnav_rl.model.stable_baselines3.policy.base_policy import PolicyType
+from rosnav_rl.model.stable_baselines3 import StableBaselinesPolicy, import_models
+from rosnav_rl.spaces.space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav.srv import GetAction, GetActionResponse
 from rosnav_rl.utils.constants import VALID_CONFIG_NAMES
-from rosnav.utils.observation_space import EncodedObservationDict
-from rosnav_rl.utils.observation_space.spaces.base_observation_space import (
+from rosnav_rl.spaces.observation_space import (
+    EncodedObservationDict,
     BaseObservationSpace,
 )
 from rosnav_rl.utils.utils import (
@@ -39,6 +36,8 @@ from tools.ros_param_distributor import (
     populate_laser_params,
     populate_rgbd_params,
 )
+
+import torch as th
 
 
 class RosnavNode:
@@ -77,7 +76,8 @@ class RosnavNode:
 
         # Get Architecture Name and retrieve Observation spaces
         architecture_name = self._hyperparams["rl_agent"]["architecture_name"]
-        agent: BaseAgent = AgentFactory.instantiate(architecture_name)
+        AgentFactory = import_models()
+        agent: StableBaselinesPolicy = AgentFactory.instantiate(architecture_name)
         observation_spaces: List[BaseObservationSpace] = agent.observation_spaces
         observation_spaces_kwargs = agent.observation_space_kwargs
 
@@ -150,13 +150,15 @@ class RosnavNode:
         if is_action_space_discrete:
             populate_discrete_action_space(hyperparams)
 
-    def _load_env_wrappers(self, hyperparams: dict, agent_description: BaseAgent):
+    def _load_env_wrappers(
+        self, hyperparams: dict, agent_description: StableBaselinesPolicy
+    ):
         """
         Loads the environment wrappers based on the provided hyperparameters and agent description.
 
         Args:
             hyperparams (dict): The hyperparameters for the RL agent.
-            agent_description (BaseAgent): The description of the agent.
+            agent_description (StableBaselinesPolicy): The description of the agent.
 
         Returns:
             None
@@ -314,7 +316,10 @@ class RosnavNode:
             self._stacked_obs_container.reset(observation)
 
     def _get_model(
-        self, agent_description: BaseAgent, checkpoint_name: str, agent_path: str
+        self,
+        agent_description: StableBaselinesPolicy,
+        checkpoint_name: str,
+        agent_path: str,
     ):
         """
         Get the model based on the given architecture name, checkpoint name, and agent path.
@@ -368,7 +373,7 @@ class RosnavNode:
 
     @staticmethod
     def _get_vec_normalize(
-        agent_description: BaseAgent,
+        agent_description: StableBaselinesPolicy,
         agent_path: str,
         hyperparams: dict,
         venv=None,
@@ -395,7 +400,7 @@ class RosnavNode:
 
     @staticmethod
     def _get_vec_stacked(
-        agent_description: BaseAgent,
+        agent_description: StableBaselinesPolicy,
         hyperparams: dict,
         ns: Namespace = "",
     ):
