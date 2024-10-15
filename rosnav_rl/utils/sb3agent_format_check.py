@@ -3,10 +3,10 @@ from typing import Type
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
-from ..model.base_agent import BaseAgent, PolicyType
+from ..model.base_agent import StableBaselinesAgent, PolicyType
 
 
-def check_format(cls: Type[BaseAgent]):
+def check_format(cls: Type[StableBaselinesAgent]):
     assert isinstance(cls.type, PolicyType), "Type has to be of type 'PolicyType'!"
 
     if cls.features_extractor_class:
