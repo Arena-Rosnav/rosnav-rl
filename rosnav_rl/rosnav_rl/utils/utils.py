@@ -1,5 +1,6 @@
 import json
 import os
+import random
 from typing import Tuple
 
 import numpy as np
@@ -8,11 +9,10 @@ import rospy
 import torch
 import yaml
 from gymnasium import spaces
-from rosnav.utils.constants import RosnavEncoder
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
-from task_generator.utils import Utils
 from task_generator.constants import Constants
+from task_generator.utils import Utils
 
 
 def get_robot_yaml_path(robot_model: str = None) -> str:
@@ -54,27 +54,6 @@ def get_actions_from_robot_yaml(robot_model: str = None):
     return action_data
 
 
-def get_observation_space_from_file(robot_model: str = None) -> Tuple[int, int]:
-    robot_state_size, action_state_size = 2, rospy.get_param(
-        rospy.get_namespace() + "action_state_size", 3
-    )
-    num_beams, _, _, _ = get_laser_from_robot_yaml(robot_model)
-
-    num_beams = RosnavEncoder[get_robot_space_encoder()]["lasers_to_adapted"](num_beams)
-
-    return num_beams, action_state_size + robot_state_size
-
-
-def get_robot_space_encoder() -> str:
-    return rospy.get_param("space_encoder", "DefaultEncoder")
-
-
-def get_observation_space() -> Tuple[int, int]:
-    observation_space = RosnavEncoder[get_robot_space_encoder()]
-
-    return observation_space["lasers"], observation_space["meta"]
-
-
 def load_json(file_path: str) -> dict:
     with open(file_path) as file:
         return json.load(file)
@@ -98,7 +77,7 @@ def make_mock_env(ns: str, agent_description) -> DummyVecEnv:
         )
 
     def _init_arena_unity_env():
-        return arena_unity_env.ArenaUnityEnv(
+        return arena_unity_env.UnityEnv(
             ns=ns,
             agent_description=agent_description,
             reward_fnc=None,
