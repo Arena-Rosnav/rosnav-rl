@@ -2,7 +2,6 @@ import functools
 
 import numpy as np
 import yaml
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
 from tools.constants import TRAINING_CONSTANTS
 
 
@@ -31,56 +30,6 @@ def distances_from_pointcloud(point_cloud: np.ndarray):
     return np.sqrt(
         point_cloud["x"] ** 2 + point_cloud["y"] ** 2 + point_cloud["z"] ** 2
     )
-
-
-class InternalStateInfoUpdate:
-    """
-    Represents a callable object that updates internal state information in a reward function.
-
-    Args:
-        key (str): The key associated with the internal state information.
-        func (callable): The function that computes the updated internal state information.
-
-    Attributes:
-        key (str): The key associated with the internal state information.
-        func (callable): The function that computes the updated internal state information.
-    """
-
-    def __init__(self, key: str, func):
-        self.key = key
-        self.func = func
-
-    def __call__(self, reward_function: "RewardFunction", obs_dict, *args, **kwargs):
-        """
-        Updates the internal state information in the given reward function.
-
-        Args:
-            reward_function (RewardFunction): The reward function to update.
-            **kwargs: Additional keyword arguments to pass to the internal state update function.
-        """
-        reward_function.add_internal_state_info(
-            self.key,
-            self.func(reward_function=reward_function, obs_dict=obs_dict),
-        )
-
-
-from rl_utils.utils.observation_collector import (
-    ObservationDict,
-    LaserCollector,
-    FullRangeLaserCollector,
-)
-
-
-def safe_dist_breached(
-    reward_function: "RewardFunction", obs_dict, *args, **kwargs
-) -> None:
-    if reward_function.distinguished_safe_dist:
-        return obs_dict["ped_safe_dist"] or obs_dict["obs_safe_dist"]
-    else:
-        return (
-            reward_function.get_internal_state_info("min_dist_laser")
-            <= reward_function.safe_dist
-        )
 
 
 from rl_utils.utils.observation_collector import *
