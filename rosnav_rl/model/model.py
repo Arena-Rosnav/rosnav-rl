@@ -32,3 +32,6 @@ class RL_Model(ABC):
 
     def get_action(self, observation: EncodedObservationDict, *args, **kwargs):
         pass
+
+    def train(self, *args, **kwargs):
+        raise NotImplementedError()
