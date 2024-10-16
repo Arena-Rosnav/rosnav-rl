@@ -4,7 +4,7 @@ from warnings import warn
 
 import numpy as np
 import rospy
-from rl_utils.state_container import StateContainer
+from rl_utils.state_container import SimulationStateContainer
 from rl_utils.utils.observation_collector import *
 from rl_utils.utils.observation_collector.constants import DONE_REASONS
 
@@ -75,7 +75,7 @@ class RewardGoalReached(RewardUnit):
     def __call__(
         self,
         obs_dict: ObservationDict,
-        state_container: StateContainer,
+        simulation_state_container: SimulationStateContainer,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -84,7 +84,7 @@ class RewardGoalReached(RewardUnit):
         Args:
             distance_to_goal (float): Distance to the goal in m.
         """
-        if obs_dict[self._goal_key][0] < state_container.task.goal_radius:
+        if obs_dict[self._goal_key][0] < simulation_state_container.task.goal_radius:
             self.add_reward(self._reward)
             self.add_info(self.DONE_INFO)
         else:
@@ -189,7 +189,7 @@ class RewardFactoredSafeDistance(RewardUnit):
     def __call__(
         self,
         obs_dict: ObservationDict,
-        state_container: StateContainer,
+        simulation_state_container: SimulationStateContainer,
         *args: Any,
         **kwargs: Any,
     ):
@@ -202,8 +202,8 @@ class RewardFactoredSafeDistance(RewardUnit):
             self.add_reward(
                 self._factor
                 * (
-                    state_container.robot.safety_distance
-                    + state_container.robot.radius
+                    simulation_state_container.robot.safety_distance
+                    + simulation_state_container.robot.radius
                     - laser_min
                 )
             )
@@ -393,7 +393,7 @@ class RewardCollision(RewardUnit):
     def __call__(
         self,
         obs_dict: ObservationDict,
-        state_container: StateContainer,
+        simulation_state_container: SimulationStateContainer,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -404,7 +404,7 @@ class RewardCollision(RewardUnit):
             return
 
         coll_in_blind_spot = False
-        crash_radius = state_container.robot.radius + self._bumper_zone
+        crash_radius = simulation_state_container.robot.radius + self._bumper_zone
         if len(obs_dict.get(FullRangeLaserCollector.name, [])) > 0:
             coll_in_blind_spot = obs_dict[FullRangeLaserCollector.name].min() <= (
                 crash_radius
@@ -842,7 +842,7 @@ class RewardActiveHeadingDirection(RewardUnit):
         # relative_x_vel: np.ndarray,
         # relative_y_vel: np.ndarray,
         obs_dict: ObservationDict,
-        state_container: StateContainer,
+        simulation_state_container: SimulationStateContainer,
         *args,
         **kwargs,
     ) -> float:
@@ -911,12 +911,15 @@ class RewardActiveHeadingDirection(RewardUnit):
                         ped_theta = np.arctan2(p_y, p_x)
 
                         # 3*robot_radius:= estimation for sum of the pedestrian radius and the robot radius
-                        vector = ped_dis**2 - (3 * state_container.robot.radius) ** 2
+                        vector = (
+                            ped_dis**2
+                            - (3 * simulation_state_container.robot.radius) ** 2
+                        )
                         if vector < 0:
                             continue  # in this case the robot likely crashed into the pedestrian, disregard this pedestrian
 
                         vo_theta = np.arctan2(
-                            3 * state_container.robot.radius,
+                            3 * simulation_state_container.robot.radius,
                             np.sqrt(vector),
                         )
                         # Check if the robot's trajectory intersects with the pedestrian's VO cone
@@ -1181,7 +1184,7 @@ class RewardPedTypeCollision(RewardUnit):
     def __call__(
         self,
         obs_dict: ObservationDict,
-        state_container: StateContainer,
+        simulation_state_container: SimulationStateContainer,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -1203,7 +1206,7 @@ class RewardPedTypeCollision(RewardUnit):
                 continue
 
             if ped_type_min_distances[ped_type] <= (
-                self._bumper_zone + state_container.robot.radius
+                self._bumper_zone + simulation_state_container.robot.radius
             ):
                 self.add_reward(reward)
 
@@ -1343,7 +1346,10 @@ class RewardMaxStepsExceeded(RewardUnit):
             warn(warn_msg)
 
     def __call__(
-        self, state_container: StateContainer, *args: Any, **kwargs: Any
+        self,
+        simulation_state_container: SimulationStateContainer,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Updates the step count and applies the penalty if the maximum steps are exceeded.
@@ -1353,7 +1359,7 @@ class RewardMaxStepsExceeded(RewardUnit):
             **kwargs: Arbitrary keyword arguments.
         """
         self._steps += 1
-        if self._steps >= state_container.task.max_steps:
+        if self._steps >= simulation_state_container.task.max_steps:
             self.add_reward(-self._penalty)
             self.add_info(self.DONE_INFO)
 

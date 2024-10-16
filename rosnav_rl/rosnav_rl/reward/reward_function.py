@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Tuple
 
 import rospy
-from rl_utils.state_container import StateContainer
+from rl_utils.state_container import SimulationStateContainer
 from rl_utils.utils.observation_collector import ObservationDict
 from rl_utils.utils.observation_collector.traversal import get_required_observations
 
@@ -17,12 +17,12 @@ class RewardFunction:
     _rew_fnc_dict: Dict[str, Dict[str, Any]]
     _reward_units: List["RewardUnit"]
 
-    __state_container: StateContainer
+    __simulation_state_container: SimulationStateContainer
 
     def __init__(
         self,
         reward_file_name: str,
-        state_container: StateContainer = None,
+        simulation_state_container: SimulationStateContainer = None,
         reward_unit_kwargs: dict = None,
         verbose: bool = False,
         *args,
@@ -41,7 +41,7 @@ class RewardFunction:
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
-        self.__state_container = state_container
+        self.__simulation_state_container = simulation_state_container
         self._reward_file_name = reward_file_name
 
         self._curr_reward = 0
@@ -118,7 +118,9 @@ class RewardFunction:
                 and not reward_unit._on_safe_dist_violation
             ):
                 continue
-            reward_unit(obs_dict, state_container=self.__state_container, **kwargs)
+            reward_unit(
+                obs_dict, state_container=self.__simulation_state_container, **kwargs
+            )
 
     def get_reward(
         self,
