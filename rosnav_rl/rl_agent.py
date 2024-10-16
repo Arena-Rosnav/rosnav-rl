@@ -10,6 +10,7 @@ from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
 from rosnav_rl.spaces.space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav_rl.utils.agent_state import AgentStateContainer
+from rl_utils.state_container import SimulationStateContainer
 
 from .model import RL_Model
 
@@ -18,17 +19,17 @@ class RL_Agent:
     model: RL_Model
     reward_function: Optional[RewardFunction] = None
     space_manager: BaseSpaceManager
-    state_container: AgentStateContainer
+    simulation_state_container: SimulationStateContainer
 
     def __init__(
         self,
         agent_cfg: AgentCfg,
-        state_container: AgentStateContainer,
+        simulation_state_container: SimulationStateContainer,
     ):
         self.model = StableBaselinesAgent(policy_cfg=agent_cfg.policy)
-        self.state_container = state_container
         self.space_manager = RosnavSpaceManager(
-            action_space_kwargs={},
+            action_space_kwargs={"is_discrete": agent_cfg.action_space.is_discrete},
+            simulation_state_container=simulation_state_container,
             observation_space_list=self.model.observation_space_list,
             observation_space_kwargs=self.model.observation_space_kwargs,
         )
@@ -36,7 +37,7 @@ class RL_Agent:
             reward_cfg = agent_cfg.reward
             self.reward_function = RewardFunction(
                 reward_file_name=reward_cfg.file_name,
-                state_container=state_container,
+                simulation_state_container=simulation_state_container,
                 reward_unit_kwargs=reward_cfg.reward_unit_kwargs,
                 verbose=reward_cfg.verbose,
             )
@@ -47,7 +48,8 @@ class RL_Agent:
             "model": self.model.config,
             "reward": self.reward_function.config,
             "space": self.space_manager.config,
-            "state_container": asdict(self.state_container),
+            "agent_state_container": asdict(self.agent_state_container),
+            "simulation_state_container": asdict(self.simulation_state_container),
         }
 
     @property
@@ -57,6 +59,10 @@ class RL_Agent:
     @property
     def action_space(self) -> Union[spaces.Discrete, spaces.Box]:
         return self.space_manager.action_space
+
+    @property
+    def agent_state_container(self) -> AgentStateContainer:
+        return self.space_manager.agent_state_container
 
     def get_reward(self, observation: ObservationDict) -> float:
         return self.reward_function.get_reward(observation)
