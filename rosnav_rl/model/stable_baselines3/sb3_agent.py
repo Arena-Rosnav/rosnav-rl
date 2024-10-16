@@ -114,6 +114,9 @@ class StableBaselinesAgent(RL_Model):
         raise NotImplementedError()
         return self.model.predict(observation, deterministic=True)
 
+    def train(self, *args, **kwargs):
+        self.model.learn(*args, **kwargs)
+
     @property
     def config(self):
         return {
