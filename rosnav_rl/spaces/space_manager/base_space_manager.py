@@ -1,99 +1,110 @@
 from abc import ABC
+from dataclasses import asdict
 from typing import Any, Dict, List, Union
 
 import numpy as np
+from gym import spaces
 from rosnav_rl.spaces import (
     ActionSpaceManager,
+    BaseFeatureMapSpace,
+    BaseObservationSpace,
     EncodedObservationDict,
     ObservationSpaceManager,
 )
-from rosnav_rl.utils.type import ObservationDict
-from rosnav_rl.spaces import BaseObservationSpace, BaseFeatureMapSpace
-
-from gym import spaces
+from rosnav_rl.utils.agent_state import AgentStateContainer
+from rosnav_rl.utils.type_aliases import ObservationDict, ObservationSpaceUnit
 
 
 class BaseSpaceManager(ABC):
     """
-    BaseSpaceManager is an abstract base class that defines the interface for managing action and
-    observation spaces in a reinforcement learning environment.
+    BaseSpaceManager is an abstract base class that manages the agent state, action space, and observation space.
 
     Attributes:
-        _action_space_manager (ActionSpaceManager): Manages the action space.
-        _observation_space_manager (ObservationSpaceManager): Manages the observation space.
-
-    Properties:
-        action_space_manager (ActionSpaceManager): Gets the action space manager.
-        observation_space_manager (ObservationSpaceManager): Gets the observation space manager.
-        observation_space (object): Gets the observation space.
-        action_space (object): Gets the action space.
+        _agent_state_container (AgentStateContainer): Container for the agent's state.
+        _action_space_manager (ActionSpaceManager): Manager for the action space.
+        _observation_space_manager (ObservationSpaceManager): Manager for the observation space.
 
     Methods:
-        get_observation_space(): Abstract method to get the observation space.
-        get_action_space(): Abstract method to get the action space.
-        encode_observation(obs_dict: ObservationDict, *args, **kwargs) -> EncodedObservationDict: Abstract method to encode an observation.
-        decode_action(action: np.ndarray) -> np.ndarray: Decodes an action.
+        __init__(agent_state_container, action_space_kwargs, observation_space_list, observation_space_kwargs):
+            Initializes the BaseSpaceManager with the given agent state container, action space arguments, and observation space arguments.
+
+        agent_state_container:
+            Returns the agent state container.
+
+        action_space_manager:
+            Returns the action space manager.
+
+        observation_space_manager:
+            Returns the observation space manager.
+
+        observation_space:
+            Returns the observation space as a dictionary.
+
+        observation_space_list:
+            Returns the list of observation spaces.
+
+        action_space:
+            Returns the action space, which can be either a dictionary or a box.
+
+        config:
+            Returns the configuration of the observation space manager, action space manager, and agent state container.
+
+        _init_action_space_manager(action_space_kwargs):
+            Initializes the ActionSpaceManager with the given action space arguments.
+
+        _init_observation_space_manager(observation_space_list, observation_space_kwargs):
+            Initializes the ObservationSpaceManager with the given observation space list and arguments.
     """
 
+    _agent_state_container: AgentStateContainer
     _action_space_manager: ActionSpaceManager
     _observation_space_manager: ObservationSpaceManager
 
     def __init__(
         self,
+        agent_state_container: AgentStateContainer,
         action_space_kwargs: Dict[str, Any],
         observation_space_list: List[Union[BaseObservationSpace, BaseFeatureMapSpace]],
         observation_space_kwargs: Dict[str, Any],
     ):
+        """
+        Initializes the BaseSpaceManager.
+
+        Args:
+            agent_state_container (AgentStateContainer): The container holding the state of the agent.
+            action_space_kwargs (Dict[str, Any]): Keyword arguments for initializing the action space manager.
+            observation_space_list (List[Union[BaseObservationSpace, BaseFeatureMapSpace]]): List of observation spaces to be managed.
+            observation_space_kwargs (Dict[str, Any]): Keyword arguments for initializing the observation space manager.
+        """
+        self._agent_state_container = agent_state_container
         self._init_action_space_manager(action_space_kwargs)
         self._init_observation_space_manager(
             observation_space_list, observation_space_kwargs
         )
 
     @property
+    def agent_state_container(self) -> AgentStateContainer:
+        return self._agent_state_container
+
+    @property
     def action_space_manager(self) -> ActionSpaceManager:
-        """
-        Gets the action space manager.
-        Returns:
-            object: The action space manager.
-        """
         return self._action_space_manager
 
     @property
     def observation_space_manager(self) -> ObservationSpaceManager:
-        """
-        Gets the observation space manager.
-        Returns:
-            object: The observation space manager.
-        """
+
         return self._observation_space_manager
 
     @property
     def observation_space(self) -> spaces.Dict:
-        """
-        Gets the observation space.
-        Returns:
-            object: The observation space.
-        """
         return self._observation_space_manager.observation_space
 
     @property
-    def observation_space_list(
-        self,
-    ) -> List[Union[BaseObservationSpace, BaseFeatureMapSpace]]:
-        """
-        Gets the observation space list.
-        Returns:
-            object: The observation space list.
-        """
+    def observation_space_list(self) -> List[ObservationSpaceUnit]:
         return self._observation_space_manager.space_list
 
     @property
     def action_space(self) -> Union[spaces.Dict, spaces.Box]:
-        """
-        Gets the action space.
-        Returns:
-            object: The action space.
-        """
         return self._action_space_manager.action_space
 
     @property
@@ -101,6 +112,7 @@ class BaseSpaceManager(ABC):
         return {
             "observation": self._observation_space_manager.config,
             "action": self._action_space_manager.config,
+            "agent_state_container": self._agent_state_container,
         }
 
     def _init_action_space_manager(self, action_space_kwargs: Dict[str, Any]):
@@ -110,7 +122,11 @@ class BaseSpaceManager(ABC):
         Args:
             action_space_kwargs (Dict[str, Any]): Additional keyword arguments for the action spaces.
         """
-        self._action_space_manager = ActionSpaceManager(**action_space_kwargs)
+        self._action_space_manager = ActionSpaceManager(
+            **action_space_kwargs.update(
+                asdict(self._agent_state_container.action_space)
+            )
+        )
 
     def _init_observation_space_manager(
         self,
@@ -126,7 +142,9 @@ class BaseSpaceManager(ABC):
         """
         self._observation_space_manager = ObservationSpaceManager(
             space_list=observation_space_list,
-            space_kwargs=observation_space_kwargs,
+            space_kwargs=observation_space_kwargs.update(
+                asdict(self._agent_state_container.observation_space)
+            ),
         )
 
     def encode_observation(
