@@ -7,6 +7,7 @@ import rospy
 from rl_utils.state_container import SimulationStateContainer
 from rl_utils.utils.observation_collector import *
 from rl_utils.utils.observation_collector.constants import DONE_REASONS
+from rl_utils.utils.type_alias.observation import ObservationDict
 
 from ..constants import DEFAULTS, REWARD_CONSTANTS
 from ..reward_function import RewardFunction
@@ -805,9 +806,9 @@ class RewardActiveHeadingDirection(RewardUnit):
         DistAngleToGoal,
         DistAngleToSubgoal,
         LastActionCollector,
-        PedestrianRelativeLocation,
-        PedestrianRelativeVelX,
-        PedestrianRelativeVelY,
+        PedestrianRelativeLocationGenerator,
+        PedestrianRelativeVelXGenerator,
+        PedestrianRelativeVelYGenerator,
     ]
 
     def __init__(
@@ -867,14 +868,14 @@ class RewardActiveHeadingDirection(RewardUnit):
         action: LastActionCollector.data_class = obs_dict.get(
             LastActionCollector.name, None
         )
-        relative_location: PedestrianRelativeLocation.data_class = obs_dict.get(
-            PedestrianRelativeLocation.name, None
+        relative_location: PedestrianRelativeLocationGenerator.data_class = (
+            obs_dict.get(PedestrianRelativeLocationGenerator.name, None)
         )
-        relative_x_vel: PedestrianRelativeVelX.data_class = obs_dict.get(
-            PedestrianRelativeVelX.name, None
+        relative_x_vel: PedestrianRelativeVelXGenerator.data_class = obs_dict.get(
+            PedestrianRelativeVelXGenerator.name, None
         )
-        relative_y_vel: PedestrianRelativeVelY.data_class = obs_dict.get(
-            PedestrianRelativeVelY.name, None
+        relative_y_vel: PedestrianRelativeVelYGenerator.data_class = obs_dict.get(
+            PedestrianRelativeVelYGenerator.name, None
         )
 
         if (

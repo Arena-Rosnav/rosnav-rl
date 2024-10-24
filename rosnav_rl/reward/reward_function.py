@@ -1,14 +1,67 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, TYPE_CHECKING
 
 import rospy
 from rl_utils.state_container import SimulationStateContainer
-from rl_utils.utils.observation_collector import ObservationDict
-from rl_utils.utils.observation_collector.traversal import get_required_observations
+from rl_utils.utils.type_alias.observation import ObservationDict
 
 from .utils import load_rew_fnc
 
+if TYPE_CHECKING:
+    from .reward_units.base_reward_units import RewardUnit
+
 
 class RewardFunction:
+    """
+    RewardFunction class is responsible for managing and calculating rewards in a reinforcement learning environment.
+
+    Attributes:
+        _reward_file_name (str): The name of the file containing reward function configurations.
+        _curr_reward (float): The current reward value.
+        _info (Dict[str, Any]): Dictionary containing additional information about the reward.
+        _rew_fnc_dict (Dict[str, Dict[str, Any]]): Dictionary containing reward function configurations.
+        _reward_units (List["RewardUnit"]): List of reward units used to calculate the reward.
+        __simulation_state_container (SimulationStateContainer): Container for simulation state information.
+        _verbose (bool): Flag to enable verbose logging.
+        _reward_overview (Dict[str, float]): Overview of rewards added by different units.
+
+    Methods:
+        __init__(reward_file_name: str, simulation_state_container: SimulationStateContainer = None, reward_unit_kwargs: dict = None, verbose: bool = False, *args, **kwargs):
+            Initializes the RewardFunction with the specified parameters.
+
+        __repr__() -> str:
+            Returns a string representation of the RewardFunction.
+
+        reward_units() -> List["RewardUnit"]:
+            Returns the list of reward units.
+
+        config() -> List[Dict[str, Any]]:
+            Returns the reward function configuration dictionary.
+
+        add_reward(value: float, *args, **kwargs):
+            Adds the specified value to the current reward.
+
+        add_info(info: Dict[str, Any]):
+            Adds the specified information to the reward function's info dictionary.
+
+        reset():
+            Resets the reward function before each episode.
+
+        calculate_reward(obs_dict: ObservationDict, *args, **kwargs) -> None:
+            Calculates the reward based on several observations.
+
+        get_reward(obs_dict: ObservationDict, *args, **kwargs) -> Tuple[float, Dict[str, Any]]:
+            Retrieves the current reward and info dictionary.
+
+        print_reward_overview():
+            Prints an overview of the rewards added by different units.
+
+        _setup_reward_function(**kwargs) -> List["RewardUnit"]:
+            Sets up the reward function and returns a list of reward units.
+
+        _reset():
+            Resets the reward function on every environment step.
+    """
+
     _reward_file_name: str
 
     _curr_reward: float
@@ -28,16 +81,14 @@ class RewardFunction:
         *args,
         **kwargs,
     ):
-        """Initialize a reward function for a reinforcement learning environment.
+        """
+        Initializes the reward function.
 
         Args:
-            rew_func_name (str): Name of the yaml file that contains the reward function specifications.
-            robot_radius (float): Radius of the robot.
-            goal_radius (float): Radius of the goal.
-            max_steps (int): Maximum number of steps in the environment.
-            safe_dist (float): Safe distance of the agent.
-            internal_state_updates (List[InternalStateInfoUpdate], optional): List of internal state updates. Defaults to None.
-            reward_unit_kwargs (dict, optional): Keyword arguments for reward units. Defaults to None.
+            reward_file_name (str): The name of the file containing the reward function.
+            simulation_state_container (SimulationStateContainer, optional): Container for the simulation state. Defaults to None.
+            reward_unit_kwargs (dict, optional): Additional keyword arguments for reward units. Defaults to None.
+            verbose (bool, optional): If True, enables verbose logging. Defaults to False.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
@@ -71,12 +122,8 @@ class RewardFunction:
         return format_string
 
     @property
-    def units(self) -> List["RewardUnit"]:
+    def reward_units(self) -> List["RewardUnit"]:
         return self._reward_units
-
-    @property
-    def required_observations(self):
-        return get_required_observations(self._reward_units)
 
     @property
     def config(self) -> List[Dict[str, Any]]:
@@ -118,8 +165,15 @@ class RewardFunction:
                 and not reward_unit._on_safe_dist_violation
             ):
                 continue
+
+            # if "simulation_state_container" not in obs_dict:
+            #     obs_dict["simulation_state_container"] = (
+            #         self.__simulation_state_container
+            #     )
             reward_unit(
-                obs_dict, state_container=self.__simulation_state_container, **kwargs
+                obs_dict,
+                simulation_state_container=self.__simulation_state_container,
+                **kwargs,
             )
 
     def get_reward(
