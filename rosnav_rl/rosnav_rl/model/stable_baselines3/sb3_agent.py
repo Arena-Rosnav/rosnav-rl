@@ -20,6 +20,7 @@ DEVICE_AUTO = "auto"
 
 class StableBaselinesAgent(RL_Model):
     model: Union[PPO, RecurrentPPO] = None
+    algorithm_cfg: PPO_Cfg = None
 
     def __init__(
         self,
@@ -157,6 +158,8 @@ class StableBaselinesAgent(RL_Model):
     @property
     def config(self):
         return {
-            "algorithm_cfg": self.algorithm_cfg.model_dump(),
-            "policy_cfg": self.policy_cfg.model_dump(),
+            "algorithm_cfg": (
+                self.algorithm_cfg.model_dump() if self.algorithm_cfg else {}
+            ),
+            "policy_cfg": self.policy_cfg.model_dump() if self.policy_cfg else {},
         }
