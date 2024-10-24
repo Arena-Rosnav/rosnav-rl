@@ -1,12 +1,14 @@
 import numpy as np
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import LaserCollector, ObservationDict
+from rl_utils.utils.observation_collector import LaserCollector
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 
 
-@SpaceFactory.register("laser")
+@SpaceFactory.register("reduce_laser")
 class ReducedLaserScanSpace(BaseObservationSpace):
     """
     Represents the observation space for laser scan data.
@@ -23,7 +25,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
     """
 
     name = "REDUCED_LASER"
-    required_observations = [LaserCollector]
+    required_observation_units = [LaserCollector]
 
     def __init__(
         self,

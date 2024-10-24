@@ -6,8 +6,9 @@ from gymnasium import spaces
 from rl_utils.utils.observation_collector import (
     DoneObservation,
     LaserCollector,
-    ObservationDict,
 )
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -41,7 +42,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
     """
 
     name = "STACKED_LASER_MAP"
-    required_observations = [LaserCollector]
+    required_observation_units = [LaserCollector]
 
     def __init__(
         self,

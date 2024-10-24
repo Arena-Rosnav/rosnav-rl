@@ -1,10 +1,11 @@
 import numpy as np
 from gymnasium import spaces
 from rl_utils.utils.observation_collector import (
-    PedestrianRelativeLocation,
+    PedestrianRelativeLocationGenerator,
     PedestrianSocialStateCollector,
-    ObservationDict,
 )
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -35,7 +36,10 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
     """
 
     name = "PEDESTRIAN_SOCIAL_STATE"
-    required_observations = [PedestrianSocialStateCollector, PedestrianRelativeLocation]
+    required_observation_units = [
+        PedestrianSocialStateCollector,
+        PedestrianRelativeLocationGenerator,
+    ]
 
     def __init__(
         self,
@@ -67,7 +71,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
     def _get_semantic_map(
         self,
         semantic_data: PedestrianSocialStateCollector.data_class,
-        relative_pos: PedestrianRelativeLocation.data_class,
+        relative_pos: PedestrianRelativeLocationGenerator.data_class,
         *args,
         **kwargs
     ) -> np.ndarray:
@@ -116,5 +120,5 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         """
         return self._get_semantic_map(
             observation[PedestrianSocialStateCollector.name],
-            observation[PedestrianRelativeLocation.name],
+            observation[PedestrianRelativeLocationGenerator.name],
         )

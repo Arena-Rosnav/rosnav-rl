@@ -1,15 +1,15 @@
 import numpy as np
 from gymnasium import spaces
+from rl_utils.utils.observation_collector import (
+    PedestrianRelativeLocationGenerator,
+    PedestrianRelativeVelYGenerator,
+)
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
-
-from rl_utils.utils.observation_collector import (
-    PedestrianRelativeLocation,
-    PedestrianRelativeVelY,
-    ObservationDict,
-)
 
 
 @SpaceFactory.register("ped_vel_y")
@@ -33,7 +33,10 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
     """
 
     name = "PEDESTRIAN_VEL_Y"
-    required_observations = [PedestrianRelativeLocation, PedestrianRelativeVelY]
+    required_observation_units = [
+        PedestrianRelativeLocationGenerator,
+        PedestrianRelativeVelYGenerator,
+    ]
 
     def __init__(
         self,
@@ -66,8 +69,8 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
 
     def _get_semantic_map(
         self,
-        relative_pos: PedestrianRelativeLocation.data_class = None,
-        relative_y_vel: PedestrianRelativeVelY.data_class = None,
+        relative_pos: PedestrianRelativeLocationGenerator.data_class = None,
+        relative_y_vel: PedestrianRelativeVelYGenerator.data_class = None,
         *args,
         **kwargs
     ) -> np.ndarray:
@@ -111,6 +114,6 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[PedestrianRelativeLocation.name],
-            observation[PedestrianRelativeVelY.name],
+            observation[PedestrianRelativeLocationGenerator.name],
+            observation[PedestrianRelativeVelYGenerator.name],
         )

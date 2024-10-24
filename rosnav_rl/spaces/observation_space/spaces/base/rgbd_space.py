@@ -1,15 +1,15 @@
 import numpy as np
 from gymnasium import spaces
 from numpy import ndarray
-
-from ...observation_space_factory import SpaceFactory
-from ..base_observation_space import BaseObservationSpace
-
 from rl_utils.utils.observation_collector import (
     ImageColorCollector,
     ImageDepthCollector,
-    ObservationDict,
 )
+
+from rosnav_rl.utils.type_aliases import ObservationDict
+
+from ...observation_space_factory import SpaceFactory
+from ..base_observation_space import BaseObservationSpace
 
 
 @SpaceFactory.register("rgbd")
@@ -31,7 +31,7 @@ class RGBDSpace(BaseObservationSpace):
     """
 
     name: str = "RGBD"
-    required_observations = [ImageColorCollector, ImageDepthCollector]
+    required_observation_units = [ImageColorCollector, ImageDepthCollector]
 
     def __init__(
         self, rgbd_image_height: int, rgbd_image_width: int, *args, **kwargs

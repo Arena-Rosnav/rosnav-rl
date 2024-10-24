@@ -7,10 +7,10 @@ from .base_feature_map_space import BaseFeatureMapSpace
 
 
 from rl_utils.utils.observation_collector import (
-    PedestrianRelativeLocation,
-    PedestrianRelativeVelX,
-    ObservationDict,
+    PedestrianRelativeLocationGenerator,
+    PedestrianRelativeVelXGenerator,
 )
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 
 @SpaceFactory.register("ped_vel_x")
@@ -39,7 +39,10 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
     """
 
     name = "PEDESTRIAN_VEL_X"
-    required_observations = [PedestrianRelativeLocation, PedestrianRelativeVelX]
+    required_observation_units = [
+        PedestrianRelativeLocationGenerator,
+        PedestrianRelativeVelXGenerator,
+    ]
 
     def __init__(
         self,
@@ -73,8 +76,8 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
 
     def _get_semantic_map(
         self,
-        relative_pos: PedestrianRelativeLocation.data_class = None,
-        relative_x_vel: PedestrianRelativeVelX.data_class = None,
+        relative_pos: PedestrianRelativeLocationGenerator.data_class = None,
+        relative_x_vel: PedestrianRelativeVelXGenerator.data_class = None,
         *args,
         **kwargs
     ) -> np.ndarray:
@@ -121,6 +124,6 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
 
         """
         return self._get_semantic_map(
-            observation[PedestrianRelativeLocation.name],
-            observation[PedestrianRelativeVelX.name],
+            observation[PedestrianRelativeLocationGenerator.name],
+            observation[PedestrianRelativeVelXGenerator.name],
         )

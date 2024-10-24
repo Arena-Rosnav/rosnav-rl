@@ -5,13 +5,14 @@ import numpy as np
 import rospy
 from gymnasium import spaces
 from rl_utils.utils.observation_collector import (
-    ObservationDict,
     RobotPoseCollector,
     SemanticLayerCollector,
 )
 from rl_utils.utils.observation_collector.utils.semantic import (
     get_relative_pos_to_robot,
 )
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ..base_observation_space import (
     BaseObservationSpace,
@@ -26,7 +27,9 @@ class BaseFeatureMapSpace(BaseObservationSpace):
     """
 
     name: str
-    required_observations: List[Union[ObservationCollector, ObservationGenerator]] = []
+    required_observation_units: List[
+        Union[ObservationCollector, ObservationGenerator]
+    ] = []
     background_value: int = 0
 
     def __init__(
