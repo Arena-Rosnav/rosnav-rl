@@ -17,6 +17,40 @@ from .model import RL_Model
 
 
 class RL_Agent:
+    """
+    RL_Agent is a reinforcement learning agent that integrates a model, reward function,
+    space manager, and simulation state container to interact with an environment.
+
+    Attributes:
+        model (RL_Model): The reinforcement learning model used by the agent.
+        reward_function (Optional[RewardFunction]): The function used to calculate rewards.
+        space_manager (BaseSpaceManager): Manages the action and observation spaces.
+        simulation_state_container (SimulationStateContainer): Container for the simulation state.
+
+    Methods:
+        __init__(agent_cfg: AgentCfg, simulation_state_container: SimulationStateContainer):
+            Initializes the RL_Agent with the given configuration and simulation state container.
+
+        config() -> Dict[str, dict]:
+            Returns the configuration of the agent, including model, reward, space, and state containers.
+
+        observation_space() -> spaces.Dict:
+            Returns the observation space managed by the space manager.
+
+        action_space() -> Union[spaces.Discrete, spaces.Box]:
+            Returns the action space managed by the space manager.
+
+        agent_state_container() -> AgentStateContainer:
+            Returns the agent state container managed by the space manager.
+
+        get_reward(observation: ObservationDict) -> float:
+            Calculates and returns the reward for a given observation.
+
+        get_action(observation: ObservationDict) -> np.ndarray:
+            Returns the action for a given observation by encoding the observation,
+            getting the action from the model, and decoding the action.
+    """
+
     model: RL_Model
     reward_function: Optional[RewardFunction] = None
     space_manager: BaseSpaceManager
@@ -27,6 +61,7 @@ class RL_Agent:
         agent_cfg: AgentCfg,
         simulation_state_container: SimulationStateContainer,
     ):
+        self.simulation_state_container = simulation_state_container
         self.model = StableBaselinesAgent(policy_cfg=agent_cfg.policy)
         self.space_manager = RosnavSpaceManager(
             action_space_kwargs={"is_discrete": agent_cfg.action_space.is_discrete},
