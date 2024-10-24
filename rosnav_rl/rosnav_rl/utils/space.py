@@ -1,11 +1,12 @@
-from typing import Any, Dict, List
 import inspect
+from typing import TYPE_CHECKING, Any, Dict, List
 
-from rosnav_rl.spaces import BaseObservationSpace
+if TYPE_CHECKING:
+    from rosnav_rl.spaces import BaseObservationSpace
 
 
 def extract_init_arguments(
-    classes: List[BaseObservationSpace],
+    classes: List["BaseObservationSpace"],
 ) -> Dict[str, Dict[str, str]]:
     """
     Extracts the arguments and their types from the __init__ method of each class in the provided list.
