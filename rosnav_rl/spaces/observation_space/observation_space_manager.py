@@ -1,9 +1,12 @@
 from typing import Any, Dict, List, Type, Union
+
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import ObservationDict
+
 from rosnav_rl.spaces.observation_space import EncodedObservationDict
-from .spaces.base_observation_space import BaseObservationSpace
 from rosnav_rl.utils.space import extract_init_arguments
+from rosnav_rl.utils.type_aliases import ObservationDict
+
+from .spaces.base_observation_space import BaseObservationSpace
 
 
 class ObservationSpaceManager:
