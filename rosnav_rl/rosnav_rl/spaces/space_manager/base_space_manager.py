@@ -122,11 +122,8 @@ class BaseSpaceManager(ABC):
         Args:
             action_space_kwargs (Dict[str, Any]): Additional keyword arguments for the action spaces.
         """
-        self._action_space_manager = ActionSpaceManager(
-            **action_space_kwargs.update(
-                asdict(self._agent_state_container.action_space)
-            )
-        )
+        action_space_kwargs.update(asdict(self._agent_state_container.action_space))
+        self._action_space_manager = ActionSpaceManager(**action_space_kwargs)
 
     def _init_observation_space_manager(
         self,
@@ -140,11 +137,12 @@ class BaseSpaceManager(ABC):
             observation_spaces (List[Union[BaseObservationSpace, BaseFeatureMapSpace]]): The list of observation spaces.
             observation_space_kwargs (Dict[str, Any]): Additional keyword arguments for the observation spaces.
         """
+        observation_space_kwargs.update(
+            asdict(self._agent_state_container.observation_space)
+        )
         self._observation_space_manager = ObservationSpaceManager(
             space_list=observation_space_list,
-            space_kwargs=observation_space_kwargs.update(
-                asdict(self._agent_state_container.observation_space)
-            ),
+            space_kwargs=observation_space_kwargs,
         )
 
     def encode_observation(
