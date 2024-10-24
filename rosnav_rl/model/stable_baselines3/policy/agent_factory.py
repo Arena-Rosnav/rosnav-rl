@@ -1,6 +1,5 @@
 from typing import Callable, Type, Union
 
-from rosnav_rl.utils.sb3agent_format_check import check_format
 from stable_baselines3.common.policies import BasePolicy
 
 from .base_policy import StableBaselinesPolicy
@@ -28,10 +27,6 @@ class AgentFactory:
             assert issubclass(wrapped_class, StableBaselinesPolicy) or issubclass(
                 wrapped_class, BasePolicy
             ), f"Wrapped class {wrapped_class.__name__} is neither of type 'StableBaselinesPolicy' nor 'BasePolicy!'"
-
-            if issubclass(wrapped_class, StableBaselinesPolicy):
-                check_format(wrapped_class)
-
             cls.registry[name] = wrapped_class
             return wrapped_class
 
