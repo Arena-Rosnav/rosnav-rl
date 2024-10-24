@@ -1,6 +1,14 @@
-from typing import Any, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict, TypeVar, Union
 
-from rosnav_rl.spaces import BaseObservationSpace, BaseFeatureMapSpace
+if TYPE_CHECKING:
+    from rosnav_rl.spaces import BaseFeatureMapSpace, BaseObservationSpace
 
 ObservationDict = Dict[str, Any]
-ObservationSpaceUnit = Union[BaseObservationSpace, BaseFeatureMapSpace]
+ObservationSpaceUnit = Union["BaseObservationSpace", "BaseFeatureMapSpace"]
+
+ObservationCollector = TypeVar(
+    "ObservationCollector"
+)  # bound=ObservationCollectorUnit)
+ObservationGenerator = TypeVar(
+    "ObservationGenerator"
+)  # bound=ObservationGeneratorUnit)
