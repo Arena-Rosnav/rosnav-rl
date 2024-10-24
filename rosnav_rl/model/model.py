@@ -1,12 +1,15 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, List
 
+from pydantic import BaseModel
+
 if TYPE_CHECKING:
     from rosnav_rl.spaces import BaseObservationSpace, EncodedObservationDict
 
 
 class RL_Model(ABC):
     model = None
+    algorithm_cfg: BaseModel = None
 
     @abstractmethod
     def initialize(self, *args, **kwargs):
