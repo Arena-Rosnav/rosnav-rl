@@ -1,16 +1,16 @@
 import numpy as np
 from gymnasium import spaces
+from rl_utils.utils.observation_collector import (
+    PedestrianLocationCollector,
+    PedestrianRelativeLocationGenerator,
+    RobotPoseCollector,
+)
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
-
-from rl_utils.utils.observation_collector import (
-    PedestrianLocationCollector,
-    RobotPoseCollector,
-    PedestrianRelativeLocation,
-    ObservationDict,
-)
 
 
 @SpaceFactory.register("ped_location")
@@ -36,9 +36,9 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
     """
 
     name = "PEDESTRIAN_LOCATION"
-    required_observations = [
+    required_observation_units = [
         PedestrianLocationCollector,
-        PedestrianRelativeLocation,
+        PedestrianRelativeLocationGenerator,
         RobotPoseCollector,
     ]
 
@@ -90,6 +90,6 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
         """
         return self._get_semantic_map(
             observation[PedestrianLocationCollector.name],
-            observation[PedestrianRelativeLocation.name],
+            observation[PedestrianRelativeLocationGenerator.name],
             observation[RobotPoseCollector.name],
         )

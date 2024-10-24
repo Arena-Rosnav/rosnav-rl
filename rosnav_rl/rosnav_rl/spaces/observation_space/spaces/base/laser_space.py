@@ -1,6 +1,8 @@
 import numpy as np
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import LaserCollector, ObservationDict
+from rl_utils.utils.observation_collector import LaserCollector
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -23,7 +25,7 @@ class LaserScanSpace(BaseObservationSpace):
     """
 
     name = "LASER"
-    required_observations = [LaserCollector]
+    required_observation_units = [LaserCollector]
 
     def __init__(
         self, laser_num_beams: int, laser_max_range: float, *args, **kwargs

@@ -1,17 +1,17 @@
-import inspect
 from abc import ABC, abstractmethod
-from typing import List, Set, Type, TypeVar, Union
+from typing import List, Union
+from warnings import warn
 
 import numpy as np
 from gym import spaces
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import *
+
 from rosnav_rl.spaces.observation_space.normalization import *
-
-ObservationCollector = TypeVar("ObservationCollector", bound=ObservationCollectorUnit)
-ObservationGenerator = TypeVar("ObservationGenerator", bound=ObservationGeneratorUnit)
-
-from warnings import warn
+from rosnav_rl.utils.type_aliases import (
+    ObservationCollector,
+    ObservationDict,
+    ObservationGenerator,
+)
 
 
 class BaseObservationSpace(ABC):
@@ -20,7 +20,9 @@ class BaseObservationSpace(ABC):
     """
 
     name: str = "BASE_OBSERVATION_SPACE"
-    required_observations: List[Union[ObservationCollector, ObservationGenerator]] = []
+    required_observation_units: List[
+        Union[ObservationCollector, ObservationGenerator]
+    ] = []
 
     def __init__(
         self,

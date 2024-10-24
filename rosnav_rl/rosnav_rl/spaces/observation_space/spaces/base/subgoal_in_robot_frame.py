@@ -2,9 +2,10 @@ import numpy as np
 import rospy
 from gymnasium import spaces
 from rl_utils.utils.observation_collector import (
-    ObservationDict,
     SubgoalLocationInRobotFrame,
 )
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -30,7 +31,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
     """
 
     name = "SUBGOAL_IN_ROBOT_FRAME"
-    required_observations = [SubgoalLocationInRobotFrame]
+    required_observation_units = [SubgoalLocationInRobotFrame]
 
     def __init__(self, subgoal_max_dist: float = 5, *args, **kwargs) -> None:
         self._max_dist = subgoal_max_dist

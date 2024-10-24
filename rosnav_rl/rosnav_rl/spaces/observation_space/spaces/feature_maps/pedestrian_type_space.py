@@ -1,11 +1,12 @@
 import numpy as np
 from gymnasium import spaces
 from rl_utils.utils.observation_collector import (
-    PedestrianRelativeLocation,
+    PedestrianRelativeLocationGenerator,
     PedestrianTypeCollector,
     RobotPoseCollector,
-    ObservationDict,
 )
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
@@ -35,9 +36,9 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
     """
 
     name = "PEDESTRIAN_TYPE"
-    required_observations = [
+    required_observation_units = [
         PedestrianTypeCollector,
-        PedestrianRelativeLocation,
+        PedestrianRelativeLocationGenerator,
         RobotPoseCollector,
     ]
     background_value = -1
@@ -101,6 +102,6 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         """
         return self._get_semantic_map(
             observation[PedestrianTypeCollector.name],
-            observation[PedestrianRelativeLocation.name],
+            observation[PedestrianRelativeLocationGenerator.name],
             observation[RobotPoseCollector.name],
         )

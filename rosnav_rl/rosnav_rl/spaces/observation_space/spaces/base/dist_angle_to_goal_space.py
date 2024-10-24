@@ -1,12 +1,12 @@
 import numpy as np
 from gymnasium import spaces
+from rl_utils.utils.observation_collector import DistAngleToGoal
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
-from ..base_observation_space import BaseObservationSpace
 from ...utils import stack_spaces
-
-
-from rl_utils.utils.observation_collector import DistAngleToGoal, ObservationDict
+from ..base_observation_space import BaseObservationSpace
 
 
 @SpaceFactory.register("dist_angle_to_goal")
@@ -29,7 +29,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
     """
 
     name = "DIST_ANGLE_TO_GOAL"
-    required_observations = [DistAngleToGoal]
+    required_observation_units = [DistAngleToGoal]
 
     def __init__(self, goal_max_dist: float = 30, *args, **kwargs) -> None:
         self._max_dist = goal_max_dist
