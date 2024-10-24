@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Any, List
 
-from ..reward_function import RewardFunction
-from rl_utils.utils.observation_collector import TypeObservationGeneric
+from rl_utils.state_container import SimulationStateContainer
+from rl_utils.utils.type_alias.observation import TypeObservationGeneric
 
-from rl_utils.state_container import StateContainer
+from ..reward_function import RewardFunction
 
 
 class RewardUnit(ABC):
@@ -75,7 +75,7 @@ class RewardUnit(ABC):
 
     @abstractmethod
     def __call__(
-        self, state_container: StateContainer, *args: Any, **kwargs: Any
+        self, state_container: SimulationStateContainer, *args: Any, **kwargs: Any
     ) -> Any:
         """
         Placeholder method for calling the reward unit. It should alter the reward and possibly the info dict.
