@@ -20,7 +20,6 @@ class RewardFunction:
         _info (Dict[str, Any]): Dictionary containing additional information about the reward.
         _rew_fnc_dict (Dict[str, Dict[str, Any]]): Dictionary containing reward function configurations.
         _reward_units (List["RewardUnit"]): List of reward units used to calculate the reward.
-        __simulation_state_container (SimulationStateContainer): Container for simulation state information.
         _verbose (bool): Flag to enable verbose logging.
         _reward_overview (Dict[str, float]): Overview of rewards added by different units.
 
@@ -70,12 +69,9 @@ class RewardFunction:
     _rew_fnc_dict: Dict[str, Dict[str, Any]]
     _reward_units: List["RewardUnit"]
 
-    __simulation_state_container: SimulationStateContainer
-
     def __init__(
         self,
         reward_file_name: str,
-        simulation_state_container: SimulationStateContainer = None,
         reward_unit_kwargs: dict = None,
         verbose: bool = False,
         *args,
@@ -92,7 +88,6 @@ class RewardFunction:
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
-        self.__simulation_state_container = simulation_state_container
         self._reward_file_name = reward_file_name
 
         self._curr_reward = 0
@@ -159,6 +154,7 @@ class RewardFunction:
         Args:
             laser_scan (np.ndarray): Array containing the laser data.
         """
+        simulation_state_container = obs_dict.get("simulation_state_container")
         for reward_unit in self._reward_units:
             if (
                 self._info.get("safe_dist_violation", False)
@@ -171,8 +167,8 @@ class RewardFunction:
             #         self.__simulation_state_container
             #     )
             reward_unit(
-                obs_dict,
-                simulation_state_container=self.__simulation_state_container,
+                obs_dict=obs_dict,
+                simulation_state_container=simulation_state_container,
                 **kwargs,
             )
 
