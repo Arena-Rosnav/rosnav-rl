@@ -3,14 +3,15 @@ from typing import Dict, Optional, Union
 
 import numpy as np
 from gym import spaces
-from rl_utils.utils.observation_collector import ObservationDict
-from rosnav_rl.config import AgentCfg
+from rl_utils.state_container import SimulationStateContainer
+
+from rosnav_rl.cfg import AgentCfg
 from rosnav_rl.model.stable_baselines3 import StableBaselinesAgent
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
 from rosnav_rl.spaces.space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav_rl.utils.agent_state import AgentStateContainer
-from rl_utils.state_container import SimulationStateContainer
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from .model import RL_Model
 
