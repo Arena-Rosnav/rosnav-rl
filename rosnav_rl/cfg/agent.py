@@ -13,7 +13,7 @@ class AgentCfg(BaseModel):
     robot: Optional[str] = None
     policy: PPO_Policy_Cfg
     reward: Optional[RewardCfg] = None
-    action_space: Optional[ActionSpaceCfg] = None
+    action_space: Optional[ActionSpaceCfg] = ActionSpaceCfg()
 
     @model_validator(mode="after")
     def check_name(self):

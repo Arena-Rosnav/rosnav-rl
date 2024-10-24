@@ -1,7 +1,7 @@
 from typing import Any, Callable, Optional
 
-from pydantic import AfterValidator
-from rosnav_rl.utils.model.learning_rate_schedules import load_lr_schedule
+from pydantic import BaseModel, AfterValidator
+from rosnav_rl.utils.model.sb3.learning_rate_schedules import load_lr_schedule
 from typing_extensions import Annotated
 
 
