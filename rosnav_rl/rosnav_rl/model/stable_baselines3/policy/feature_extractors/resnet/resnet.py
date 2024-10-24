@@ -86,6 +86,8 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         self._norm_layer = norm_layer
         self._zero_init_residual = zero_init_residual
 
+        self._observation_space = observation_space
+
         self._num_pedestrian_feature_maps = self._get_num_pedestrian_feature_maps()
         self._get_input_sizes()
 
