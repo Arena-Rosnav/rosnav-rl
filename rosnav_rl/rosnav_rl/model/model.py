@@ -8,8 +8,15 @@ if TYPE_CHECKING:
 
 
 class RL_Model(ABC):
-    model = None
-    algorithm_cfg: BaseModel = None
+    _model = None
+    _model_cfg: BaseModel = None
+    _algorithm_cfg: BaseModel = None
+
+    def __init__(
+        self, model_cfg: BaseModel, algorithm_cfg: BaseModel, *args, **kwargs
+    ) -> None:
+        self._model_cfg = model_cfg
+        self._algorithm_cfg = algorithm_cfg
 
     @abstractmethod
     def initialize(self, *args, **kwargs):
@@ -29,6 +36,20 @@ class RL_Model(ABC):
 
     def get_action(self, observation: "EncodedObservationDict", *args, **kwargs):
         pass
+
+    @property
+    def model(self):
+        if self._model is None:
+            raise ValueError("Model not initialized. Call 'initialize' first.")
+        return self._model
+
+    @property
+    def model_cfg(self):
+        return self._model_cfg
+
+    @property
+    def algorithm_cfg(self):
+        return self._algorithm_cfg
 
     @property
     def observation_space_list(self) -> List["BaseObservationSpace"]:
