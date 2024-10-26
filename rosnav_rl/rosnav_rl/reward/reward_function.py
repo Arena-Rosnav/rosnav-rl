@@ -1,9 +1,7 @@
 from typing import Any, Dict, List, Tuple, TYPE_CHECKING
-
 import rospy
 from rl_utils.state_container import SimulationStateContainer
 from rl_utils.utils.type_alias.observation import ObservationDict
-
 from .utils import load_rew_fnc
 
 if TYPE_CHECKING:
@@ -12,62 +10,58 @@ if TYPE_CHECKING:
 
 class RewardFunction:
     """
-    RewardFunction class is responsible for managing and calculating rewards in a reinforcement learning environment.
+    RewardFunction class for managing and calculating rewards in a reinforcement learning environment.
 
     Attributes:
         _reward_file_name (str): The name of the file containing reward function configurations.
-        _curr_reward (float): The current reward value.
-        _info (Dict[str, Any]): Dictionary containing additional information about the reward.
-        _rew_fnc_dict (Dict[str, Dict[str, Any]]): Dictionary containing reward function configurations.
-        _reward_units (List["RewardUnit"]): List of reward units used to calculate the reward.
         _verbose (bool): Flag to enable verbose logging.
-        _reward_overview (Dict[str, float]): Overview of rewards added by different units.
+        _reward_unit_kwargs (dict): Additional keyword arguments for reward units.
+        _curr_reward (float): Current accumulated reward.
+        _info (dict): Dictionary containing additional information about the reward calculation.
+        _reward_overview (dict): Overview of the reward breakdown.
+        _rew_fnc_dict (dict): Dictionary containing reward function configurations.
+        _reward_units (list): List of instantiated reward units.
 
     Methods:
-        __init__(reward_file_name: str, simulation_state_container: SimulationStateContainer = None, reward_unit_kwargs: dict = None, verbose: bool = False, *args, **kwargs):
-            Initializes the RewardFunction with the specified parameters.
+        __init__(reward_file_name: str, reward_unit_kwargs: dict = None, verbose: bool = False, *args, **kwargs):
+            Initializes the RewardFunction with the given parameters.
 
-        __repr__() -> str:
-            Returns a string representation of the RewardFunction.
+        _initialize_state():
+            Initializes internal state variables.
+
+        _initialize_reward_units():
+            Sets up reward units from the configuration file.
 
         reward_units() -> List["RewardUnit"]:
             Returns the list of reward units.
 
-        config() -> List[Dict[str, Any]]:
+        config() -> Dict[str, Dict[str, Any]]:
             Returns the reward function configuration dictionary.
 
-        add_reward(value: float, *args, **kwargs):
-            Adds the specified value to the current reward.
-
-        add_info(info: Dict[str, Any]):
-            Adds the specified information to the reward function's info dictionary.
-
-        reset():
-            Resets the reward function before each episode.
-
-        calculate_reward(obs_dict: ObservationDict, *args, **kwargs) -> None:
-            Calculates the reward based on several observations.
+        calculate_reward(obs_dict: ObservationDict, simulation_state_container: SimulationStateContainer, *args, **kwargs) -> None:
+            Calculates the reward based on the observation dictionary and simulation state.
 
         get_reward(obs_dict: ObservationDict, *args, **kwargs) -> Tuple[float, Dict[str, Any]]:
-            Retrieves the current reward and info dictionary.
+            Resets the state, calculates the reward, and returns the current reward and additional information.
 
-        print_reward_overview():
-            Prints an overview of the rewards added by different units.
+        add_reward(value: float, **kwargs):
+            Adds a reward value and tracks its source.
 
-        _setup_reward_function(**kwargs) -> List["RewardUnit"]:
-            Sets up the reward function and returns a list of reward units.
+        add_info(info: Dict[str, Any]):
+            Updates the info dictionary with new information.
+
+        reset():
+            Resets the state before each episode.
 
         _reset():
-            Resets the reward function on every environment step.
+            Resets the state before each step.
+
+        _print_reward_overview():
+            Prints a detailed reward breakdown if verbose mode is enabled.
+
+        __repr__() -> str:
+            Returns a string representation of the RewardFunction instance.
     """
-
-    _reward_file_name: str
-
-    _curr_reward: float
-    _info: Dict[str, Any]
-
-    _rew_fnc_dict: Dict[str, Dict[str, Any]]
-    _reward_units: List["RewardUnit"]
 
     def __init__(
         self,
@@ -81,80 +75,52 @@ class RewardFunction:
         Initializes the reward function.
 
         Args:
-            reward_file_name (str): The name of the file containing the reward function.
-            simulation_state_container (SimulationStateContainer, optional): Container for the simulation state. Defaults to None.
+            reward_file_name (str): The name of the reward file.
             reward_unit_kwargs (dict, optional): Additional keyword arguments for reward units. Defaults to None.
             verbose (bool, optional): If True, enables verbose logging. Defaults to False.
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
         """
         self._reward_file_name = reward_file_name
+        self._verbose = verbose
+        self._reward_unit_kwargs = reward_unit_kwargs or {}
 
+        self._initialize_state()
+        self._initialize_reward_units()
+
+    def _initialize_state(self):
+        """Initialize internal state variables"""
         self._curr_reward = 0
         self._info = {}
-
+        self._reward_overview = {}
         self._rew_fnc_dict = load_rew_fnc(self._reward_file_name)
 
-        reward_unit_kwargs = reward_unit_kwargs or {}
-        self._reward_units: List["RewardUnit"] = self._setup_reward_function(
-            **reward_unit_kwargs
-        )
+    def _initialize_reward_units(self):
+        """Set up reward units from configuration"""
+        import rosnav_rl.reward as rew_pkg
 
-        # TODO: Add dynamic parameter for goal radius
-        # self._goal_radius_updater = DynamicParameter(
-        #     cls=self, key="goal_radius", message_type=Float32
-        # )
-
-        self._verbose = verbose
-        self._reward_overview = {}
-
-    def __repr__(self) -> str:
-        format_string = self.__class__.__name__ + "("
-        for name, params in self._rew_fnc_dict.items():
-            format_string += "\n"
-            format_string += f"{name}: {params}"
-        format_string += "\n)"
-        return format_string
+        self._reward_units = [
+            rew_pkg.RewardUnitFactory.instantiate(unit_name)(
+                reward_function=self, **self._reward_unit_kwargs, **params
+            )
+            for unit_name, params in self._rew_fnc_dict.items()
+        ]
 
     @property
     def reward_units(self) -> List["RewardUnit"]:
         return self._reward_units
 
     @property
-    def config(self) -> List[Dict[str, Any]]:
+    def config(self) -> Dict[str, Dict[str, Any]]:
         return self._rew_fnc_dict
 
-    def add_reward(self, value: float, *args, **kwargs):
-        """Adds the specified value to the current reward.
-
-        Args:
-            value (float): Reward to be added. Typically called by the RewardUnit.
-        """
-        self._curr_reward += value
-
-        if "called_by" in kwargs:
-            self._reward_overview[kwargs["called_by"]] = value
-
-    def add_info(self, info: Dict[str, Any]):
-        """Adds the specified information to the reward function's info dictionary.
-
-        Args:
-            info (Dict[str, Any]): RewardUnits information to be added.
-        """
-        self._info.update(info)
-
-    def reset(self):
-        """Reset before each episode."""
-        for reward_unit in self._reward_units:
-            reward_unit.reset()
-
-    def calculate_reward(self, obs_dict: ObservationDict, *args, **kwargs) -> None:
-        """Calculates the reward based on several observations.
-
-        Args:
-            laser_scan (np.ndarray): Array containing the laser data.
-        """
-        simulation_state_container = obs_dict.get("simulation_state_container")
+    def calculate_reward(
+        self,
+        obs_dict: ObservationDict,
+        simulation_state_container: SimulationStateContainer,
+        *args,
+        **kwargs,
+    ) -> None:
         for reward_unit in self._reward_units:
             if (
                 self._info.get("safe_dist_violation", False)
@@ -162,10 +128,6 @@ class RewardFunction:
             ):
                 continue
 
-            # if "simulation_state_container" not in obs_dict:
-            #     obs_dict["simulation_state_container"] = (
-            #         self.__simulation_state_container
-            #     )
             reward_unit(
                 obs_dict=obs_dict,
                 simulation_state_container=simulation_state_container,
@@ -178,48 +140,51 @@ class RewardFunction:
         *args,
         **kwargs,
     ) -> Tuple[float, Dict[str, Any]]:
-        """Retrieves the current reward and info dictionary.
-
-        Args:
-            laser_scan (np.ndarray): Array containing the laser data.
-            point_cloud (np.ndarray): Array containing the point cloud data.
-            from_aggregate_obs (bool): Iff the observation from the aggreation (GetDump.srv) should be considered.
-
-        Returns:
-            Tuple[float, Dict[str, Any]]: Tuple of the current timesteps reward and info.
-        """
         self._reset()
         self.calculate_reward(obs_dict=obs_dict, **kwargs)
+
         if self._verbose:
-            self.print_reward_overview()
+            self._print_reward_overview()
+
         return self._curr_reward, self._info
 
-    def print_reward_overview(self):
-        rospy.loginfo("_____________________________")
-        rospy.loginfo("Reward Overview:")
-        for key, value in self._reward_overview.items():
-            rospy.loginfo(f"{key}: {value}")
-        rospy.loginfo("-----------------------------")
-        rospy.loginfo(f"Total Reward: {self._curr_reward}")
-        rospy.loginfo("_____________________________")
+    def add_reward(self, value: float, **kwargs):
+        """Add a reward value and track its source"""
+        self._curr_reward += value
 
-    def _setup_reward_function(self, **kwargs) -> List["RewardUnit"]:
-        """Sets up the reward function.
+        if "called_by" in kwargs:
+            self._reward_overview[kwargs["called_by"]] = value
 
-        Returns:
-            List[RewardUnit]: List of reward units for calculating the reward.
-        """
-        import rosnav_rl.reward as rew_pkg
+    def add_info(self, info: Dict[str, Any]):
+        """Update the info dictionary with new information"""
+        self._info.update(info)
 
-        return [
-            rew_pkg.RewardUnitFactory.instantiate(unit_name)(
-                reward_function=self, **kwargs, **params
-            )
-            for unit_name, params in self._rew_fnc_dict.items()
-        ]
+    def reset(self):
+        """Reset state before each episode"""
+        for reward_unit in self._reward_units:
+            reward_unit.reset()
 
     def _reset(self):
-        """Reset on every environment step."""
+        """Reset state before each step"""
         self._curr_reward = 0
         self._info = {}
         self._reward_overview = {}
+
+    def _print_reward_overview(self):
+        """Print detailed reward breakdown if verbose mode is enabled"""
+        rospy.loginfo("____________________________________")
+        rospy.loginfo("Reward Overview:")
+
+        for key, value in self._reward_overview.items():
+            rospy.loginfo(f"{key}: {value:.4f}")
+
+        rospy.loginfo("------------------------------------")
+        rospy.loginfo(f"Total Reward: {self._curr_reward:.4f}")
+        rospy.loginfo("____________________________________")
+
+    def __repr__(self) -> str:
+        parts = [self.__class__.__name__ + "("]
+        for name, params in self._rew_fnc_dict.items():
+            parts.append(f"{name}: {params}")
+        parts.append(")")
+        return "\n".join(parts)
