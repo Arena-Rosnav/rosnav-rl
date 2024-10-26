@@ -62,7 +62,10 @@ class RL_Agent:
         simulation_state_container: SimulationStateContainer,
     ):
         self.simulation_state_container = simulation_state_container
-        self.model = StableBaselinesAgent(policy_cfg=agent_cfg.policy)
+        self.model = StableBaselinesAgent(
+            model_cfg=agent_cfg.framework.model,
+            algorithm_cfg=agent_cfg.framework.algorithm,
+        )
         self.space_manager = RosnavSpaceManager(
             action_space_kwargs={"is_discrete": agent_cfg.action_space.is_discrete},
             simulation_state_container=simulation_state_container,
@@ -70,12 +73,11 @@ class RL_Agent:
             observation_space_kwargs=self.model.observation_space_kwargs,
         )
         if agent_cfg.reward is not None:
-            reward_cfg = agent_cfg.reward
             self.reward_function = RewardFunction(
-                reward_file_name=reward_cfg.file_name,
+                reward_file_name=agent_cfg.reward.file_name,
                 simulation_state_container=simulation_state_container,
-                reward_unit_kwargs=reward_cfg.reward_unit_kwargs,
-                verbose=reward_cfg.verbose,
+                reward_unit_kwargs=agent_cfg.reward.reward_unit_kwargs,
+                verbose=agent_cfg.reward.verbose,
             )
 
     @property
