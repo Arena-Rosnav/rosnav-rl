@@ -1,53 +1,14 @@
+import os
 from typing import Optional, Union
 
+import rospkg
 import torch as th
-from pydantic import BaseModel
-from rosnav_rl.utils.action_space.custom_discrete_action import (
-    generate_discrete_action_dict,
-)
+from pydantic import BaseModel, model_validator
 
 from .lr_schedule import LearningRateSchedulerCfg
 
 
-class CustomDiscreteActionSpaceCfg(BaseModel):
-    """
-    CustomDiscreteActionSpaceCfg is a configuration class for defining the discrete action space in a reinforcement learning environment.
-
-    Attributes:
-        buckets_linear_vel (int): The number of discrete buckets for linear velocity.
-        buckets_angular_vel (int): The number of discrete buckets for angular velocity.
-    """
-
-    buckets_linear_vel: int
-    buckets_angular_vel: int
-
-    def generate_discrete_action_dict(
-        self, linear_range: tuple, angular_range: tuple
-    ) -> dict:
-        """
-        Generate a discrete action dictionary based on the given linear and angular ranges.
-
-        Args:
-            linear_range (tuple): The linear velocity range depending on the robot.
-            angular_range (tuple): The angular velocity range depending on the robot.
-
-        Returns:
-            list: A list of discrete actions.
-        """
-        return generate_discrete_action_dict(
-            linear_range,
-            angular_range,
-            self.buckets_linear_vel,
-            self.buckets_angular_vel,
-        )
-
-
-class ActionSpaceCfg(BaseModel):
-    is_discrete: Optional[bool] = False
-    custom_discretization: Optional[CustomDiscreteActionSpaceCfg] = None
-
-
-class PPO_Cfg(BaseModel):
+class PPO_Algorithm_Cfg(BaseModel):
     total_batch_size: int = 2048
     n_steps: Optional[int] = None
     batch_size: int = 256
@@ -71,11 +32,49 @@ class PPO_Cfg(BaseModel):
     device: Union[th.device, str] = "auto"
     _init_setup_model: bool = True
 
+    @model_validator(mode="after")
+    def load_learning_rate_scheduler(self):
+        if isinstance(self.learning_rate, dict):
+            self.learning_rate = LearningRateSchedulerCfg(**self.learning_rate).callable
+        elif isinstance(self.learning_rate, LearningRateSchedulerCfg):
+            self.learning_rate = self.learning_rate.callable
+        return self
+
     class Config:
         arbitrary_types_allowed = True
 
 
+class ResumeCfg(BaseModel):
+    agent_name: str
+    checkpoint: Optional[str] = "last_model"  # checkpoint name to load
+    path: Optional[str] = None  # if none, use the default rosnav_rl agents directory
+
+    @model_validator(mode="after")
+    def set_path(self):
+        if self.path is None:
+            self.path = os.path.join(
+                rospkg.RosPack().get_path("rosnav"),
+                "agents",
+                self.agent_name,
+                f"{self.checkpoint}.zip",
+            )
+        elif not os.path.isfile(self.path):
+            raise FileNotFoundError(f"Couldn't find model in '{self.path}' for resume!")
+
+        print(f"Resuming training from '{self.path}' - ignoring checkpoint name...")
+        return self
+
+
 class PPO_Policy_Cfg(BaseModel):
-    architecture_name: str
-    resume: Optional[str] = None
-    checkpoint: Optional[str] = "last_model"
+    # architecture name of the policy for the agentfactory
+    architecture_name: Optional[str] = None
+    # agent directory to resume training from
+    resume: Optional[ResumeCfg] = None
+
+    @model_validator(mode="after")
+    def check_validity(self):
+        if self.architecture_name is None and self.resume is None:
+            raise ValueError(
+                "Either architecture_name or resume must be provided for 'PPO_Policy_Cfg'"
+            )
+        return self
