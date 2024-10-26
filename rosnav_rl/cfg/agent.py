@@ -8,7 +8,7 @@ from rosnav_rl.utils.name_generator import generate_agent_name
 
 from .framework import FrameworkCfg
 from .reward import RewardCfg
-from .stable_baselines3.ppo import ActionSpaceCfg
+from .action_space.action_space import ActionSpaceCfg
 from .stable_baselines3.framework import SB3_Model_Cfg
 
 
