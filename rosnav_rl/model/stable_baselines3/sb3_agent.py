@@ -6,9 +6,10 @@ from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecEnv, VecNormalize
 
-from rosnav_rl.cfg import PPO_Algorithm_Cfg, PPO_Policy_Cfg
+from rosnav_rl.cfg import AgentCfg, PPO_Algorithm_Cfg, PPO_Policy_Cfg
 from rosnav_rl.spaces import BaseObservationSpace
 from rosnav_rl.utils.stable_baselines3.config import check_batch_size
+from rosnav_rl.utils.utils import load_yaml
 
 from ..model import RL_Model
 from .policy.base_policy import PolicyType, StableBaselinesPolicy
@@ -56,17 +57,10 @@ class StableBaselinesAgent(RL_Model):
 
     def save(self, dirpath: str, file_name: str, *args, **kwargs) -> None:
         model_path = os.path.join(dirpath, f"{file_name}.zip")
-        vec_normalize_path = os.path.join(dirpath, f"vec_normalize_{file_name}.pkl")
-
         print(f"Saving model to: {model_path}")
-        self.model.save(model_path)
 
-        vec_normalize = self._get_vec_normalize()
-        if vec_normalize:
-            print(f"Saving VecNormalize to: {vec_normalize_path}")
-            vec_normalize.save(vec_normalize_path)
-        else:
-            print("No VecNormalize object found to save.")
+        self.model.save(model_path)
+        self._save_vec_normalize(dirpath, file_name)
 
     def load(self, path: str, env: VecEnv, *args, **kwargs) -> None:
         self.model = self._load_model(path=path, env=env)
@@ -90,6 +84,13 @@ class StableBaselinesAgent(RL_Model):
         ):
             return self.model.env.venv
         return None
+
+    def _save_vec_normalize(self, dirpath: str, file_name: str):
+        vec_normalize = self._get_vec_normalize()
+        if vec_normalize:
+            vec_normalize_path = os.path.join(dirpath, f"vec_normalize_{file_name}.pkl")
+            print(f"Saving VecNormalize to: {vec_normalize_path}")
+            vec_normalize.save(vec_normalize_path)
 
     def _setup_algorithm_arguments(
         self,
@@ -141,6 +142,12 @@ class StableBaselinesAgent(RL_Model):
             ValueError: If the policy type specified in self._policy_description is unsupported.
         """
         # TODO: Load configs and compare against parsed configs
+        # cfg_path = os.path.splitext(path)[0]
+        # train_cfg_dict = load_yaml(os.path.join(cfg_path, "training_config.yaml"))
+        # train_cfg = AgentCfg.model_validate(
+        #     train_cfg_dict["agent_cfg"], strict=True, from_attributes=True
+        # )
+
         if self._policy_description.type == PolicyType.MULTI_INPUT:
             return PPO.load(path, env=env, custom_objects=algorithm_args)
         elif self._policy_description.type == PolicyType.MULTI_INPUT_LSTM:
