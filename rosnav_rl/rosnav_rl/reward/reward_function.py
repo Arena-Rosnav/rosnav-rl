@@ -137,11 +137,16 @@ class RewardFunction:
     def get_reward(
         self,
         obs_dict: ObservationDict,
+        simulation_state_container: SimulationStateContainer,
         *args,
         **kwargs,
     ) -> Tuple[float, Dict[str, Any]]:
         self._reset()
-        self.calculate_reward(obs_dict=obs_dict, **kwargs)
+        self.calculate_reward(
+            obs_dict=obs_dict,
+            simulation_state_container=simulation_state_container,
+            **kwargs,
+        )
 
         if self._verbose:
             self._print_reward_overview()
