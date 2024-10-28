@@ -103,7 +103,9 @@ class RL_Agent:
         return self.space_manager.agent_state_container
 
     def get_reward(self, observation: ObservationDict) -> float:
-        return self.reward_function.get_reward(observation)
+        return self.reward_function.get_reward(
+            observation, simulation_state_container=self.simulation_state_container
+        )
 
     def get_action(self, observation: ObservationDict) -> np.ndarray:
         return self.space_manager.decode_action(
