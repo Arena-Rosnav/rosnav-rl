@@ -19,9 +19,9 @@ DEVICE_AUTO = "auto"
 
 
 class StableBaselinesAgent(RL_Model):
-    _model: Union[PPO, RecurrentPPO] = None
-    _model_cfg: PPO_Policy_Cfg = None
-    _algorithm_cfg: PPO_Algorithm_Cfg = None
+    _model: Union[PPO, RecurrentPPO]
+    _model_cfg: PPO_Policy_Cfg
+    _algorithm_cfg: PPO_Algorithm_Cfg
 
     def __init__(self, model_cfg: PPO_Policy_Cfg, algorithm_cfg: PPO_Algorithm_Cfg):
         super().__init__(model_cfg, algorithm_cfg)
@@ -59,18 +59,18 @@ class StableBaselinesAgent(RL_Model):
         model_path = os.path.join(dirpath, f"{file_name}.zip")
         print(f"Saving model to: {model_path}")
 
-        self.model.save(model_path)
+        self._model.save(model_path)
         self._save_vec_normalize(dirpath, file_name)
 
     def load(self, path: str, env: VecEnv, *args, **kwargs) -> None:
-        self.model = self._load_model(path=path, env=env)
+        self._model = self._load_model(path=path, env=env)
 
     def get_action(self, observation, *args, **kwargs):
-        return self.model.predict(observation, deterministic=True)
+        return self._model.predict(observation, deterministic=True)
 
     def train(self, *args, **kwargs) -> bool:
         try:
-            self.model.learn(*args, **kwargs)
+            self._model.learn(*args, **kwargs)
         except KeyboardInterrupt:
             print("Training interrupted by user.")
             return False
@@ -120,7 +120,7 @@ class StableBaselinesAgent(RL_Model):
     def _initialize_model(self, algorithm_parameters: dict) -> None:
         is_lstm = "LSTM" in self._policy_description.type.name
         model_class = RecurrentPPO if is_lstm else PPO
-        self.model = model_class(**algorithm_parameters)
+        self._model = model_class(**algorithm_parameters)
 
     def _load_model(
         self,
@@ -156,14 +156,6 @@ class StableBaselinesAgent(RL_Model):
             raise ValueError(
                 f"Unsupported policy type: {self._policy_description.type}"
             )
-
-    @property
-    def model(self) -> Union[PPO, RecurrentPPO]:
-        return self._model
-
-    @model.setter
-    def model(self, model: Union[PPO, RecurrentPPO]):
-        self._model = model
 
     @property
     def model_cfg(self) -> PPO_Policy_Cfg:

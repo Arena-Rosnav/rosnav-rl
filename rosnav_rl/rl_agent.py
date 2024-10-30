@@ -51,63 +51,83 @@ class RL_Agent:
             getting the action from the model, and decoding the action.
     """
 
-    model: RL_Model
-    reward_function: Optional[RewardFunction] = None
-    space_manager: BaseSpaceManager
-    simulation_state_container: SimulationStateContainer
+    _model: RL_Model
+    _reward_function: Optional[RewardFunction] = None
+    _space_manager: BaseSpaceManager
+    _simulation_state_container: SimulationStateContainer
 
     def __init__(
         self,
         agent_cfg: AgentCfg,
         simulation_state_container: SimulationStateContainer,
     ):
-        self.simulation_state_container = simulation_state_container
-        self.model = StableBaselinesAgent(
+        self._simulation_state_container = simulation_state_container
+        self._model = StableBaselinesAgent(
             model_cfg=agent_cfg.framework.model,
             algorithm_cfg=agent_cfg.framework.algorithm,
         )
-        self.space_manager = RosnavSpaceManager(
+        self._space_manager = RosnavSpaceManager(
             action_space_kwargs={"is_discrete": agent_cfg.action_space.is_discrete},
             simulation_state_container=simulation_state_container,
             observation_space_list=self.model.observation_space_list,
             observation_space_kwargs=self.model.observation_space_kwargs,
         )
         if agent_cfg.reward is not None:
-            self.reward_function = RewardFunction(
+            self._reward_function = RewardFunction(
                 reward_file_name=agent_cfg.reward.file_name,
                 simulation_state_container=simulation_state_container,
                 reward_unit_kwargs=agent_cfg.reward.reward_unit_kwargs,
                 verbose=agent_cfg.reward.verbose,
             )
 
+    def initialize_model(self, *args, **kwargs):
+        if not self.model.is_model_initialized:
+            self.model.initialize(*args, **kwargs)
+
+    def get_reward(self, observation: ObservationDict) -> float:
+        return self._reward_function.get_reward(
+            observation, simulation_state_container=self._simulation_state_container
+        )
+
+    def get_action(self, observation: ObservationDict) -> np.ndarray:
+        return self._space_manager.decode_action(
+            self.model.get_action(self.space_manager.encode_observation(observation))
+        )
+
     @property
     def config(self) -> Dict[str, dict]:
         return {
             "model": self.model.config,
-            "reward": self.reward_function.config,
-            "space": self.space_manager.config,
+            "reward": self._reward_function.config,
+            "space": self._space_manager.config,
             "agent_state_container": asdict(self.agent_state_container),
-            "simulation_state_container": asdict(self.simulation_state_container),
+            "simulation_state_container": asdict(self._simulation_state_container),
         }
 
     @property
+    def model(self) -> RL_Model:
+        if self._model is None:
+            raise ValueError("'RL_Model' not initialized.")
+        return self._model
+
+    @property
+    def reward_function(self) -> Union[None, RewardFunction]:
+        return self._reward_function
+
+    @property
+    def space_manager(self) -> BaseSpaceManager:
+        if self._space_manager is None:
+            raise ValueError("'SpaceManager' not initialized.")
+        return self._space_manager
+
+    @property
     def observation_space(self) -> spaces.Dict:
-        return self.space_manager.observation_space
+        return self._space_manager.observation_space
 
     @property
     def action_space(self) -> Union[spaces.Discrete, spaces.Box]:
-        return self.space_manager.action_space
+        return self._space_manager.action_space
 
     @property
     def agent_state_container(self) -> AgentStateContainer:
-        return self.space_manager.agent_state_container
-
-    def get_reward(self, observation: ObservationDict) -> float:
-        return self.reward_function.get_reward(
-            observation, simulation_state_container=self.simulation_state_container
-        )
-
-    def get_action(self, observation: ObservationDict) -> np.ndarray:
-        return self.space_manager.decode_action(
-            self.model.get_action(self.space_manager.encode_observation(observation))
-        )
+        return self._space_manager.agent_state_container

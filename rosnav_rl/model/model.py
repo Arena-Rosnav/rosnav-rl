@@ -38,10 +38,18 @@ class RL_Model(ABC):
         pass
 
     @property
+    def is_model_initialized(self):
+        return self._model is not None
+
+    @property
     def model(self):
         if self._model is None:
             raise ValueError("Model not initialized. Call 'initialize' first.")
         return self._model
+
+    @model.setter
+    def model(self, model):
+        self._model = model
 
     @property
     def model_cfg(self):
