@@ -51,6 +51,7 @@ class RL_Agent:
             getting the action from the model, and decoding the action.
     """
 
+    _name: str
     _model: RL_Model
     _reward_function: Optional[RewardFunction] = None
     _space_manager: BaseSpaceManager
@@ -60,7 +61,9 @@ class RL_Agent:
         self,
         agent_cfg: AgentCfg,
         simulation_state_container: SimulationStateContainer,
+        name: str = None,
     ):
+        self._name = name or agent_cfg.name
         self._simulation_state_container = simulation_state_container
         self._model = StableBaselinesAgent(
             model_cfg=agent_cfg.framework.model,
@@ -131,3 +134,7 @@ class RL_Agent:
     @property
     def agent_state_container(self) -> AgentStateContainer:
         return self._space_manager.agent_state_container
+
+    @property
+    def name(self) -> str:
+        return self._name
