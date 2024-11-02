@@ -34,8 +34,8 @@ class EXTRACTOR_1(RosnavBaseExtractor):
     ):
         self._laser_size, self._goal_size, self._last_action_size = (
             observation_space[SPACE.LaserScanSpace.name].shape[-1],
-            observation_space[SPACE.DistAngleToSubgoalSpace].shape[-1],
-            observation_space[SPACE.LastActionSpace].shape[-1],
+            observation_space[SPACE.DistAngleToSubgoalSpace.name].shape[-1],
+            observation_space[SPACE.LastActionSpace.name].shape[-1],
         )
 
         self._stack_size = stack_size
