@@ -63,6 +63,21 @@ class RL_Agent:
         simulation_state_container: SimulationStateContainer,
         name: str = None,
     ):
+        """
+        Initialize the Reinforcement Learning Agent.
+
+        Args:
+            agent_cfg (AgentCfg): Configuration for the agent.
+            simulation_state_container (SimulationStateContainer): Container for the simulation state.
+            name (str, optional): Name of the agent. Defaults to None.
+
+        Attributes:
+            _name (str): Name of the agent.
+            _simulation_state_container (SimulationStateContainer): Container for the simulation state.
+            _model (StableBaselinesAgent): The framework-specific RL model used by the agent.
+            _space_manager (RosnavSpaceManager): Manages the action and observation spaces.
+            _reward_function (RewardFunction, optional): The reward function used by the agent, if specified in the configuration.
+        """
         self._name = name or agent_cfg.name
         self._simulation_state_container = simulation_state_container
         self._model = StableBaselinesAgent(
@@ -83,10 +98,29 @@ class RL_Agent:
             )
 
     def initialize_model(self, *args, **kwargs):
+        """
+        Initialize the model if it has not been initialized yet.
+
+        This method checks if the model is already initialized. If not, it calls the
+        model's initialize method with the provided arguments.
+
+        Args:
+            *args: Variable length argument list to be passed to the model's initialize method.
+            **kwargs: Arbitrary keyword arguments to be passed to the model's initialize method.
+        """
         if not self.model.is_model_initialized:
             self.model.initialize(*args, **kwargs)
 
     def get_reward(self, observation: ObservationDict) -> float:
+        """
+        Calculate and return the reward based on the given observation.
+
+        Args:
+            observation (ObservationDict): The current observation containing relevant state information.
+
+        Returns:
+            float: The calculated reward based on the observation and the current simulation state.
+        """
         return self._reward_function.get_reward(
             observation, simulation_state_container=self._simulation_state_container
         )
