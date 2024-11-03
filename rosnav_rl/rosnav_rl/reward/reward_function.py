@@ -35,7 +35,35 @@ class RewardConfig:
 
 class RewardFunction:
     """
-    Manages and calculates rewards in a reinforcement learning environment.
+    Attributes:
+            config (RewardConfig): Configuration for the reward function.
+            state (RewardState): Current state of the reward function.
+            _reward_units (List[RewardUnit]): List of reward unit instances.
+
+        Methods:
+            __init__(reward_file_name: str, reward_unit_kwargs: Optional[Dict[str, Any]] = None, verbose: bool = False):
+            _create_reward_units() -> List["RewardUnit"]:
+                Create reward unit instances from configuration.
+            _create_reward_unit(factory: Any, unit_name: str, params: Dict[str, Any]) -> "RewardUnit":
+                Create a single reward unit instance.
+            calculate_reward(obs_dict: ObservationDict, simulation_state_container: SimulationStateContainer, **kwargs) -> None:
+                Calculate rewards using all reward units.
+            _skip_on_safe_dist_violation(reward_unit: "RewardUnit") -> bool:
+                Determine if a reward unit should be skipped.
+            get_reward(obs_dict: ObservationDict, simulation_state_container: SimulationStateContainer, **kwargs) -> Tuple[float, Dict[str, Any]]:
+            add_reward(value: float, **kwargs) -> None:
+            add_info(info: Dict[str, Any]) -> None:
+                Update the info dictionary.
+            reset() -> None:
+                Reset all reward units between episodes.
+            _reset_state() -> None:
+                Reset the reward state between steps.
+            _log_reward_overview() -> None:
+                Log detailed reward breakdown.
+            reward_units() -> List["RewardUnit"]:
+                Get the list of reward units.
+            __repr__() -> str:
+                String representation of the reward function.
     """
 
     def __init__(
