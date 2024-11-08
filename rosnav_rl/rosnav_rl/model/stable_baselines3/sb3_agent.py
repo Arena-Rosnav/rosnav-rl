@@ -104,10 +104,10 @@ class StableBaselinesAgent(RL_Model):
             batch_size=self.algorithm_cfg.total_batch_size,
             mn_batch_size=self.algorithm_cfg.batch_size,
         )
-        self.algorithm_cfg.batch_size = int(
+
+        self.algorithm_cfg.n_steps = int(
             self.algorithm_cfg.total_batch_size / env.num_envs
         )
-        self.algorithm_cfg.n_steps = int(self.algorithm_cfg.batch_size / env.num_envs)
 
         return {
             "env": env,
