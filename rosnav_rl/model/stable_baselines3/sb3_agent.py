@@ -105,10 +105,11 @@ class StableBaselinesAgent(RL_Model):
             batch_size=self.algorithm_cfg.total_batch_size,
             mn_batch_size=self.algorithm_cfg.batch_size,
         )
-        if self.algorithm_cfg.n_steps is None:
-            self.algorithm_cfg.n_steps = int(
-                self.algorithm_cfg.batch_size / env.num_envs
-            )
+
+        self.algorithm_cfg.n_steps = int(
+            self.algorithm_cfg.total_batch_size / env.num_envs
+        )
+
         return {
             "env": env,
             "policy": self._policy_description.type.value,
