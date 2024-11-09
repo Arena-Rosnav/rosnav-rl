@@ -45,24 +45,7 @@ class PPO_Algorithm_Cfg(BaseModel):
 
 
 class ResumeCfg(BaseModel):
-    agent_name: str
-    checkpoint: Optional[str] = "last_model"  # checkpoint name to load
-    path: Optional[str] = None  # if none, use the default rosnav_rl agents directory
-
-    @model_validator(mode="after")
-    def set_path(self):
-        if self.path is None:
-            self.path = os.path.join(
-                rospkg.RosPack().get_path("rosnav"),
-                "agents",
-                self.agent_name,
-                f"{self.checkpoint}.zip",
-            )
-        elif not os.path.isfile(self.path):
-            raise FileNotFoundError(f"Couldn't find model in '{self.path}' for resume!")
-
-        print(f"Resuming training from '{self.path}' - ignoring checkpoint name...")
-        return self
+    checkpoint: Optional[str] = "last_model.zip"  # checkpoint name to load
 
 
 class PPO_Policy_Cfg(BaseModel):

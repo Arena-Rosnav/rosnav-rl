@@ -19,7 +19,7 @@ class RL_Model(ABC):
         self._algorithm_cfg = algorithm_cfg
 
     @abstractmethod
-    def initialize(self, *args, **kwargs):
+    def setup_model(self, *args, **kwargs):
         pass
 
     @abstractmethod
