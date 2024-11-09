@@ -61,7 +61,6 @@ class RL_Agent:
         self,
         agent_cfg: AgentCfg,
         simulation_state_container: SimulationStateContainer,
-        name: str = None,
     ):
         """
         Initialize the Reinforcement Learning Agent.
@@ -78,7 +77,7 @@ class RL_Agent:
             _space_manager (RosnavSpaceManager): Manages the action and observation spaces.
             _reward_function (RewardFunction, optional): The reward function used by the agent, if specified in the configuration.
         """
-        self._name = name or agent_cfg.name
+        self._name = agent_cfg.name
         self._simulation_state_container = simulation_state_container
         self._model = StableBaselinesAgent(
             model_cfg=agent_cfg.framework.model,
@@ -109,7 +108,7 @@ class RL_Agent:
             **kwargs: Arbitrary keyword arguments to be passed to the model's initialize method.
         """
         if not self.model.is_model_initialized:
-            self.model.initialize(*args, **kwargs)
+            self.model.setup_model(*args, **kwargs)
 
     def get_reward(self, observation: ObservationDict) -> float:
         """

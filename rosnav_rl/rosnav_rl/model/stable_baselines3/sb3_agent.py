@@ -35,20 +35,21 @@ class StableBaselinesAgent(RL_Model):
             self._agent_factory.instantiate(self.model_cfg.architecture_name)
         )
 
-    def initialize(
+    def setup_model(
         self,
         env: Union[VecEnv, gym.Env],
         no_gpu: Optional[bool] = False,
         tensorboard_log_path: Optional[str] = None,
+        resume_model_file: Optional[str] = None,
         *args,
         **kwargs,
     ):
         algorithm_args = self._setup_algorithm_arguments(
             self.algorithm_cfg, env, no_gpu, tensorboard_log_path
         )
-        if self.model_cfg.resume:
+        if resume_model_file:
             self.model = self._load_model(
-                path=self.model_cfg.resume.path,
+                path=resume_model_file,
                 env=env,
                 algorithm_args=algorithm_args,
             )
