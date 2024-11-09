@@ -12,7 +12,7 @@ from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR
 class AGENT_1(StableBaselinesPolicy):
     observation_space_kwargs = {
         "normalize": True,
-        "goal_max_dist": 5,
+        "goal_max_dist": 10,
     }
     observation_spaces = [
         spaces.LaserScanSpace,
