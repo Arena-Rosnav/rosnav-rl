@@ -45,7 +45,7 @@ class PPO_Algorithm_Cfg(BaseModel):
 
 
 class ResumeCfg(BaseModel):
-    checkpoint: Optional[str] = "last_model.zip"  # checkpoint name to load
+    checkpoint: Optional[str] = "last_model"  # checkpoint name to load
 
 
 class PPO_Policy_Cfg(BaseModel):

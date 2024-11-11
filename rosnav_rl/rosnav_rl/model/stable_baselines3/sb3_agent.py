@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import List, Optional, Union
 
 import gym
@@ -9,7 +10,6 @@ from stable_baselines3.common.vec_env import VecEnv, VecNormalize
 from rosnav_rl.cfg import AgentCfg, PPO_Algorithm_Cfg, PPO_Policy_Cfg
 from rosnav_rl.spaces import BaseObservationSpace
 from rosnav_rl.utils.stable_baselines3.config import check_batch_size
-from rosnav_rl.utils.utils import load_yaml
 
 from ..model import RL_Model
 from .policy.base_policy import PolicyType, StableBaselinesPolicy
@@ -86,7 +86,7 @@ class StableBaselinesAgent(RL_Model):
             return self.model.env.venv
         return None
 
-    def _save_vec_normalize(self, dirpath: str, file_name: str):
+    def _save_vec_normalize(self, dirpath: Union[str, Path], file_name: str) -> None:
         vec_normalize = self._get_vec_normalize()
         if vec_normalize:
             vec_normalize_path = os.path.join(dirpath, f"vec_normalize_{file_name}.pkl")
