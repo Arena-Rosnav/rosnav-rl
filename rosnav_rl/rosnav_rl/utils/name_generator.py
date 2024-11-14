@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal
 import rospy
 
 if TYPE_CHECKING:
-    from rosnav_rl.cfg import FrameworkCfg, SB3_Model_Cfg
+    from rosnav_rl.cfg import FrameworkCfg
 
 
 def generate_name(architecture_name: str, robot: str = None) -> str:
@@ -14,8 +14,8 @@ def generate_name(architecture_name: str, robot: str = None) -> str:
     return agent_name
 
 
-def generate_sb3_agent_name(framework_cfg: "SB3_Model_Cfg", robot: str = None) -> str:
-    return generate_name(framework_cfg.model.architecture_name, robot=robot)
+def generate_sb3_agent_name(framework_cfg: "FrameworkCfg", robot: str = None) -> str:
+    return generate_name(framework_cfg.algorithm.architecture_name, robot=robot)
 
 
 def generate_agent_name(framework_cfg: "FrameworkCfg", robot: str = None) -> str:
