@@ -1,11 +1,12 @@
 from dataclasses import asdict
-from typing import Dict, Optional, Union
+from typing import TYPE_CHECKING, Dict, Optional, Union
 
 import numpy as np
 from gym import spaces
 from rl_utils.state_container import SimulationStateContainer
 
-from rosnav_rl.cfg import AgentCfg
+if TYPE_CHECKING:
+    from rosnav_rl.cfg import AgentCfg
 from rosnav_rl.model.stable_baselines3 import StableBaselinesAgent
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
@@ -59,7 +60,7 @@ class RL_Agent:
 
     def __init__(
         self,
-        agent_cfg: AgentCfg,
+        agent_cfg: "AgentCfg",
         simulation_state_container: SimulationStateContainer,
     ):
         """
@@ -80,7 +81,6 @@ class RL_Agent:
         self._name = agent_cfg.name
         self._simulation_state_container = simulation_state_container
         self._model = StableBaselinesAgent(
-            model_cfg=agent_cfg.framework.model,
             algorithm_cfg=agent_cfg.framework.algorithm,
         )
         self._space_manager = RosnavSpaceManager(

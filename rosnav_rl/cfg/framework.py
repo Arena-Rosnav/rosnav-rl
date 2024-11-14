@@ -1,9 +1,10 @@
-from typing import Literal, Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel
+from rl_utils.utils.type_alias.enums import RLFramework
+from .sb3_cfg.base import BaseAlgorithmCfg
 
 
 class FrameworkCfg(BaseModel):
-    name: Literal["stable_baselines3"] = "stable_baselines3"
-    model: BaseModel = None
-    algorithm: Optional[BaseModel] = None
+    name: Union[str, RLFramework]
+    algorithm: BaseAlgorithmCfg

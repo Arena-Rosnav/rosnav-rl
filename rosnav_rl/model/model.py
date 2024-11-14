@@ -9,13 +9,9 @@ if TYPE_CHECKING:
 
 class RL_Model(ABC):
     _model = None
-    _model_cfg: BaseModel = None
     _algorithm_cfg: BaseModel = None
 
-    def __init__(
-        self, model_cfg: BaseModel, algorithm_cfg: BaseModel, *args, **kwargs
-    ) -> None:
-        self._model_cfg = model_cfg
+    def __init__(self, algorithm_cfg: BaseModel, *args, **kwargs) -> None:
         self._algorithm_cfg = algorithm_cfg
 
     @abstractmethod

@@ -1,38 +1,53 @@
-import os
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import gym
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecEnv, VecNormalize
 
-from rosnav_rl.cfg import AgentCfg, PPO_Algorithm_Cfg, PPO_Policy_Cfg
+if TYPE_CHECKING:
+    import rosnav_rl.cfg.sb3_cfg as sb3_cfg
+    from .policy.agent_factory import AgentFactory
 from rosnav_rl.spaces import BaseObservationSpace
 from rosnav_rl.utils.stable_baselines3.config import check_batch_size
 
 from ..model import RL_Model
-from .policy.base_policy import PolicyType, StableBaselinesPolicy
+from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicy
 
 DEVICE_CPU = "cpu"
 DEVICE_AUTO = "auto"
 
+_SUPPORTED_ALGORITHM_CLASSES = Union[PPO, RecurrentPPO]
+
 
 class StableBaselinesAgent(RL_Model):
-    _model: Union[PPO, RecurrentPPO]
-    _model_cfg: PPO_Policy_Cfg
-    _algorithm_cfg: PPO_Algorithm_Cfg
+    """StableBaselinesAgent is a reinforcement learning agent that utilizes the Stable Baselines3 library to implement RL algorithms.
 
-    def __init__(self, model_cfg: PPO_Policy_Cfg, algorithm_cfg: PPO_Algorithm_Cfg):
-        super().__init__(model_cfg, algorithm_cfg)
+    Attributes:
+        _model (Union[PPO, RecurrentPPO]): The PPO or Recurrent PPO model used by the agent.
+        _algorithm_cfg (PPO_Algorithm_Cfg): Configuration for the PPO algorithm.
+    """
+
+    _model: _SUPPORTED_ALGORITHM_CLASSES
+    _algorithm_cfg: "sb3_cfg.BaseAlgorithmCfg"
+
+    def __init__(self, algorithm_cfg: "sb3_cfg.BaseAlgorithmCfg"):
+        """
+        Initialize the SB3Agent with the given model and algorithm configurations.
+
+        Args:
+            algorithm_cfg (PPO_Cfg): Configuration for the PPO algorithm.
+        """
+        super().__init__(algorithm_cfg)
         self._setup_agent_factory_and_policy_description()
 
     def _setup_agent_factory_and_policy_description(self):
         import rosnav_rl.model.stable_baselines3 as sb3_pkg
 
-        self._agent_factory = sb3_pkg.import_models()
+        self._agent_factory: AgentFactory = sb3_pkg.import_models()
         self._policy_description: StableBaselinesPolicy = (
-            self._agent_factory.instantiate(self.model_cfg.architecture_name)
+            self._agent_factory.instantiate(self.algorithm_cfg.architecture_name)
         )
 
     def setup_model(
@@ -44,8 +59,22 @@ class StableBaselinesAgent(RL_Model):
         *args,
         **kwargs,
     ):
+        """
+        Set up the model for training or resuming from a checkpoint.
+
+        Args:
+            env (Union[VecEnv, gym.Env]): The environment to train the model on.
+            no_gpu (Optional[bool]): If True, disable GPU usage. Defaults to False.
+            tensorboard_log_path (Optional[str]): Path to save TensorBoard logs. Defaults to None.
+            resume_model_file (Optional[str]): Path to a model file to resume training from. Defaults to None.
+            *args: Additional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            None
+        """
         algorithm_args = self._setup_algorithm_arguments(
-            self.algorithm_cfg, env, no_gpu, tensorboard_log_path
+            self.algorithm_cfg.parameters, env, no_gpu, tensorboard_log_path
         )
         if resume_model_file:
             self.model = self._load_model(
@@ -57,19 +86,46 @@ class StableBaselinesAgent(RL_Model):
             self._initialize_model(algorithm_args)
 
     def save(self, dirpath: str, file_name: str, *args, **kwargs) -> None:
-        model_path = os.path.join(dirpath, f"{file_name}.zip")
-        print(f"Saving model to: {model_path}")
+        """
+        Save the model and its associated normalization parameters to the specified directory.
 
+        Args:
+            dirpath (str): The directory path where the model and normalization parameters will be saved.
+            file_name (str): The base name of the file to save the model as (without extension).
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
+        model_path = Path(dirpath) / f"{file_name}.zip"
         self._model.save(model_path)
         self._save_vec_normalize(dirpath, file_name)
 
     def load(self, path: str, env: VecEnv, *args, **kwargs) -> None:
+        """
+        Load a pre-trained model from the specified path and initialize it with the given environment.
+
+        Args:
+            path (str): The file path to the pre-trained model.
+            env (VecEnv): The environment to initialize the model with.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         self._model = self._load_model(path=path, env=env)
 
     def get_action(self, observation, *args, **kwargs):
+        raise NotImplementedError()
         return self._model.predict(observation, deterministic=True)
 
     def train(self, *args, **kwargs) -> bool:
+        """
+        Train the model using the provided arguments.
+
+        Args:
+            *args: Variable length argument list to be passed to the model's learn method.
+            **kwargs: Arbitrary keyword arguments to be passed to the model's learn method.
+
+        Returns:
+            bool: True if training completes successfully, False if interrupted by the user.
+        """
         try:
             self._model.learn(*args, **kwargs)
         except KeyboardInterrupt:
@@ -77,52 +133,81 @@ class StableBaselinesAgent(RL_Model):
             return False
         return True
 
-    def _get_vec_normalize(self) -> Optional[VecNormalize]:
-        if isinstance(self.model.env, VecNormalize):
-            return self.model.env
-        if hasattr(self.model.env, "venv") and isinstance(
-            self.model.env.venv, VecNormalize
-        ):
-            return self.model.env.venv
+    def _get_vec_normalize(self) -> VecNormalize:
+        """
+        Retrieve the VecNormalize instance from the model's environment if it exists.
+
+        This method checks if the model's environment or its nested environment (venv)
+        is an instance of VecNormalize. If so, it returns the VecNormalize instance.
+        Otherwise, it returns None.
+
+        Returns:
+            VecNormalize | None: The VecNormalize instance if found, otherwise None.
+        """
+        env = self.model.env
+        if isinstance(env, VecNormalize):
+            return env
+        if hasattr(env, "venv") and isinstance(env.venv, VecNormalize):
+            return env.venv
         return None
 
     def _save_vec_normalize(self, dirpath: Union[str, Path], file_name: str) -> None:
+        """
+        Save the VecNormalize instance to a file if it exists.
+
+        Args:
+            dirpath (Union[str, Path]): The directory path where the VecNormalize instance will be saved.
+            file_name (str): The base name of the file to save the VecNormalize instance as (without extension).
+        """
         vec_normalize = self._get_vec_normalize()
         if vec_normalize:
-            vec_normalize_path = os.path.join(dirpath, f"vec_normalize_{file_name}.pkl")
-            print(f"Saving VecNormalize to: {vec_normalize_path}")
+            vec_normalize_path = Path(dirpath) / f"vec_normalize_{file_name}.pkl"
             vec_normalize.save(vec_normalize_path)
 
     def _setup_algorithm_arguments(
         self,
-        algorithm_cfg: PPO_Algorithm_Cfg,
+        parameters: "sb3_cfg.BaseAlgorithmParameters",
         env: Union[VecEnv, gym.Env],
         no_gpu: bool,
-        tensorboard_log_path: str,
+        tensorboard_log_path: Optional[str],
     ) -> dict:
+        """
+        Set up the arguments required for initializing the PPO algorithm.
+
+        Args:
+            algorithm_cfg (PPO_Algorithm_Cfg): Configuration for the PPO algorithm.
+            env (Union[VecEnv, gym.Env]): The environment to train the model on.
+            no_gpu (bool): If True, disable GPU usage.
+            tensorboard_log_path (Optional[str]): Path to save TensorBoard logs.
+
+        Returns:
+            dict: A dictionary containing the algorithm arguments.
+        """
         check_batch_size(
             n_envs=env.num_envs,
-            batch_size=self.algorithm_cfg.total_batch_size,
-            mn_batch_size=self.algorithm_cfg.batch_size,
+            batch_size=parameters.total_batch_size,
+            mn_batch_size=parameters.batch_size,
         )
 
-        self.algorithm_cfg.n_steps = int(
-            self.algorithm_cfg.total_batch_size / env.num_envs
-        )
+        parameters.n_steps = parameters.total_batch_size // env.num_envs
 
         return {
             "env": env,
-            "policy": self._policy_description.type.value,
+            "policy": POLICY_TYPE[self._policy_description.algorithm_class],
             "policy_kwargs": self._policy_description.get_kwargs(),
-            "tensorboard_log": algorithm_cfg.tensorboard_log or tensorboard_log_path,
+            "tensorboard_log": tensorboard_log_path or parameters.tensorboard_log,
             "device": DEVICE_CPU if no_gpu else DEVICE_AUTO,
-            **algorithm_cfg.model_dump(exclude=["total_batch_size", "tensorboard_log"]),
+            **parameters.model_dump(exclude=["total_batch_size", "tensorboard_log"]),
         }
 
     def _initialize_model(self, algorithm_parameters: dict) -> None:
-        is_lstm = "LSTM" in self._policy_description.type.name
-        model_class = RecurrentPPO if is_lstm else PPO
-        self._model = model_class(**algorithm_parameters)
+        """
+        Initialize the PPO or Recurrent PPO model with the given parameters.
+
+        Args:
+            algorithm_parameters (dict): The parameters required to initialize the model.
+        """
+        self._model = self._policy_description.algorithm_class(**algorithm_parameters)
 
     def _load_model(
         self,
@@ -143,28 +228,12 @@ class StableBaselinesAgent(RL_Model):
         Raises:
             ValueError: If the policy type specified in self._policy_description is unsupported.
         """
-        # TODO: Load configs and compare against parsed configs
-        # cfg_path = os.path.splitext(path)[0]
-        # train_cfg_dict = load_yaml(os.path.join(cfg_path, "training_config.yaml"))
-        # train_cfg = AgentCfg.model_validate(
-        #     train_cfg_dict["agent_cfg"], strict=True, from_attributes=True
-        # )
-
-        if self._policy_description.type == PolicyType.MULTI_INPUT:
-            return PPO.load(path, env=env, custom_objects=algorithm_args)
-        elif self._policy_description.type == PolicyType.MULTI_INPUT_LSTM:
-            return RecurrentPPO.load(path, env=env, custom_objects=algorithm_args)
-        else:
-            raise ValueError(
-                f"Unsupported policy type: {self._policy_description.type}"
-            )
+        return self._policy_description.algorithm_class.load(
+            path, env=env, custom_objects=algorithm_args
+        )
 
     @property
-    def model_cfg(self) -> PPO_Policy_Cfg:
-        return self._model_cfg
-
-    @property
-    def algorithm_cfg(self) -> PPO_Algorithm_Cfg:
+    def algorithm_cfg(self) -> "sb3_cfg.BaseAlgorithmCfg":
         return self._algorithm_cfg
 
     @property
@@ -189,5 +258,4 @@ class StableBaselinesAgent(RL_Model):
             "algorithm_cfg": (
                 self.algorithm_cfg.model_dump() if self.algorithm_cfg else {}
             ),
-            "policy_cfg": self.model_cfg.model_dump() if self.model_cfg else {},
         }

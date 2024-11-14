@@ -7,7 +7,8 @@ from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
-from .constants import BASE_AGENT_ATTR, PolicyType
+from .constants import BASE_AGENT_ATTR, POLICY_TYPE
+from stable_baselines3.common.base_class import BaseAlgorithm
 
 
 class StableBaselinesPolicy(ABC):
@@ -30,6 +31,17 @@ class StableBaselinesPolicy(ABC):
 
     @property
     @abstractmethod
+    def algorithm_class(self) -> Type[BaseAlgorithm]:
+        """
+        Get the algorithm class.
+
+        Returns:
+            Type[BaseAlgorithm]: The algorithm class.
+        """
+        pass
+
+    @property
+    @abstractmethod
     def observation_spaces(self) -> List[BaseObservationSpace]:
         """
         Get the list of observation spaces.
@@ -48,17 +60,6 @@ class StableBaselinesPolicy(ABC):
             dict: Additional keyword arguments for the observation space.
         """
         return {}
-
-    @property
-    @abstractmethod
-    def type(self) -> PolicyType:
-        """
-        Get the type of policy used by the agent.
-
-        Returns:
-            PolicyType: The type of policy used by the agent.
-        """
-        pass
 
     @property
     @abstractmethod
@@ -125,5 +126,8 @@ class StableBaselinesPolicy(ABC):
                 val = getattr(self, key)
                 if val is not None:
                     kwargs[key] = val
+
+                if key == "features_extractor_kwargs":
+                    kwargs[key].update({"stack_size": self.stack_size})
 
         return kwargs
