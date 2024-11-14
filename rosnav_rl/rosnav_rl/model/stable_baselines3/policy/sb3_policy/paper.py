@@ -1,15 +1,22 @@
-import rosnav_rl.spaces.observation_space as spaces
+from typing import Type
 
+from stable_baselines3 import PPO
+from stable_baselines3.common.base_class import BaseAlgorithm
 from torch import nn
 
+import rosnav_rl.spaces.observation_space as spaces
+
 from ..agent_factory import AgentFactory
-from ..base_policy import StableBaselinesPolicy, PolicyType
+from ..base_policy import StableBaselinesPolicy
 from ..feature_extractors.classic import *
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR
+
+from sb3_contrib import RecurrentPPO
 
 
 @AgentFactory.register("AGENT_1")
 class AGENT_1(StableBaselinesPolicy):
+    algorithm_class: Type[BaseAlgorithm] = PPO
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
@@ -19,7 +26,6 @@ class AGENT_1(StableBaselinesPolicy):
         spaces.DistAngleToSubgoalSpace,
         spaces.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = dict(pi=[64, 64], vf=[64, 64])
@@ -28,6 +34,7 @@ class AGENT_1(StableBaselinesPolicy):
 
 @AgentFactory.register("AGENT_2")
 class AGENT_2(StableBaselinesPolicy):
+    algorithm_class: Type[BaseAlgorithm] = RecurrentPPO
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
@@ -37,7 +44,6 @@ class AGENT_2(StableBaselinesPolicy):
         spaces.DistAngleToSubgoalSpace,
         spaces.LastActionSpace,
     ]
-    type = PolicyType.MULTI_INPUT_LSTM
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = dict(pi=[64, 64], vf=[64, 64])
@@ -51,7 +57,7 @@ class AGENT_2(StableBaselinesPolicy):
 
 @AgentFactory.register("AGENT_3")
 class AGENT_3(StableBaselinesPolicy):
-    type = PolicyType.MULTI_INPUT
+    algorithm_class: Type[BaseAlgorithm] = PPO
     stack_size = 10
     observation_space_kwargs = {
         "normalize": True,
@@ -71,7 +77,7 @@ class AGENT_3(StableBaselinesPolicy):
 
 @AgentFactory.register("AGENT_4")
 class AGENT_4(StableBaselinesPolicy):
-    type = PolicyType.MULTI_INPUT_LSTM
+    algorithm_class: Type[BaseAlgorithm] = RecurrentPPO
     stack_size = 10
     observation_space_kwargs = {
         "normalize": True,
@@ -109,7 +115,7 @@ class AGENT_5(StableBaselinesPolicy):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT
+    algorithm_class: Type[BaseAlgorithm] = PPO
     observation_spaces = [
         spaces.StackedLaserMapSpace,
         spaces.PedestrianVelXSpace,
@@ -151,7 +157,7 @@ class AGENT_6(StableBaselinesPolicy):
         activation_fn (function): The activation function used in the neural network.
     """
 
-    type = PolicyType.MULTI_INPUT_LSTM
+    algorithm_class: Type[BaseAlgorithm] = RecurrentPPO
     observation_spaces = [
         spaces.StackedLaserMapSpace,
         spaces.PedestrianVelXSpace,

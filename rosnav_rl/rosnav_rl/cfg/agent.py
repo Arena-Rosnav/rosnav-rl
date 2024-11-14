@@ -6,21 +6,21 @@ from pydantic import BaseModel, model_validator
 from rosnav_rl.utils.name_generator import generate_agent_name
 
 from .framework import FrameworkCfg
+from .sb3_cfg.ppo import PPO_Cfg
 from .reward import RewardCfg
 from .action_space.action_space import ActionSpaceCfg
-from .stable_baselines3.framework import SB3_Model_Cfg
 
 
 class AgentCfg(BaseModel):
     name: Optional[str] = None
     robot: Optional[str] = None
-    framework: Union[FrameworkCfg, SB3_Model_Cfg]
+    framework: FrameworkCfg
     reward: Optional[RewardCfg] = None
     action_space: Optional[ActionSpaceCfg] = ActionSpaceCfg()
 
     @model_validator(mode="after")
     def check_name(self):
-        if self.name is None and hasattr(self.framework.model, "architecture_name"):
+        if self.name is None and hasattr(self.framework.algorithm, "architecture_name"):
             self.name = generate_agent_name(self.framework, robot=self.robot)
         return self
 

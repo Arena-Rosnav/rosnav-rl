@@ -1,24 +1,20 @@
-from enum import Enum
-from typing import List, Type, Union
+from typing import List, Type, Union, Literal, Dict
 
-from rosnav_rl.spaces.observation_space.observation_space_manager import (
-    ObservationSpaceManager,
-)
+from sb3_contrib import RecurrentPPO
+from stable_baselines3 import PPO
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from stable_baselines3.common.base_class import BaseAlgorithm
 from torch.nn.modules.module import Module
 
-
-class PolicyType(Enum):
-    CNN = "CnnPolicy"
-    MLP = "MlpPolicy"
-    MLP_LSTM = "MlpLstmPolicy"
-    MULTI_INPUT = "MultiInputPolicy"
-    MULTI_INPUT_LSTM = "MultiInputLstmPolicy"
-
+POLICY_TYPE: Dict[
+    BaseAlgorithm, Literal["MultiInputPolicy", "MultiInputLstmPolicy"]
+] = {
+    PPO: "MultiInputPolicy",
+    RecurrentPPO: "MultiInputLstmPolicy",
+}
 
 # Parsed as ppo_kwargs to sb3 ppo class
 BASE_AGENT_ATTR = {
-    "observation_space_manager": ObservationSpaceManager,
     "features_extractor_class": Union[Type[BaseFeaturesExtractor], None],
     "features_extractor_kwargs": Union[dict, None],
     "net_arch": Union[List[Union[int, dict]], None],
