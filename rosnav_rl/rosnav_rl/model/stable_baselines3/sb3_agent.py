@@ -1,35 +1,36 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import List, Optional, Union
 
 import gym
-from sb3_contrib import RecurrentPPO
-from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecEnv, VecNormalize
 
-if TYPE_CHECKING:
-    import rosnav_rl.cfg.sb3_cfg as sb3_cfg
-    from .policy.agent_factory import AgentFactory
+import rosnav_rl.cfg.sb3_cfg as sb3_cfg
 from rosnav_rl.spaces import BaseObservationSpace
 from rosnav_rl.utils.stable_baselines3.config import check_batch_size
+from rosnav_rl.utils.stable_baselines3.model.learning_rate_schedules import (
+    load_lr_schedule,
+)
+from rosnav_rl.utils.stable_baselines3.transfer import transfer_weights
+from rosnav_rl.utils.type_aliases import _SupportedStableBaselinesModels
+from rosnav_rl.utils.utils import load_yaml
 
+# from rosnav_rl.cfg.sb3_cfg import
 from ..model import RL_Model
+from .policy.agent_factory import AgentFactory
 from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicy
 
 DEVICE_CPU = "cpu"
 DEVICE_AUTO = "auto"
-
-_SUPPORTED_ALGORITHM_CLASSES = Union[PPO, RecurrentPPO]
 
 
 class StableBaselinesAgent(RL_Model):
     """StableBaselinesAgent is a reinforcement learning agent that utilizes the Stable Baselines3 library to implement RL algorithms.
 
     Attributes:
-        _model (Union[PPO, RecurrentPPO]): The PPO or Recurrent PPO model used by the agent.
-        _algorithm_cfg (PPO_Algorithm_Cfg): Configuration for the PPO algorithm.
+        _algorithm_cfg (PPO_Algorithm_Cfg): Configuration for the algorithm.
     """
 
-    _model: _SUPPORTED_ALGORITHM_CLASSES
+    _model: _SupportedStableBaselinesModels
     _algorithm_cfg: "sb3_cfg.BaseAlgorithmCfg"
 
     def __init__(self, algorithm_cfg: "sb3_cfg.BaseAlgorithmCfg"):
@@ -133,6 +134,30 @@ class StableBaselinesAgent(RL_Model):
             return False
         return True
 
+    def transfer_weights(
+        self,
+        source_dir: Union[str, Path],
+        source_checkpoint: str,
+        include: List[str] = None,
+        exclude: List[str] = None,
+        cfg_file_name: Optional[str] = "training_config.yaml",
+    ) -> None:
+        config = load_yaml(source_dir / cfg_file_name)
+        validated_algorithm_cfg = sb3_cfg.BaseAlgorithmCfg.model_validate(
+            config["agent_cfg"]["framework"]["algorithm"]
+        )
+
+        source_model = StableBaselinesAgent(
+            algorithm_cfg=validated_algorithm_cfg
+        )._load_model(Path(source_dir) / f"{source_checkpoint}")
+
+        self.model.policy = transfer_weights(
+            target_model=self.model.policy,
+            source_model=source_model.policy,
+            include=include,
+            exclude=exclude,
+        )
+
     def _get_vec_normalize(self) -> VecNormalize:
         """
         Retrieve the VecNormalize instance from the model's environment if it exists.
@@ -190,6 +215,14 @@ class StableBaselinesAgent(RL_Model):
         )
 
         parameters.n_steps = parameters.total_batch_size // env.num_envs
+        parameters.learning_rate = (
+            load_lr_schedule(
+                type=parameters.learning_rate["type"],
+                settings=parameters.learning_rate["kwargs"],
+            )
+            if isinstance(parameters.learning_rate, dict)
+            else parameters.learning_rate
+        )
 
         return {
             "env": env,
@@ -214,7 +247,7 @@ class StableBaselinesAgent(RL_Model):
         path: str,
         env: Optional[VecEnv] = None,
         algorithm_args: Optional[dict] = None,
-    ) -> Union[PPO, RecurrentPPO]:
+    ) -> _SupportedStableBaselinesModels:
         """
         Load a model from the specified path.
 
@@ -231,10 +264,6 @@ class StableBaselinesAgent(RL_Model):
         return self._policy_description.algorithm_class.load(
             path, env=env, custom_objects=algorithm_args
         )
-
-    @property
-    def algorithm_cfg(self) -> "sb3_cfg.BaseAlgorithmCfg":
-        return self._algorithm_cfg
 
     @property
     def observation_space_list(self) -> List[BaseObservationSpace]:
