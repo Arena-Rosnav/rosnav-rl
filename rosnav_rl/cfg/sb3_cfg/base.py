@@ -1,9 +1,10 @@
 from typing import Optional, Union
 
 import torch as th
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 from .lr_schedule import LearningRateSchedulerCfg
+from .transfer import TransferWeightsCfg
 
 
 class BaseAlgorithmParameters(BaseModel):
@@ -19,14 +20,6 @@ class BaseAlgorithmParameters(BaseModel):
     device: Union[th.device, str] = "auto"
     _init_setup_model: bool = True
 
-    @model_validator(mode="after")
-    def load_learning_rate_scheduler(self):
-        if isinstance(self.learning_rate, dict):
-            self.learning_rate = LearningRateSchedulerCfg(**self.learning_rate).callable
-        elif isinstance(self.learning_rate, LearningRateSchedulerCfg):
-            self.learning_rate = self.learning_rate.callable
-        return self
-
     class Config:
         arbitrary_types_allowed = True
 
@@ -34,4 +27,5 @@ class BaseAlgorithmParameters(BaseModel):
 class BaseAlgorithmCfg(BaseModel):
     architecture_name: str
     checkpoint: Optional[str] = "last_model"
+    transfer_weights: Optional[TransferWeightsCfg] = None
     parameters: BaseAlgorithmParameters

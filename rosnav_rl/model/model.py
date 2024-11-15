@@ -6,6 +6,9 @@ from pydantic import BaseModel
 if TYPE_CHECKING:
     from rosnav_rl.spaces import BaseObservationSpace, EncodedObservationDict
 
+import rosnav_rl.cfg.sb3_cfg as sb3_cfg
+from rosnav_rl.utils.type_aliases import _SupportedRosnavRLModels
+
 
 class RL_Model(ABC):
     _model = None
@@ -33,12 +36,15 @@ class RL_Model(ABC):
     def get_action(self, observation: "EncodedObservationDict", *args, **kwargs):
         pass
 
+    def transfer_weights(self, *args, **kwargs):
+        raise NotImplementedError()
+
     @property
     def is_model_initialized(self):
         return self._model is not None
 
     @property
-    def model(self):
+    def model(self) -> _SupportedRosnavRLModels:
         if self._model is None:
             raise ValueError("Model not initialized. Call 'initialize' first.")
         return self._model
@@ -48,11 +54,7 @@ class RL_Model(ABC):
         self._model = model
 
     @property
-    def model_cfg(self):
-        return self._model_cfg
-
-    @property
-    def algorithm_cfg(self):
+    def algorithm_cfg(self) -> "sb3_cfg.BaseAlgorithmCfg":
         return self._algorithm_cfg
 
     @property

@@ -1,12 +1,11 @@
 from typing import Optional, Union
 
 import rospy
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, Field
 
 from rosnav_rl.utils.name_generator import generate_agent_name
 
 from .framework import FrameworkCfg
-from .sb3_cfg.ppo import PPO_Cfg
 from .reward import RewardCfg
 from .action_space.action_space import ActionSpaceCfg
 
