@@ -3,16 +3,16 @@ import os
 import random
 from typing import Tuple
 
-import numpy as np
 import rospkg
 import rospy
 import torch
 import yaml
-from gymnasium import spaces
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 from task_generator.constants import Constants
 from task_generator.utils import Utils
+
+from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
 
 
 def get_robot_yaml_path(robot_model: str = None) -> str:
@@ -64,24 +64,22 @@ def load_yaml(file_path: str) -> dict:
         return yaml.load(file, Loader=yaml.FullLoader)
 
 
-def make_mock_env(ns: str, agent_description) -> DummyVecEnv:
+def make_mock_env(ns: str, space_manager: BaseSpaceManager) -> DummyVecEnv:
     import rl_utils.envs.flatland_gymnasium_env as flatland_gym_env
     import rl_utils.envs.unity as arena_unity_env
 
     def _init_flatland_env():
         return flatland_gym_env.FlatlandEnv(
             ns=ns,
-            agent_description=agent_description,
-            reward_fnc=None,
-            init_by_call=False,
+            space_manager=space_manager,
+            init_by_call=True,
         )
 
     def _init_arena_unity_env():
         return arena_unity_env.UnityEnv(
             ns=ns,
-            agent_description=agent_description,
-            reward_fnc=None,
-            init_by_call=False,
+            space_manager=space_manager,
+            init_by_call=True,
         )
 
     sim = Utils.get_simulator()
