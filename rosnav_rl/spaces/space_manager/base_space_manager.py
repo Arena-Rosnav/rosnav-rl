@@ -1,4 +1,3 @@
-from abc import ABC
 from dataclasses import asdict
 from typing import Any, Dict, List, Union
 
@@ -15,7 +14,7 @@ from rosnav_rl.utils.agent_state import AgentStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict, ObservationSpaceUnit
 
 
-class BaseSpaceManager(ABC):
+class BaseSpaceManager:
     """
     BaseSpaceManager is an abstract base class that manages the agent state, action space, and observation space.
 
@@ -82,39 +81,6 @@ class BaseSpaceManager(ABC):
             observation_space_list, observation_space_kwargs
         )
 
-    @property
-    def agent_state_container(self) -> AgentStateContainer:
-        return self._agent_state_container
-
-    @property
-    def action_space_manager(self) -> ActionSpaceManager:
-        return self._action_space_manager
-
-    @property
-    def observation_space_manager(self) -> ObservationSpaceManager:
-
-        return self._observation_space_manager
-
-    @property
-    def observation_space(self) -> spaces.Dict:
-        return self._observation_space_manager.observation_space
-
-    @property
-    def observation_space_list(self) -> List[ObservationSpaceUnit]:
-        return self._observation_space_manager.space_list
-
-    @property
-    def action_space(self) -> Union[spaces.Dict, spaces.Box]:
-        return self._action_space_manager.action_space
-
-    @property
-    def config(self):
-        return {
-            "observation": self._observation_space_manager.config,
-            "action": self._action_space_manager.config,
-            "agent_state_container": self._agent_state_container,
-        }
-
     def _init_action_space_manager(self, action_space_kwargs: Dict[str, Any]):
         """
         Initializes the ActionSpaceManager.
@@ -172,3 +138,36 @@ class BaseSpaceManager(ABC):
             The decoded action as determined by the action space manager.
         """
         return self._action_space_manager.decode_action(action)
+
+    @property
+    def agent_state_container(self) -> AgentStateContainer:
+        return self._agent_state_container
+
+    @property
+    def action_space_manager(self) -> ActionSpaceManager:
+        return self._action_space_manager
+
+    @property
+    def observation_space_manager(self) -> ObservationSpaceManager:
+
+        return self._observation_space_manager
+
+    @property
+    def observation_space(self) -> spaces.Dict:
+        return self._observation_space_manager.observation_space
+
+    @property
+    def observation_space_list(self) -> List[ObservationSpaceUnit]:
+        return self._observation_space_manager.space_list
+
+    @property
+    def action_space(self) -> Union[spaces.Dict, spaces.Box]:
+        return self._action_space_manager.action_space
+
+    @property
+    def config(self):
+        return {
+            "observation": self._observation_space_manager.config,
+            "action": self._action_space_manager.config,
+            "agent_state_container": self._agent_state_container,
+        }

@@ -1,2 +1,1 @@
 from .base_space_manager import BaseSpaceManager
-from .rosnav_space_manager import RosnavSpaceManager
