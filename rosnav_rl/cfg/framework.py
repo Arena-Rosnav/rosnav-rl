@@ -1,10 +1,10 @@
 from typing import Optional, Union
+from abc import ABC
 
 from pydantic import BaseModel
 from rl_utils.utils.type_alias.enums import RLFramework
-from .sb3_cfg.base import BaseAlgorithmCfg
 
 
-class FrameworkCfg(BaseModel):
+class FrameworkCfg(BaseModel, ABC):
     name: Union[str, RLFramework]
-    algorithm: BaseAlgorithmCfg
+    algorithm: BaseModel

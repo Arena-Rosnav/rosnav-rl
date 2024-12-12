@@ -5,7 +5,7 @@ from pydantic import BaseModel, model_validator, Field
 
 from rosnav_rl.utils.name_generator import generate_agent_name
 
-from .framework import FrameworkCfg
+from .sb3_cfg.framework import StableBaselinesCfg
 from .reward import RewardCfg
 from .action_space.action_space import ActionSpaceCfg
 
@@ -13,7 +13,7 @@ from .action_space.action_space import ActionSpaceCfg
 class AgentCfg(BaseModel):
     name: Optional[str] = None
     robot: Optional[str] = None
-    framework: FrameworkCfg
+    framework: StableBaselinesCfg
     reward: Optional[RewardCfg] = None
     action_space: Optional[ActionSpaceCfg] = ActionSpaceCfg()
 

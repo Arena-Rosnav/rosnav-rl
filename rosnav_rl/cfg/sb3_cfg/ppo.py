@@ -1,9 +1,9 @@
 from typing import Optional, Union
 
-from .base import BaseAlgorithmCfg, BaseAlgorithmParameters
+from .base import SBAlgorithmCfg, SBAlgorithmParameters
 
 
-class PPO_Algorithm_Cfg(BaseAlgorithmParameters):
+class PPO_Algorithm_Cfg(SBAlgorithmParameters):
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_range: Union[float, callable] = 0.2
@@ -17,5 +17,5 @@ class PPO_Algorithm_Cfg(BaseAlgorithmParameters):
     target_kl: Optional[float] = None
 
 
-class PPO_Cfg(BaseAlgorithmCfg):
+class PPO_Cfg(SBAlgorithmCfg):
     parameters: PPO_Algorithm_Cfg
