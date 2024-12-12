@@ -70,7 +70,7 @@ class RewardFunction:
         self,
         reward_file_name: str,
         reward_unit_kwargs: Optional[Dict[str, Any]] = None,
-        verbose: bool = False,
+        verbose: bool = True,
     ):
         """
         Initialize the reward function.
