@@ -6,3 +6,4 @@ from .observation import (
 )
 
 from .models import _SupportedStableBaselinesModels, _SupportedRosnavRLModels
+from .action import _HolonomicAction
