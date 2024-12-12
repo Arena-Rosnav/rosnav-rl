@@ -3,14 +3,12 @@ from typing import TYPE_CHECKING, Dict, Optional, Union
 
 import numpy as np
 from gym import spaces
-from rl_utils.state_container import SimulationStateContainer
 
 if TYPE_CHECKING:
     from rosnav_rl.cfg import AgentCfg
-from rosnav_rl.model.stable_baselines3 import StableBaselinesAgent
+from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
-from rosnav_rl.spaces.space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav_rl.utils.agent_state import AgentStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict
 
@@ -53,15 +51,15 @@ class RL_Agent:
     """
 
     _name: str
-    _model: RL_Model
+    _model: StableBaselinesModel
     _reward_function: Optional[RewardFunction] = None
     _space_manager: BaseSpaceManager
-    _simulation_state_container: SimulationStateContainer
+    _agent_state_container: AgentStateContainer
 
     def __init__(
         self,
         agent_cfg: "AgentCfg",
-        simulation_state_container: SimulationStateContainer,
+        agent_state_container: AgentStateContainer,
     ):
         """
         Initialize the Reinforcement Learning Agent.
@@ -74,18 +72,19 @@ class RL_Agent:
         Attributes:
             _name (str): Name of the agent.
             _simulation_state_container (SimulationStateContainer): Container for the simulation state.
-            _model (StableBaselinesAgent): The framework-specific RL model used by the agent.
-            _space_manager (RosnavSpaceManager): Manages the action and observation spaces.
+            _model (StableBaselinesModel): The framework-specific RL model used by the agent.
+            _space_manager (BaseSpaceManager): Manages the action and observation spaces.
             _reward_function (RewardFunction, optional): The reward function used by the agent, if specified in the configuration.
         """
         self._name = agent_cfg.name
-        self._simulation_state_container = simulation_state_container
-        self._model = StableBaselinesAgent(
+        self._agent_state_container = agent_state_container
+        self._model = StableBaselinesModel(
+            rl_agent=self,
             algorithm_cfg=agent_cfg.framework.algorithm,
         )
-        self._space_manager = RosnavSpaceManager(
+        self._space_manager = BaseSpaceManager(
             action_space_kwargs={"is_discrete": agent_cfg.action_space.is_discrete},
-            simulation_state_container=simulation_state_container,
+            agent_state_container=self._agent_state_container,
             observation_space_list=self.model.observation_space_list,
             observation_space_kwargs=self.model.observation_space_kwargs,
         )
@@ -100,47 +99,54 @@ class RL_Agent:
         """
         Initialize the model if it has not been initialized yet.
 
-        This method checks if the model is already initialized. If not, it calls the
-        model's initialize method with the provided arguments.
-
         Args:
             *args: Variable length argument list to be passed to the model's initialize method.
             **kwargs: Arbitrary keyword arguments to be passed to the model's initialize method.
         """
-        if not self.model.is_model_initialized:
-            self.model.setup_model(*args, **kwargs)
+        self.model.setup_model(*args, **kwargs)
 
-    def get_reward(self, observation: ObservationDict) -> float:
+    def load_model(self, *args, **kwargs):
         """
-        Calculate and return the reward based on the given observation.
+        Load the model if it has not been loaded yet.
 
         Args:
-            observation (ObservationDict): The current observation containing relevant state information.
-
-        Returns:
-            float: The calculated reward based on the observation and the current simulation state.
+            *args: Variable length argument list to be passed to the model's load method.
+            **kwargs: Arbitrary keyword arguments to be passed to the model's load method.
         """
-        return self._reward_function.get_reward(
-            observation, simulation_state_container=self._simulation_state_container
-        )
+        if not self.model.is_model_initialized:
+            self.model.load(*args, **kwargs)
 
-    def get_action(self, observation: ObservationDict) -> np.ndarray:
-        return self._space_manager.decode_action(
-            self.model.get_action(self.space_manager.encode_observation(observation))
-        )
+    # def get_reward(self, observation: ObservationDict) -> float:
+    #     """
+    #     Calculate and return the reward based on the given observation.
+
+    #     Args:
+    #         observation (ObservationDict): The current observation containing relevant state information.
+
+    #     Returns:
+    #         float: The calculated reward based on the observation and the current simulation state.
+    #     """
+    #     return self._reward_function.get_reward(
+    #         observation, simulation_state_container=self._simulation_state_container
+    #     )
+
+    def get_action(self, observation: ObservationDict, *args, **kwargs) -> np.ndarray:
+        return self.model.get_action(observation=observation, *args, **kwargs)
 
     @property
     def config(self) -> Dict[str, dict]:
-        return {
+        config_dict = {
             "model": self.model.config,
-            "reward": self._reward_function.config,
             "space": self._space_manager.config,
             "agent_state_container": asdict(self.agent_state_container),
-            "simulation_state_container": asdict(self._simulation_state_container),
+            # "simulation_state_container": asdict(self._simulation_state_container),
         }
+        if self._reward_function is not None:
+            config_dict["reward"] = self._reward_function.config
+        return config_dict
 
     @property
-    def model(self) -> RL_Model:
+    def model(self) -> StableBaselinesModel:
         if self._model is None:
             raise ValueError("'RL_Model' not initialized.")
         return self._model
