@@ -4,10 +4,11 @@ import torch as th
 from pydantic import BaseModel
 
 from .lr_schedule import LearningRateSchedulerCfg
+from .normalization import NormalizationCfg
 from .transfer import TransferWeightsCfg
 
 
-class BaseAlgorithmParameters(BaseModel):
+class SBAlgorithmParameters(BaseModel):
     total_batch_size: int = 2048
     n_steps: Optional[int] = None
     batch_size: int = 256
@@ -24,8 +25,9 @@ class BaseAlgorithmParameters(BaseModel):
         arbitrary_types_allowed = True
 
 
-class BaseAlgorithmCfg(BaseModel):
+class SBAlgorithmCfg(BaseModel):
     architecture_name: str
     checkpoint: Optional[str] = "last_model"
     transfer_weights: Optional[TransferWeightsCfg] = None
-    parameters: BaseAlgorithmParameters
+    parameters: SBAlgorithmParameters
+    normalization: Optional[NormalizationCfg] = None
