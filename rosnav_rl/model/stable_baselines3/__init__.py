@@ -1,5 +1,5 @@
 from .policy.base_policy import StableBaselinesPolicy
-from .sb3_agent import StableBaselinesAgent
+from .sb3_model import StableBaselinesModel
 
 
 def import_models() -> "AgentFactory":
