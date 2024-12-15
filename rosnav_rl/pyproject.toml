@@ -21,13 +21,7 @@ opencv-python = "^4.8"
 sb3-contrib = "^2.1.0"
 shimmy = "^1.3.0"
 pygments = "^2.18.0"
-stable-baselines3 = {path = "../../arena/utils/stable-baselines3", develop = true}
-
-
-# [tool.poetry.group.sb3_local]
-# optional = false
-# [tool.poetry.group.sb3_local.dependencies]
-# stable-baselines3 = {path = "../../arena/utils/stable-baselines3", develop = true}
+stable-baselines3 = "^2.1.0"
 
 [build-system]
 requires = ["poetry-core"]
