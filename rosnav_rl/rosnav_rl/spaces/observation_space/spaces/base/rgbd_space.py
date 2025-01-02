@@ -1,11 +1,11 @@
 import numpy as np
 from gymnasium import spaces
 from numpy import ndarray
-from rl_utils.utils.observation_collector import (
+
+from rosnav_rl.observations import (
     ImageColorCollector,
     ImageDepthCollector,
 )
-
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory

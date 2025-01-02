@@ -1,10 +1,7 @@
 import numpy as np
-import rospy
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import (
-    SubgoalLocationInRobotFrame,
-)
 
+from rosnav_rl.observations import SubgoalLocationInRobotFrameGenerator
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
@@ -31,7 +28,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
     """
 
     name = "SUBGOAL_IN_ROBOT_FRAME"
-    required_observation_units = [SubgoalLocationInRobotFrame]
+    required_observation_units = [SubgoalLocationInRobotFrameGenerator]
 
     def __init__(self, subgoal_max_dist: float = 5, *args, **kwargs) -> None:
         self._max_dist = subgoal_max_dist
@@ -54,7 +51,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
     @BaseObservationSpace.apply_normalization
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
-    ) -> SubgoalLocationInRobotFrame.data_class:
+    ) -> SubgoalLocationInRobotFrameGenerator.data_class:
         """
         Encodes the goal observation.
 
@@ -65,7 +62,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        subgoal_dist_angle = observation[SubgoalLocationInRobotFrame.name][
+        subgoal_dist_angle = observation[SubgoalLocationInRobotFrameGenerator.name][
             np.newaxis, :
         ]
         return subgoal_dist_angle

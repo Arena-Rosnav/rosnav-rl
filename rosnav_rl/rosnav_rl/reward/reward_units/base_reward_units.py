@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Any, List
 
 from rl_utils.state_container import SimulationStateContainer
-from rl_utils.utils.type_alias.observation import TypeObservationGeneric
+
+from rosnav_rl.observations import BaseUnit
 
 from ..reward_function import RewardFunction
 
@@ -27,7 +28,7 @@ class RewardUnit(ABC):
         __call__(*args: Any, **kwargs: Any) -> Any: Abstract method to alter the reward and possibly the info dict. Must be overridden in derived classes.
     """
 
-    required_observation_units: List[TypeObservationGeneric]
+    required_observation_units: List[BaseUnit]
 
     def __init__(
         self,

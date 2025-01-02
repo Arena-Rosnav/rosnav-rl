@@ -1,11 +1,10 @@
 import numpy as np
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import DistAngleToGoal
 
+from rosnav_rl.observations import DistAngleToGoalGenerator
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
-from ...utils import stack_spaces
 from ..base_observation_space import BaseObservationSpace
 
 
@@ -29,7 +28,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
     """
 
     name = "DIST_ANGLE_TO_GOAL"
-    required_observation_units = [DistAngleToGoal]
+    required_observation_units = [DistAngleToGoalGenerator]
 
     def __init__(self, goal_max_dist: float = 30, *args, **kwargs) -> None:
         self._max_dist = goal_max_dist
@@ -53,7 +52,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
     @BaseObservationSpace.check_dtype
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
-    ) -> DistAngleToGoal.data_class:
+    ) -> DistAngleToGoalGenerator.data_class:
         """
         Encodes the goal observation.
 
@@ -64,4 +63,4 @@ class DistAngleToGoalSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        return observation[DistAngleToGoal.name][np.newaxis, :]
+        return observation[DistAngleToGoalGenerator.name][np.newaxis, :]
