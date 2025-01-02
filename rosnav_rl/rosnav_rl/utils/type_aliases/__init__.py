@@ -3,7 +3,9 @@ from .observation import (
     ObservationDict,
     ObservationGenerator,
     ObservationSpaceUnit,
+    ObservationName,
 )
 
 from .models import _SupportedStableBaselinesModels, _SupportedRosnavRLModels
 from .action import _HolonomicAction
+from .ros import _RospyMessage
