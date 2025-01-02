@@ -1,24 +1,28 @@
+from __future__ import annotations
+
 from abc import abstractmethod
-from typing import List, Union
+from typing import TYPE_CHECKING, List, Union
 
 import numpy as np
 import rospy
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import (
+
+from rosnav_rl.observations import (
     RobotPoseCollector,
     SemanticLayerCollector,
 )
-from rl_utils.utils.observation_collector.utils.semantic import (
+from rosnav_rl.observations.utils.semantic import (
     get_relative_pos_to_robot,
 )
-
-from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ..base_observation_space import (
     BaseObservationSpace,
     ObservationCollector,
     ObservationGenerator,
 )
+
+if TYPE_CHECKING:
+    from rosnav_rl.utils.type_aliases import ObservationDict
 
 
 class BaseFeatureMapSpace(BaseObservationSpace):

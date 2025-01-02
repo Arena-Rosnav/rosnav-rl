@@ -3,11 +3,11 @@ from collections import deque
 import numpy as np
 import rospy
 from gymnasium import spaces
-from rl_utils.utils.observation_collector import (
+
+from rosnav_rl.observations import (
     DoneObservation,
     LaserCollector,
 )
-
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory

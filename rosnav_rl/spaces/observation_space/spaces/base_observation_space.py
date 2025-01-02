@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import List, Union, TYPE_CHECKING, ClassVar
 from warnings import warn
 
 import numpy as np
@@ -7,6 +9,7 @@ from gym import spaces
 from gymnasium import spaces
 
 from rosnav_rl.spaces.observation_space.normalization import *
+
 from rosnav_rl.utils.type_aliases import (
     ObservationCollector,
     ObservationDict,
@@ -19,9 +22,9 @@ class BaseObservationSpace(ABC):
     Base class for defining observation spaces in reinforcement learning environments.
     """
 
-    name: str = "BASE_OBSERVATION_SPACE"
-    required_observation_units: List[
-        Union[ObservationCollector, ObservationGenerator]
+    name: ClassVar[str]
+    required_observation_units: ClassVar[
+        List[Union[ObservationCollector, ObservationGenerator]]
     ] = []
 
     def __init__(

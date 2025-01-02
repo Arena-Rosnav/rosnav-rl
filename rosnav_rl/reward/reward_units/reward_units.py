@@ -5,11 +5,11 @@ from warnings import warn
 import numpy as np
 import rospy
 from rl_utils.state_container import SimulationStateContainer
-from rl_utils.utils.observation_collector import *
-from rl_utils.utils.observation_collector.constants import DONE_REASONS
-from rl_utils.utils.type_alias.observation import ObservationDict
 
-from ..constants import DEFAULTS, REWARD_CONSTANTS
+from rosnav_rl.observations import *
+from rosnav_rl.utils.type_aliases.observation import ObservationDict
+
+from ..constants import DEFAULTS, DONE_REASONS, REWARD_CONSTANTS
 from ..reward_function import RewardFunction
 from ..utils import check_params
 from .base_reward_units import RewardUnit
@@ -33,7 +33,7 @@ __all__ = [
 
 @RewardUnitFactory.register("goal_reached")
 class RewardGoalReached(RewardUnit):
-    required_observation_units = [DistAngleToGoal, DistAngleToSubgoal]
+    required_observation_units = [DistAngleToGoalGenerator, DistAngleToSubgoalGenerator]
     DONE_INFO = {
         "is_done": True,
         "done_reason": DONE_REASONS.SUCCESS.name,
@@ -61,7 +61,9 @@ class RewardGoalReached(RewardUnit):
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._reward = reward
         self._goal_key = (
-            DistAngleToSubgoal.name if _following_subgoal else DistAngleToGoal.name
+            DistAngleToSubgoalGenerator.name
+            if _following_subgoal
+            else DistAngleToGoalGenerator.name
         )
 
     def check_parameters(self, *args, **kwargs):
@@ -803,8 +805,8 @@ class RewardActiveHeadingDirection(RewardUnit):
     """
 
     required_observation_units = [
-        DistAngleToGoal,
-        DistAngleToSubgoal,
+        DistAngleToGoalGenerator,
+        DistAngleToSubgoalGenerator,
         LastActionCollector,
         PedestrianRelativeLocationGenerator,
         PedestrianRelativeVelXGenerator,
@@ -832,7 +834,9 @@ class RewardActiveHeadingDirection(RewardUnit):
         self._iters = iters
 
         self._goal_key = (
-            DistAngleToSubgoal.name if _following_subgoal else DistAngleToGoal.name
+            DistAngleToSubgoalGenerator.name
+            if _following_subgoal
+            else DistAngleToGoalGenerator.name
         )
 
     def __call__(
@@ -863,7 +867,7 @@ class RewardActiveHeadingDirection(RewardUnit):
             float: The calculated reward based on the active heading direction.
         """
         dist_angle_to_goal: Union[
-            DistAngleToGoal.data_class, DistAngleToSubgoal.name
+            DistAngleToGoalGenerator.data_class, DistAngleToSubgoalGenerator.name
         ] = obs_dict[self._goal_key]
         action: LastActionCollector.data_class = obs_dict.get(
             LastActionCollector.name, None
