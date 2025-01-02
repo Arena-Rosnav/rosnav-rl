@@ -30,28 +30,3 @@ def distances_from_pointcloud(point_cloud: np.ndarray):
     return np.sqrt(
         point_cloud["x"] ** 2 + point_cloud["y"] ** 2 + point_cloud["z"] ** 2
     )
-
-
-from rl_utils.utils.observation_collector import *
-
-
-def get_ped_type_min_distances(observation_dict):
-    ped_distances = {}
-
-    relative_locations = observation_dict.get(PedestrianRelativeLocation.name, None)
-    pedestrian_types = observation_dict.get(PedestrianTypeCollector.name, None)
-
-    if relative_locations is None or pedestrian_types is None:
-        return ped_distances
-
-    if len(relative_locations) == 0 or len(pedestrian_types.points) == 0:
-        return ped_distances
-
-    distances = np.linalg.norm(relative_locations, axis=1)
-    types = np.array([int(type_data.evidence) for type_data in pedestrian_types.points])
-
-    # get the unique types
-    for _type in np.unique(types):
-        ped_distances[_type] = np.min(distances[types == _type])
-
-    return ped_distances
