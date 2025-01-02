@@ -1,6 +1,15 @@
+import enum
+
+
 class REWARD_CONSTANTS:
     MIN_GOAL_RADIUS = 0.1
     NO_MOVEMENT_TOLERANCE = 0.1
+
+
+class DONE_REASONS(enum.Enum):
+    STEP_LIMIT = 0
+    COLLISION = 1
+    SUCCESS = 2
 
 
 class DEFAULTS:
