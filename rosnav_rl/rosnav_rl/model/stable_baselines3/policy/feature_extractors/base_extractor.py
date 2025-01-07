@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union
+from typing import List, Union
 
 import rosnav_rl.spaces.observation_space as SPACE
 import torch as th
 from gymnasium import spaces
 from stable_baselines3.common.policies import BaseFeaturesExtractor
 
-TensorDict = Dict[str, th.Tensor]
+from rosnav_rl.utils.type_aliases import TensorDict
 
 
 class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
@@ -46,7 +46,7 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def forward(self, observations: Union[th.Tensor, SPACE.TensorDict]) -> th.Tensor:
+    def forward(self, observations: Union[th.Tensor, TensorDict]) -> th.Tensor:
         """
         Forward pass of the feature extractor.
 

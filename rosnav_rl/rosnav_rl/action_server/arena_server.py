@@ -3,10 +3,7 @@ from pathlib import Path
 import rospkg
 from rl_utils.cfg import TrainingCfg
 from rl_utils.state_container.container import SimulationStateContainer
-from rl_utils.utils.observation_collector.observation_manager import ObservationManager
-from rl_utils.utils.observation_collector.traversal import (
-    get_required_observation_units,
-)
+from rosnav_rl.observations import ObservationManager, get_required_observation_units
 from tools.states import get_arena_states
 
 from rosnav_rl.rl_agent import RL_Agent
