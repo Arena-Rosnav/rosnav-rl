@@ -3,15 +3,19 @@ from typing import Any, Dict, List, Union
 
 import numpy as np
 from gym import spaces
+
 from rosnav_rl.spaces import (
     ActionSpaceManager,
     BaseFeatureMapSpace,
     BaseObservationSpace,
-    EncodedObservationDict,
     ObservationSpaceManager,
 )
 from rosnav_rl.utils.agent_state import AgentStateContainer
-from rosnav_rl.utils.type_aliases import ObservationDict, ObservationSpaceUnit
+from rosnav_rl.utils.type_aliases import (
+    EncodedObservationDict,
+    ObservationDict,
+    ObservationSpaceUnit,
+)
 
 
 class BaseSpaceManager:

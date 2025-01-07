@@ -3,12 +3,15 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 from pydantic import BaseModel
 
+import rosnav_rl.cfg.sb3_cfg as sb3_cfg
+from rosnav_rl.utils.type_aliases import (
+    EncodedObservationDict,
+    _SupportedRosnavRLModels,
+)
+
 if TYPE_CHECKING:
     from rosnav_rl.rl_agent import RL_Agent
-    from rosnav_rl.spaces import BaseObservationSpace, EncodedObservationDict
-
-import rosnav_rl.cfg.sb3_cfg as sb3_cfg
-from rosnav_rl.utils.type_aliases import _SupportedRosnavRLModels
+    from rosnav_rl.spaces import BaseObservationSpace
 
 
 class RL_Model(ABC):
