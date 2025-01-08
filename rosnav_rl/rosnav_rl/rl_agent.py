@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
-from rosnav_rl.utils.agent_state import AgentStateContainer
+from rosnav_rl.states import AgentStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 from .model import RL_Model
