@@ -24,36 +24,6 @@ def get_robot_yaml_path(robot_model: str = None) -> str:
     )
 
 
-def get_laser_from_robot_yaml(robot_model: str = None) -> Tuple[int, int, int, int]:
-    robot_yaml_path = get_robot_yaml_path(robot_model)
-
-    with open(robot_yaml_path, "r") as fd:
-        robot_data = yaml.safe_load(fd)
-        laser_data = robot_data["laser"]
-
-        rospy.set_param(
-            os.path.join(rospy.get_namespace(), "laser/num_beams"),
-            laser_data["num_beams"],
-        )
-
-        return (
-            laser_data["num_beams"],
-            laser_data["angle"]["min"],
-            laser_data["angle"]["max"],
-            laser_data["angle"]["increment"],
-        )
-
-
-def get_actions_from_robot_yaml(robot_model: str = None):
-    robot_yaml_path = get_robot_yaml_path(robot_model)
-
-    with open(robot_yaml_path, "r") as fd:
-        robot_data = yaml.safe_load(fd)
-        action_data = robot_data["actions"]
-
-    return action_data
-
-
 def load_json(file_path: str) -> dict:
     with open(file_path) as file:
         return json.load(file)
@@ -65,11 +35,11 @@ def load_yaml(file_path: str) -> dict:
 
 
 def make_mock_env(ns: str, space_manager: BaseSpaceManager) -> DummyVecEnv:
-    import rl_utils.envs.flatland_gymnasium_env as flatland_gym_env
+    import rl_utils.envs.flatland_gymnasium_env as arena_flatland_gym_env
     import rl_utils.envs.unity as arena_unity_env
 
     def _init_flatland_env():
-        return flatland_gym_env.FlatlandEnv(
+        return arena_flatland_gym_env.FlatlandEnv(
             ns=ns,
             space_manager=space_manager,
             init_by_call=True,
