@@ -3,11 +3,11 @@ from typing import Protocol
 
 import numpy as np
 import rospy
-from rl_utils.topic import Namespace
 from std_msgs.msg import Int16
 
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.srv import GetAction, GetActionResponse
+from rosnav_rl.utils.rostopic import Namespace
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 

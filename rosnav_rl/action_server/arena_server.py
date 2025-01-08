@@ -1,13 +1,12 @@
 from pathlib import Path
+from time import sleep
 
 import rospkg
-from rl_utils.cfg import TrainingCfg
-from rl_utils.state_container.container import SimulationStateContainer
-from rosnav_rl.observations import ObservationManager, get_required_observation_units
 from tools.states import get_arena_states
 
+from rosnav_rl.observations import ObservationManager, get_required_observation_units
 from rosnav_rl.rl_agent import RL_Agent
-from rosnav_rl.utils.agent_state import AgentStateContainer
+from rosnav_rl.states import AgentStateContainer, SimulationStateContainer
 from rosnav_rl.utils.utils import load_yaml
 
 from .base_server import ActionServer, ObservationCollector
@@ -28,10 +27,12 @@ class ArenaActionServer(ActionServer):
         Returns:
             RL_Agent: An instance of the RL_Agent class initialized with the loaded model and configuration.
         """
+        import rl_utils.cfg as arena_cfg
+
         _rosnav_path = Path(rospkg.RosPack().get_path("rosnav_rl"))
         _model_dir = _rosnav_path / "agents" / self.agent_name
 
-        training_cfg = TrainingCfg.model_validate(
+        training_cfg = arena_cfg.TrainingCfg.model_validate(
             load_yaml(_model_dir / "training_config.yaml")
         )
         self.simulation_state_container: SimulationStateContainer = get_arena_states(
@@ -64,7 +65,10 @@ class ArenaActionServer(ActionServer):
             ObservationCollector: An instance of ObservationManager configured
             with the required observation units and simulation state container.
         """
-        return ObservationManager(
+        import task_generator.constants as arena_task_constants
+        import task_generator.utils as arena_task_utils
+
+        obs_manager = ObservationManager(
             ns=self.namespace,
             obs_structur=get_required_observation_units(
                 self.agent.space_manager.observation_space_list
@@ -73,5 +77,11 @@ class ArenaActionServer(ActionServer):
             wait_for_obs=False,
             is_single_env=True,
         )
-        # if Utils.get_simulator() == Constants.Simulator.UNITY:
-        # sleep(5)  # wait for unity collector unit to set itself up
+
+        if (
+            arena_task_utils.Utils.get_simulator()
+            == arena_task_constants.Constants.Simulator.UNITY
+        ):
+            sleep(5)  # wait for unity collector unit to set itself up
+
+        return obs_manager
