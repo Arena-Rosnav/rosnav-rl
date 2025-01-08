@@ -3,7 +3,11 @@ from typing import Any, Dict, List, Type, Union
 from gymnasium import spaces
 
 from rosnav_rl.utils.space import extract_init_arguments
-from rosnav_rl.utils.type_aliases import EncodedObservationDict, ObservationDict
+from rosnav_rl.utils.type_aliases import (
+    EncodedObservationDict,
+    ObservationDict,
+    ObservationSpaceList,
+)
 
 from .spaces.base_observation_space import BaseObservationSpace
 
@@ -13,7 +17,7 @@ class ObservationSpaceManager:
     A class that manages the observation spaces for a given namespace.
 
     Args:
-        space_list (List[Type[BaseObservationSpace]]): A list of observation space classes.
+        space_list (ObservationSpaceList): A list of observation space classes.
         space_kwargs (Dict[str, Any]): Additional keyword arguments to be passed to the observation space classes.
 
     Attributes:
@@ -22,7 +26,7 @@ class ObservationSpaceManager:
     """
 
     def __init__(
-        self, space_list: List[Type[BaseObservationSpace]], space_kwargs: Dict[str, Any]
+        self, space_list: ObservationSpaceList, space_kwargs: Dict[str, Any]
     ) -> None:
         self._space_cls_list = space_list
         self._space_kwargs = space_kwargs
@@ -49,7 +53,7 @@ class ObservationSpaceManager:
         )
 
     def __getitem__(
-        self, space: Union[str, BaseObservationSpace, Type[BaseObservationSpace]]
+        self, space: Union[str, Type[BaseObservationSpace]]
     ) -> BaseObservationSpace:
         """
         Retrieve the observation space with the given name or instance.
@@ -104,7 +108,7 @@ class ObservationSpaceManager:
         }
 
     @property
-    def space_list(self) -> List[Type[BaseObservationSpace]]:
+    def space_list(self) -> ObservationSpaceList:
         """Return the list of observation spaces."""
         return self._space_cls_list
 

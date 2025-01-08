@@ -6,14 +6,13 @@ from gym import spaces
 
 from rosnav_rl.spaces import (
     ActionSpaceManager,
-    BaseFeatureMapSpace,
-    BaseObservationSpace,
     ObservationSpaceManager,
 )
-from rosnav_rl.utils.agent_state import AgentStateContainer
+from rosnav_rl.states import AgentStateContainer
 from rosnav_rl.utils.type_aliases import (
     EncodedObservationDict,
     ObservationDict,
+    ObservationSpaceList,
     ObservationSpaceUnit,
 )
 
@@ -67,7 +66,7 @@ class BaseSpaceManager:
         self,
         agent_state_container: AgentStateContainer,
         action_space_kwargs: Dict[str, Any],
-        observation_space_list: List[Union[BaseObservationSpace, BaseFeatureMapSpace]],
+        observation_space_list: ObservationSpaceList,
         observation_space_kwargs: Dict[str, Any],
     ):
         """
@@ -76,7 +75,7 @@ class BaseSpaceManager:
         Args:
             agent_state_container (AgentStateContainer): The container holding the state of the agent.
             action_space_kwargs (Dict[str, Any]): Keyword arguments for initializing the action space manager.
-            observation_space_list (List[Union[BaseObservationSpace, BaseFeatureMapSpace]]): List of observation spaces to be managed.
+            observation_space_list (ObservationSpaceList): List of observation spaces to be managed.
             observation_space_kwargs (Dict[str, Any]): Keyword arguments for initializing the observation space manager.
         """
         self._agent_state_container = agent_state_container
@@ -97,14 +96,14 @@ class BaseSpaceManager:
 
     def _init_observation_space_manager(
         self,
-        observation_space_list: List[Union[BaseObservationSpace, BaseFeatureMapSpace]],
+        observation_space_list: ObservationSpaceList,
         observation_space_kwargs: Dict[str, Any],
     ):
         """
         Initializes the ObservationSpaceManager.
 
         Args:
-            observation_spaces (List[Union[BaseObservationSpace, BaseFeatureMapSpace]]): The list of observation spaces.
+            observation_spaces (ObservationSpaceList): The list of observation spaces.
             observation_space_kwargs (Dict[str, Any]): Additional keyword arguments for the observation spaces.
         """
         observation_space_kwargs.update(
