@@ -2,9 +2,10 @@ from typing import List, Type
 
 import rospy
 import unity_msgs.msg as unity_msgs
-from rl_utils.state_container import SimulationStateContainer
-from rl_utils.topic import Namespace
+from rosnav_rl.states import SimulationStateContainer
 from task_generator.constants import Config, Constants, UnityConstants
+
+from rosnav_rl.utils.rostopic import Namespace
 
 from .base_collector import ObservationCollectorUnit
 

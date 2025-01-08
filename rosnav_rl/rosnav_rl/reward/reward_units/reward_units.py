@@ -4,9 +4,9 @@ from warnings import warn
 
 import numpy as np
 import rospy
-from rl_utils.state_container import SimulationStateContainer
 
 from rosnav_rl.observations import *
+from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.type_aliases.observation import ObservationDict
 
 from ..constants import DEFAULTS, DONE_REASONS, REWARD_CONSTANTS

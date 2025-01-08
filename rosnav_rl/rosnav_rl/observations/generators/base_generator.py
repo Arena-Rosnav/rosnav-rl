@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import ClassVar, List, Type, TypeVar, Generic
 
-from rl_utils.state_container import SimulationStateContainer
+from rosnav_rl.states import SimulationStateContainer
 
 from ..collectors import BaseUnit
 
