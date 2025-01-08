@@ -5,7 +5,6 @@ import re
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
 
 import rospy
-from rl_utils.state_container import SimulationStateContainer
 from typing_extensions import Self
 
 from rosnav_rl.observations import (
@@ -16,13 +15,14 @@ from rosnav_rl.observations import (
 from rosnav_rl.observations.collectors.base_collector import (
     SimulationNotCompatibleError,
 )
+from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.rostopic import Namespace, Topic
-
-if TYPE_CHECKING:
-    from rosnav_rl.utils.type_aliases import ObservationDict
 
 from .generic_observation import GenericObservation
 from .traversal import explore_hierarchy
+
+if TYPE_CHECKING:
+    from rosnav_rl.utils.type_aliases import ObservationDict
 
 
 def map_crowdsim_topics(topic: Union[str, Topic], manager: ObservationManager) -> str:
@@ -137,7 +137,7 @@ class ObservationManager:
         and setting up ROS subscribers for each observation.
 
         This method performs the following steps:
-        1. Imports the `GenericObservation` class from `rl_utils.utils.observation_collector.generic_observation`.
+        1. Imports the `GenericObservation` class from `rosnav_rl.observations.generic_observation`.
         2. Iterates over the `_collectors` dictionary.
         3. For each collector, creates an instance of `GenericObservation` with the initial message and preprocessing function.
         4. Stores the `GenericObservation` instance in the `_collectable_observations` dictionary.

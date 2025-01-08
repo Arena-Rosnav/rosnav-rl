@@ -17,7 +17,8 @@ from typing import TYPE_CHECKING, List, Tuple, TypeVar
 
 import numpy as np
 import rospy
-from rl_utils.state_container import SimulationStateContainer
+
+from rosnav_rl.states import SimulationStateContainer
 
 if TYPE_CHECKING:
     from rosnav_rl.utils.type_aliases import ObservationDict

@@ -1,10 +1,10 @@
-from typing import Optional, Union
+from typing import Union
 from abc import ABC
 
 from pydantic import BaseModel
-from rl_utils.utils.type_alias.enums import RLFramework
+from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
 
 
 class FrameworkCfg(BaseModel, ABC):
-    name: Union[str, RLFramework]
+    name: Union[str, SupportedRLFrameworks]
     algorithm: BaseModel

@@ -2,7 +2,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import rospy
 from pydantic.dataclasses import Field, dataclass
-from rl_utils.state_container import SimulationStateContainer
+
+from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 from .utils import load_rew_fnc

@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, List
 
-from rl_utils.state_container import SimulationStateContainer
-
 from rosnav_rl.observations import BaseUnit
+from rosnav_rl.states import SimulationStateContainer
 
 from ..reward_function import RewardFunction
 
