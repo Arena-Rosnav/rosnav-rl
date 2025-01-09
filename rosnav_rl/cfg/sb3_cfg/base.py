@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union, ClassVar
 
 import torch as th
 from pydantic import BaseModel
@@ -26,6 +26,7 @@ class SBAlgorithmParameters(BaseModel):
 
 
 class SBAlgorithmCfg(BaseModel):
+    __algorithm_name__: ClassVar[str]
     architecture_name: str
     checkpoint: Optional[str] = "last_model"
     transfer_weights: Optional[TransferWeightsCfg] = None
