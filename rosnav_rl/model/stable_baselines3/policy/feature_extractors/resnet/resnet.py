@@ -138,7 +138,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         self._goal_size = 2
 
         self._last_action_size = 0
-        if SPACE.LastActionSpace.name in self._observation_space:
+        if SPACE.LastActionSpace.name in self._observation_space.spaces:
             self._last_action_size = self._observation_space[
                 SPACE.LastActionSpace.name
             ].shape[-1]
@@ -473,7 +473,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             )  # (num_envs, num_semantic_layers, 80, 80)
 
         last_action = None
-        if SPACE.LastActionSpace.name in self._observation_space:
+        if SPACE.LastActionSpace.name in self._observation_space.spaces:
             last_action = observations[SPACE.LastActionSpace.name].squeeze(
                 1
             )  # (num_envs, 3)

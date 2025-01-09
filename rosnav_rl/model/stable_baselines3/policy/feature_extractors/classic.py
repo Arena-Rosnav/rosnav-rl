@@ -32,8 +32,13 @@ class EXTRACTOR_1(RosnavBaseExtractor):
         *args,
         **kwargs
     ):
+        self._laser_key = (
+            SPACE.LaserScanSpace.name
+            if SPACE.LaserScanSpace.name in observation_space
+            else SPACE.ReducedLaserScanSpace.name
+        )
         self._laser_size, self._goal_size, self._last_action_size = (
-            observation_space[SPACE.LaserScanSpace.name].shape[-1],
+            observation_space[self._laser_key].shape[-1],
             observation_space[SPACE.DistAngleToSubgoalSpace.name].shape[-1],
             observation_space[SPACE.LastActionSpace.name].shape[-1],
         )
@@ -92,7 +97,7 @@ class EXTRACTOR_1(RosnavBaseExtractor):
             #         1, 2
             #     )
         elif isinstance(observations, dict):
-            laser_scan = observations[SPACE.LaserScanSpace.name]
+            laser_scan = observations[self._laser_key]
             goal = observations[SPACE.DistAngleToSubgoalSpace.name]
             last_action = observations[SPACE.LastActionSpace.name]
         else:
