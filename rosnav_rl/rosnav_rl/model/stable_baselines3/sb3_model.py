@@ -499,6 +499,10 @@ class StableBaselinesModel(RL_Model):
         Returns:
             _SupportedStableBaselinesModels: The loaded model.
         """
+        if algorithm_args is None:
+            algorithm_args = {}
+
+        algorithm_args["observation_space"] = env.observation_space
         return self._policy_description.algorithm_class.load(
             path, env=env, custom_objects=algorithm_args
         )
