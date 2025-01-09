@@ -20,9 +20,11 @@ class AGENT_1(StableBaselinesPolicy):
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
+        "subgoal_max_dist": 10,
+        "reduced_num_beams": 360,
     }
     observation_spaces = [
-        spaces.LaserScanSpace,
+        spaces.ReducedLaserScanSpace,
         spaces.DistAngleToSubgoalSpace,
         spaces.LastActionSpace,
     ]
@@ -38,9 +40,11 @@ class AGENT_2(StableBaselinesPolicy):
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
+        "subgoal_max_dist": 10,
+        "reduced_num_beams": 360,
     }
     observation_spaces = [
-        spaces.LaserScanSpace,
+        spaces.ReducedLaserScanSpace,
         spaces.DistAngleToSubgoalSpace,
         spaces.LastActionSpace,
     ]
@@ -62,9 +66,11 @@ class AGENT_3(StableBaselinesPolicy):
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
+        "subgoal_max_dist": 10,
+        "reduced_num_beams": 360,
     }
     observation_spaces = [
-        spaces.LaserScanSpace,
+        spaces.ReducedLaserScanSpace,
         spaces.DistAngleToSubgoalSpace,
         spaces.LastActionSpace,
     ]
@@ -82,9 +88,11 @@ class AGENT_4(StableBaselinesPolicy):
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
+        "subgoal_max_dist": 10,
+        "reduced_num_beams": 360,
     }
     observation_spaces = [
-        spaces.LaserScanSpace,
+        spaces.ReducedLaserScanSpace,
         spaces.DistAngleToSubgoalSpace,
         spaces.LastActionSpace,
     ]
@@ -131,6 +139,7 @@ class AGENT_5(StableBaselinesPolicy):
         "laser_stack_size": 10,
         "normalize": True,
         "goal_max_dist": 10,
+        "subgoal_max_dist": 10,
     }
     features_extractor_class = DRL_VO_ROSNAV_EXTRACTOR
     features_extractor_kwargs = {
