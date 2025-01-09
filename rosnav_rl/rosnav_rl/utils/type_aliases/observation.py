@@ -20,4 +20,7 @@ ObservationGenerator = TypeVar("ObservationGenerator", bound=ObservationGenerato
 
 ObservationSpaceList = TypeVar(
     "ObservationSpaceList", bound=List[Type[ObservationSpaceUnit]]
-)
+)  # List containing classes of observation spaces to define a model's observation space
+ObservationSpaceKwargs = TypeVar(
+    "ObservationSpaceKwargs", bound=Dict[str, Any]
+)  # Keyword arguments for observation spaces defining a model's observation space attributes

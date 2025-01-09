@@ -7,6 +7,7 @@ from .observation import (
     ObservationName,
     ObservationSpaceUnit,
     ObservationSpaceList,
+    ObservationSpaceKwargs,
 )
 from .rl_frameworks import SupportedRLFrameworks
 from .ros import _RospyMessage

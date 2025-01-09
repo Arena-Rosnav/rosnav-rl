@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import List, Type
 
-from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
-    BaseObservationSpace,
-)
+from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
-from .constants import BASE_AGENT_ATTR, POLICY_TYPE
-from stable_baselines3.common.base_class import BaseAlgorithm
+from rosnav_rl.utils.type_aliases import ObservationSpaceList, ObservationSpaceKwargs
+
+from .constants import BASE_AGENT_ATTR
 
 
 class StableBaselinesPolicy(ABC):
@@ -42,7 +41,7 @@ class StableBaselinesPolicy(ABC):
 
     @property
     @abstractmethod
-    def observation_spaces(self) -> List[BaseObservationSpace]:
+    def observation_spaces(self) -> ObservationSpaceList:
         """
         Get the list of observation spaces.
 
@@ -52,7 +51,7 @@ class StableBaselinesPolicy(ABC):
         return None
 
     @property
-    def observation_space_kwargs(self) -> dict:
+    def observation_space_kwargs(self) -> ObservationSpaceKwargs:
         """
         Get additional keyword arguments for the observation space.
 
