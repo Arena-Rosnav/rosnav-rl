@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, ClassVar
 from abc import ABC
 
 from pydantic import BaseModel
@@ -6,5 +6,5 @@ from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
 
 
 class FrameworkCfg(BaseModel, ABC):
-    name: Union[str, SupportedRLFrameworks]
+    __name__: ClassVar[Union[str, SupportedRLFrameworks]]
     algorithm: BaseModel

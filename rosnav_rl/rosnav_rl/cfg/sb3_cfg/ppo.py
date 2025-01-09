@@ -1,5 +1,7 @@
 from typing import Optional, Union
 
+from stable_baselines3.ppo import PPO
+
 from .base import SBAlgorithmCfg, SBAlgorithmParameters
 
 
@@ -18,4 +20,5 @@ class PPO_Algorithm_Cfg(SBAlgorithmParameters):
 
 
 class PPO_Cfg(SBAlgorithmCfg):
+    __algorithm_name__ = PPO.__name__
     parameters: PPO_Algorithm_Cfg
