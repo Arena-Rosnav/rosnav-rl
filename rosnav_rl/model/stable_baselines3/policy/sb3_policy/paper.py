@@ -13,17 +13,19 @@ from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR
 
 from sb3_contrib import RecurrentPPO
 
+from rosnav_rl.utils.type_aliases import ObservationSpaceList, ObservationSpaceKwargs
+
 
 @AgentFactory.register("AGENT_1")
 class AGENT_1(StableBaselinesPolicy):
     algorithm_class: Type[BaseAlgorithm] = PPO
-    observation_space_kwargs = {
+    observation_space_kwargs: ObservationSpaceKwargs = {
         "normalize": True,
         "goal_max_dist": 10,
         "subgoal_max_dist": 10,
         "reduced_num_beams": 360,
     }
-    observation_spaces = [
+    observation_spaces: ObservationSpaceList = [
         spaces.ReducedLaserScanSpace,
         spaces.DistAngleToSubgoalSpace,
         spaces.LastActionSpace,

@@ -1,16 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import Union, ClassVar
 
-import rosnav_rl.spaces.observation_space as SPACE
 import torch as th
 from gymnasium import spaces
 from stable_baselines3.common.policies import BaseFeaturesExtractor
 
-from rosnav_rl.utils.type_aliases import TensorDict
+from rosnav_rl.utils.type_aliases import TensorDict, ObservationSpaceList
 
 
 class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
-    REQUIRED_OBSERVATIONS: List[SPACE.BaseObservationSpace] = []
+    REQUIRED_OBSERVATIONS: ClassVar[ObservationSpaceList] = []
 
     def __init__(
         self,

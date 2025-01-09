@@ -3,9 +3,6 @@ from typing import Tuple, Union
 import gymnasium as gym
 import rosnav_rl.spaces.observation_space as SPACE
 import torch as th
-from rosnav_rl.spaces.observation_space.observation_space_manager import (
-    ObservationSpaceManager,
-)
 from torch import nn
 
 from .base_extractor import RosnavBaseExtractor, TensorDict
