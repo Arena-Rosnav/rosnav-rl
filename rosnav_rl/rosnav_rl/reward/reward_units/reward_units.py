@@ -1,5 +1,5 @@
 import random
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Union
 from warnings import warn
 
 import numpy as np
@@ -36,7 +36,7 @@ class RewardGoalReached(RewardUnit):
     required_observation_units = [DistAngleToGoalGenerator, DistAngleToSubgoalGenerator]
     DONE_INFO = {
         "is_done": True,
-        "done_reason": DONE_REASONS.SUCCESS.name,
+        "done_reason": DONE_REASONS.SUCCESS,
         "is_success": True,
     }
     NOT_DONE_INFO = {"is_done": False}
@@ -361,7 +361,7 @@ class RewardCollision(RewardUnit):
     required_observation_units = [LaserCollector]
     DONE_INFO = {
         "is_done": True,
-        "done_reason": DONE_REASONS.COLLISION.name,
+        "done_reason": DONE_REASONS.COLLISION,
         "is_success": False,
     }
 
@@ -1324,7 +1324,7 @@ class RewardMaxStepsExceeded(RewardUnit):
 
     DONE_INFO = {
         "is_done": True,
-        "done_reason": DONE_REASONS.STEP_LIMIT.name,
+        "done_reason": DONE_REASONS.STEP_LIMIT,
         "is_success": 0,
     }
 
