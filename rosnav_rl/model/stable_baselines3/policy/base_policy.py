@@ -7,7 +7,7 @@ from torch.nn.modules.module import Module
 
 from rosnav_rl.utils.type_aliases import ObservationSpaceList, ObservationSpaceKwargs
 
-from .constants import BASE_AGENT_ATTR
+from .constants import BASE_AGENT_ATTR, POLICY_TYPE
 
 
 class StableBaselinesPolicy(ABC):
