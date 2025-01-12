@@ -12,7 +12,8 @@ import sensor_msgs.msg as sensor_msgs
 
 from ..utils.pose import Pose2DType, TwistType, pose3d_to_pose2d
 from .base_collector import ObservationCollectorUnit
-from task_generator.constants import Constants
+
+from rl_utils.utils.constants import Simulator
 
 __all__ = [
     "LaserCollector",
@@ -42,10 +43,10 @@ class LaserCollector(ObservationCollectorUnit[sensor_msgs.LaserScan, np.ndarray]
     topic: ClassVar[str] = "scan"
     up_to_date_required: ClassVar[bool] = True
     msg_data_class: ClassVar[Type[sensor_msgs.LaserScan]] = sensor_msgs.LaserScan
-    applicable_simulators: List[Constants.Simulator] = [
-        Constants.Simulator.FLATLAND,
-        Constants.Simulator.UNITY,
-        Constants.Simulator.GAZEBO,
+    applicable_simulators: List[Simulator] = [
+        Simulator.FLATLAND,
+        Simulator.UNITY,
+        Simulator.GAZEBO,
     ]
 
     def preprocess(self, msg: sensor_msgs.LaserScan) -> np.ndarray:
@@ -97,10 +98,10 @@ class PoseCollector(
     msg_data_class: ClassVar[Type[geometry_msgs.PoseStamped]] = (
         geometry_msgs.PoseStamped
     )
-    applicable_simulators: List[Constants.Simulator] = [
-        Constants.Simulator.FLATLAND,
-        Constants.Simulator.UNITY,
-        Constants.Simulator.GAZEBO,
+    applicable_simulators: List[Simulator] = [
+        Simulator.FLATLAND,
+        Simulator.UNITY,
+        Simulator.GAZEBO,
     ]
 
 
@@ -217,10 +218,10 @@ class LastActionCollector(ObservationCollectorUnit[geometry_msgs.Twist, np.ndarr
     topic: ClassVar[str] = "cmd_vel"
     up_to_date_required: bool = False
     msg_data_class: ClassVar[Type[geometry_msgs.Twist]] = geometry_msgs.Twist
-    applicable_simulators: List[Constants.Simulator] = [
-        Constants.Simulator.FLATLAND,
-        Constants.Simulator.UNITY,
-        Constants.Simulator.GAZEBO,
+    applicable_simulators: List[Simulator] = [
+        Simulator.FLATLAND,
+        Simulator.UNITY,
+        Simulator.GAZEBO,
     ]
 
     def preprocess(self, msg: geometry_msgs.Twist) -> np.ndarray:
@@ -259,10 +260,10 @@ class GlobalPlanCollector(ObservationCollectorUnit[nav_msgs.Path, np.ndarray]):
     name: ClassVar[str] = "global_plan"
     topic: ClassVar[str] = "global_plan"
     msg_data_class: ClassVar[Type[nav_msgs.Path]] = nav_msgs.Path
-    applicable_simulators: List[Constants.Simulator] = [
-        Constants.Simulator.FLATLAND,
-        Constants.Simulator.UNITY,
-        Constants.Simulator.GAZEBO,
+    applicable_simulators: List[Simulator] = [
+        Simulator.FLATLAND,
+        Simulator.UNITY,
+        Simulator.GAZEBO,
     ]
 
     def preprocess(self, msg: nav_msgs.Path) -> np.ndarray:

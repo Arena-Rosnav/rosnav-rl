@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Generic, List, Type, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Generic, List, Type, TypeVar
 
 import rospy
-from task_generator.constants import Constants
-from task_generator.utils import Utils
+from rl_utils.utils.constants import Simulator
 
 NameType = TypeVar("NameType", bound=str)
 TopicType = TypeVar("TopicType", bound=str)
@@ -50,14 +49,19 @@ class ObservationCollectorUnit(
     topic: ClassVar[str]
     msg_data_class: ClassVar[Type[MessageType]]
     data_class: ClassVar[Type[ProcessedObservationType]] = ProcessedObservationType
-    applicable_simulators: ClassVar[List[Constants.Simulator]]
+    applicable_simulators: ClassVar[List[Simulator]]
     is_topic_agent_specific: ClassVar[bool] = True
     up_to_date_required: ClassVar[bool] = False
 
     def __init__(self, strict: bool = True, *args, **kwargs) -> None:
-        if Utils.get_simulator() not in self.applicable_simulators:
+        import task_generator.utils as _task_generator_utils
+
+        if (
+            _task_generator_utils.Utils.get_simulator()
+            not in self.applicable_simulators
+        ):
             raise SimulationNotCompatibleError(
-                f"Collector '{self.name}' is not applicable for simulator {Utils.get_simulator()}"
+                f"Collector '{self.name}' is not applicable for simulator {_task_generator_utils.Utils.get_simulator()}"
             )
 
     @abstractmethod

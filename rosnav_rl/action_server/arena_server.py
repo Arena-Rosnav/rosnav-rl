@@ -2,6 +2,7 @@ from pathlib import Path
 from time import sleep
 
 import rospkg
+from rl_utils.utils.constants import Simulator
 from tools.states import get_arena_states
 
 from rosnav_rl.observations import ObservationManager, get_required_observation_units
@@ -78,10 +79,7 @@ class ArenaActionServer(ActionServer):
             is_single_env=True,
         )
 
-        if (
-            arena_task_utils.Utils.get_simulator()
-            == arena_task_constants.Constants.Simulator.UNITY
-        ):
+        if arena_task_utils.Utils.get_simulator() == Simulator.UNITY:
             sleep(5)  # wait for unity collector unit to set itself up
 
         return obs_manager

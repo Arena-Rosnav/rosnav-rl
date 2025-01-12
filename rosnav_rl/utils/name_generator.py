@@ -1,9 +1,7 @@
 from datetime import datetime as dt
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import rospy
-
-from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
 
 if TYPE_CHECKING:
     from rosnav_rl.cfg import FrameworkCfg
@@ -25,7 +23,9 @@ def generate_sb3_agent_name(framework_cfg: "FrameworkCfg", robot: str = None) ->
 
 
 def generate_agent_name(framework_cfg: "FrameworkCfg", robot: str = None) -> str:
-    if framework_cfg.__name__ == SupportedRLFrameworks.STABLE_BASELINES3:
+    import rosnav_rl.utils.type_aliases as type_aliases
+
+    if framework_cfg.__name__ == type_aliases.SupportedRLFrameworks.STABLE_BASELINES3:
         return generate_sb3_agent_name(framework_cfg, robot=robot)
     else:
         raise ValueError(
