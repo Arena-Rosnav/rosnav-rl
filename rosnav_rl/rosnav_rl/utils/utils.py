@@ -9,7 +9,7 @@ import torch
 import yaml
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
-from task_generator.constants import Constants
+from rl_utils.utils.constants import Simulator
 from task_generator.utils import Utils
 
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
@@ -53,9 +53,9 @@ def make_mock_env(ns: str, space_manager: BaseSpaceManager) -> DummyVecEnv:
         )
 
     sim = Utils.get_simulator()
-    if sim == Constants.Simulator.UNITY:
+    if sim == Simulator.UNITY:
         return DummyVecEnv([_init_arena_unity_env])
-    elif sim == Constants.Simulator.FLATLAND:
+    elif sim == Simulator.FLATLAND:
         return DummyVecEnv([_init_flatland_env])
     else:
         raise RuntimeError(

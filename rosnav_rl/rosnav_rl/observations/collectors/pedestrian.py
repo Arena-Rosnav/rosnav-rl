@@ -2,7 +2,7 @@ from abc import ABC
 from typing import List
 
 from crowdsim_agents.utils import SemanticAttribute, SemanticMsg
-from task_generator.constants import Constants
+from rl_utils.utils.constants import Simulator
 
 from .base_collector import ObservationCollectorUnit
 
@@ -21,10 +21,10 @@ class SemanticLayerCollector(ObservationCollectorUnit[SemanticMsg, SemanticMsg],
     topic: str
     is_topic_agent_specific: bool = False
     msg_data_class = SemanticMsg
-    applicable_simulators: List[Constants.Simulator] = [
-        Constants.Simulator.FLATLAND,
-        Constants.Simulator.UNITY,
-        Constants.Simulator.GAZEBO,
+    applicable_simulators: List[Simulator] = [
+        Simulator.FLATLAND,
+        Simulator.UNITY,
+        Simulator.GAZEBO,
     ]
 
     def preprocess(self, msg: SemanticMsg) -> SemanticMsg:

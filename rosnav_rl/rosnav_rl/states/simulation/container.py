@@ -12,6 +12,21 @@ from .states import RobotState, TaskState
 
 @dataclass(frozen=False)
 class SimulationStateContainer:
+    """
+    A container class for holding the state of the simulation, including the robot state and task state.
+
+    Attributes:
+        robot (RobotState): The state of the robot in the simulation.
+        task (TaskState): The state of the task in the simulation.
+
+    Methods:
+        distribute():
+            Distributes the state using the StateDistributor.
+
+        to_agent_state_container() -> AgentStateContainer:
+            Converts the simulation state to an agent state container, which includes the action space and observation space states.
+    """
+
     robot: RobotState
     task: TaskState
 

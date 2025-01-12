@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 from abc import ABC
 from typing import List
 
 import numpy as np
 import sensor_msgs.msg as sensor_msgs
 from cv_bridge import CvBridge
+from rl_utils.utils.constants import Simulator
 
 from .base_collector import ObservationCollectorUnit
-from task_generator.constants import Constants
 
 __all__ = ["ImageColorCollector", "ImageDepthCollector"]
 
@@ -26,9 +28,9 @@ class ImageCollector(ObservationCollectorUnit[sensor_msgs.Image, np.ndarray], AB
     name: str
     topic: str
     up_to_date_required: bool = True
-    applicable_simulators: List[Constants.Simulator] = [
-        Constants.Simulator.UNITY,
-        Constants.Simulator.GAZEBO,
+    applicable_simulators: List[Simulator] = [
+        Simulator.UNITY,
+        Simulator.GAZEBO,
     ]
 
     def __init__(self, *args, **kwargs) -> None:

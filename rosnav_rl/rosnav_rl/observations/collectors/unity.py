@@ -6,6 +6,7 @@ from rosnav_rl.states import SimulationStateContainer
 from task_generator.constants import Config, Constants, UnityConstants
 
 from rosnav_rl.utils.rostopic import Namespace
+from rl_utils.utils.constants import Simulator
 
 from .base_collector import ObservationCollectorUnit
 
@@ -29,7 +30,7 @@ class CollisionCollector(ObservationCollectorUnit[unity_msgs.Collision, bool]):
     msg_data_class: Type[unity_msgs.Collision] = unity_msgs.Collision
     data_class: Type[bool] = bool
     up_to_date_required: bool = True
-    applicable_simulators = [Constants.Simulator.UNITY]
+    applicable_simulators = [Simulator.UNITY]
 
     def preprocess(self, msg: unity_msgs.Collision) -> bool:
         """
@@ -58,7 +59,7 @@ class PedSafeDistCollector(ObservationCollectorUnit[unity_msgs.Collision, bool])
 
     name: str = "ped_safe_dist"
     topic: str = "ped_safe_dist"
-    applicable_simulators: list = [Constants.Simulator.UNITY]
+    applicable_simulators: list = [Simulator.UNITY]
     msg_data_class: Type[unity_msgs.Collision] = unity_msgs.Collision
     data_class: Type[bool] = bool
     up_to_date_required: bool = True
@@ -128,7 +129,7 @@ class ObsSafeDistCollector(ObservationCollectorUnit[unity_msgs.Collision, bool])
     msg_data_class: Type[unity_msgs.Collision] = unity_msgs.Collision
     data_class: Type[bool] = bool
     up_to_date_required: bool = True
-    applicable_simulators = [Constants.Simulator.UNITY]
+    applicable_simulators = [Simulator.UNITY]
 
     def preprocess(self, msg: unity_msgs.Collision) -> bool:
         """
