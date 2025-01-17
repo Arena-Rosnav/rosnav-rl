@@ -644,3 +644,26 @@ class StableBaselinesModel(RL_Model):
                 self.algorithm_cfg.model_dump() if self.algorithm_cfg else {}
             ),
         }
+
+    @property
+    def environment(self) -> StableBaselinesEnv:
+        """
+        Returns the StableBaselinesEnv environment instance.
+
+        Returns:
+            StableBaselinesEnv: The environment instance used by the model.
+        """
+        return self.__env
+
+    @environment.setter
+    def environment(self, env: VecEnv):
+        """
+        Sets the environment for the model.
+
+        Args:
+            env (VecEnv): The environment to be used by the model. It should be an instance of VecEnv.
+
+        Returns:
+            None
+        """
+        self.__env = StableBaselinesEnv(env)
