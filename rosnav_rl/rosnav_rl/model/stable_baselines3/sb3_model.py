@@ -451,14 +451,7 @@ class StableBaselinesModel(RL_Model):
         )
 
         parameters.n_steps = parameters.total_batch_size // env.num_envs
-        parameters.learning_rate = (
-            load_lr_schedule(
-                type=parameters.learning_rate.type,
-                settings=parameters.learning_rate.kwargs,
-            )
-            if isinstance(parameters.learning_rate, LearningRateSchedulerCfg)
-            else parameters.learning_rate
-        )
+        parameters.learning_rate = load_lr_schedule(parameters.learning_rate)
 
         return {
             "env": env,
