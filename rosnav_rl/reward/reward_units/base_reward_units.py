@@ -3,6 +3,7 @@ from typing import Any, List
 
 from rosnav_rl.observations import BaseUnit
 from rosnav_rl.states import SimulationStateContainer
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ..reward_function import RewardFunction
 
@@ -75,7 +76,11 @@ class RewardUnit(ABC):
 
     @abstractmethod
     def __call__(
-        self, state_container: SimulationStateContainer, *args: Any, **kwargs: Any
+        self,
+        obs_dict: ObservationDict,
+        state_container: SimulationStateContainer,
+        *args: Any,
+        **kwargs: Any
     ) -> Any:
         """
         Placeholder method for calling the reward unit. It should alter the reward and possibly the info dict.

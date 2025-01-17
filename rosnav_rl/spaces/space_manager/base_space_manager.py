@@ -20,6 +20,7 @@ from rosnav_rl.utils.type_aliases import (
 class BaseSpaceManager:
     """
     BaseSpaceManager is an abstract base class that manages the agent state, action space, and observation space.
+    Translates observations to encoded observations for the model input and decodes actions for the environment.
 
     Attributes:
         _agent_state_container (AgentStateContainer): Container for the agent's state.

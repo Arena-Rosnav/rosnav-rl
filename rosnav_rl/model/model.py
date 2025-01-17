@@ -15,6 +15,61 @@ if TYPE_CHECKING:
 
 
 class RL_Model(ABC):
+    """
+    Abstract base class for reinforcement learning models.
+
+    Attributes:
+        _model: The underlying model used for reinforcement learning.
+        _algorithm_cfg: Configuration for the reinforcement learning algorithm.
+        _rl_agent: The reinforcement learning agent.
+
+    Methods:
+        __init__(rl_agent, algorithm_cfg, *args, **kwargs):
+            Initializes the RL_Model with the given agent and algorithm configuration.
+
+        setup_model(*args, **kwargs):
+            Abstract method to set up the model. Must be implemented by subclasses.
+
+        train(*args, **kwargs):
+            Abstract method to train the model. Must be implemented by subclasses.
+
+        save(*args, **kwargs):
+            Abstract method to save the model. Must be implemented by subclasses.
+
+        load(*args, **kwargs):
+            Abstract method to load the model. Must be implemented by subclasses.
+
+        get_action(observation, *args, **kwargs):
+            Gets the action for a given observation.
+
+        transfer_weights(*args, **kwargs):
+            Abstract method to transfer weights. Must be implemented by subclasses.
+
+        is_model_initialized:
+            Checks if the model is initialized.
+
+        model:
+            Gets or sets the underlying model.
+
+        algorithm_cfg:
+            Gets the algorithm configuration.
+
+        observation_space_list:
+            Abstract property to get the list of observation spaces. Must be implemented by subclasses.
+
+        observation_space_kwargs:
+            Abstract property to get the keyword arguments for observation spaces. Must be implemented by subclasses.
+
+        stack_size:
+            Gets the stack size. Default is 1.
+
+        parameter_number:
+            Abstract property to get the number of parameters. Must be implemented by subclasses.
+
+        config:
+            Gets the configuration dictionary. Default is an empty dictionary.
+    """
+
     _model: ...
     _algorithm_cfg: BaseModel
     _rl_agent: "RL_Agent"
@@ -41,6 +96,7 @@ class RL_Model(ABC):
     def load(self, *args, **kwargs):
         pass
 
+    @abstractmethod
     def get_action(self, observation: "EncodedObservationDict", *args, **kwargs):
         pass
 

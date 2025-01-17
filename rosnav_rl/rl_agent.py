@@ -21,10 +21,11 @@ class RL_Agent:
     space manager, and simulation state container to interact with an environment.
 
     Attributes:
-        model (RL_Model): The reinforcement learning model used by the agent.
-        reward_function (Optional[RewardFunction]): The function used to calculate rewards.
-        space_manager (BaseSpaceManager): Manages the action and observation spaces.
-        simulation_state_container (SimulationStateContainer): Container for the simulation state.
+        _name (str): The name of the agent.
+        _model (RL_Model): The reinforcement learning model used by the agent.
+        _reward_function (Optional[RewardFunction]): The function used to calculate rewards.
+        _space_manager (BaseSpaceManager): Manages the action and observation spaces.
+        _agent_state_container (AgentStateContainer): Container for the agent state (action and observation space).
 
     Methods:
         __init__(agent_cfg: AgentCfg, simulation_state_container: SimulationStateContainer):
@@ -51,7 +52,7 @@ class RL_Agent:
     """
 
     _name: str
-    _model: StableBaselinesModel
+    _model: Union[RL_Model, StableBaselinesModel]
     _reward_function: Optional[RewardFunction] = None
     _space_manager: BaseSpaceManager
     _agent_state_container: AgentStateContainer
