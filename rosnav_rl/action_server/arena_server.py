@@ -66,7 +66,6 @@ class ArenaActionServer(ActionServer):
             ObservationCollector: An instance of ObservationManager configured
             with the required observation units and simulation state container.
         """
-        import task_generator.constants as arena_task_constants
         import task_generator.utils as arena_task_utils
 
         obs_manager = ObservationManager(
