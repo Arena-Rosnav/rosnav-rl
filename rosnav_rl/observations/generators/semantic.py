@@ -1,4 +1,5 @@
 from __future__ import annotations
+from warnings import warn
 
 __all__ = [
     "PedestrianRelativeLocationGenerator",
@@ -156,6 +157,10 @@ class PedestrianDistanceGenerator(
             return ped_distances
 
         if len(relative_locations) == 0 or len(pedestrian_types.points) == 0:
+            return ped_distances
+        
+        if len(pedestrian_types.points) != len(relative_locations):
+            warn("Number of pedestrian types and locations do not match!")
             return ped_distances
 
         distances = np.linalg.norm(relative_locations, axis=1)
