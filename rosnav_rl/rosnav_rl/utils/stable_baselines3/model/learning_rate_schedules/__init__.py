@@ -12,7 +12,7 @@ def load_lr_schedule(
     if isinstance(settings, LearningRateSchedulerCfg):
         return _get_lr_schedule(settings.type, settings.kwargs)
     elif isinstance(settings, dict):
-        return _get_lr_schedule(settings["type"], settings["settings"])
+        return _get_lr_schedule(settings["type"], settings["kwargs"])
     elif isinstance(settings, float):
         return settings
 
