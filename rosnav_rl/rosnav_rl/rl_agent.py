@@ -131,7 +131,28 @@ class RL_Agent:
     #         observation, simulation_state_container=self._simulation_state_container
     #     )
 
+    def train(self, *args, **kwargs):
+        """
+        Train the model.
+
+        Args:
+            *args: Variable length argument list to be passed to the model's train method.
+            **kwargs: Arbitrary keyword arguments to be passed to the model's train method.
+        """
+        self.model.train(*args, **kwargs)
+
     def get_action(self, observation: ObservationDict, *args, **kwargs) -> np.ndarray:
+        """
+        Get an action from the model based on the given observation.
+
+        Args:
+            observation (ObservationDict): The observation data used by the model to determine the action.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            np.ndarray: The action determined by the model.
+        """
         return self.model.get_action(observation=observation, *args, **kwargs)
 
     @property
