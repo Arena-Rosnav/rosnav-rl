@@ -43,7 +43,7 @@
 This is the official **Rosnav-RL** package. The Rosnav-RL framework provides tools to construct a
 deep reinforcement learning agent for autonomous robot navigation, straight-forward development of a training pipeline and further testing across different platforms. 
 It provides a highly-modular, flexible and unified interface for defining an agent with a neural network, reward function, action and observation space. 
-The configuration layout (mit großer Möglichkeit an Einstellungen soll motivieren Experimente durhczuführen). The framework is
+The configuration layout provides a wide range of settings to encourage experimentation. The framework is
 intended to facilitate multiple reinforcement learning libraries for the application on learning-based navigation systems for mobile robots in ROS1.
 
 Rosnav-RL was initially developed for the [Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav) environment, which is a simulation platform for training and evaluating navigation systems. 
