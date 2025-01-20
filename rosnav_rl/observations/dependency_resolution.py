@@ -51,7 +51,7 @@ def retrieve_unique_unit(
     return set(collectors)
 
 
-def explore_hierarchy(
+def explore_dependency_hierarchy(
     list_of_units: List[Union[ObservationCollectorUnit, ObservationGeneratorUnit]]
 ):
     """
@@ -104,7 +104,7 @@ def explore_hierarchy(
 #     set_out = set(dist) - set(social_state)
 #     print(set_out)
 
-#     c = explore_hierarchy(
+#     c = explore_dependency_hierarchy(
 #         [
 #             PedestrianRelativeVelXGenerator,
 #             PedestrianRelativeLocationGenerator,
