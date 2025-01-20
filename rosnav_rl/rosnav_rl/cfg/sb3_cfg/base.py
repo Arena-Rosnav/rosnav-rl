@@ -1,5 +1,6 @@
 from typing import Literal, Optional, Union, ClassVar
 
+from abc import ABC
 import torch as th
 from pydantic import BaseModel
 
@@ -8,7 +9,7 @@ from .normalization import NormalizationCfg
 from .transfer import TransferWeightsCfg
 
 
-class SBAlgorithmParameters(BaseModel):
+class SBAlgorithmParameters(BaseModel, ABC):
     total_batch_size: int = 2048
     n_steps: Optional[int] = None
     batch_size: int = 256
@@ -25,8 +26,8 @@ class SBAlgorithmParameters(BaseModel):
         arbitrary_types_allowed = True
 
 
-class SBAlgorithmCfg(BaseModel):
-    __algorithm_name__: ClassVar[str]
+class SBAlgorithmCfg(BaseModel, ABC):
+    __algorithm_name__: ClassVar[str] = None
     architecture_name: str
     checkpoint: Optional[str] = "last_model"
     transfer_weights: Optional[TransferWeightsCfg] = None

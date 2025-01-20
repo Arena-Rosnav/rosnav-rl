@@ -5,10 +5,10 @@ from rosnav_rl.states import SimulationStateContainer
 
 from ..collectors import BaseUnit
 
-GeneratedData = TypeVar("D")
+GeneratedDataType = TypeVar("D")
 
 
-class ObservationGeneratorUnit(BaseUnit, Generic[GeneratedData], ABC):
+class ObservationGeneratorUnit(BaseUnit, Generic[GeneratedDataType], ABC):
     """
     Base class for observation generator units.
 
@@ -20,7 +20,7 @@ class ObservationGeneratorUnit(BaseUnit, Generic[GeneratedData], ABC):
 
     name: ClassVar[str]
     requires: ClassVar[List[BaseUnit]]
-    data_class: Type[GeneratedData]
+    data_class: Type[GeneratedDataType]
 
     @abstractmethod
     def generate(
@@ -29,7 +29,7 @@ class ObservationGeneratorUnit(BaseUnit, Generic[GeneratedData], ABC):
         simulation_state_container: SimulationStateContainer,
         *args,
         **kwargs,
-    ) -> GeneratedData:
+    ) -> GeneratedDataType:
         """
         Generates the observation data based on the given observation dictionary.
 
