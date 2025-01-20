@@ -47,9 +47,9 @@ class SemanticState:
 
 @dataclass(frozen=True)
 class TaskModuleState:
-    tm_robots: str
-    tm_obstacles: str
-    tm_modules: str
+    tm_robots: str = None
+    tm_obstacles: str = None
+    tm_modules: str = None
 
 
 @dataclass(frozen=False)
