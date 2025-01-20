@@ -2,4 +2,4 @@ from .collectors import *
 from .generators import *
 from .observation_manager import ObservationManager
 from .static import *
-from .traversal import get_required_observation_units
+from .dependency_resolution import get_required_observation_units

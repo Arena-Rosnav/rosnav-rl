@@ -19,7 +19,7 @@ from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.rostopic import Namespace, Topic
 
 from .generic_observation import GenericObservation
-from .traversal import explore_hierarchy
+from .dependency_resolution import explore_dependency_hierarchy
 
 if TYPE_CHECKING:
     from rosnav_rl.utils.type_aliases import ObservationDict
@@ -82,7 +82,7 @@ class ObservationManager:
         """
         self._ns = ns
         self._simulation_state_container = simulation_state_container
-        self._obs_structur = list(explore_hierarchy(obs_structur).keys())
+        self._obs_structur = list(explore_dependency_hierarchy(obs_structur).keys())
 
         self._topic_mappings = topic_mappings or {}
         self._topic_mappings.update(self._default_topic_mappings)
