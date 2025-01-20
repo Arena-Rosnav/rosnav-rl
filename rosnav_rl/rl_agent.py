@@ -91,8 +91,8 @@ class RL_Agent:
         )
         if agent_cfg.reward is not None:
             self._reward_function = RewardFunction(
-                reward_file_name=agent_cfg.reward.file_name,
-                reward_unit_kwargs=agent_cfg.reward.reward_unit_kwargs,
+                function_dict=agent_cfg.reward.reward_function_dict,
+                unit_kwargs=agent_cfg.reward.reward_unit_kwargs,
                 verbose=agent_cfg.reward.verbose,
             )
 

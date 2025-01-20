@@ -1,8 +1,5 @@
 import functools
-
 import numpy as np
-import yaml
-from tools.constants import TRAINING_CONSTANTS
 
 
 def check_params(fn):
@@ -13,13 +10,6 @@ def check_params(fn):
         return
 
     return wrapper
-
-
-def load_rew_fnc(config_name: str) -> dict:
-    config_location = TRAINING_CONSTANTS.PATHS.REWARD_FUNCTIONS(config_name)
-    with open(config_location, "r", encoding="utf-8") as target:
-        config = yaml.load(target, Loader=yaml.FullLoader)
-    return config
 
 
 def min_distance_from_pointcloud(point_cloud: np.ndarray):
