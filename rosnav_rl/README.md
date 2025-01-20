@@ -33,7 +33,9 @@
     3. [Adding New Observation Space](#adding-new-observation-space)
     4. [Adding New Reward Component](#adding-new-reward-component)
     5. [Adding New Observation Unit](#adding-new-observation-unit)
-    6. [Best Practices](#best-practices)
+    6. [Adding New Model Architectures](#adding-new-model-architectures)
+
+    [Best Practices](#best-practices)
 
 ## 1. Executive Summary
 
@@ -142,6 +144,7 @@ poetry add *path-to-rosnav-rl*
 ### Directory Structure
 ```
 agents/             # Agent storage
+reward/             # Reward functions
 rosnav_rl/
 ├── action_server/    # ROS action server implementation
 ├── cfg/             # Configuration management
@@ -609,6 +612,8 @@ class RewardSafeDistance(RewardUnit):
             self.add_info(self.SAFE_DIST_VIOLATION_INFO)
 ```
 
+### Adding New Model architectures
+Implementation depends on the prefered framework to be used:
 
 
 ## Best Practices
