@@ -54,14 +54,19 @@ class ObservationCollectorUnit(
     up_to_date_required: ClassVar[bool] = False
 
     def __init__(self, strict: bool = True, *args, **kwargs) -> None:
-        import task_generator.utils as _task_generator_utils
+        try:
+            import task_generator.utils as _task_generator_utils
 
-        if (
-            _task_generator_utils.Utils.get_simulator()
-            not in self.applicable_simulators
-        ):
-            raise SimulationNotCompatibleError(
-                f"Collector '{self.name}' is not applicable for simulator {_task_generator_utils.Utils.get_simulator()}"
+            if (
+                _task_generator_utils.Utils.get_simulator()
+                not in self.applicable_simulators
+            ):
+                raise SimulationNotCompatibleError(
+                    f"Collector '{self.name}' is not applicable for simulator {_task_generator_utils.Utils.get_simulator()}"
+                )
+        except ImportError:
+            rospy.logwarn(
+                f"[{self.__class__.__name__}] Could not import task_generator.utils. Skipping compatibility check."
             )
 
     @abstractmethod
