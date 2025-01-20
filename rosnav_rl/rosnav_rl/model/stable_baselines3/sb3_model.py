@@ -44,6 +44,10 @@ from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicy
 DEVICE_CPU = "cpu"
 DEVICE_AUTO = "auto"
 
+_DUMMY_ALG_CFG = sb3_cfg.PPO_Cfg(
+    architecture_name="AGENT_1", parameters=sb3_cfg.PPO_Algorithm_Cfg()
+)
+
 
 class StableBaselinesModelState:
     """
@@ -381,9 +385,13 @@ class StableBaselinesModel(RL_Model):
             None
         """
         config = load_yaml(source_dir / cfg_file_name)
-        validated_algorithm_cfg = sb3_cfg.SBAlgorithmCfg.model_validate(
-            config["agent_cfg"]["framework"]["algorithm"]
-        )
+        try:
+            validated_algorithm_cfg = sb3_cfg.SBAlgorithmCfg.model_validate(
+                config["agent_cfg"]["framework"]["algorithm"]
+            )
+        except Exception as e:
+            print(f"Error validating algorithm configuration: {e}")
+            validated_algorithm_cfg = _DUMMY_ALG_CFG
 
         source_model = StableBaselinesModel(
             rl_agent=self._rl_agent, algorithm_cfg=validated_algorithm_cfg
@@ -495,7 +503,8 @@ class StableBaselinesModel(RL_Model):
         if algorithm_args is None:
             algorithm_args = {}
 
-        algorithm_args["observation_space"] = env.observation_space
+        if env:
+            algorithm_args["observation_space"] = env.observation_space
         return self._policy_description.algorithm_class.load(
             path, env=env, custom_objects=algorithm_args
         )
