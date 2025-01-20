@@ -47,7 +47,7 @@ The configuration layout provides a wide range of settings to encourage experime
 intended to facilitate multiple reinforcement learning libraries for the application on learning-based navigation systems for mobile robots in ROS1.
 
 Rosnav-RL was initially developed for the [Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav) environment, which is a simulation platform for training and evaluating navigation systems. 
-Though, the framework can be easily integrated into simulation environments. 
+Though, the framework can be easily integrated into other simulation environments. 
 
 <img width="50%" src="img/training_pipeline.png" />
 
