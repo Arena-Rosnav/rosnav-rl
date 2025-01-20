@@ -6,7 +6,6 @@ RewardFunctionDict = Dict[str, RewardUnitDict]
 
 
 class RewardCfg(BaseModel):
-    file_name: str
+    reward_function_dict: RewardFunctionDict
     reward_unit_kwargs: Optional[dict] = None
     verbose: Optional[bool] = False
-    _reward_dict: Optional[RewardFunctionDict] = None
