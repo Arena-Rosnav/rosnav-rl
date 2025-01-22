@@ -1,8 +1,9 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import rospy
 from pydantic.dataclasses import Field, dataclass
 
+from rosnav_rl.cfg.reward import RewardFunctionDict
 from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict
 
@@ -66,7 +67,7 @@ class RewardFunction:
 
     def __init__(
         self,
-        function_dict: Dict[str, Union[str, float, int]],
+        function_dict: RewardFunctionDict,
         unit_kwargs: Optional[Dict[str, Any]] = None,
         verbose: bool = True,
     ):
