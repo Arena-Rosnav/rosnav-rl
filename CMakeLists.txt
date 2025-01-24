@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(rosnav)
+project(rosnav_rl)
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
@@ -17,10 +17,6 @@ add_service_files(FILES
   GetAction.srv
 )
 
-add_message_files(FILES
-  ResetStackedObs.msg
-)
-
 generate_messages()
 
 catkin_package(
@@ -32,6 +28,6 @@ include_directories(
 )
 
 catkin_install_python(PROGRAMS
-  scripts/rosnav_node.py
+  scripts/action_server.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
