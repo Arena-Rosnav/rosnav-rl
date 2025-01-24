@@ -1,4 +1,4 @@
-from .policy.base_policy import StableBaselinesPolicy
+from .policy.base_policy import StableBaselinesPolicyDescription
 from .sb3_model import StableBaselinesModel
 
 
