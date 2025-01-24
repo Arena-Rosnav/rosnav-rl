@@ -2,7 +2,7 @@ from typing import Callable, Type, Union
 
 from stable_baselines3.common.policies import BasePolicy
 
-from .base_policy import StableBaselinesPolicy
+from .base_policy import StableBaselinesPolicyDescription
 
 
 class AgentFactory:
@@ -24,9 +24,11 @@ class AgentFactory:
 
         def inner_wrapper(wrapped_class) -> Callable:
             assert name not in cls.registry, f"Agent '{name}' already exists!"
-            assert issubclass(wrapped_class, StableBaselinesPolicy) or issubclass(
+            assert issubclass(
+                wrapped_class, StableBaselinesPolicyDescription
+            ) or issubclass(
                 wrapped_class, BasePolicy
-            ), f"Wrapped class {wrapped_class.__name__} is neither of type 'StableBaselinesPolicy' nor 'BasePolicy!'"
+            ), f"Wrapped class {wrapped_class.__name__} is neither of type 'StableBaselinesPolicyDescription' nor 'BasePolicy!'"
             cls.registry[name] = wrapped_class
             return wrapped_class
 
@@ -37,7 +39,7 @@ class AgentFactory:
     @classmethod
     def instantiate(
         cls, name: str, **kwargs
-    ) -> Union[Type[StableBaselinesPolicy], Type[BasePolicy]]:
+    ) -> Union[Type[StableBaselinesPolicyDescription], Type[BasePolicy]]:
         """Factory command to create the agent.
         This method gets the appropriate agent class from the registry
         and creates an instance of it, while passing in the parameters
@@ -52,7 +54,7 @@ class AgentFactory:
         assert name in cls.registry, f"Agent '{name}' is not registered!"
         agent_class = cls.registry[name]
 
-        if issubclass(agent_class, StableBaselinesPolicy):
+        if issubclass(agent_class, StableBaselinesPolicyDescription):
             return agent_class(**kwargs)
         else:
             return agent_class

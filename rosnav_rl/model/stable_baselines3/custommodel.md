@@ -1,18 +1,18 @@
 # Custom Stable-Baselines3 Policies in Rosnav-RL
 
-The `rosnav-rl` framework provides a flexible interface for implementing custom reinforcement learning policies using Stable-Baselines3. This guide explains how to create your own policy implementations using the `StableBaselinesPolicy` base class.
+The `rosnav-rl` framework provides a flexible interface for implementing custom reinforcement learning policies using Stable-Baselines3. This guide explains how to create your own policy implementations using the `StableBaselinesPolicyDescription` base class.
 
 ## Core Concepts
 
-The `StableBaselinesPolicy` class serves as an abstract base class for defining custom policies. It provides a standardized interface that integrates seamlessly with Stable-Baselines3 algorithms while adding specific functionality for robotic navigation tasks.
+The `StableBaselinesPolicyDescription` class serves as an abstract base class for defining custom policies. It provides a standardized interface that integrates seamlessly with Stable-Baselines3 algorithms while adding specific functionality for robotic navigation tasks.
 
 ## Implementing a Custom Policy
 
-To create a custom policy, extend the `StableBaselinesPolicy` class and implement all required abstract properties:
+To create a custom policy, extend the `StableBaselinesPolicyDescription` class and implement all required abstract properties:
 
 ```python
 @AgentFactory.register("CustomAgent")
-class CustomAgent(StableBaselinesPolicy):
+class CustomAgent(StableBaselinesPolicyDescription):
     algorithm_class = PPO  # or any other SB3 algorithm
     observation_spaces = [
         spaces.StackedLaserMapSpace,
@@ -105,7 +105,7 @@ Here's a more sophisticated example using RecurrentPPO:
 
 ```python
 @AgentFactory.register("RecurrentNavigationAgent")
-class RecurrentNavigationAgent(StableBaselinesPolicy):
+class RecurrentNavigationAgent(StableBaselinesPolicyDescription):
   algorithm_class = RecurrentPPO
   observation_spaces = [
     spaces.StackedLaserMapSpace,

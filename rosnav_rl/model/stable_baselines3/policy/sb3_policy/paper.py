@@ -7,7 +7,7 @@ from torch import nn
 import rosnav_rl.spaces.observation_space as spaces
 
 from ..agent_factory import AgentFactory
-from ..base_policy import StableBaselinesPolicy
+from ..base_policy import StableBaselinesPolicyDescription
 from ..feature_extractors.classic import *
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR
 
@@ -17,7 +17,7 @@ from rosnav_rl.utils.type_aliases import ObservationSpaceList, ObservationSpaceK
 
 
 @AgentFactory.register("AGENT_1")
-class AGENT_1(StableBaselinesPolicy):
+class AGENT_1(StableBaselinesPolicyDescription):
     """
     AGENT_1 is a custom policy class for the Stable Baselines3 library using the PPO algorithm.
 
@@ -60,7 +60,7 @@ class AGENT_1(StableBaselinesPolicy):
 
 
 @AgentFactory.register("AGENT_2")
-class AGENT_2(StableBaselinesPolicy):
+class AGENT_2(StableBaselinesPolicyDescription):
     """
     AGENT_2 is a custom policy class for a reinforcement learning agent using the RecurrentPPO algorithm.
 
@@ -113,7 +113,7 @@ class AGENT_2(StableBaselinesPolicy):
 
 
 @AgentFactory.register("AGENT_3")
-class AGENT_3(StableBaselinesPolicy):
+class AGENT_3(StableBaselinesPolicyDescription):
     """
     AGENT_3 class implementing a specific Stable Baselines policy.
 
@@ -160,7 +160,7 @@ class AGENT_3(StableBaselinesPolicy):
 
 
 @AgentFactory.register("AGENT_4")
-class AGENT_4(StableBaselinesPolicy):
+class AGENT_4(StableBaselinesPolicyDescription):
     """
     AGENT_4 is a custom policy class for a reinforcement learning agent using the RecurrentPPO algorithm from Stable Baselines3.
 
@@ -215,7 +215,7 @@ class AGENT_4(StableBaselinesPolicy):
 
 
 @AgentFactory.register("AGENT_5")
-class AGENT_5(StableBaselinesPolicy):
+class AGENT_5(StableBaselinesPolicyDescription):
     """
     AGENT_5 is a custom policy class for the Stable Baselines3 reinforcement learning library.
 
@@ -267,7 +267,7 @@ class AGENT_5(StableBaselinesPolicy):
 
 
 @AgentFactory.register("AGENT_6")
-class AGENT_6(StableBaselinesPolicy):
+class AGENT_6(StableBaselinesPolicyDescription):
     """
     AGENT_6 is a custom policy class for a reinforcement learning agent using the RecurrentPPO algorithm from Stable Baselines3.
 

@@ -39,7 +39,7 @@ from rosnav_rl.utils.utils import load_yaml, make_mock_env
 
 from ..model import RL_Model
 from .policy.agent_factory import AgentFactory
-from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicy
+from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicyDescription
 
 DEVICE_CPU = "cpu"
 DEVICE_AUTO = "auto"
@@ -224,12 +224,12 @@ class StableBaselinesModel(RL_Model):
 
         Attributes:
             self._agent_factory (AgentFactory): The factory responsible for creating agent instances.
-            self._policy_description (StableBaselinesPolicy): The policy description instantiated by the agent factory.
+            self._policy_description (StableBaselinesPolicyDescription): The policy description instantiated by the agent factory.
         """
         import rosnav_rl.model.stable_baselines3 as sb3_pkg
 
         self._agent_factory: AgentFactory = sb3_pkg.import_models()
-        self._policy_description: StableBaselinesPolicy = (
+        self._policy_description: StableBaselinesPolicyDescription = (
             self._agent_factory.instantiate(self.algorithm_cfg.architecture_name)
         )
 

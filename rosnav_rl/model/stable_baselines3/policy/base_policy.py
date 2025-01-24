@@ -10,22 +10,22 @@ from rosnav_rl.utils.type_aliases import ObservationSpaceList, ObservationSpaceK
 from .constants import BASE_AGENT_ATTR, POLICY_TYPE
 
 
-class StableBaselinesPolicy(ABC):
+class StableBaselinesPolicyDescription(ABC):
     """
-    Base class for defining an agent in a reinforcement learning environment.
+    StableBaselinesPolicyDescription is an abstract base class that defines the interface for policies used in the Stable Baselines framework.
 
-    Attributes:
-        observation_spaces (List[BaseObservationSpace]): List of observation space indices.
-        observation_space_kwargs (dict): Additional keyword arguments for the observation space.
-        type (PolicyType): The type of policy used by the agent.
-        features_extractor_class (Type[BaseFeaturesExtractor]): The class of the features extractor used by the agent.
-        features_extractor_kwargs (dict): Additional keyword arguments for the features extractor.
-        net_arch (List[dict]): List of dictionaries specifying the architecture of the neural network.
-        activation_fn (Type[Module]): The activation function used in the neural network.
+    Properties:
+        algorithm_class (Type[BaseAlgorithm]): Abstract property to get the algorithm class.
+        observation_spaces (ObservationSpaceList): Abstract property to get the list of observation spaces.
+        observation_space_kwargs (ObservationSpaceKwargs): Property to get additional keyword arguments for the observation space.
+        features_extractor_class (Type[BaseFeaturesExtractor]): Abstract property to get the class of the features extractor used by the agent.
+        features_extractor_kwargs (dict): Abstract property to get additional keyword arguments for the features extractor.
+        net_arch (List[dict]): Abstract property to get the architecture of the neural network.
+        activation_fn (Type[Module]): Abstract property to get the activation function used in the neural network.
+        stack_size (int): Property to get the stack size, defaults to 1.
 
     Methods:
-        get_kwargs(): Get the keyword arguments for the agent.
-
+        get_kwargs() -> dict: Generates the keyword arguments dict to be used in the agent.
     """
 
     @property
