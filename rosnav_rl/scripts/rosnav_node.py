@@ -1,24 +1,27 @@
 import argparse
 import os
-import sys
 from time import sleep
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import rospkg
 import rospy
-from rl_utils.utils.observation_collector.constants import OBS_DICT_KEYS
+from rl_utils.topic import Namespace
+from rl_utils.utils.observation_collector import ObservationDict
 from rl_utils.utils.observation_collector.observation_manager import ObservationManager
-from rosnav.model.agent_factory import AgentFactory
-from rosnav.model.base_agent import PolicyType
-from rosnav.model.custom_sb3_policy import *
-from rosnav.rosnav_space_manager.rosnav_space_manager import RosnavSpaceManager
+from rosnav_rl.model.stable_baselines3.policy.base_policy import PolicyType
+from rosnav_rl.model.stable_baselines3 import (
+    StableBaselinesPolicyDescription,
+    import_models,
+)
+from rosnav_rl.spaces.space_manager.rosnav_space_manager import RosnavSpaceManager
 from rosnav.srv import GetAction, GetActionResponse
-from rosnav.utils.constants import VALID_CONFIG_NAMES
-from rosnav.utils.observation_space.spaces.base_observation_space import (
+from rosnav_rl.utils.constants import VALID_CONFIG_NAMES
+from rosnav_rl.spaces.observation_space import (
+    EncodedObservationDict,
     BaseObservationSpace,
 )
-from rosnav.utils.utils import (
+from rosnav_rl.utils.utils import (
     load_json,
     load_vec_normalize,
     load_yaml,
@@ -27,15 +30,17 @@ from rosnav.utils.utils import (
 )
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
+from stable_baselines3.common.utils import obs_as_tensor
 from std_msgs.msg import Int16
 from task_generator.constants import Constants
-from rl_utils.topic import Namespace
 from task_generator.utils import Utils
 from tools.ros_param_distributor import (
     populate_discrete_action_space,
     populate_laser_params,
     populate_rgbd_params,
 )
+
+import torch as th
 
 
 class RosnavNode:
@@ -50,8 +55,8 @@ class RosnavNode:
         Args:
             ns (Namespace, optional): The namespace for the node. Defaults to "".
         """
-        self.ns = Namespace(ns) if ns else Namespace(rospy.get_namespace()[:-1])
-        # self.ns = Namespace(ns) if ns else Namespace("/jackal")
+        # self.ns = Namespace(ns) if ns else Namespace(rospy.get_namespace()[:-1])
+        self.ns = Namespace(ns) if ns else Namespace("/jackal")
 
         rospy.loginfo(f"Starting Rosnav-Node on {self.ns}")
 
@@ -74,7 +79,10 @@ class RosnavNode:
 
         # Get Architecture Name and retrieve Observation spaces
         architecture_name = self._hyperparams["rl_agent"]["architecture_name"]
-        agent: BaseAgent = AgentFactory.instantiate(architecture_name)
+        AgentFactory = import_models()
+        agent: StableBaselinesPolicyDescription = AgentFactory.instantiate(
+            architecture_name
+        )
         observation_spaces: List[BaseObservationSpace] = agent.observation_spaces
         observation_spaces_kwargs = agent.observation_space_kwargs
 
@@ -102,6 +110,7 @@ class RosnavNode:
         self._agent.observation_space = (
             self._encoder.observation_space_manager.observation_space
         )
+        self._agent.set_training_mode(False)
 
         obs_unit_kwargs = {
             # "subgoal_mode": self._hyperparams["rl_agent"].get("subgoal_mode", False),
@@ -146,13 +155,15 @@ class RosnavNode:
         if is_action_space_discrete:
             populate_discrete_action_space(hyperparams)
 
-    def _load_env_wrappers(self, hyperparams: dict, agent_description: BaseAgent):
+    def _load_env_wrappers(
+        self, hyperparams: dict, agent_description: StableBaselinesPolicyDescription
+    ):
         """
         Loads the environment wrappers based on the provided hyperparameters and agent description.
 
         Args:
             hyperparams (dict): The hyperparameters for the RL agent.
-            agent_description (BaseAgent): The description of the agent.
+            agent_description (StableBaselinesPolicyDescription): The description of the agent.
 
         Returns:
             None
@@ -187,7 +198,9 @@ class RosnavNode:
                 ns=self.ns,
             )
 
-    def _encode_observation(self, observation: Dict[str, Any], *args, **kwargs):
+    def _encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> EncodedObservationDict:
         """
         Encodes the given observation using the encoder.
 
@@ -199,15 +212,14 @@ class RosnavNode:
         """
         return self._encoder.encode_observation(observation, **kwargs)
 
-    def _get_observation(self):
+    def _get_observation(self) -> ObservationDict:
         """
         Get the observation from the observation manager and append the last action.
 
         Returns:
             dict: The observation dictionary.
         """
-        observation = self._observation_manager.get_observations()
-        return observation
+        return self._observation_manager.get_observations()
 
     def get_action(self):
         """
@@ -216,7 +228,7 @@ class RosnavNode:
         Returns:
             The decoded action to be taken.
         """
-        observation = self._encode_observation(
+        observation: EncodedObservationDict = self._encode_observation(
             self._get_observation(), is_done=self._is_reset
         )
 
@@ -248,7 +260,7 @@ class RosnavNode:
             )
             self._reset_state = False
 
-        action, self.state = self._agent.predict(**predict_dict)
+        action, self.state = self.predict(**predict_dict)
 
         decoded_action = self._encoder.decode_action(action)
 
@@ -309,7 +321,10 @@ class RosnavNode:
             self._stacked_obs_container.reset(observation)
 
     def _get_model(
-        self, agent_description: BaseAgent, checkpoint_name: str, agent_path: str
+        self,
+        agent_description: StableBaselinesPolicyDescription,
+        checkpoint_name: str,
+        agent_path: str,
     ):
         """
         Get the model based on the given architecture name, checkpoint name, and agent path.
@@ -363,7 +378,7 @@ class RosnavNode:
 
     @staticmethod
     def _get_vec_normalize(
-        agent_description: BaseAgent,
+        agent_description: StableBaselinesPolicyDescription,
         agent_path: str,
         hyperparams: dict,
         venv=None,
@@ -390,7 +405,7 @@ class RosnavNode:
 
     @staticmethod
     def _get_vec_stacked(
-        agent_description: BaseAgent,
+        agent_description: StableBaselinesPolicyDescription,
         hyperparams: dict,
         ns: Namespace = "",
     ):
@@ -408,6 +423,54 @@ class RosnavNode:
         return wrap_vec_framestack(
             venv, hyperparams["rl_agent"]["frame_stacking"]["stack_size"]
         )
+
+    def predict(
+        self,
+        observation: Union[np.ndarray, Dict[str, np.ndarray]],
+        state: Optional[Tuple[np.ndarray, ...]] = None,
+        episode_start: Optional[np.ndarray] = None,
+        deterministic: bool = True,
+    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        if self._recurrent_arch:
+            return self._agent.predict(
+                observation=observation,
+                state=state,
+                episode_start=episode_start,
+                deterministic=deterministic,
+            )
+        return self._predict_without_sb3(
+            observation=observation,
+            state=state,
+            episode_start=episode_start,
+            deterministic=deterministic,
+        )
+
+    def _predict_without_sb3(
+        self,
+        observation: Union[np.ndarray, Dict[str, np.ndarray]],
+        state: Optional[Tuple[np.ndarray, ...]] = None,
+        episode_start: Optional[np.ndarray] = None,
+        deterministic: bool = True,
+    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        for key, value in observation.items():
+            if value.ndim == 2:
+                observation[key] = np.expand_dims(value, axis=0)
+
+        with th.no_grad():
+            actions = (
+                self._agent._predict(
+                    obs_as_tensor(observation, self._agent.device),
+                    deterministic=deterministic,
+                )
+                .cpu()
+                .numpy()
+            )
+
+        actions = np.clip(
+            actions, self._agent.action_space.low, self._agent.action_space.high
+        )
+
+        return actions.squeeze(axis=0), self.state
 
 
 def parse_args():

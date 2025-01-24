@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>rosnav</name>
+  <name>rosnav_rl</name>
   <version>0.0.0</version>
   <description>The rosnav package</description>
 
