@@ -374,6 +374,10 @@ class RewardUnit(ABC):
 
 ## 7. Common Tasks
 
+Module Guide for common tasks and extensions can also be found in the submodules:
+- [Reward Functions](rosnav_rl/reward/reward_functions.md)
+- [Observation Spaces](rosnav_rl/spaces/spaces.md)
+
 ### Adding New RL-Framework
 1. Implement a new RL_Model while inheriting the base class. Implement the necessary methods for training, saving, loading and action selection.
 2. Implement your new architectures. Define the required observation spaces for the model.
@@ -407,6 +411,10 @@ agent.initialize_model(env=train_env)
 # Train agent
 agent.train()
 ```
+
+### Adding New Model Architectures
+Implementation depends on the prefered framework to be used:
+- [StableBaselines3](rosnav_rl/model/stable_baselines3/custommodel.md)
 
 ### Adding New Observation Space
 You can add a new observation space by inheriting from the `BaseObservationSpace` class and registering it with the `SpaceFactory`.
@@ -612,8 +620,7 @@ class RewardSafeDistance(RewardUnit):
             self.add_info(self.SAFE_DIST_VIOLATION_INFO)
 ```
 
-### Adding New Model architectures
-Implementation depends on the prefered framework to be used:
+
 
 
 ## Best Practices
