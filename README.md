@@ -58,26 +58,25 @@ Though, the framework can be easily integrated into other simulation environment
 - PyTorch (Deep Learning)
 
 ### Key Features
-- Environment-agnostic infrastructure for model development
-- Support for multiple reinforcement learning frameworks
-- Modular and straight-forward network architecture design
-- Flexible and easy-to-extend action- / observation space and reward system
-- Deployment-ready ROS action server for agents
-- Configuration management with Pydantic (robust configuration validation, serialization, and documentation)
-- Optional observations management coupled with space management
-    - Social navigation capabilities with pedestrian interaction
-    - Multiple sensor support (laser scans, RGBD cameras)
+- **Flexible Infrastructure**: Framework-agnostic design supporting multiple reinforcement learning backends for model development
+- **Modular Design**: Clean separation between network architecture building blocks, allowing straightforward customization and extension
+- **Unified Encoding**: Standardized observation and action space management across different navigation tasks and robot configurations.
+- **Robust Configuration**: Pydantic-based configuration management providing automatic validation, schema documentation, serialization support
+- **Observation Handling**: Modular observation management for easy integration of new observation types and seamless data collection
+- **Neural Networks and Reward Functions**: Extensivly-tested neural network architectures and reward functions for quick agent development
+- Deployment-ready ROS action server for seamless agent deployment
+
 
 
 ## 2. Project Architecture
 
 ### High-Level Overview
 The system is built around a modular reinforcement learning architecture that separates concerns between:
-- Reinforcement Learning Fr
-- Agent-specific space management
-- Reward calculation
-- Observation handling
-- Centralized parameters storage
+- Reinforcement Learning Framework
+- Agent-specific Space Management
+- Reward Calculation
+- Observation Handling
+- Centralized Parameter Management
 
 ### Key Components
 <img width="70%" src="img/rosnav_rl.png" />
@@ -144,6 +143,7 @@ poetry add *path-to-rosnav-rl*
 ### Directory Structure
 ```
 agents/             # Agent storage
+launch/             # ROS launch files
 reward/             # Reward functions
 rosnav_rl/
 ├── action_server/    # ROS action server implementation
@@ -362,6 +362,22 @@ class RewardUnit(ABC):
 
 ### Deployment
 <!-- Maybe implement roslaunch, refer to action server -->
+When using the Rosnav-RL Action Server, the agent seamlessly integrates into the ROS infrastructure. The action server is responsible for handling the communication between the agent and the ROS environment.
+Observations are collected and passed to the agent, which then returns an action to be executed by the robot. One needs to make sure that the `ObservationUnit` of the `observations`-module has the right topics and message types to collect the necessary data.
+The action has to be requested via an external service on `/rosnav_rl/get_action`. We provide a simple launch file to start the action server.
+
+
+```python
+import rospy
+from rosnav_rl.srv import GetAction, GetActionRequest
+
+rospy.wait_for_service(f"{self.ns}/rosnav_rl/get_action")
+self._get_action_srv = rospy.ServiceProxy(
+    f"{self.ns}/rosnav_rl/get_action", GetAction
+)
+
+action = self._get_action_srv(GetActionRequest()).action
+```
 
 ### Training
 1. Choose a simulator environment.
@@ -372,6 +388,7 @@ class RewardUnit(ABC):
 3. Instantiate the `SimulationStateContainer` with the necessary parameters. The `AgentStateContainer` is derived from it via `.to_agent_state_container()` and holds space-specific parameters.
 4. Initialize the agent with desired configuration and the `AgentStateContainer`. Train it using the new environment. 
 
+> Note: One needs to make sure that the `ObservationUnits` of the `observations`-module has the right topics and message types to collect the necessary data.
 ## 7. Common Tasks
 
 Module Guide for common tasks and extensions can also be found in the submodules:
@@ -386,9 +403,14 @@ Module Guide for common tasks and extensions can also be found in the submodules
 
 ### Training New Agent
 For a working integration into a training pipeline check out the [Arena](https://github.com/Arena-Rosnav/arena-rosnav) repository with its [documentation](https://arena-rosnav.readthedocs.io/en/latest/). 
-<!-- insert link -->
 
 ```python
+from rosnav_rl import RL_Agent
+from rosnav_rl.cfg import AgentCfg, StableBaselinesCfg
+from rosnav_rl.cfg.sb3_cfg import PPO_Cfg
+
+from rosnav_rl.states import SimulationStateContainer, TaskState
+
 # Create agent configuration
 agent_cfg = AgentCfg(
     name="my_agent",
@@ -488,7 +510,6 @@ class LaserScanSpace(BaseObservationSpace):
 ```
 
 ### Adding New Observation Unit
-<!-- Import the factory, inherit, take a simple example -->
 The `ObservationCollectorUnit` base class provides the interface for collecting and preprocessing observations from ROS1 topics.
 
 ```python
@@ -627,7 +648,6 @@ class RewardSafeDistance(RewardUnit):
 1. Always use type hints for better code maintainability
 2. Follow the factory pattern for new observation spaces
 3. Use configuration files for hyperparameters
-4. Implement proper validation in reward functions
-5. Use the provided base classes for consistency
+4. Use the provided base classes for consistency
 
-Note: This guide provides a high-level overview. For detailed implementation specifics, refer to the inline documentation and example configurations in the `agents/` directory.
+> Note: This guide provides a high-level overview. For detailed implementation specifics, refer to the inline documentation and example configurations in the `agents/` directory.

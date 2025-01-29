@@ -55,7 +55,7 @@ class ActionServer(ABC):
             None
         """
         self._get_next_action_srv = rospy.Service(
-            str(self.namespace("rosnav/get_action")),
+            str(self.namespace("rosnav_rl/get_action")),
             GetAction,
             self.__handle_next_action_srv,
         )
