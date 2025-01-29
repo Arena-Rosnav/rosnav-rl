@@ -4,7 +4,7 @@
     <arg name="agent_name"/>
 
     <node 
-      name="action_server" 
+      name="rosnav_action_server" 
       pkg="rosnav_rl" 
       type="action_server.py" 
       output="screen"
