@@ -116,6 +116,8 @@ reward:
 or in python:
 
 ```python
+from rosnav_rl.reward.reward_function import RewardCfg
+
 RewardCfg(
    reward_function_dict={
       "goal_reached": {"reward": 15},
