@@ -50,7 +50,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         return spaces.Box(
             low=0,
             high=self._max_range,
-            shape=(1, self._reduced_num_beams),
+            shape=(self._reduced_num_beams,),
             dtype=np.float32,
         )
 
@@ -89,4 +89,4 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         """
         return ReducedLaserScanSpace.reduce_laserbeams(
             observation[LaserCollector.name], self._reduced_num_beams
-        )[np.newaxis, :]
+        )

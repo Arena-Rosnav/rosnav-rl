@@ -43,8 +43,8 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
 
         """
         return spaces.Box(
-            low=np.array([[-self._max_dist, -self._max_dist]]),
-            high=np.array([[self._max_dist, self._max_dist]]),
+            low=np.array([-self._max_dist, -self._max_dist]),
+            high=np.array([self._max_dist, self._max_dist]),
             dtype=np.float32,
         )
 
@@ -62,7 +62,4 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        subgoal_dist_angle = observation[SubgoalLocationInRobotFrameGenerator.name][
-            np.newaxis, :
-        ]
-        return subgoal_dist_angle
+        return observation[SubgoalLocationInRobotFrameGenerator.name]

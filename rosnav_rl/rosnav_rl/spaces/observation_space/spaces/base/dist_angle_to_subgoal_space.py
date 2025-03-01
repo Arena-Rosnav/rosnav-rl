@@ -43,9 +43,10 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
 
         """
         return spaces.Box(
-            low=np.array([[0, -np.pi]]),
-            high=np.array([[self._max_dist, np.pi]]),
+            low=np.array([0, -np.pi]),
+            high=np.array([self._max_dist, np.pi]),
             dtype=np.float32,
+            shape=(2,),
         )
 
     @BaseObservationSpace.apply_normalization
@@ -63,4 +64,4 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        return observation[DistAngleToSubgoalGenerator.name][np.newaxis, :]
+        return observation[DistAngleToSubgoalGenerator.name]
