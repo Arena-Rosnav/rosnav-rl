@@ -139,10 +139,13 @@ class LaserSafeDistanceGenerator(ObservationGeneratorUnit[bool]):
                 60,
                 f"Can't calculate '{self.name}'-Generator! SimulationStateContainer not provided.",
             )
-        return (
-            obs_dict[LaserCollector.name].min()
-            <= simulation_state_container.robot.safety_distance
+        laser_data = (
+            obs_dict[LaserCollector.name]
             if FullRangeLaserCollector.name not in obs_dict
-            else obs_dict[FullRangeLaserCollector.name].min()
-            <= simulation_state_container.robot.safety_distance
+            else obs_dict[FullRangeLaserCollector.name]
+        )
+        return (
+            False
+            if len(laser_data) == 0
+            else laser_data.min() <= simulation_state_container.robot.safety_distance
         )
