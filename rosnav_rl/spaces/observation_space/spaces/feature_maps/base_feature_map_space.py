@@ -27,7 +27,32 @@ if TYPE_CHECKING:
 
 class BaseFeatureMapSpace(BaseObservationSpace):
     """
-    Base class for feature map observation spaces.
+        A base class for creating feature map observation spaces in robotics applications.
+
+    This class provides the foundation for implementing feature map-based observation spaces,
+    which are commonly used in robotics for representing spatial information about the environment.
+    It handles the conversion between real-world coordinates and feature map indices, and provides
+    methods for semantic map generation.
+
+    Attributes:
+        name (str): The name of the feature map space.
+        required_observation_units (List[Union[ObservationCollector, ObservationGenerator]]):
+            List of required observation units for this feature map space.
+        background_value (int): Default value for empty/background cells in the feature map.
+        _feature_map_size (int): The size of the feature map (width and height).
+        _roi_in_m (float): The region of interest in meters.
+        _flatten (bool): Whether to flatten the feature map output.
+
+    Example:
+        ```python
+        class CustomFeatureMap(BaseFeatureMapSpace):
+            def __init__(self, feature_map_size=64, roi_in_m=10.0):
+                super().__init__(feature_map_size, roi_in_m)
+        ```
+
+        - The feature map is square with dimensions (feature_map_size × feature_map_size)
+        - The origin (0,0) is mapped to the center of the feature map
+        - Real-world coordinates are scaled based on the ROI size and feature map size
     """
 
     name: str
@@ -76,13 +101,19 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
     def _get_map_index(self, position: tuple) -> tuple:
         """
-        Get the map index for a given position.
+        Converts real-world coordinates to feature map indices.
 
         Args:
-            position (tuple): The position coordinates.
+            position (tuple): A tuple containing at least (x,y) coordinates in meters,
+                             additional elements in tuple are ignored.
 
         Returns:
-            tuple: The map index.
+            tuple: A tuple (x,y) containing the corresponding indices in the feature map.
+                  Origin (0,0) is mapped to the center of the feature map.
+
+        Note:
+            The conversion is done by scaling the real-world coordinates based on the ROI size
+            and feature map size, then shifting by half the feature map size to center the origin.
         """
         x, y, *_ = position
 
@@ -114,7 +145,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             np.ndarray: The semantic map.
         """
         pos_map = (
-            np.zeros((self._feature_map_size, self._feature_map_size))
+            np.zeros((1, self._feature_map_size, self._feature_map_size))
             + self.background_value
         )
 
@@ -141,7 +172,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
                     0 <= index[0] < self.feature_map_size
                     and 0 <= index[1] < self.feature_map_size
                 ):
-                    pos_map[index] = data.evidence
+                    pos_map[0, index[0], index[1]] = data.evidence
         except Exception as e:
             rospy.logwarn(e)
 

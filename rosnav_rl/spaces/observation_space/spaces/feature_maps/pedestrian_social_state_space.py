@@ -64,7 +64,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=self._social_state_num,
-            shape=(self._feature_map_size, self._feature_map_size),
+            shape=(1, self._feature_map_size, self._feature_map_size),
             dtype=int,
         )
 
