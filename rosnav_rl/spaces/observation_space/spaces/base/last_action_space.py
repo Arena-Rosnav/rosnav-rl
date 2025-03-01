@@ -69,23 +69,20 @@ class LastActionSpace(BaseObservationSpace):
         return spaces.Box(
             low=np.array(
                 [
-                    [
-                        self._min_linear_vel,
-                        self._min_translational_vel,
-                        self._min_angular_vel,
-                    ]
+                    self._min_linear_vel,
+                    self._min_translational_vel,
+                    self._min_angular_vel,
                 ]
             ),
             high=np.array(
                 [
-                    [
-                        self._max_linear_vel,
-                        self._max_translational_vel,
-                        self._max_angular_vel,
-                    ]
+                    self._max_linear_vel,
+                    self._max_translational_vel,
+                    self._max_angular_vel,
                 ]
             ),
             dtype=np.float32,
+            shape=(3,),
         )
 
     @BaseObservationSpace.apply_normalization
@@ -101,4 +98,4 @@ class LastActionSpace(BaseObservationSpace):
         Returns:
             ndarray: The encoded observation representing the last action.
         """
-        return observation[LastActionCollector.name][np.newaxis, :]
+        return observation[LastActionCollector.name]
