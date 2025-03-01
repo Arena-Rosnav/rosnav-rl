@@ -23,6 +23,12 @@ shimmy = "^1.3.0"
 pygments = "^2.18.0"
 stable-baselines3 = "^2.1.0"
 gymnasium = "^1.0.0"
+ruamel-yaml = "^0.17"
+
+
+[tool.poetry.group.dev.dependencies]
+matplotlib = "^3.0.0"
+einops = "^0.3.0"
 
 [build-system]
 requires = ["poetry-core"]
