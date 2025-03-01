@@ -89,7 +89,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
 
         """
         if type(laser_scan) is not np.ndarray:
-            return np.zeros((self._feature_map_size * self._feature_map_size,))
+            return np.zeros(self.get_gym_space().shape)
 
         if len(self._laser_queue) == 0 or done:
             self._reset_laser_stack(laser_scan)
@@ -113,32 +113,21 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
 
         """
         try:
-            # laser_array = np.array(laser_queue)
-            # # laserstack list of 10 np.arrays of shape (720,)
-            # scan_avg = np.zeros((20, self._feature_map_size))
-            # # horizontal stacking of the pooling operations
-            # # min pooling over every 9th entry
-            # scan_avg[::2, :] = np.min(
-            #     laser_array.reshape(10, self._feature_map_size, 9), axis=2
-            # )
-            # # avg pooling over every 9th entry
-            # scan_avg[1::2, :] = np.mean(
-            #     laser_array.reshape(10, self._feature_map_size, 9), axis=2
-            # )
-
-            # scan_avg_map = np.tile(scan_avg.ravel(), 4).reshape(
-            #     (self._feature_map_size, self._feature_map_size)
-            # )
             temp = np.array(laser_queue, dtype=np.float32).flatten()
-            scan_avg = np.zeros((20, 80))
-            for n in range(10):
-                scan_tmp = temp[n * 720 : (n + 1) * 720]
-                for i in range(80):
-                    scan_avg[2 * n, i] = np.min(scan_tmp[i * 9 : (i + 1) * 9])
-                    scan_avg[2 * n + 1, i] = np.mean(scan_tmp[i * 9 : (i + 1) * 9])
 
+            # Single reshape for all operations
+            reshaped = temp.reshape(10, 80, 9)
+
+            # Pre-allocate output with matching dtype
+            scan_avg = np.zeros((20, 80), dtype=np.float32)
+
+            # Vectorized calculations using axis reduction
+            scan_avg[::2] = reshaped.min(axis=2)  # Even rows: minima
+            scan_avg[1::2] = reshaped.mean(axis=2)  # Odd rows: averages
+
+            # Final transformations
             scan_avg = scan_avg.reshape(1600)
-            scan_avg_map = np.tile(scan_avg, (4, 1)).reshape((80, 80))
+            scan_avg_map = np.tile(scan_avg, (4, 1)).reshape(1, 80, 80)
         except Exception as e:
             rospy.logwarn(
                 f"[{rospy.get_name()}, {StackedLaserMapSpace.__name__}]: {e} \n Cannot build laser map. Instead return empty map."
@@ -158,7 +147,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=self._roi_in_m,
-            shape=(self._feature_map_size, self._feature_map_size),
+            shape=(1, self._feature_map_size, self._feature_map_size),
             dtype=np.float32,
         )
 

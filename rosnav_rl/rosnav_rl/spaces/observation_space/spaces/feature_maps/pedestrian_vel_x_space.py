@@ -69,7 +69,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=self._min_speed,
             high=self._max_speed,
-            shape=(self._feature_map_size, self._feature_map_size),
+            shape=(1, self._feature_map_size, self._feature_map_size),
             dtype=float,
         )
 
