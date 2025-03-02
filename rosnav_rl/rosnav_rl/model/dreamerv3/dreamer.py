@@ -5,15 +5,14 @@ from typing import Generator
 
 sys.path.append(str(pathlib.Path(__file__).parent))
 
-import rosnav_rl.model.dreamerv3.exploration as expl
 import gymnasium
-import models
 import numpy as np
-import rosnav_rl.model.dreamerv3.tools as tools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ..dreamerv3 import exploration as expl
+from ..dreamerv3 import models, tools
 from .cfg import DreamerV3Cfg
 
 to_np = lambda x: x.detach().cpu().numpy()

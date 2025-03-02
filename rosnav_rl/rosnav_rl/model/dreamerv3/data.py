@@ -1,9 +1,9 @@
+from pathlib import Path
 from typing import Dict, Generator, OrderedDict
-import rosnav_rl.model.dreamerv3.tools as tools
-import rosnav_rl.model.dreamerv3.cfg as cfg
 
 import numpy as np
-from pathlib import Path
+
+from ..dreamerv3 import cfg, tools
 
 
 def count_steps(folder: Path) -> int:

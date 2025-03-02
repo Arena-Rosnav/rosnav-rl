@@ -1,13 +1,13 @@
 from typing import TYPE_CHECKING, List, Set, Type, Union
 
-from rosnav_rl.observations import (
+from ..observations import (
     ObservationCollectorUnit,
     ObservationGeneratorUnit,
 )
 
 if TYPE_CHECKING:
-    from rosnav_rl.reward.reward_units.base_reward_units import RewardUnit
-    from rosnav_rl.spaces import BaseObservationSpace
+    from ..reward.reward_units.base_reward_units import RewardUnit
+    from ..spaces import BaseObservationSpace
 
 
 def get_required_observation_units(

@@ -1,10 +1,9 @@
 import copy
+
 import torch
 from torch import nn
 
-import rosnav_rl.model.dreamerv3.networks as networks
-import rosnav_rl.model.dreamerv3.tools as tools
-import rosnav_rl.model.dreamerv3.cfg as cfg
+from ..dreamerv3 import cfg, networks, tools
 
 to_np = lambda x: x.detach().cpu().numpy()
 

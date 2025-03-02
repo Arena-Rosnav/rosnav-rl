@@ -2,10 +2,10 @@ import torch
 from torch import distributions as torchd
 from torch import nn
 
-import rosnav_rl.model.dreamerv3.cfg as cfg
-import rosnav_rl.model.dreamerv3.models as models
-import rosnav_rl.model.dreamerv3.networks as networks
-import rosnav_rl.model.dreamerv3.tools as tools
+from ..dreamerv3 import cfg
+from ..dreamerv3 import models
+from ..dreamerv3 import networks
+from ..dreamerv3 import tools
 
 
 class Random(nn.Module):
