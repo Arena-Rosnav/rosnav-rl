@@ -12,24 +12,25 @@ from stable_baselines3.common.vec_env import (
     VecNormalize,
 )
 
-from ...cfg import sb3_cfg
-from ...spaces import BaseObservationSpace
-from ...utils.stable_baselines3.config import check_batch_size
-from ...utils.stable_baselines3.model.learning_rate_schedules import (
+from rosnav_rl.cfg import sb3_cfg
+from rosnav_rl.spaces import BaseObservationSpace
+from rosnav_rl.utils.stable_baselines3.config import check_batch_size
+from rosnav_rl.utils.stable_baselines3.model.learning_rate_schedules import (
     load_lr_schedule,
 )
-from ...utils.stable_baselines3.transfer import transfer_weights
-from ...utils.stable_baselines3.vec_env import (
+from rosnav_rl.utils.stable_baselines3.transfer import transfer_weights
+from rosnav_rl.utils.stable_baselines3.vec_env import (
     apply_vec_framestack,
     apply_vec_normalize,
     get_vec_framestack,
     get_vec_normalize,
 )
-from ...utils.type_aliases import (
+from rosnav_rl.utils.type_aliases import (
     ObservationDict,
     _SupportedStableBaselinesModels,
 )
-from ...utils.utils import load_yaml, make_mock_env
+from rosnav_rl.utils.utils import load_yaml, make_mock_env
+
 from ..model import RL_Model
 from .policy.agent_factory import AgentFactory
 from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicyDescription
