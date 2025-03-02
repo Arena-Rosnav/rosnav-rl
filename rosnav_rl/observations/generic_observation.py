@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Generic, TypeVar
 
-from rosnav_rl.utils.type_aliases.ros import (
+from ..utils.type_aliases.ros import (
     _RospyMessage,
 )
 

@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Union, TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, List, Union
 from warnings import warn
 
 import numpy as np
 from gym import spaces
 from gymnasium import spaces
 
-from rosnav_rl.spaces.observation_space.normalization import *
-
 from rosnav_rl.utils.type_aliases import (
     ObservationCollector,
     ObservationDict,
     ObservationGenerator,
 )
+
+from ..normalization import *
 
 
 class BaseObservationSpace(ABC):

@@ -1,14 +1,14 @@
 import math
-from typing import Dict
-import numpy as np
 import re
+from typing import Dict
 
+import numpy as np
 import torch
-from torch import nn
 import torch.nn.functional as F
 from torch import distributions as torchd
+from torch import nn
 
-import rosnav_rl.model.dreamerv3.tools as tools
+from ..dreamerv3 import tools
 
 
 def add_batch_dim(shape: tuple, is_channels_first: bool = False):

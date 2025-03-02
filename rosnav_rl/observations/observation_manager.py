@@ -7,19 +7,18 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
 import rospy
 from typing_extensions import Self
 
-from rosnav_rl.observations import (
+from ..observations import (
     BaseUnit,
     ObservationCollectorUnit,
     ObservationGeneratorUnit,
 )
-from rosnav_rl.observations.collectors.base_collector import (
+from ..observations.collectors.base_collector import (
     SimulationNotCompatibleError,
 )
-from rosnav_rl.states import SimulationStateContainer
-from rosnav_rl.utils.rostopic import Namespace, Topic
-
-from .generic_observation import GenericObservation
+from ..states import SimulationStateContainer
+from ..utils.rostopic import Namespace, Topic
 from .dependency_resolution import explore_dependency_hierarchy
+from .generic_observation import GenericObservation
 
 if TYPE_CHECKING:
     from rosnav_rl.utils.type_aliases import ObservationDict

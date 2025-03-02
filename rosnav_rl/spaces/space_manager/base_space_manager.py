@@ -4,12 +4,12 @@ from typing import Any, Dict, List, Union
 import numpy as np
 from gym import spaces
 
-from rosnav_rl.spaces import (
+from ...spaces import (
     ActionSpaceManager,
     ObservationSpaceManager,
 )
-from rosnav_rl.states import AgentStateContainer
-from rosnav_rl.utils.type_aliases import (
+from ...states import AgentStateContainer
+from ...utils.type_aliases import (
     EncodedObservationDict,
     ObservationDict,
     ObservationSpaceList,

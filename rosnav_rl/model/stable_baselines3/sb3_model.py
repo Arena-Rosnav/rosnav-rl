@@ -4,42 +4,38 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 import gym
 import numpy as np
 import torch as th
+from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import (
-    DummyVecEnv,
     VecEnv,
     VecFrameStack,
     VecNormalize,
 )
 
-import rosnav_rl.cfg.sb3_cfg as sb3_cfg
-
-if TYPE_CHECKING:
-    from rosnav_rl.rl_agent import RL_Agent
-from sb3_contrib import RecurrentPPO
-
-from rosnav_rl.cfg.sb3_cfg.lr_schedule import LearningRateSchedulerCfg
-from rosnav_rl.spaces import BaseObservationSpace
-from rosnav_rl.utils.stable_baselines3.config import check_batch_size
-from rosnav_rl.utils.stable_baselines3.model.learning_rate_schedules import (
+from ...cfg import sb3_cfg
+from ...spaces import BaseObservationSpace
+from ...utils.stable_baselines3.config import check_batch_size
+from ...utils.stable_baselines3.model.learning_rate_schedules import (
     load_lr_schedule,
 )
-from rosnav_rl.utils.stable_baselines3.transfer import transfer_weights
-from rosnav_rl.utils.stable_baselines3.vec_env import (
+from ...utils.stable_baselines3.transfer import transfer_weights
+from ...utils.stable_baselines3.vec_env import (
     apply_vec_framestack,
     apply_vec_normalize,
     get_vec_framestack,
     get_vec_normalize,
 )
-from rosnav_rl.utils.type_aliases import (
+from ...utils.type_aliases import (
     ObservationDict,
     _SupportedStableBaselinesModels,
 )
-from rosnav_rl.utils.utils import load_yaml, make_mock_env
-
+from ...utils.utils import load_yaml, make_mock_env
 from ..model import RL_Model
 from .policy.agent_factory import AgentFactory
 from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicyDescription
+
+if TYPE_CHECKING:
+    from rosnav_rl.rl_agent import RL_Agent
 
 DEVICE_CPU = "cpu"
 DEVICE_AUTO = "auto"

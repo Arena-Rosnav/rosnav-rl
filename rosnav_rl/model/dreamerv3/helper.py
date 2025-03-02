@@ -1,10 +1,11 @@
 import functools
 import pathlib
+from collections import OrderedDict
 from functools import partial
 from typing import TYPE_CHECKING, Dict, Generator, List, Optional, Tuple
 
 import gym.spaces
-import gymnasium
+import gymnasium as gym
 import numpy as np
 import rospy
 import torch
@@ -15,6 +16,7 @@ import rosnav_rl.model.dreamerv3.envs.wrappers as wrappers
 import rosnav_rl.model.dreamerv3.exploration as expl
 import rosnav_rl.model.dreamerv3.models as models
 import rosnav_rl.model.dreamerv3.tools as tools
+import rosnav_rl.model.dreamerv3.dreamer as dreamer
 from rosnav_rl.model.dreamerv3.cfg import DreamerV3Cfg
 from rosnav_rl.model.dreamerv3.parallel import Damy, Parallel
 
@@ -23,16 +25,11 @@ if TYPE_CHECKING:
     from rosnav_rl.rl_agent import RL_Agent
     from rosnav_rl.spaces import BaseSpaceManager
     from rosnav_rl.states import SimulationStateContainer
-from collections import OrderedDict
-
-import rosnav_rl.model.dreamerv3.dreamer as dreamer
 
 to_np = lambda x: x.detach().cpu().numpy()
 
-import gym
 
-
-def setup_arena_env(config, id) -> gymnasium.Env:
+def setup_arena_env(config, id) -> gym.Env:
     import rl_utils.cfg.train as arena_cfg
     import rl_utils.envs.flatland_gymnasium_env as arena_flatland
     import rl_utils.tools.config as arena_config

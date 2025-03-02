@@ -1,23 +1,19 @@
 import pathlib
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Dict, List
 
 import torch
-from collections import OrderedDict
-import rosnav_rl.model.dreamerv3.dreamer as dreamer
-import rosnav_rl.model.dreamerv3.tools as tools
-import rosnav_rl.spaces.observation_space as spaces
-from rosnav_rl.model.dreamerv3.cfg import DreamerV3Cfg
-from rosnav_rl.model.model import RL_Model
-from rosnav_rl.states import SimulationStateContainer
 
-if TYPE_CHECKING:
-    from rosnav_rl.rl_agent import RL_Agent
-
-from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
+from ...spaces import observation_space as spaces
+from ...spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
-from rosnav_rl.utils.type_aliases.spaces import EncodedObservationDict
-
+from ...states import SimulationStateContainer
+from ...utils.type_aliases.spaces import EncodedObservationDict
+from ..dreamerv3 import tools
+from ..model import RL_Model
+from .cfg import DreamerV3Cfg
+from .dreamer import Dreamer
 from .helper import (
     create_agent,
     load_episodes,
@@ -30,6 +26,9 @@ from .helper import (
     set_runtime_configuration,
     train,
 )
+
+if TYPE_CHECKING:
+    from ...rl_agent import RL_Agent
 
 
 class DreamerV3Model(RL_Model):
@@ -58,7 +57,7 @@ class DreamerV3Model(RL_Model):
         observation_space_kwargs: Configuration for observation spaces
     """
 
-    _model: dreamer.Dreamer = None
+    _model: Dreamer = None
     _logger: tools.Logger = None
     _logdir: pathlib.Path = None
 
