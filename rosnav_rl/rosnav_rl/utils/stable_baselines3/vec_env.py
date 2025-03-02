@@ -1,10 +1,13 @@
 from typing import List
 
-from stable_baselines3.common.vec_env import VecEnv, VecFrameStack, VecNormalize
+from stable_baselines3.common.vec_env import VecEnv, VecNormalize
+import rosnav_rl.utils.stable_baselines3.vec_frame_stack as vec_frame_stack
 
 
 def apply_vec_framestack(env: VecEnv, stack_size: int) -> VecEnv:
-    return VecFrameStack(env, n_stack=stack_size, channels_order="first")
+    return vec_frame_stack.VecFrameStack(
+        env, n_stack=stack_size, channels_order="first"
+    )
 
 
 def apply_vec_normalize(
@@ -63,8 +66,8 @@ def get_vec_normalize(env: VecEnv) -> VecNormalize:
     return None
 
 
-def get_vec_framestack(env: VecEnv) -> VecFrameStack:
-    if isinstance(env, VecFrameStack):
+def get_vec_framestack(env: VecEnv) -> vec_frame_stack.VecFrameStack:
+    if isinstance(env, vec_frame_stack.VecFrameStack):
         return env
 
     # Unwrap the environment until we find VecFrameStack
