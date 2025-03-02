@@ -40,6 +40,26 @@ class RequiresGrad:
 
 
 class TimeRecording:
+    """
+    A context manager for timing CUDA operations.
+
+    This class utilizes CUDA events to record timing information for operations executed within its context.
+    It prints the elapsed time in seconds upon exiting the context.
+
+    Example:
+        with TimeRecording('Forward pass:') as tr:
+            output = model(input)
+        # This will print: Forward pass: <time in seconds>
+
+    Args:
+        comment (str): A string to be printed before the timing information when the context is exited.
+
+    Notes:
+        - This class is designed for use with CUDA operations, as it uses CUDA events for timing.
+        - The timing is done in milliseconds internally and converted to seconds for output.
+        - Requires PyTorch and CUDA to be available.
+    """
+
     def __init__(self, comment):
         self._comment = comment
 
@@ -55,6 +75,33 @@ class TimeRecording:
 
 
 class Logger:
+    """
+    A logging utility for tracking and visualizing training metrics.
+
+    This class provides functionality to log scalar values, images, and videos during
+    training, and writes them to disk using TensorBoard's SummaryWriter. It also
+    supports computation of frames per second (fps) and offline logging.
+
+    Attributes:
+        _logdir (Path): Directory where logs are saved.
+        _writer (SummaryWriter): TensorBoard SummaryWriter instance.
+        _last_step (int, optional): Last recorded step for fps calculation.
+        _last_time (float, optional): Last recorded time for fps calculation.
+        _scalars (dict): Dictionary to store scalar values before writing.
+        _images (dict): Dictionary to store images before writing.
+        _videos (dict): Dictionary to store videos before writing.
+        step (int): Current step counter.
+
+    Methods:
+        scalar(name, value): Log a scalar value.
+        image(name, value): Log an image.
+        video(name, value): Log a video.
+        write(fps=False, step=False): Write all logged data to disk.
+        _compute_fps(step): Calculate frames per second between steps.
+        offline_scalar(name, value, step): Log a scalar value without buffering.
+        offline_video(name, value, step): Log a video without buffering.
+    """
+
     def __init__(self, logdir, step):
         self._logdir = logdir
         self._writer = SummaryWriter(log_dir=str(logdir), max_queue=1000)
