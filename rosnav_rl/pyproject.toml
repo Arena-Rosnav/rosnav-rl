@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.8"
 docutils = "0.20"
-torch = "^1.11.0"
+torch = "^2.0.0"
 wandb = "^0.13.9"
 tensorboard = "^2.12.2"
 torchdiffeq = "^0.2.3"
