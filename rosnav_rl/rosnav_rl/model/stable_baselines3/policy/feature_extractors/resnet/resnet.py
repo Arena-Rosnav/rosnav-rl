@@ -450,20 +450,20 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     def _get_input(
         self, observations: TensorDict
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        laser_map = observations[SPACE.StackedLaserMapSpace.name].unsqueeze(
-            1
-        )  # (num_envs, 1, 80, 80)
+        laser_map = observations[
+            SPACE.StackedLaserMapSpace.name
+        ]  # (num_envs, 1, 80, 80)
 
         goal_key = (
             SPACE.DistAngleToSubgoalSpace.name
             if SPACE.DistAngleToSubgoalSpace.name in observations
             else SPACE.SubgoalInRobotFrameSpace.name
         )
-        dist_angle_to_goal = observations[goal_key].squeeze(1)  # (num_envs, 2)
+        dist_angle_to_goal = observations[goal_key]  # (num_envs, 2)
 
         ped_map = None
         if self.num_pedestrian_feature_maps > 0:
-            ped_map = torch.stack(
+            ped_map = torch.concat(
                 [
                     observations[space]
                     for space in self._observation_space
@@ -474,9 +474,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         last_action = None
         if SPACE.LastActionSpace.name in self._observation_space.spaces:
-            last_action = observations[SPACE.LastActionSpace.name].squeeze(
-                1
-            )  # (num_envs, 3)
+            last_action = observations[SPACE.LastActionSpace.name]  # (num_envs, 3)
 
         return {
             "ped_map": ped_map,
