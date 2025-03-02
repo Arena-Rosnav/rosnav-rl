@@ -405,29 +405,28 @@ Module Guide for common tasks and extensions can also be found in the submodules
 For a working integration into a training pipeline check out the [Arena](https://github.com/Arena-Rosnav/arena-rosnav) repository with its [documentation](https://arena-rosnav.readthedocs.io/en/latest/). 
 
 ```python
-from rosnav_rl import RL_Agent
-from rosnav_rl.cfg import AgentCfg, StableBaselinesCfg
-from rosnav_rl.cfg.sb3_cfg import PPO_Cfg
+import rosnav_rl
+import rosnav_rl.states as states
+import rosnav_rl.cfg.sb3_cfg as sb3_cfg
 
-from rosnav_rl.states import SimulationStateContainer, TaskState
 
 # Create agent configuration
-agent_cfg = AgentCfg(
+agent_cfg = rosnav_rl.AgentCfg(
     name="my_agent",
     robot="jackal",
-    framework=StableBaselinesCfg(
-        algorithm=PPO_Cfg(
+    framework=rosnav_rl.StableBaselinesCfg(
+        algorithm=sb3_cfg.PPO_Cfg(
             architecture_name="AGENT_1"
         )
     )
 )
 
 # Create agent state container - holds space relevant parameters
-simulation_state_container = SimulationStateContainer(robot=TaskState(goal_radius=..., max_steps=...))
+simulation_state_container = rosnav_rl.SimulationStateContainer(robot=states.simulation.TaskState(goal_radius=..., max_steps=...))
 agent_state_container = simulation_state_container.to_agent_state_container()
 
 # Initialize agent
-agent = RL_Agent(agent_cfg, agent_state_container)
+agent = rosnav_rl.RL_Agent(agent_cfg, agent_state_container)
 agent.initialize_model(env=train_env)
 
 # Train agent
@@ -446,11 +445,14 @@ The parameters for the observation space are given by the `AgentStateContainer`.
 
 
 ```python
-from rosnav_rl.spaces.observation_space import BaseObservationSpace
-from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
+import numpy as np
+from gymnasium import spaces
 
 from rosnav_rl.observations import LaserCollector
 from rosnav_rl.utils.type_aliases import ObservationDict
+
+from ...observation_space_factory import SpaceFactory
+from ..base_observation_space import BaseObservationSpace
 
 
 @SpaceFactory.register("laser")
@@ -489,7 +491,7 @@ class LaserScanSpace(BaseObservationSpace):
         return spaces.Box(
             low=0,
             high=self._max_range,
-            shape=(1, self._num_beams),
+            shape=(self._num_beams,),
             dtype=np.float32,
         )
 
@@ -506,7 +508,8 @@ class LaserScanSpace(BaseObservationSpace):
         Returns:
             ndarray: The encoded laser scan observation.
         """
-        return observation[LaserCollector.name][np.newaxis, :]
+        return observation[LaserCollector.name]
+
 ```
 
 ### Adding New Observation Unit
