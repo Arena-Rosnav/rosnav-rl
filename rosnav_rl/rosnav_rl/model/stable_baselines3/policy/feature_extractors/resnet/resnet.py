@@ -39,23 +39,38 @@ __all__ = [
 
 
 class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
-    """
-    Feature extractor class that implements a mid-fusion ResNet-based architecture.
+    """A ResNet-based feature extractor for robot navigation using mid-fusion approach.
 
-    Args:
-        observation_space (gym.spaces.Box): The observation space of the environment
-        observation_space_manager (ObservationSpaceManager): The observation space manager
-        features_dim (int, optional): The dimensionality of the output features. Defaults to 256.
-        stack_size (bool, optional): Whether the observations are stacked. Defaults to False.
-        block (nn.Module, optional): The block type to use in the ResNet architecture. Defaults to Bottleneck.
-        layers (list, optional): The number of layers in each block of the ResNet architecture. Defaults to [2, 1, 1].
-        zero_init_residual (bool, optional): Whether to zero-initialize the last batch normalization in each residual branch. Defaults to True.
-        groups (int, optional): The number of groups to use in the ResNet architecture. Defaults to 1.
-        width_per_group (int, optional): The width of each group in the ResNet architecture. Defaults to 64.
-        replace_stride_with_dilation (List[bool], optional): Whether to replace stride with dilation in each block of the ResNet architecture. Defaults to None.
-        norm_layer (nn.Module, optional): The normalization layer to use in the ResNet architecture. Defaults to nn.BatchNorm2d.
-    """
+    This class implements a feature extractor that fuses laser scan data with pedestrian
+    velocity information using a ResNet architecture. The mid-fusion happens by combining
+    scan and pedestrian information early in the network, then processing them together
+    through ResNet blocks.
 
+    The network consists of:
+    1. Input fusion of scan maps and pedestrian velocity maps
+    2. ResNet backbone with bottleneck blocks
+    3. Goal and last action integration in the final fully connected layers
+
+    Required Observations:
+    - StackedLaserMapSpace: Laser scan data represented as 2D maps
+    - PedestrianVelXSpace: X-velocity component of pedestrians
+    - PedestrianVelYSpace: Y-velocity component of pedestrians
+    - DistAngleToSubgoalSpace: Distance and angle to the subgoal
+
+    Attributes:
+        REQUIRED_OBSERVATIONS (list): List of observation spaces required by the extractor
+
+        observation_space (gym.spaces.Dict): Dictionary of observation spaces
+        features_dim (int): Dimension of the output feature vector, default is 256
+        stack_size (int): Number of stacked observations, default is 1
+        block (nn.Module): Type of ResNet block to use, default is Bottleneck
+        layers (list): Number of blocks in each layer, default is [2, 1, 1]
+        zero_init_residual (bool): Whether to initialize residual branch as zeros, default is True
+        groups (int): Number of groups for group convolution, default is 1
+        width_per_group (int): Width of each group in group convolution, default is 64
+        replace_stride_with_dilation (List[bool]): Whether to replace stride with dilation, default is None
+        norm_layer (nn.Module): Normalization layer, default is nn.BatchNorm2d
+"""
     REQUIRED_OBSERVATIONS = [
         SPACE.StackedLaserMapSpace,
         SPACE.PedestrianVelXSpace,

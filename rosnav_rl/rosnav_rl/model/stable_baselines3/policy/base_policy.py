@@ -5,28 +5,27 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
-from rosnav_rl.utils.type_aliases import ObservationSpaceList, ObservationSpaceKwargs
+from rosnav_rl.utils.type_aliases import ObservationSpaceKwargs, ObservationSpaceList
 
 from .constants import BASE_AGENT_ATTR, POLICY_TYPE
 
 
 class StableBaselinesPolicyDescription(ABC):
-    """
-    StableBaselinesPolicyDescription is an abstract base class that defines the interface for policies used in the Stable Baselines framework.
+    """Abstract base class for describing a policy in Stable Baselines 3.
 
-    Properties:
-        algorithm_class (Type[BaseAlgorithm]): Abstract property to get the algorithm class.
-        observation_spaces (ObservationSpaceList): Abstract property to get the list of observation spaces.
-        observation_space_kwargs (ObservationSpaceKwargs): Property to get additional keyword arguments for the observation space.
-        features_extractor_class (Type[BaseFeaturesExtractor]): Abstract property to get the class of the features extractor used by the agent.
-        features_extractor_kwargs (dict): Abstract property to get additional keyword arguments for the features extractor.
-        net_arch (List[dict]): Abstract property to get the architecture of the neural network.
-        activation_fn (Type[Module]): Abstract property to get the activation function used in the neural network.
-        stack_size (int): Property to get the stack size, defaults to 1.
+    This class provides an interface for defining the components and parameters
+    needed to create a Stable Baselines 3 policy. It abstracts away the common
+    elements required for any RL algorithm implementation, such as the observation
+    spaces, feature extractors, network architecture, and activation functions.
 
-    Methods:
-        get_kwargs() -> dict: Generates the keyword arguments dict to be used in the agent.
+    Each concrete implementation of this class should define the specific properties
+    required for a particular algorithm/policy configuration.
+
+    Attributes:
+        BASE_AGENT_ATTR (list): List of attribute names that are common to all agents
+                               (defined elsewhere in the codebase)
     """
+
 
     @property
     @abstractmethod
