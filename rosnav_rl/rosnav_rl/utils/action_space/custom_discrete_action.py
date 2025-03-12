@@ -13,22 +13,28 @@ def generate_discrete_action_dict(
     num_translational_actions: int = 0,
 ) -> List[Dict[str, Union[str, float]]]:
     """
-    Generates a dictionary of discrete actions for a robot, combining linear and angular velocities.
-
+    Generate a discrete action dictionary for robot control with linear and angular velocity pairs,
+    and optional translational velocity.
+    
+    This function creates a list of action dictionaries, where each dictionary represents a 
+    unique combination of linear and angular velocities, and optionally translational velocity.
+    The function ensures that a zero action (0, 0) is included in the action space.
+    
     Args:
-        linear_range (Tuple[float, float]): The range (min, max) of linear velocities.
-        angular_range (Tuple[float, float]): The range (min, max) of angular velocities.
-        num_linear_actions (int): The number of discrete linear actions to generate.
-        num_angular_actions (int): The number of discrete angular actions to generate.
-        translational_range (Optional[Tuple[float, float]]): The range (min, max) of translational velocities.
-        num_translational_actions (int): The number of discrete translational actions to generate.
-
+        linear_range: A tuple (min, max) specifying the range of linear velocities.
+        angular_range: A tuple (min, max) specifying the range of angular velocities.
+        num_linear_actions: The number of discrete linear velocity values to generate.
+        num_angular_actions: The number of discrete angular velocity values to generate.
+        translational_range: Optional tuple (min, max) for translational velocities.
+        num_translational_actions: Number of discrete translational velocity values to generate,
+            defaults to 0 (no translational actions).
+            
     Returns:
-        List[Dict[str, Union[str, float]]]: A list of dictionaries, each containing:
-            - "name" (str): A randomly generated name for the action.
-            - "linear" (float): The linear velocity component of the action.
-            - "angular" (float): The angular velocity component of the action.
-            - "translational" (Optional[float]): The translational velocity component of the action if specified.
+        A list of dictionaries, where each dictionary has the following keys:
+        - 'name': A random string of lowercase letters (length 12) to identify the action.
+        - 'linear': The linear velocity value.
+        - 'angular': The angular velocity value.
+        - 'translational': The translational velocity value (None if not specified).
     """
     NAME_LEN = 12  # Length for random action name
 
