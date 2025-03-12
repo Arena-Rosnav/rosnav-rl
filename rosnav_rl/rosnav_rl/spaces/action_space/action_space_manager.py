@@ -4,28 +4,38 @@ from gymnasium import spaces
 
 
 class ActionSpaceManager:
-    """
-    Class representing an action space manager.
+    """Action Space Manager for Reinforcement Learning Environments in ROS Navigation.
 
-    Args:
-        holonomic (bool): Flag indicating whether the robot is holonomic.
-        action_space_discrete (bool): Flag indicating whether the action space is discrete.
-        actions (dict): Dictionary containing the available actions.
-        stacked (bool): Flag indicating whether the actions are stacked.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
+    This class manages the action space for both holonomic and non-holonomic robots.
+    It handles discrete and continuous action spaces, and provides methods for
+    working with actions in the reinforcement learning environment.
 
     Attributes:
-        _holonomic (bool): Flag indicating whether the robot is holonomic.
-        _discrete (bool): Flag indicating whether the action space is discrete.
-        _actions (dict): Dictionary containing the available actions.
-        _stacked (bool): Flag indicating whether the actions are stacked.
-        _space: The action space.
+        _holonomic (bool): Flag indicating if the robot is holonomic (can move in any direction).
+        _discrete (bool): Flag indicating if the action space is discrete.
+        _actions (list): Available actions or action ranges.
+        _space (object): The action space object from gym.spaces.
 
-    Properties:
-        actions: Get the available actions.
-        action_space: Get the action space.
-        shape: Get the shape of the action space.
+    Usage:
+        For a holonomic robot with continuous actions:
+            manager = ActionSpaceManager(
+                is_holonomic=True,
+                is_discrete=False,
+                actions={
+                    "linear_range": {
+                        "x": [-1.0, 1.0],
+                        "y": [-1.0, 1.0]
+                    },
+                    "angular_range": [-1.0, 1.0]
+        
+        For a non-holonomic robot with discrete actions:
+            manager = ActionSpaceManager(
+                is_holonomic=False,
+                is_discrete=True,
+                actions=[
+                    {"linear": 0.2, "angular": 0.0},
+                    {"linear": 0.0, "angular": 0.5},
+                    # More discrete actions...
     """
 
     def __init__(

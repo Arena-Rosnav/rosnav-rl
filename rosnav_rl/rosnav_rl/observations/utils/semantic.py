@@ -7,16 +7,23 @@ import crowdsim_msgs.msg as crowdsim_msgs
 def get_relative_pos_to_robot(
     robot_pose: np.ndarray, distant_poses: np.ndarray
 ) -> np.ndarray:
-    """
-    Calculates the relative positions of distant frames to the robot's pose.
-
+    """Transforms distant poses from map frame to robot frame coordinates.
+    
+    This function calculates the relative positions of a set of points with respect to
+    the robot's current pose. It creates a homogeneous transformation matrix from map
+    to robot coordinates, inverts it, and applies it to the distant poses.
+    
     Args:
-        robot_pose (np.ndarray): The pose of the robot, represented as a numpy array. Represented as structured array containing x, y, and yaw.
-        distant_poses (np.ndarray): The distant frames to calculate the relative positions for, represented as a numpy array.
-                                    Shape in (num_distant_frames, 3). Each row contains x-coordinate, y-coordinate, and 1 (homogenous component).
-
+        robot_pose: A numpy array or dictionary containing the robot's pose with keys:
+            - "x": x-coordinate of the robot in the map frame
+            - "y": y-coordinate of the robot in the map frame
+            - "yaw": orientation of the robot in the map frame (in radians)
+        distant_poses: A numpy array of shape (N, 3) where each row represents a pose
+            in homogeneous coordinates [x, y, 1] in the map frame
+    
     Returns:
-        np.ndarray: The relative positions of the distant frames to the robot's pose, represented as a numpy array.
+        A numpy array of shape (N, 2) containing the x and y coordinates of the distant
+        poses in the robot's frame of reference (excluding the homogeneous component)
     """
     # Create the homogeneous transformation matrix map_T_robot
     map_T_robot = np.array(
@@ -46,17 +53,24 @@ def get_relative_vel_to_robot(
     robot_pose: np.ndarray,
     pedestrian_vel_vector: np.ndarray,
 ) -> np.ndarray:
-    """
-    Calculates the relative velocity of pedestrians to the robot.
-
-    Args:
-        robot_pose (np.ndarray): The pose of the robot, including its position and orientation.
-        pedestrian_vel_vector (np.ndarray): The velocity vectors of pedestrians in (num_peds, 2).
-                                            Each row contains the x and y components of the velocity.
-
+    """Transforms pedestrian velocity vectors from a global map frame to the robot's local frame.
+    
+    This function transforms the velocity vectors of pedestrians from the map coordinate
+    frame to the robot's local coordinate frame using a rotation matrix derived from the 
+    robot's orientation (yaw).
+    
+    Parameters:
+        robot_pose (np.ndarray): A numpy array containing the robot's pose information,
+                                 which must include a 'yaw' key representing the robot's
+                                 orientation in radians.
+        pedestrian_vel_vector (np.ndarray): A numpy array of shape (n, 2) containing
+                                            pedestrian velocity vectors [vx, vy] in
+                                            the map coordinate frame.
     Returns:
-        np.ndarray: The relative velocity vectors of pedestrians with respect to the robot
-                    in the robot's coordinate frame, shape (num_peds, 2).
+        np.ndarray: A numpy array of shape (n, 2) containing the pedestrian velocity
+                    vectors transformed to the robot's coordinate frame. Returns an
+                    empty array with shape (0, 2) if the input pedestrian_vel_vector
+                    is empty.
     """
     # Create the rotation matrix to transform from map frame to robot frame
     map_r_robot = np.array(

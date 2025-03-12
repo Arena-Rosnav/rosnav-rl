@@ -14,22 +14,22 @@ from .base_feature_map_space import BaseFeatureMapSpace
 
 @SpaceFactory.register("ped_vel_y")
 class PedestrianVelYSpace(BaseFeatureMapSpace):
-    """
-    A feature map space representing the y-component of pedestrian velocity.
-
-    Args:
-        min_speed_y (float): The minimum y-component of pedestrian velocity.
-        max_speed_y (float): The maximum y-component of pedestrian velocity.
-        feature_map_size (int): The size of the feature map.
-        roi_in_m (float): The region of interest in meters.
-        flatten (bool, optional): Whether to flatten the feature map. Defaults to True.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
+    """A class for creating and processing feature maps based on the y-component of pedestrians' velocities.
+    
+    This class creates a 2D feature map where each cell represents a spatial location, and the value
+    in that cell represents the y-component of a pedestrian's velocity if a pedestrian is present at
+    that location. The feature map provides information about pedestrian movement in the y-direction
+    (typically forward/backward movement in the robot's reference frame).
+    
     Attributes:
-        _map_size (int): The size of the feature map.
-        _min_speed (float): The minimum y-component of pedestrian velocity.
-        _max_speed (float): The maximum y-component of pedestrian velocity.
+        name (str): The name identifier for this space, "PEDESTRIAN_VEL_Y".
+        required_observation_units (list): List of required observation generators needed for this space.
+        ped_min_speed_y (float): Minimum y-velocity value for pedestrians (m/s).
+        ped_max_speed_y (float): Maximum y-velocity value for pedestrians (m/s).
+        feature_map_size (int): Size of the feature map (width and height in cells).
+        roi_in_m (float): Region of interest in meters, defining the real-world area covered by the feature map.
+        *args: Additional positional arguments passed to the parent class.
+        **kwargs: Additional keyword arguments passed to the parent class.
     """
 
     name = "PEDESTRIAN_VEL_Y"
@@ -63,7 +63,7 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=self._min_speed,
             high=self._max_speed,
-            shape=(self._feature_map_size, self._feature_map_size),
+            shape=(1, self._feature_map_size, self._feature_map_size),
             dtype=float,
         )
 

@@ -413,11 +413,13 @@ class RewardCollision(RewardUnit):
                 crash_radius
             )
 
-        laser_min = (
-            obs_dict[LaserCollector.name].min()
-            if not FullRangeLaserCollector.name in obs_dict
-            else obs_dict[FullRangeLaserCollector.name].min()
+        laser_data = (
+            obs_dict[LaserCollector.name]
+            if FullRangeLaserCollector.name not in obs_dict
+            else obs_dict[FullRangeLaserCollector.name]
         )
+
+        laser_min = np.inf if len(laser_data) == 0 else laser_data.min()
 
         if laser_min <= crash_radius or coll_in_blind_spot:
             self.add_reward(self._reward)

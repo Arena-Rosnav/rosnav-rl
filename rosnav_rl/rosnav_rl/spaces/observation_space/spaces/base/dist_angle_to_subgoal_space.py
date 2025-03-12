@@ -10,23 +10,19 @@ from ..base_observation_space import BaseObservationSpace
 
 @SpaceFactory.register("dist_angle_to_subgoal")
 class DistAngleToSubgoalSpace(BaseObservationSpace):
-    """
-    Represents the observation space for the goal in a navigation task.
-
-    Args:
-        subgoal_max_dist (float): The maximum distance to the goal. Defaults to 30.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
+    """A space for representing the distance and angle to a subgoal.
+    
+    This observation space encodes the distance and angle to a subgoal as a 2D vector.
+    The first component represents the distance to the subgoal (normalized from 0 to max_dist),
+    and the second component represents the angle to the subgoal (from -π to π).
+    
     Attributes:
-        _max_dist (float): The maximum distance to the goal.
-
-    Methods:
-        get_gym_space: Returns the Gym space for the goal observation.
-        encode_observation: Encodes the goal observation.
-
+        name (str): The name of the observation space.
+        required_observation_units (list): List of required observation generators.
+        subgoal_max_dist (float, optional): The maximum distance to a subgoal. Defaults to 30.
+        *args: Variable length argument list passed to the parent class.
+        **kwargs: Arbitrary keyword arguments passed to the parent class.
     """
-
     name = "DIST_ANGLE_TO_SUBGOAL"
     required_observation_units = [DistAngleToSubgoalGenerator]
 
@@ -43,9 +39,10 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
 
         """
         return spaces.Box(
-            low=np.array([[0, -np.pi]]),
-            high=np.array([[self._max_dist, np.pi]]),
+            low=np.array([0, -np.pi]),
+            high=np.array([self._max_dist, np.pi]),
             dtype=np.float32,
+            shape=(2,),
         )
 
     @BaseObservationSpace.apply_normalization
@@ -63,4 +60,4 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        return observation[DistAngleToSubgoalGenerator.name][np.newaxis, :]
+        return observation[DistAngleToSubgoalGenerator.name]

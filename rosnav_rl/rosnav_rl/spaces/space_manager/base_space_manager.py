@@ -4,12 +4,12 @@ from typing import Any, Dict, List, Union
 import numpy as np
 from gym import spaces
 
-from rosnav_rl.spaces import (
+from ...spaces import (
     ActionSpaceManager,
     ObservationSpaceManager,
 )
-from rosnav_rl.states import AgentStateContainer
-from rosnav_rl.utils.type_aliases import (
+from ...states import AgentStateContainer
+from ...utils.type_aliases import (
     EncodedObservationDict,
     ObservationDict,
     ObservationSpaceList,
@@ -100,12 +100,18 @@ class BaseSpaceManager:
         observation_space_list: ObservationSpaceList,
         observation_space_kwargs: Dict[str, Any],
     ):
-        """
-        Initializes the ObservationSpaceManager.
-
+        """Initialize the observation space manager.
+        
+        This method creates an ObservationSpaceManager instance by combining
+        the provided observation space list and keyword arguments with
+        the agent state container's observation space settings.
+        
         Args:
-            observation_spaces (ObservationSpaceList): The list of observation spaces.
-            observation_space_kwargs (Dict[str, Any]): Additional keyword arguments for the observation spaces.
+            observation_space_list (ObservationSpaceList): The list of observation spaces to include
+            observation_space_kwargs (Dict[str, Any]): Additional keyword arguments for observation space configuration
+        
+        Returns:
+            None
         """
         observation_space_kwargs.update(
             asdict(self._agent_state_container.observation_space)
@@ -118,29 +124,32 @@ class BaseSpaceManager:
     def encode_observation(
         self, obs_dict: ObservationDict, *args, **kwargs
     ) -> EncodedObservationDict:
-        """
-        Encodes the given observation using the observation space manager.
-
+        """Encode observation dictionary using the observation space manager.
+        
+        This method takes an observation dictionary and forwards it to the observation space manager
+        for encoding.
+        
         Args:
-            observation: The observation to be encoded.
-            *args: Additional positional arguments.
-            **kwargs: Additional keyword arguments to be passed to the observation space manager.
-
+            obs_dict (ObservationDict): The raw observation dictionary to encode.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments passed to the observation space manager.
+        
         Returns:
-            EncodedObservationDict: The encoded observation.
+            EncodedObservationDict: The encoded observation dictionary.
         """
         return self._observation_space_manager.encode_observation(obs_dict, **kwargs)
 
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         """
-        Decodes the given action using the action space manager.
-
+        Decodes an action from the agent's action space to the robot's action space.
+        
         Args:
-            action (np.ndarray): The action to be decoded.
-
+            action (np.ndarray): The action to decode, represented as a numpy array in the agent's action space.
+        
         Returns:
-            The decoded action as determined by the action space manager.
+            np.ndarray: The decoded action in the robot's action space.
         """
+        
         return self._action_space_manager.decode_action(action)
 
     @property

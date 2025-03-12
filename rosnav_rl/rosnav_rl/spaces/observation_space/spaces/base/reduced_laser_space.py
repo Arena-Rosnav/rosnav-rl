@@ -10,18 +10,19 @@ from ..base_observation_space import BaseObservationSpace
 
 @SpaceFactory.register("reduce_laser")
 class ReducedLaserScanSpace(BaseObservationSpace):
-    """
-    Represents the observation space for laser scan data.
-
-    Args:
-        laser_num_beams (int): The number of laser beams.
-        laser_max_range (float): The maximum range of the laser.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
+    """A class representing a reduced laser scan observation space.
+    
+    This observation space reduces the dimensionality of laser scan data by 
+    selecting a subset of the original laser beams at evenly spaced intervals.
+    This can be useful for reducing computational complexity while still 
+    maintaining sufficient environmental awareness for navigation tasks.
+    
     Attributes:
-        _num_beams (int): The number of laser beams.
-        _max_range (float): The maximum range of the laser.
+        name (str): Identifier for this observation space type, set to "REDUCED_LASER".
+        required_observation_units (list): List of required collectors, only LaserCollector needed.
+        _num_beams (int): The number of beams in the original laser scan.
+        _max_range (float): The maximum range value for laser measurements.
+        _reduced_num_beams (int): The target number of beams after reduction.
     """
 
     name = "REDUCED_LASER"
@@ -50,7 +51,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         return spaces.Box(
             low=0,
             high=self._max_range,
-            shape=(1, self._reduced_num_beams),
+            shape=(self._reduced_num_beams,),
             dtype=np.float32,
         )
 
@@ -89,4 +90,4 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         """
         return ReducedLaserScanSpace.reduce_laserbeams(
             observation[LaserCollector.name], self._reduced_num_beams
-        )[np.newaxis, :]
+        )

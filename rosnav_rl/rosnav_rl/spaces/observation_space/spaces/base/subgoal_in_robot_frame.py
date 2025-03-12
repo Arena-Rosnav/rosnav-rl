@@ -10,23 +10,17 @@ from ..base_observation_space import BaseObservationSpace
 
 @SpaceFactory.register("subgoal_in_robot_frame")
 class SubgoalInRobotFrameSpace(BaseObservationSpace):
-    """
-    Represents the observation space for the goal in a navigation task.
+    """Observation space representing the subgoal position in the robot's coordinate frame.
 
-    Args:
-        subgoal_max_dist (float): The maximum distance to the goal. Defaults to 30.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
+    This class defines a 2D observation space that contains the relative position (x, y) of
+    the subgoal from the robot's perspective. The values are bounded by the maximum distance
+    parameter.
 
     Attributes:
-        _max_dist (float): The maximum distance to the goal.
-
-    Methods:
-        get_gym_space: Returns the Gym space for the goal observation.
-        encode_observation: Encodes the goal observation.
-
+        name (str): Identifier for this observation space type.
+        required_observation_units (list): List of required observation generators.
+        _max_dist (float): Maximum distance in meters for the subgoal position.
     """
-
     name = "SUBGOAL_IN_ROBOT_FRAME"
     required_observation_units = [SubgoalLocationInRobotFrameGenerator]
 
@@ -43,8 +37,8 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
 
         """
         return spaces.Box(
-            low=np.array([[-self._max_dist, -self._max_dist]]),
-            high=np.array([[self._max_dist, self._max_dist]]),
+            low=np.array([-self._max_dist, -self._max_dist]),
+            high=np.array([self._max_dist, self._max_dist]),
             dtype=np.float32,
         )
 
@@ -62,7 +56,4 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
             ndarray: The encoded goal observation.
 
         """
-        subgoal_dist_angle = observation[SubgoalLocationInRobotFrameGenerator.name][
-            np.newaxis, :
-        ]
-        return subgoal_dist_angle
+        return observation[SubgoalLocationInRobotFrameGenerator.name]

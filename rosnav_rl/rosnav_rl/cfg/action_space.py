@@ -7,9 +7,8 @@ from rosnav_rl.utils.action_space.custom_discrete_action import (
 
 
 class DiscreteFromBoxActionSpaceCfg(BaseModel):
-
-    buckets_linear_vel: int
-    buckets_angular_vel: int
+    buckets_linear_vel: int = 12
+    buckets_angular_vel: int = 16
 
     def generate_discrete_from_box_dict(
         self, linear_range: tuple, angular_range: tuple
@@ -34,6 +33,4 @@ class DiscreteFromBoxActionSpaceCfg(BaseModel):
 
 class ActionSpaceCfg(BaseModel):
     is_discrete: Optional[bool] = False
-    custom_discretization: Optional[DiscreteFromBoxActionSpaceCfg] = (
-        DiscreteFromBoxActionSpaceCfg(buckets_angular_vel=16, buckets_linear_vel=12)
-    )
+    custom_discretization: Optional[DiscreteFromBoxActionSpaceCfg] = None
