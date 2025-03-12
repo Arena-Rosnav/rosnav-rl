@@ -55,6 +55,7 @@ Though, the framework can be easily integrated into other simulation environment
 - ROS 1 (Robot Operating System)
 - Python 3
 - StableBaselines 3 (RL framework)
+- [DreamerV3](rosnav_rl/model/dreamerv3/package_description.md) (RL framework for DreamerV3)
 - PyTorch (Deep Learning)
 
 ### Key Features
@@ -406,36 +407,44 @@ For a working integration into a training pipeline check out the [Arena](https:/
 
 ```python
 import rosnav_rl
-import rosnav_rl.states as states
-import rosnav_rl.cfg.sb3_cfg as sb3_cfg
 
+# Create configuration
+config = rosnav_rl.model.dreamerv3.cfg.DreamerV3Cfg(...) # or
+config = rosnav_rl.model.stable_baselines3.cfg.StableBaselinesCfg(...)
 
-# Create agent configuration
 agent_cfg = rosnav_rl.AgentCfg(
     name="my_agent",
     robot="jackal",
-    framework=rosnav_rl.StableBaselinesCfg(
-        algorithm=sb3_cfg.PPO_Cfg(
-            architecture_name="AGENT_1"
-        )
-    )
+    framework=config,
 )
 
-# Create agent state container - holds space relevant parameters
-simulation_state_container = rosnav_rl.SimulationStateContainer(robot=states.simulation.TaskState(goal_radius=..., max_steps=...))
+
+# Create state containers
+simulation_state_container = rosnav_rl.SimulationStateContainer(...)
 agent_state_container = simulation_state_container.to_agent_state_container()
 
-# Initialize agent
-agent = rosnav_rl.RL_Agent(agent_cfg, agent_state_container)
-agent.initialize_model(env=train_env)
+# Create agent
+agent = rosnav_rl.RL_Agent(
+    agent_cfg=agent_cfg,
+    agent_state_container=agent_state_container
+)
+agent.initialize_model()
+
+# Create environments
+train_envs = [create_env("train", i) for i in range(config.general.envs)]
+eval_envs = [create_env("eval", i) for i in range(config.general.envs)]
 
 # Train agent
-agent.train()
+agent.train(
+    train_envs=train_envs,
+    eval_envs=eval_envs
+)
 ```
 
 ### Adding New Model Architectures
 Implementation depends on the prefered framework to be used:
 - [StableBaselines3](rosnav_rl/model/stable_baselines3/custommodel.md)
+- [DreamerV3](rosnav_rl/model/dreamerv3/package_description.md)
 
 ### Adding New Observation Space
 You can add a new observation space by inheriting from the `BaseObservationSpace` class and registering it with the `SpaceFactory`.
@@ -644,13 +653,16 @@ class RewardSafeDistance(RewardUnit):
             self.add_info(self.SAFE_DIST_VIOLATION_INFO)
 ```
 
+## Contributing
 
+Contributions are welcome! Please follow these steps:
 
+1. Fork the repository
+2. Create a feature branch
+3. Add your changes
+4. Run tests
+5. Submit a pull request
 
-## Best Practices
-1. Always use type hints for better code maintainability
-2. Follow the factory pattern for new observation spaces
-3. Use configuration files for hyperparameters
-4. Use the provided base classes for consistency
+For questions, please open an issue on the GitHub repository.
 
-> Note: This guide provides a high-level overview. For detailed implementation specifics, refer to the inline documentation and example configurations in the `agents/` directory.
+> Note: This guide provides a high-level overview. For detailed implementation specifics, refer to the inline documentation.
