@@ -14,27 +14,27 @@ from .base_feature_map_space import BaseFeatureMapSpace
 
 @SpaceFactory.register("ped_vel_x")
 class PedestrianVelXSpace(BaseFeatureMapSpace):
-    """
-    A feature map space representing the pedestrian velocity in the x-direction.
-
-    Args:
-        min_speed_x (float): The minimum speed in the x-direction.
-        max_speed_x (float): The maximum speed in the x-direction.
-        feature_map_size (int): The size of the feature map.
-        roi_in_m (float): The region of interest in meters.
-        flatten (bool, optional): Whether to flatten the feature map. Defaults to True.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
+    """A space for representing the feature map of pedestrian x-velocity.
+    
+    This class creates a spatial representation of pedestrians' x-velocity in the robot's
+    environment. The feature map is a 2D grid where each cell represents a location,
+    and the value in each cell represents the x-component of the velocity of a pedestrian
+    at that location, if present.
+    The feature map uses relative positions to place pedestrians on the grid and assigns
+    their x-velocity to the corresponding cells. Empty cells (without pedestrians) have zero values.
+    
     Attributes:
-        _map_size (int): The size of the feature map.
-        _min_speed (float): The minimum speed in the x-direction.
-        _max_speed (float): The maximum speed in the x-direction.
-
-    Methods:
-        get_gym_space(): Returns the Gym space corresponding to the feature map.
-        encode_observation(observation, *args, **kwargs): Encodes the observation into a numpy array.
-
+        name (str): The name identifier for this space ("PEDESTRIAN_VEL_X").
+        required_observation_units (list): The observation generators required for this feature map:
+            - PedestrianRelativeLocationGenerator: Provides relative positions of pedestrians
+            - PedestrianRelativeVelXGenerator: Provides x-velocity component of pedestrians
+    
+    Parameters:
+        ped_min_speed_x (float): The minimum possible x-velocity of pedestrians.
+        ped_max_speed_x (float): The maximum possible x-velocity of pedestrians.
+        feature_map_size (int): The size of the feature map (width and height in cells).
+        roi_in_m (float): Region of interest in meters, representing the physical size of the area
+                          covered by the feature map.
     """
 
     name = "PEDESTRIAN_VEL_X"
@@ -69,7 +69,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=self._min_speed,
             high=self._max_speed,
-            shape=(self._feature_map_size, self._feature_map_size),
+            shape=(1, self._feature_map_size, self._feature_map_size),
             dtype=float,
         )
 

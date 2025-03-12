@@ -28,16 +28,21 @@ __all__ = [
 
 
 class LaserCollector(ObservationCollectorUnit[sensor_msgs.LaserScan, np.ndarray]):
-    """
-    A class that collects laser scan observations.
-
+    """A collector unit for processing laser scan messages from ROS topics.
+    
+    This class inherits from ObservationCollectorUnit and is responsible for 
+    collecting and preprocessing laser scan data from ROS sensors. It handles 
+    laser readings and converts them into a format suitable for use in 
+    reinforcement learning environments.
+    
     Attributes:
-        name (str): The name of the collector.
-        topic (str): The topic to subscribe to for laser scan messages.
-        msg_data_class (Type[sensor_msgs.LaserScan]): The message data class for laser scan messages.
-        data_class (Type[np.ndarray]): The data class for storing the collected laser scan observations.
-        up_to_date_required (bool): Specifies whether value should be kept up to date, i.e. a new message is required for every step.
-    """
+        name (ClassVar[str]): The name identifier for this collector ("laser_scan").
+        topic (ClassVar[str]): The ROS topic to subscribe to for laser scan data ("scan").
+        up_to_date_required (ClassVar[bool]): Flag indicating whether the data must be current.
+        msg_data_class (ClassVar[Type]): The message type this collector processes (sensor_msgs.LaserScan).
+        applicable_simulators (List[Simulator]): List of simulators where this collector can be used
+            (Flatland, Unity, and Gazebo).
+   """ 
 
     name: ClassVar[str] = "laser_scan"
     topic: ClassVar[str] = "scan"
@@ -50,15 +55,18 @@ class LaserCollector(ObservationCollectorUnit[sensor_msgs.LaserScan, np.ndarray]
     ]
 
     def preprocess(self, msg: sensor_msgs.LaserScan) -> np.ndarray:
-        """
-        Preprocesses the received laser scan message.
-
+        """Preprocess raw LaserScan message into numpy array.
+        
+        This method takes a LaserScan message, filters out NaN values by replacing them with the maximum range,
+        and returns a numpy array representation of the laser scan data.
+        
         Args:
-            msg (sensor_msgs.LaserScan): The laser scan message to preprocess.
-
+            msg (sensor_msgs.LaserScan): The raw LaserScan message from ROS.
+        
         Returns:
-            np.ndarray: The preprocessed laser scan data as a NumPy array.
+            np.ndarray: Processed laser scan data as a numpy array. Empty array if input ranges are empty.
         """
+        
         super().preprocess(msg)
         if len(msg.ranges) == 0:
             return np.array([])
@@ -69,14 +77,15 @@ class LaserCollector(ObservationCollectorUnit[sensor_msgs.LaserScan, np.ndarray]
 
 
 class FullRangeLaserCollector(LaserCollector):
-    """
-    A class representing a collector for full range laser scans. (i.e., 360-degree laser scans.)
-
+    """A collector for full range laser scan data.
+    
+    This collector is responsible for handling the processing of full range laser scan
+    data received from the 'full_scan' topic.
+    
     Attributes:
-        name (str): The name of the collector.
-        topic (str): The topic to subscribe to for laser scan messages.
+        name (ClassVar[str]): The name identifier for this collector.
+        topic (ClassVar[str]): The ROS topic name from which to collect laser scan data.
     """
-
     name: ClassVar[str] = "full_range_laser_scan"
     topic: ClassVar[str] = "full_scan"
 
@@ -84,15 +93,18 @@ class FullRangeLaserCollector(LaserCollector):
 class PoseCollector(
     ObservationCollectorUnit[geometry_msgs.PoseStamped, np.ndarray], ABC
 ):
-    """
-    PoseCollector is a class that collects pose observations in the form of geometry_msgs.PoseStamped
-    and converts them into numpy arrays.
-
+    """Base class for collecting pose observations from ROS topics.
+    
+    This abstract class serves as the foundation for observation collectors that process pose data
+    from ROS messages. It inherits from ObservationCollectorUnit and specifies that it will convert
+    geometry_msgs.PoseStamped messages to numpy arrays.
+    
     Attributes:
-        name (str): The name of the collector.
-        topic (str): The ROS topic from which the pose messages are collected.
+        name (ClassVar[str]): The name identifier for the collector (to be defined in subclasses).
+        topic (ClassVar[str]): The ROS topic to subscribe to (to be defined in subclasses).
+        msg_data_class (ClassVar[Type[geometry_msgs.PoseStamped]]): The message type to expect (PoseStamped).
+        applicable_simulators (List[Simulator]): List of simulators where this collector can be used.
     """
-
     name: ClassVar[str]
     topic: ClassVar[str]
     msg_data_class: ClassVar[Type[geometry_msgs.PoseStamped]] = (
@@ -109,37 +121,40 @@ class RobotPoseCollector(
     PoseCollector,
     ObservationCollectorUnit[nav_msgs.Odometry, np.ndarray],
 ):
-    """
-    A class for collecting robot pose observations.
-
-    This class inherits from the `PoseCollector` class and provides a specific implementation
-    for collecting robot pose observations.
-
+    """Collector for robot pose information from the odometry topic.
+    
+    This collector subscribes to the robot's odometry messages and extracts 
+    the 2D pose (x, y, theta) of the robot. It is designed to provide the robot's
+    position and orientation as part of the observation space for reinforcement
+    learning algorithms.
+    
     Attributes:
-        name (str): The name of the collector.
-        topic (str): The ROS topic to subscribe to for pose messages.
-        msg_data_class (Type[nav_msgs.Odometry]): The ROS message data class for pose messages.
-        data_class (Type[np.ndarray]): The data class for storing the collected pose observations.
-        up_to_date_required (bool): Specifies whether value should be kept up to date, i.e. a new message is required for every step.
+        name (str): Name identifier for this collector, set to "robot_pose".
+        topic (str): ROS topic to subscribe to, set to "odom".
+        up_to_date_required (bool): Flag indicating whether the newest data is required, set to True.
+        msg_data_class (Type): Message type class, set to nav_msgs.Odometry.
+    
+    Note:
+        This collector inherits from both PoseCollector and ObservationCollectorUnit
+        and specializes in processing odometry messages into 2D pose representations.
     """
-
     name: ClassVar[str] = "robot_pose"
     topic: ClassVar[str] = "odom"
     up_to_date_required: ClassVar[bool] = True
     msg_data_class: ClassVar[Type[nav_msgs.Odometry]] = nav_msgs.Odometry
 
     def preprocess(self, msg: nav_msgs.Odometry) -> np.ndarray:
-        """
-        Preprocesses the received pose message.
-
-        This method converts the received pose message into a 2D pose representation
-        (x, y, theta) and returns it as a numpy array.
-
+        """Preprocess the Odometry message to extract 2D pose information.
+        
+        This method extracts the 2D pose (x, y, theta) from the 3D pose contained in
+        the Odometry message.
+        
         Args:
-            msg (nav_msgs.Odometry): The received pose message.
-
+            msg (nav_msgs.Odometry): The Odometry message to preprocess.
+        
         Returns:
-            np.ndarray: The preprocessed pose observation as a numpy array.
+            np.ndarray: A numpy array containing the 2D pose information (x, y, theta)
+                       with dtype Pose2DType.
         """
         super().preprocess(msg)
         pose3d: geometry_msgs.PoseWithCovariance = (
@@ -164,20 +179,22 @@ class GoalCollector(
         msg_data_class (Type[geometry_msgs.PoseStamped]): The ROS message data class for goal messages.
         data_class (Type[np.ndarray]): The numpy array data class for the preprocessed goal observations.
     """
-
     name: ClassVar[str] = "goal"
     topic: ClassVar[str] = "move_base_simple/goal"
 
     def preprocess(self, msg: geometry_msgs.PoseStamped) -> np.ndarray:
-        """
-        Preprocesses the goal message into a numpy array representation.
-
+        """Preprocesses a ROS PoseStamped message by converting it to a 2D pose array.
+        
+        This method converts a 3D pose from a PoseStamped message to a 2D representation
+        containing x, y positions and theta orientation.
+        
         Args:
-            msg (geometry_msgs.PoseStamped): The goal message to preprocess.
-
+            msg (geometry_msgs.PoseStamped): The ROS PoseStamped message to preprocess.
+        
         Returns:
-            np.ndarray: The preprocessed goal observation as a numpy array.
+            np.ndarray: A numpy array of type Pose2DType containing (x, y, theta).
         """
+        
         super().preprocess(msg)
         pose3d: geometry_msgs.Pose = msg.pose
         pose2d: geometry_msgs.Pose2D = pose3d_to_pose2d(pose3d)

@@ -1,33 +1,47 @@
 from datetime import datetime as dt
-from typing import TYPE_CHECKING
-
-import rospy
+from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from rosnav_rl.cfg import FrameworkCfg
+    from rosnav_rl.model.stable_baselines3.cfg import StableBaselinesCfg
 
 
-def generate_name(architecture_name: str, algorithm: str, robot: str = None) -> str:
-    start_time = dt.now().strftime("%Y_%m_%d__%H_%M_%S")
-    robot_model = rospy.get_param("robot_model", "") if robot is None else robot
-    agent_name = f"{robot_model}_{algorithm}_{architecture_name}_{start_time}"
-    return agent_name
+def _create_formatted_name(*args: str) -> str:
+    """
+    Create a formatted name by joining the input arguments and appending a timestamp.
+    
+    Args:
+        *args (str): Variable length argument list of strings to be joined.
+        
+    Returns:
+        str: A formatted string where the arguments are joined with underscores
+             followed by the current timestamp in the format 'YYYY_MM_DD__HH_MM_SS'.
+             
+    Example:
+        >>> _create_formatted_name("model", "v1")
+        'model_v1_2023_04_15__14_30_22'
+    """
+    formatted_args = "_".join(args)
+    return f"{formatted_args}_{dt.now().strftime('%Y_%m_%d__%H_%M_%S')}"
 
 
-def generate_sb3_agent_name(framework_cfg: "FrameworkCfg", robot: str = None) -> str:
-    return generate_name(
-        framework_cfg.algorithm.architecture_name,
-        framework_cfg.algorithm.__algorithm_name__,
-        robot=robot,
-    )
+def generate_agent_name(framework_cfg: Union["FrameworkCfg", "StableBaselinesCfg"], robot: str = None) -> str:
+    import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
+    import rosnav_rl.model.dreamerv3.cfg as dreamerv3_cfg
+    
+    NAMING_MAP = {
+        sb3_cfg.StableBaselinesCfg: 
+            (
+                framework_cfg.algorithm.architecture_name, 
+                framework_cfg.algorithm.parameters.algorithm_name, 
+                robot if robot else "[no_robot_specified]"
+            ),
+        dreamerv3_cfg.DreamerV3Cfg: 
+            (
+                framework_cfg.name, 
+                robot if robot else "[no_robot_specified]"
+            ),
+    }
 
 
-def generate_agent_name(framework_cfg: "FrameworkCfg", robot: str = None) -> str:
-    import rosnav_rl.utils.type_aliases as type_aliases
-
-    if framework_cfg.__name__ == type_aliases.SupportedRLFrameworks.STABLE_BASELINES3:
-        return generate_sb3_agent_name(framework_cfg, robot=robot)
-    else:
-        raise ValueError(
-            f"Framework {framework_cfg.name} not supported for name generation."
-        )
+    return _create_formatted_name(*NAMING_MAP[type(framework_cfg)])

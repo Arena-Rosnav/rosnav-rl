@@ -7,19 +7,18 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
 import rospy
 from typing_extensions import Self
 
-from rosnav_rl.observations import (
+from ..observations import (
     BaseUnit,
     ObservationCollectorUnit,
     ObservationGeneratorUnit,
 )
-from rosnav_rl.observations.collectors.base_collector import (
+from ..observations.collectors.base_collector import (
     SimulationNotCompatibleError,
 )
-from rosnav_rl.states import SimulationStateContainer
-from rosnav_rl.utils.rostopic import Namespace, Topic
-
-from .generic_observation import GenericObservation
+from ..states import SimulationStateContainer
+from ..utils.rostopic import Namespace, Topic
 from .dependency_resolution import explore_dependency_hierarchy
+from .generic_observation import GenericObservation
 
 if TYPE_CHECKING:
     from rosnav_rl.utils.type_aliases import ObservationDict
@@ -33,18 +32,27 @@ def map_crowdsim_topics(topic: Union[str, Topic], manager: ObservationManager) -
 
 
 class ObservationManager:
-    """
-    The ObservationManager class manages the collection and generation of observations from different units.
+    """Manages the collection and generation of observations for reinforcement learning agents in ROS.
 
-    It provides methods to initialize observation units, subscribe to topics, invalidate observations,
-    wait for observations, and retrieve observations from collectors and generators.
+    This class is responsible for:
+    - Initializing observation collector and generator units
+    - Setting up ROS subscribers for collecting observations from topics
+    - Managing the state of observations (stale vs. up-to-date)
+    - Providing methods to retrieve and process observations
 
-    Args:
-        ns (Namespace): The namespace object.
-        obs_structur (List[ObservationCollectorUnit], optional): The list of observation unit types. Defaults to None.
-        obs_unit_kwargs (dict, optional): Additional keyword arguments for observation units. Defaults to None.
-        wait_for_obs (bool, optional): Whether to wait for observations to be available. Defaults to True.
-        is_single_env (bool, optional): Whether the simulation environment is a single environment. Defaults to None.
+    The manager works with a hierarchy of observation units (collectors and generators) and handles
+    namespace-specific topics and subscriptions. It can be configured to wait for observations
+    to be updated before providing them to the agent.
+
+    Attributes:
+        _ns (Namespace): The namespace object for ROS topics.
+        _obs_structur (List[BaseUnit]): Structure of observation units.
+        _simulation_state_container (SimulationStateContainer): Container for simulation state.
+        _collectors (Dict[str, ObservationCollectorUnit]): Dictionary of collector units.
+        _generators (Dict[str, ObservationGeneratorUnit]): Dictionary of generator units.
+        _collectable_observations (Dict[str, GenericObservation]): Observations collected from topics.
+        _subscribers (Dict[str, rospy.Subscriber]): ROS subscribers for observations.
+        _default_topic_mappings (Dict[Union[str, Topic], Callable]): Default mappings for topics.
     """
 
     _ns: Namespace
@@ -69,16 +77,24 @@ class ObservationManager:
         obs_unit_kwargs: Optional[dict] = None,
         wait_for_obs: Optional[bool] = True,
     ) -> None:
-        """
-        Initialize ObservationManager with namespace and observation structure.
-
+        """Initialize the ObservationManager.
+        
+        The ObservationManager handles the collection and management of observations
+        from various sources within a ROS environment.
+        
         Args:
-            ns (Namespace): The namespace object.
-            obs_structur (List[ObservationCollectorUnit], optional): The list of observation unit types. Defaults to None.
+            ns (Namespace): The ROS namespace.
+            obs_structur (List[BaseUnit]): List of observation units defining the structure of observations.
+            simulation_state_container (SimulationStateContainer): Container holding the simulation state.
+            topic_mappings (Dict[str, Callable[[Union[str, Topic], Self], str]], optional): 
+                Dictionary mapping observation types to functions that return topic names. Defaults to None.
+            is_single_env (bool, optional): Whether this is a single environment setup. 
+                Will be set to True if "sim" is in namespace. Defaults to False.
             obs_unit_kwargs (dict, optional): Additional keyword arguments for observation units. Defaults to None.
-            wait_for_obs (bool, optional): Whether to wait for observations to be available. Defaults to True.
-            is_single_env (bool, optional): Whether the simulation environment consists of a single environment and
-                doesn't require environment-specific namespaces. Defaults to None.
+            wait_for_obs (bool, optional): Whether to wait for observations before proceeding. Defaults to True.
+            
+        Returns:
+            None
         """
         self._ns = ns
         self._simulation_state_container = simulation_state_container

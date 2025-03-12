@@ -102,6 +102,14 @@ class EXTRACTOR_1(RosnavBaseExtractor):
 
         return laser_scan, goal, last_action
 
+    def process_input(self, *observations):
+        def add_time_dimension(obs: th.Tensor):
+            if self._stack_size == 1:
+                return obs.unsqueeze(1)
+            return obs
+
+        return tuple([add_time_dimension(obs) for obs in observations])
+
     def forward(self, observations: Union[th.Tensor, TensorDict]) -> th.Tensor:
         """
         Forward pass of the feature extractor.
@@ -112,7 +120,9 @@ class EXTRACTOR_1(RosnavBaseExtractor):
         Returns:
             th.Tensor: The extracted features by the network.
         """
-        laser_scan, goal, last_action = self.get_input(observations)
+        laser_scan, goal, last_action = self.process_input(
+            *self.get_input(observations)
+        )
 
         cnn_features = self.cnn(laser_scan)
         extracted_features = th.cat(

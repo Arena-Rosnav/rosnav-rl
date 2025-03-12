@@ -15,24 +15,19 @@ from .base_feature_map_space import BaseFeatureMapSpace
 
 @SpaceFactory.register("ped_type")
 class PedestrianTypeSpace(BaseFeatureMapSpace):
-    """
-    A class representing the observation space for pedestrian types in a feature map.
-
-    Args:
-        num_ped_types (int): The number of pedestrian types.
-        feature_map_size (int): The size of the feature map.
-        roi_in_m (float): The region of interest in meters.
-        flatten (bool, optional): Whether to flatten the feature map. Defaults to True.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
+    """A space for representing pedestrian types as a feature map.
+    
+    This class inherits from BaseFeatureMapSpace and creates a feature map that encodes
+    different pedestrian types in the robot's environment. It uses pedestrian type information,
+    relative locations, and the robot's pose to generate a semantic map where each cell 
+    represents the type of pedestrian (if any) at that location.
+    
     Attributes:
-        _num_ped_types (int): The number of pedestrian types.
-
-    Methods:
-        get_gym_space: Returns the gym space for the observation.
-        encode_observation: Encodes the observation into a numpy array.
-
+        name (str): The name identifier for this space, set to "PEDESTRIAN_TYPE".
+        required_observation_units (list): The observation collectors and generators required
+            for this space to function, including pedestrian type information, pedestrian
+            relative locations, and robot pose.
+        background_value (int): The default value for cells with no pedestrian, set to -1.
     """
 
     name = "PEDESTRIAN_TYPE"
@@ -79,7 +74,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=-1,
             high=self._num_ped_types,
-            shape=(self._feature_map_size, self._feature_map_size),
+            shape=(1, self._feature_map_size, self._feature_map_size),
             dtype=int,
         )
 

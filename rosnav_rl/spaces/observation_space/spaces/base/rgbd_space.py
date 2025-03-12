@@ -14,22 +14,21 @@ from ..base_observation_space import BaseObservationSpace
 
 @SpaceFactory.register("rgbd")
 class RGBDSpace(BaseObservationSpace):
-    """
-    Represents the observation space for laser scan data.
-
-    Args:
-        image_height (int): The spatial height of the RGBD input image.
-        image_width (int): The spatial width of the RGBD input image.
-        *args: Variable length argument list. Might be
-            used for BaseObservationSpace init.
-        **kwargs: Arbitrary keyword arguments. Might be
-            used for BaseObservationSpace init.
-
+    """A base observation space implementation that combines RGB color images with depth information.
+    
+    This class implements the RGBD (Red, Green, Blue, Depth) observation space,
+    processing both color images and depth data into a combined representation suitable
+    for machine learning models.
+    
     Attributes:
-        _image_height (int): RGBD input image height.
-        _image_width (int): RGBD input iamge width.
+        name (str): Name identifier for the observation space.
+        required_observation_units (list): List of required collector classes for this observation space.
+    Parameters:
+        rgbd_image_height (int): Height of the RGBD image.
+        rgbd_image_width (int): Width of the RGBD image.
+        *args: Variable length argument list passed to parent class.
+        **kwargs: Arbitrary keyword arguments passed to parent class.
     """
-
     name: str = "RGBD"
     required_observation_units = [ImageColorCollector, ImageDepthCollector]
 

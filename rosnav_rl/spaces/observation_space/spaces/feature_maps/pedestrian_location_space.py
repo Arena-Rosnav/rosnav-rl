@@ -15,24 +15,23 @@ from .base_feature_map_space import BaseFeatureMapSpace
 
 @SpaceFactory.register("ped_location")
 class PedestrianLocationSpace(BaseFeatureMapSpace):
-    """
-    A class representing the observation space for pedestrian locations.
-
-    Args:
-        feature_map_size (int): The size of the feature map.
-        roi_in_m (float): The region of interest in meters.
-        flatten (bool, optional): Whether to flatten the feature map. Defaults to True.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
+    """A feature map observation space for pedestrian locations.
+    
+    This class represents a feature map in the observation space that captures the locations of pedestrians
+    in the environment relative to the robot's position. It creates a 2D grid representation where pedestrian
+    locations are marked.
+    
     Attributes:
-        _feature_map_size (int): The size of the feature map.
-        _roi_in_m (float): The region of interest in meters.
-        _flatten (bool): Whether to flatten the feature map.
-
-    Methods:
-        get_gym_space: Returns the gym space for the observation.
-        encode_observation: Encodes the observation into a numpy array.
+        name (str): Identifier for this observation space ("PEDESTRIAN_LOCATION").
+        required_observation_units (list): List of collector and generator classes required 
+            to build this observation space.
+            
+    Parameters:
+        feature_map_size (int): The size of the feature map grid (N x N).
+        roi_in_m (float): Region of interest in meters, representing the physical area covered by the feature map.
+        flatten (bool, optional): If True, the resulting observation will be flattened to 1D. Defaults to False.
+        *args: Additional positional arguments passed to the parent class.
+        **kwargs: Additional keyword arguments passed to the parent class.
     """
 
     name = "PEDESTRIAN_LOCATION"
@@ -68,7 +67,7 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
         return spaces.Box(
             low=0,
             high=1,
-            shape=(self._feature_map_size, self._feature_map_size),
+            shape=(1, self._feature_map_size, self._feature_map_size),
             dtype=int,
         )
 

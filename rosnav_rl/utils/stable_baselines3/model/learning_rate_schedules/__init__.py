@@ -1,15 +1,18 @@
-from typing import Callable, Union
+from __future__ import annotations
 
-from rosnav_rl.cfg.sb3_cfg.lr_schedule import LearningRateSchedulerCfg
+from typing import Callable, Union, TYPE_CHECKING
 
 from .linear import linear_decay
 from .square_root import square_root_decay
 
+if TYPE_CHECKING:
+    import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
 
 def load_lr_schedule(
-    settings: Union[float, dict, LearningRateSchedulerCfg]
+    settings: Union[float, dict, "sb3_cfg.LearningRateSchedulerCfg"]
 ) -> Callable:
-    if isinstance(settings, LearningRateSchedulerCfg):
+    import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
+    if isinstance(settings, sb3_cfg.LearningRateSchedulerCfg):
         return _get_lr_schedule(settings.type, settings.kwargs)
     elif isinstance(settings, dict):
         return _get_lr_schedule(settings["type"], settings["kwargs"])

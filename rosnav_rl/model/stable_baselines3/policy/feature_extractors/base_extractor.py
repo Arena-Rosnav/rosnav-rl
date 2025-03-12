@@ -47,12 +47,12 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
     @abstractmethod
     def forward(self, observations: Union[th.Tensor, TensorDict]) -> th.Tensor:
         """
-        Forward pass of the feature extractor.
+                Forward pass of the feature extractor.
 
-        Args:
-            observations (th.Tensor): The input observations.
-
-        Returns:
-            th.Tensor: The extracted features.
+                Args:
+                    observations (th.Tensor): The input observations.
+        stacked_observation_space
+                Returns:
+                    th.Tensor: The extracted features.
         """
         raise NotImplementedError
