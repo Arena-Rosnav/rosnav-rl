@@ -13,15 +13,18 @@ if TYPE_CHECKING:
 def get_required_observation_units(
     list_of_units: Union[List["BaseObservationSpace"], List["RewardUnit"]]
 ) -> list:
-    """
-    Collects and returns a list of unique required observation units from the provided list of units.
-
+    """Extracts and returns a unique list of required observation units from a list of units.
+    
+    This function iterates through each unit in the provided list, collecting all required
+    observation units and their dependencies recursively.
+    
     Args:
-        list_of_units (Union[List["BaseObservationSpace"], List["RewardUnit"]]):
-            A list containing instances of either BaseObservationSpace or RewardUnit.
-
+        list_of_units (Union[List["BaseObservationSpace"], List["RewardUnit"]]): A list of 
+            units that have required_observation_units attributes. These can be either
+            observation space units or reward units.
+    
     Returns:
-        list: A list of unique required observation units.
+        list: A unique list of required observation unit classes without duplicates.
     """
     observations = []
     for unit in list_of_units:
@@ -34,6 +37,21 @@ def retrieve_unique_unit(
     unit: Union[ObservationCollectorUnit, ObservationGeneratorUnit],
     include_generators: bool = False,
 ) -> Set[Type[ObservationCollectorUnit]]:
+    """
+    Recursively retrieves a set of unique ObservationCollectorUnit types required by the given unit.
+    
+    This function traverses through the dependency tree of an observation unit to identify all collector units
+    it depends on. It can optionally include generator units in the result as well.
+    
+    Args:
+        unit: The observation unit to analyze. Can be either a collector or generator unit.
+        include_generators: If True, ObservationGeneratorUnit types will also be included in the result.
+                           Defaults to False.
+    
+    Returns:
+        A set of unique ObservationCollectorUnit types (and optionally ObservationGeneratorUnit types)
+        that the input unit depends on.
+    """
     is_collector = issubclass(unit, ObservationCollectorUnit)
     collectors = [unit] if include_generators and not is_collector else []
 

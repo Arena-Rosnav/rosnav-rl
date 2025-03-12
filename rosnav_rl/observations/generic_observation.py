@@ -10,16 +10,29 @@ ProcessedObservation = TypeVar("ProcessedObservation", bound=Any)
 
 
 class GenericObservation(Generic[_RospyMessage]):
-    """
-    Represents a generic observation.
+    """A generic observation class that processes and stores ROS messages of any type.
 
-    This class is responsible for holding and processing observations.
-    It provides methods to update the observation, check if it is stale,
+    This class provides a way to handle any type of ROS message with custom processing functionality.
+    It keeps track of whether the observation is stale (outdated) and provides methods to update
     and invalidate the observation.
 
+    Type Parameters:
+        _RospyMessage: The type of ROS message this observation handles.
+
     Attributes:
-        _value (ObservationCollector): The processed observation value.
-        _stale (bool): Indicates whether the observation is stale or not.
+        _value (ProcessedObservation): The processed observation data.
+        _stale (bool): Flag indicating whether the observation is stale (True) or fresh (False).
+        _msg (_RospyMessage): The latest raw message received.
+        _process_fnc (Callable): Function that processes raw messages into usable observation data.
+
+    Methods:
+        __init__: Initialize the observation with an initial message and processing function.
+        update: Update the observation with a new message.
+        invalidate: Mark the observation as stale.
+        
+    Properties:
+        stale: Get or set whether the observation is stale.
+        value: Get the processed observation value.
     """
 
     _value: ProcessedObservation

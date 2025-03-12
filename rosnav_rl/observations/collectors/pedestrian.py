@@ -17,6 +17,18 @@ __all__ = [
 
 
 class SemanticLayerCollector(ObservationCollectorUnit[SemanticMsg, SemanticMsg], ABC):
+    """Base class for collectors which collect semantic information from a semantic layer.
+
+    This abstract class serves as a foundation for observers that handle semantic
+    messages, such as pedestrian or static/dynamic obstacle data.
+
+    Attributes:
+        name (str): The name of the collector unit.
+        topic (str): The ROS topic to subscribe to for semantic data.
+        is_topic_agent_specific (bool): Whether the topic is specific to an agent (defaults to False).
+        msg_data_class: The message class type, set to SemanticMsg.
+        applicable_simulators (List[Simulator]): List of simulators where this collector can be used.
+    """
     name: str
     topic: str
     is_topic_agent_specific: bool = False

@@ -14,15 +14,19 @@ __all__ = ["ImageColorCollector", "ImageDepthCollector"]
 
 
 class ImageCollector(ObservationCollectorUnit[sensor_msgs.Image, np.ndarray], ABC):
-    """
-    A class for collecting image observations.
-
+    """An abstract base class for collecting image observations from ROS topics.
+    
+    This class extends ObservationCollectorUnit to handle image messages from ROS topics,
+    converting them from sensor_msgs.Image format to numpy arrays for use in reinforcement
+    learning environments.
+    
     Attributes:
-        name (str): The name of the image collector.
-        topic (str): The topic to subscribe to for image messages.
-
-    Methods:
-        __init__(*args, **kwargs): Initializes the ImageCollector object.
+        name (str): Name of the observation collector.
+        topic (str): ROS topic to subscribe to for image data.
+        up_to_date_required (bool): Flag indicating whether the latest message is required.
+            Defaults to True.
+        applicable_simulators (List[Simulator]): List of simulators this collector works with.
+            By default supports Unity and Gazebo simulators.
     """
 
     name: str

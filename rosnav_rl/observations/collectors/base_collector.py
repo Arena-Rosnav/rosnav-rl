@@ -28,23 +28,29 @@ class BaseUnit(ABC):
 class ObservationCollectorUnit(
     BaseUnit, Generic[MessageType, ProcessedObservationType], ABC
 ):
+    """An abstract base class for observation collectors in ROS navigation.
+    
+    This class serves as a foundation for units that collect and process observations from ROS topics.
+    Each collector is responsible for subscribing to a specific topic, receiving messages, and
+    preprocessing them into a standardized format for use in navigation algorithms.
+    
+    Class Attributes:
+        name (ClassVar[str]): The name identifier for this collector.
+        topic (ClassVar[str]): The ROS topic this collector subscribes to.
+        msg_data_class (ClassVar[Type[MessageType]]): The expected ROS message type.
+        data_class (ClassVar[Type[ProcessedObservationType]]): The type for processed observations.
+        applicable_simulators (ClassVar[List[Simulator]]): List of simulators this collector works with.
+        is_topic_agent_specific (ClassVar[bool]): Whether the topic is specific to an agent.
+        up_to_date_required (ClassVar[bool]): Whether the most recent observation is required.
+        
+    Args:
+        strict (bool, optional): Whether to strictly enforce requirements. Defaults to True.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+        
+    Raises:
+        SimulationNotCompatibleError: If the current simulator is not compatible with this collector.
     """
-    ObservationCollectorUnit is an abstract base class for collecting and preprocessing observations in a ROS environment.
-
-    Attributes:
-        name (ClassVar[str]): The name of the collector.
-        topic (str): The ROS topic to subscribe to for collecting messages.
-        msg_data_class (Type[MessageType]): The expected type of the incoming ROS messages.
-        data_class (ProcessedObservationType): The type of the processed observation data.
-        applicable_simulators (List[Constants.Simulator]): List of simulators where this collector is applicable.
-        is_topic_agent_specific (bool): Indicates if the topic is specific to an agent. Defaults to True.
-        up_to_date_required (bool): Indicates if the data needs to be up-to-date. Defaults to False.
-
-    Methods:
-        __init__(*args, **kwargs): Initializes the collector and checks if it is applicable for the current simulator.
-        preprocess(msg: MessageType) -> ProcessedObservationType: Abstract method to preprocess the incoming message.
-    """
-
     name: ClassVar[str]
     topic: ClassVar[str]
     msg_data_class: ClassVar[Type[MessageType]]
@@ -71,6 +77,22 @@ class ObservationCollectorUnit(
 
     @abstractmethod
     def preprocess(self, msg: MessageType) -> ProcessedObservationType:
+        """
+        Pre-process the received message into the desired observation format.
+
+        This method transforms a ROS message into the format needed by the agent for processing.
+        If the message is not of the expected data class (as specified by `self.msg_data_class`),
+        a warning will be logged once.
+
+        Args:
+            msg (MessageType): The ROS message to be processed
+
+        Returns:
+            ProcessedObservationType: The processed observation data
+
+        Raises:
+            None: A warning is logged instead of raising an exception for type mismatches
+        """
         if self.data_class and not isinstance(msg, self.msg_data_class):
             rospy.logwarn_once(
                 f"[{self.__class__.__name__}] Expected {self.msg_data_class} but got {type(msg)}"
