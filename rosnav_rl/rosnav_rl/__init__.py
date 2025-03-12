@@ -37,16 +37,18 @@ __all__ = [
     "SimulationStateContainer",
     "AgentCfg",
     "RewardCfg",
+    "SupportedRLFrameworks",
 ]
 
 
 from .model import (
-    DreamerV3Cfg,
+    # DreamerV3Cfg,
     DreamerV3Model,
     RL_Model,
     StableBaselinesModel,
     dreamerv3,
     stable_baselines3,
+    
 )
 from .observations import ObservationManager, collectors, generators, static
 from .reward import RewardFunction, reward_units
@@ -54,3 +56,4 @@ from .rl_agent import RL_Agent
 from .spaces import ActionSpaceManager, BaseSpaceManager, ObservationSpaceManager
 from .states import AgentStateContainer, SimulationStateContainer
 from .cfg import AgentCfg, RewardCfg
+from .utils.type_aliases import SupportedRLFrameworks

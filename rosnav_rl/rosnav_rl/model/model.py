@@ -9,65 +9,37 @@ from ..utils.type_aliases import (
 )
 
 if TYPE_CHECKING:
-    from ..cfg import sb3_cfg
+    from .stable_baselines3.cfg.base import SBAlgorithmCfg
     from ..rl_agent import RL_Agent
     from ..spaces import BaseObservationSpace
 
 
 class RL_Model(ABC):
-    """
-    Abstract base class for reinforcement learning models.
+    """Abstract base class for Reinforcement Learning models.
+
+    This class serves as a blueprint for different reinforcement learning model implementations
+    within the rosnav framework. It defines the common interface that all RL models must implement.
 
     Attributes:
-        _model: The underlying model used for reinforcement learning.
-        _algorithm_cfg: Configuration for the reinforcement learning algorithm.
-        _rl_agent: The reinforcement learning agent.
+        _model: The actual machine learning model instance.
+        _algorithm_cfg (BaseModel): Configuration parameters for the RL algorithm.
+        _rl_agent (RL_Agent): Reference to the RL agent controlling this model.ddddddd
 
     Methods:
-        __init__(rl_agent, algorithm_cfg, *args, **kwargs):
-            Initializes the RL_Model with the given agent and algorithm configuration.
-
-        setup_model(*args, **kwargs):
-            Abstract method to set up the model. Must be implemented by subclasses.
-
-        train(*args, **kwargs):
-            Abstract method to train the model. Must be implemented by subclasses.
-
-        save(*args, **kwargs):
-            Abstract method to save the model. Must be implemented by subclasses.
-
-        load(*args, **kwargs):
-            Abstract method to load the model. Must be implemented by subclasses.
-
-        get_action(observation, *args, **kwargs):
-            Gets the action for a given observation.
-
-        transfer_weights(*args, **kwargs):
-            Abstract method to transfer weights. Must be implemented by subclasses.
-
-        is_model_initialized:
-            Checks if the model is initialized.
-
-        model:
-            Gets or sets the underlying model.
-
-        algorithm_cfg:
-            Gets the algorithm configuration.
-
-        observation_space_list:
-            Abstract property to get the list of observation spaces. Must be implemented by subclasses.
-
-        observation_space_kwargs:
-            Abstract property to get the keyword arguments for observation spaces. Must be implemented by subclasses.
-
-        stack_size:
-            Gets the stack size. Default is 1.
-
-        parameter_number:
-            Abstract property to get the number of parameters. Must be implemented by subclasses.
-
-        config:
-            Gets the configuration dictionary. Default is an empty dictionary.
+        setup_model: Initialize and configure the model.
+        train: Train the model with provided data.
+        save: Save the model to disk.
+        load: Load the model from disk.
+        get_action: Get an action from the model based on the current observation.
+        transfer_weights: Transfer weights from another model (optional implementation).
+        is_model_initialized: Check if the model has been initialized.
+        model: Property to access the underlying model with validation.
+        algorithm_cfg: Property to access algorithm configuration.
+        observation_space_list: Property to get the list of observation spaces.
+        observation_space_kwargs: Property to get keyword arguments for observation spaces.
+        stack_size: Property that returns the size of observation stacks (default: 1).
+        parameter_number: Property that returns the number of model parameters.
+        config: Property that returns the model configuration (default: empty dict).
     """
 
     _model: ...
@@ -118,7 +90,7 @@ class RL_Model(ABC):
         self._model = model
 
     @property
-    def algorithm_cfg(self) -> "sb3_cfg.SBAlgorithmCfg":
+    def algorithm_cfg(self) -> "SBAlgorithmCfg":
         return self._algorithm_cfg
 
     @property
