@@ -1,5 +1,5 @@
 from .action import _HolonomicAction
-from .models import _SupportedRosnavRLModels, _SupportedStableBaselinesModels
+from .models import _SupportedRosnavRLModels, _SupportedStableBaselinesModels, _SupportedDreamerModels
 from .observation import (
     ObservationCollector,
     ObservationDict,
