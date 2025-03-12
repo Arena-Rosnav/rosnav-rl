@@ -14,27 +14,29 @@ from .base_feature_map_space import BaseFeatureMapSpace
 
 @SpaceFactory.register("ped_social_state")
 class PedestrianSocialStateSpace(BaseFeatureMapSpace):
-    """
-    Represents the observation space for pedestrian social state feature map.
-
-    Args:
-        feature_map_size (int): The size of the feature map.
-        roi_in_m (float): The region of interest in meters.
-        flatten (bool, optional): Whether to flatten the feature map. Defaults to True.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
+    """A feature map space representing pedestrian social states in a grid.
+    
+    This class creates a 2D feature map where each cell contains a social state value 
+    for pedestrians detected in that spatial region. The social state is an integer 
+    value extracted from semantic data.
+    
     Attributes:
-        _feature_map_size (int): The size of the feature map.
-        _roi_in_m (float): The region of interest in meters.
-        _flatten (bool): Whether to flatten the feature map.
-
-    Methods:
-        get_gym_space: Get the Gym space representation of the feature map.
-        _get_semantic_map: Get the semantic map based on semantic data and relative position.
-        encode_observation: Encode the observation into a numpy array.
+        name (str): Identifier for this space type, set to "PEDESTRIAN_SOCIAL_STATE".
+        required_observation_units (list): Units required for generating observations:
+            - PedestrianSocialStateCollector: Collects social state data from pedestrians
+            - PedestrianRelativeLocationGenerator: Provides relative positions of pedestrians
+    
+    Parameters:
+        ped_social_state_num (int): Number of possible pedestrian social states.
+        feature_map_size (int): Size of the feature map (width and height in cells).
+        roi_in_m (float): Region of interest in meters around the robot.
+        *args: Variable length argument list passed to parent class.
+        **kwargs: Arbitrary keyword arguments passed to parent class.
+    
+    The feature map encodes pedestrian social states as integer values in a grid,
+    where each cell corresponds to a spatial location. The social state is extracted
+    from the 'evidence' field of pedestrian data points by bit-shifting.
     """
-
     name = "PEDESTRIAN_SOCIAL_STATE"
     required_observation_units = [
         PedestrianSocialStateCollector,
@@ -75,15 +77,21 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         *args,
         **kwargs
     ) -> np.ndarray:
-        """
-        Get the semantic map based on semantic data and relative position.
-
+        """Generates a semantic map representing pedestrian social states.
+        
+        This method creates a 2D grid map where each cell may contain the social state of a pedestrian 
+        located at that position. The social states are extracted from the provided semantic data, and
+        positioned on the map according to the relative positions of pedestrians.
+        
         Args:
-            semantic_data (pedsim_msgs.SemanticData): The semantic data.
-            relative_pos (np.ndarray): The relative position.
-
+            semantic_data (PedestrianSocialStateCollector.data_class): Data containing pedestrian social state information.
+            relative_pos (PedestrianRelativeLocationGenerator.data_class): Data containing pedestrian relative positions.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+        
         Returns:
-            np.ndarray: The semantic map.
+            np.ndarray: A 2D numpy array (feature_map_size × feature_map_size) where values represent 
+                pedestrian social states. Zeros indicate empty cells with no pedestrian presence.
         """
         social_state_map = np.zeros((self.feature_map_size, self.feature_map_size))
         social_states = list(

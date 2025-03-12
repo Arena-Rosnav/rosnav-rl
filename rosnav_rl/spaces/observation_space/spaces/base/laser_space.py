@@ -53,12 +53,14 @@ class LaserScanSpace(BaseObservationSpace):
         self, observation: ObservationDict, *args, **kwargs
     ) -> LaserCollector.data_class:
         """
-        Encodes the laser scan observation.
-
+        Extracts laser scan data from the observation dictionary.
+        
         Args:
-            observation (ObservationDict): The observation dictionary.
-
+            observation (ObservationDict): A dictionary containing observation data.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+            
         Returns:
-            ndarray: The encoded laser scan observation.
+            LaserCollector.data_class: The laser scan data extracted from the observation dictionary.
         """
         return observation[LaserCollector.name]
