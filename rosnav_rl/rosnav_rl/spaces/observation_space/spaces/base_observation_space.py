@@ -18,10 +18,36 @@ from ..normalization import *
 
 
 class BaseObservationSpace(ABC):
+    """An abstract base class for observation spaces in reinforcement learning environments.
+    
+    This class defines the interface for observation spaces and provides common
+    functionality for normalization and validation of observations. It is designed to be
+    extended by concrete observation space implementations.
+    
+    Attributes:
+        name (ClassVar[str]): The name of the observation space.
+        required_observation_units (ClassVar[List[Union[ObservationCollector, ObservationGenerator]]]): 
+            List of observation collectors or generators required by this observation space.
+    
+    Parameters:
+        normalize (bool, optional): Whether to normalize observations. Defaults to False.
+        norm_func (str, optional): Name of the normalization function to use. Defaults to "max_abs_scaling".
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    
+    Methods:
+        get_gym_space(): Define and return the gym.Space object representing the observation space.
+        encode_observation(observation, *args, **kwargs): Encode the observation into a numpy array.
+    
+    Properties:
+        config: Returns the configuration parameters.
+        space: Get the gym.Space object representing the observation space.
+        shape: Get the shape of the observation space.
+    
+    Decorators:
+        apply_normalization: Decorator to apply normalization to observation arrays.
+        check_dtype: Decorator to validate observation array data types.
     """
-    Base class for defining observation spaces in reinforcement learning environments.
-    """
-
     name: ClassVar[str]
     required_observation_units: ClassVar[
         List[Union[ObservationCollector, ObservationGenerator]]

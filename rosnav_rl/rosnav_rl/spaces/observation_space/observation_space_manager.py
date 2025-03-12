@@ -13,21 +13,48 @@ from .spaces.base_observation_space import BaseObservationSpace
 
 
 class ObservationSpaceManager:
-    """
-    A class that manages the observation spaces for a given namespace.
+    """ObservationSpaceManager manages multiple observation spaces for reinforcement learning.
 
-    Args:
-        space_list (ObservationSpaceList): A list of observation space classes.
-        space_kwargs (Dict[str, Any]): Additional keyword arguments to be passed to the observation space classes.
+    This class creates, manages, and combines different observation spaces into a unified
+    observation space for an RL agent. It provides functionality to access individual spaces,
+    encode observations, and retrieve configuration details.
 
     Attributes:
-        space_list: The list of observation space classes.
-        observation_space: The combined observation space.
+        _space_cls_list (ObservationSpaceList): List of observation space classes to initialize.
+        _space_kwargs (Dict[str, Any]): Arguments to initialize observation spaces.
+        _space_containers (Dict[str, BaseObservationSpace]): Dictionary of initialized observation spaces.
+        _observation_space (spaces.Dict): Combined gym observation space from all individual spaces.
+        
+    Example:
+        ```
+        space_list = [LaserScanSpace, GoalSpace]
+        space_kwargs = {"robot_state_size": 4, "laser_scan_size": 720}
+        
+        obs_manager = ObservationSpaceManager(space_list, space_kwargs)
+        encoded_obs = obs_manager.encode_observation(observation_dict)
+        ```
     """
-
     def __init__(
         self, space_list: ObservationSpaceList, space_kwargs: Dict[str, Any]
     ) -> None:
+        """
+        Initialize the ObservationSpaceManager with a list of observation spaces.
+
+        This class manages multiple observation spaces and combines them into a single
+        observation space.
+
+        Args:
+            space_list (ObservationSpaceList): List of observation space classes.
+            space_kwargs (Dict[str, Any]): Dictionary of keyword arguments for initializing
+                the observation spaces.
+
+        Attributes:
+            _space_cls_list (ObservationSpaceList): List of observation space classes.
+            _space_kwargs (Dict[str, Any]): Dictionary of keyword arguments.
+            _space_containers (Dict[str, BaseObservationSpace]): Dictionary mapping space names
+                to their respective observation space instances.
+            _observation_space: The combined observation space created from all individual spaces.
+        """
         self._space_cls_list = space_list
         self._space_kwargs = space_kwargs
         self._space_containers: Dict[str, BaseObservationSpace] = {}
@@ -36,7 +63,18 @@ class ObservationSpaceManager:
         self._observation_space = self._create_combined_observation_space()
 
     def _initialize_spaces(self) -> None:
-        """Initialize the individual observation spaces."""
+        """Initialize all observation space containers based on the provided space classes.
+        
+        This method instantiates each observation space class in the _space_cls_list
+        and stores the instances in the _space_containers dictionary, using the
+        class name as the key. It passes any keyword arguments stored in _space_kwargs
+        to the constructor of each space class.
+        
+        Raises:
+            TypeError: If any space class constructor is missing required arguments
+                      or receives incompatible arguments.
+        """
+        
         for space_cls in self._space_cls_list:
             try:
                 self._space_containers[space_cls.name] = space_cls(**self._space_kwargs)
@@ -47,7 +85,16 @@ class ObservationSpaceManager:
                 )
 
     def _create_combined_observation_space(self) -> spaces.Dict:
-        """Create a combined observation space from individual spaces."""
+        """Creates a combined observation space by merging individual observation spaces.
+        
+        This method combines all registered observation spaces from the _space_containers
+        dictionary into a single Dict space, where each key corresponds to the name of
+        an observation space container, and the value is the actual space object.
+        
+        Returns:
+            spaces.Dict: A dictionary space containing all registered observation spaces.
+        """
+        
         return spaces.Dict(
             {name: space.space for name, space in self._space_containers.items()}
         )
@@ -91,16 +138,19 @@ class ObservationSpaceManager:
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
     ) -> EncodedObservationDict:
-        """
-        Encode the observation using the observation spaces.
-
+        """Encodes the observation for all spaces in the manager.
+        
+        This method applies the encoding function of each space container to the 
+        observation dictionary and returns a dictionary with the encoded observations.
+        
         Args:
-            observation (ObservationDict): The observation to be encoded.
-            *args: Additional positional arguments.
-            **kwargs: Additional keyword arguments.
-
+            observation (ObservationDict): The original observation dictionary to be encoded.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments passed to each space container's encode_observation method.
+            
         Returns:
-            EncodedObservationDict: The encoded observation.
+            EncodedObservationDict: A dictionary where each key is a space name and each value is the
+                                   encoded observation for that space.
         """
         return {
             name: space.encode_observation(observation, **kwargs)
