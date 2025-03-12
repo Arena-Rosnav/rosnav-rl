@@ -1,19 +1,19 @@
 from dataclasses import asdict
-from typing import TYPE_CHECKING, Dict, Optional, Union
+from typing import Dict, Optional, Union
 
 import numpy as np
 from gym import spaces
 
-from rosnav_rl.utils.type_aliases.rl_frameworks import SupportedRLFrameworks
-
-
 import rosnav_rl.cfg as rosnav_rl_cfg
+import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
+import rosnav_rl.model.dreamerv3.cfg as dreamerv3_cfg
+
+from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
 from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
 from rosnav_rl.states import AgentStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict
-from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
 
 from .model import RL_Model
 
@@ -27,7 +27,7 @@ class RL_Agent:
 
     Attributes:
         _name (str): The identifier name of the agent.
-        _model (Union[RL_Model, StableBaselinesModel]): The underlying RL model implementation.
+        _model (Union[RL_Model, StableBaselinesModel, DreamerV3Model]): The underlying RL model implementation.
         _reward_function (Optional[RewardFunction]): Function to calculate rewards during training.
         _space_manager (BaseSpaceManager): Manages observation and action spaces.
         _agent_state_container (AgentStateContainer): Contains and manages agent state information.
@@ -50,7 +50,7 @@ class RL_Agent:
     """
 
     _name: str
-    _model: Union[RL_Model, StableBaselinesModel]
+    _model: Union[RL_Model, StableBaselinesModel, DreamerV3Model]
     _reward_function: Optional[RewardFunction] = None
     _space_manager: BaseSpaceManager
     _agent_state_container: AgentStateContainer
@@ -74,7 +74,7 @@ class RL_Agent:
         Attributes:
             _name (str): Name identifier for the agent.
             _agent_state_container (AgentStateContainer): Reference to the state container.
-            _model (StableBaselinesModel): The underlying RL model using stable-baselines3.
+            _model (Union[StableBaselinesModel, DreamerV3Model]): The underlying RL model using stable-baselines3 or DreamerV3.
             _space_manager (BaseSpaceManager): Manages observation and action spaces.
             _reward_function (RewardFunction, optional): Function to calculate rewards,
                 initialized if reward configuration is provided.
@@ -87,26 +87,30 @@ class RL_Agent:
         self._name = agent_cfg.name
         self._agent_cfg = agent_cfg
         self._agent_state_container = agent_state_container
+        
+        
 
-        if isinstance(agent_cfg.framework, rosnav_rl_cfg.StableBaselinesCfg):
+        if isinstance(agent_cfg.framework, sb3_cfg.StableBaselinesCfg):
             self._model = StableBaselinesModel(
                 rl_agent=self,
                 algorithm_cfg=agent_cfg.framework.algorithm,
             )
-        elif isinstance(agent_cfg.framework, rosnav_rl_cfg.DreamerV3Cfg):
+        elif isinstance(agent_cfg.framework, dreamerv3_cfg.DreamerV3Cfg):
             self._model = DreamerV3Model(
                 rl_agent=self, algorithm_cfg=agent_cfg.framework
             )
         else:
             raise ValueError(
-                f"Unsupported RL algorithm: {agent_cfg.framework.__name__}"
+                f"Unsupported RL algorithm: {agent_cfg.framework.name}"
             )
+            
         self._space_manager = BaseSpaceManager(
             action_space_kwargs={"is_discrete": agent_cfg.action_space.is_discrete},
             agent_state_container=self._agent_state_container,
             observation_space_list=self.model.observation_space_list,
             observation_space_kwargs=self.model.observation_space_kwargs,
         )
+        
         if agent_cfg.reward is not None:
             self._reward_function = RewardFunction(
                 function_dict=agent_cfg.reward.reward_function_dict,
@@ -212,7 +216,7 @@ class RL_Agent:
         return config_dict
 
     @property
-    def model(self) -> StableBaselinesModel:
+    def model(self) -> Union[StableBaselinesModel, DreamerV3Model]:
         if self._model is None:
             raise ValueError("'RL_Model' not initialized.")
         return self._model
@@ -223,8 +227,6 @@ class RL_Agent:
 
     @property
     def space_manager(self) -> BaseSpaceManager:
-        if self._space_manager is None:
-            raise ValueError("'SpaceManager' not initialized.")
         return self._space_manager
 
     @property
@@ -237,12 +239,12 @@ class RL_Agent:
 
     @property
     def agent_state_container(self) -> AgentStateContainer:
-        return self._space_manager.agent_state_container
-
+        return self._agent_state_container
+    
     @property
     def name(self) -> str:
         return self._name
 
     @property
-    def agent_cfg(self) -> "AgentCfg":
+    def agent_cfg(self) -> rosnav_rl_cfg.AgentCfg:
         return self._agent_cfg
