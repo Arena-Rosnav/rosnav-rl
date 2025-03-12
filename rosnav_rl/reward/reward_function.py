@@ -30,41 +30,27 @@ class RewardConfig:
 
 
 class RewardFunction:
+    """The RewardFunction class manages reward calculation for reinforcement learning.
+
+    This class calculates rewards based on configured reward units, which can be combined 
+    to create complex reward functions. It handles the instantiation of reward units,
+    aggregation of rewards, and management of reward-related state information.
+
+    Attributes:
+        config (RewardConfig): Configuration for the reward function.
+        state (RewardState): Current state of rewards and information.
+        _reward_units (List[RewardUnit]): List of instantiated reward unit objects.
+
+    Example:
+        ```python
+        reward_dict = {
+            "goal_reached": {"reward": 15.0},
+            "safe_dist": {"reward": -1.0, "safe_dist": 0.3}
+        }
+        reward_function = RewardFunction(reward_dict)
+        reward, info = reward_function.get_reward(observation, sim_state)
+        ```
     """
-    RewardFunction class to manage and calculate rewards based on given configurations.
-
-        Attributes:
-            config (RewardConfig): Configuration for the reward function.
-            state (RewardState): Current state of the reward function.
-            _reward_units (List[RewardUnit]): List of reward unit instances.
-
-        Methods:
-            __init__(function_dict, unit_kwargs=None, verbose=True):
-                Initialize the reward function with given configurations.
-            _create_reward_units() -> List["RewardUnit"]:
-                Create reward unit instances from configuration.
-            _create_reward_unit(factory, unit_name, params) -> "RewardUnit":
-                Create a single reward unit instance.
-            calculate_reward(obs_dict, simulation_state_container, **kwargs) -> None:
-                Calculate rewards using all reward units.
-            _skip_on_safe_dist_violation(reward_unit) -> bool:
-                Determine if a reward unit should be skipped.
-            get_reward(obs_dict, simulation_state_container, **kwargs) -> Tuple[float, Dict[str, Any]]:
-            add_reward(value, **kwargs) -> None:
-            add_info(info) -> None:
-                Update the info dictionary.
-            reset() -> None:
-                Reset all reward units between episodes.
-            _reset_state() -> None:
-                Reset the reward state between steps.
-            _log_reward_overview() -> None:
-                Log detailed reward breakdown.
-            reward_units() -> List["RewardUnit"]:
-                Get the list of reward units.
-            __repr__() -> str:
-                String representation of the reward function.
-    """
-
     def __init__(
         self,
         function_dict: RewardFunctionDict,
@@ -210,4 +196,12 @@ class RewardFunction:
                 ],
                 ")",
             ]
+        )
+
+    def copy(self) -> "RewardFunction":
+        """Create a deep copy of the reward function."""
+        return RewardFunction(
+            function_dict=self.config.reward_function_dict,
+            unit_kwargs=self.config.unit_kwargs,
+            verbose=self.config.verbose,
         )
