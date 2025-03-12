@@ -4,6 +4,27 @@ from pathlib import Path
 
 
 class TransferWeightsCfg(BaseModel):
+    """
+    Configuration for transferring weights from a source agent's model to a target model.
+
+    This class defines the parameters needed for weight transfer operations, including
+    source directory information, checkpoint selection, and inclusion/exclusion patterns
+    for specific weights.
+
+    Attributes:
+        source_dir (Union[str, Path]): Directory where the source agent's model is saved.
+            Must be an existing directory.
+        source_checkpoint (str): Checkpoint to load from the source agent.
+            Defaults to "last_model".
+        include (Union[List[str], None]): List of regex patterns for keys to include in the transfer.
+            If empty list or None, no weights will be transferred.
+        exclude (Union[List[str], None]): List of substrings for keys to exclude from the transfer.
+            Defaults to ["---"].
+
+    Validators:
+        check_source_dir: Validates that the source directory exists and converts it to a Path object.
+    """
+
     source_dir: Union[str, Path] = Field(
         ..., description="Directory where the source agent's model is saved."
     )
