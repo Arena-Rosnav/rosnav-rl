@@ -1,6 +1,7 @@
 import pathlib
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Dict, List
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Union
 
 import torch
 
@@ -8,17 +9,14 @@ from ...spaces import observation_space as spaces
 from ...spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
-from ...states import SimulationStateContainer
 from ...utils.type_aliases.spaces import EncodedObservationDict
 from ..dreamerv3 import tools
 from ..model import RL_Model
-from .cfg import DreamerV3Cfg
 from .dreamer import Dreamer
 from .helper import (
     create_agent,
     load_episodes,
     make_datasets,
-    make_envs,
     prefill_dataset,
     prepare_config,
     prepare_directories,
@@ -26,9 +24,14 @@ from .helper import (
     set_runtime_configuration,
     train,
 )
+from .parallel import Damy, Parallel
 
 if TYPE_CHECKING:
-    from ...rl_agent import RL_Agent
+    import rosnav_rl
+
+    from .cfg import DreamerV3Cfg
+
+DreamerEnvWrapper = Union[Parallel, Damy]
 
 
 class DreamerV3Model(RL_Model):
@@ -62,7 +65,7 @@ class DreamerV3Model(RL_Model):
     _logdir: pathlib.Path = None
 
     def __init__(
-        self, rl_agent: "RL_Agent", algorithm_cfg: DreamerV3Cfg, *args, **kwargs
+        self, rl_agent: "rosnav_rl.RL_Agent", algorithm_cfg: "DreamerV3Cfg", *args, **kwargs
     ) -> None:
         """
         Initialize the DreamerV3 Model.
@@ -77,10 +80,12 @@ class DreamerV3Model(RL_Model):
             **kwargs: Additional keyword arguments to pass to the parent class
         """
         super().__init__(rl_agent, algorithm_cfg, *args, **kwargs)
+        
+        algorithm_cfg.general.logdir = Path(algorithm_cfg.general.logdir) / rl_agent.name
         self._logdir = prepare_config(algorithm_cfg)
         self._logger = prepare_logger(algorithm_cfg, self._logdir)
 
-    def setup_model(self, train_dataset: OrderedDict, *args, **kwargs):
+    def setup_model(self, train_dataset: OrderedDict = None, *args, **kwargs):
         """
         Initialize the DreamerV3 agent model.
 
@@ -107,7 +112,11 @@ class DreamerV3Model(RL_Model):
         )
 
     def train(
-        self, simulation_state_container: SimulationStateContainer, *args, **kwargs
+        self,
+        train_envs: DreamerEnvWrapper,
+        eval_envs: DreamerEnvWrapper,
+        *args,
+        **kwargs,
     ):
         """
         Train the DreamerV3 model using the provided simulation state container.
@@ -116,11 +125,10 @@ class DreamerV3Model(RL_Model):
         1. Configures runtime settings based on algorithm configuration
         2. Creates necessary directories for logging
         3. Loads training and evaluation episodes
-        4. Creates training and evaluation environments
-        5. Prefills the dataset with initial experiences
-        6. Sets up the model if not already initialized
-        7. Loads the latest model checkpoint
-        8. Runs the training process
+        4. Prefills the dataset with initial experiences
+        5. Sets up the model if not already initialized
+        6. Loads the latest model checkpoint
+        7. Runs the training process
 
         Args:
             simulation_state_container: Container for simulation state information
@@ -133,11 +141,6 @@ class DreamerV3Model(RL_Model):
         set_runtime_configuration(self._algorithm_cfg)
         prepare_directories(self._algorithm_cfg, self._logdir)
         train_eps, eval_eps = load_episodes(self._algorithm_cfg)
-        train_envs, eval_envs = make_envs(
-            self._algorithm_cfg,
-            self._rl_agent,
-            simulation_state_container,
-        )
 
         action_space, observation_space = (
             self._rl_agent.action_space,
@@ -159,12 +162,17 @@ class DreamerV3Model(RL_Model):
             eval_eps,
         )
 
+        # Setup model if not already initialized
         if self._model is None:
             self.setup_model(train_dataset)
+        elif self._model.dataset is None:
+            self._model.dataset = train_dataset
+        else:
+            train_dataset = self._model.dataset
 
         self.load("latest")
         train(
-            self._algorithm_cfg,
+            self._algorithm_cfg, 
             self._model,
             train_envs,
             eval_envs,
@@ -175,6 +183,7 @@ class DreamerV3Model(RL_Model):
             self._logdir,
             is_image_available=observation_space.get("image", None) is not None,
             state=state,
+            log_wandb=True,
         )
 
     def save(self, file_name: str, *args, **kwargs):
@@ -274,7 +283,7 @@ class DreamerV3Model(RL_Model):
     @property
     def observation_space_kwargs(self) -> Dict[str, Any]:
         return {
-            "roi_in_m": 30,
+            "roi_in_m": 40,
             "feature_map_size": 80,
             "laser_stack_size": 10,
             "normalize": True,

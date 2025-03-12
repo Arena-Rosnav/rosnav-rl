@@ -1,15 +1,29 @@
 import copy
+from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
 
-from ..dreamerv3 import cfg, networks, tools
+from ..dreamerv3 import networks, tools
 
 to_np = lambda x: x.detach().cpu().numpy()
 
+if TYPE_CHECKING:
+    from ..dreamerv3 import cfg
+    
 
 class RewardEMA:
-    """running mean and std"""
+    """Reward Exponential Moving Average (EMA) normalization class.
+    
+    This class computes the quantiles of reward values and uses them to normalize rewards
+    through an exponential moving average approach. It helps stabilize learning by adaptively
+    scaling rewards based on their distribution.
+    
+    Attributes:
+        device (torch.device): The device where the tensors are stored.
+        alpha (float): The smoothing factor for the exponential moving average (default: 1e-2).
+        range (torch.Tensor): A tensor containing the quantile values [0.05, 0.95] used for normalization.
+    """
 
     def __init__(self, device, alpha=1e-2):
         self.device = device
@@ -37,7 +51,30 @@ class RewardEMA:
 
 
 class WorldModel(nn.Module):
-    def __init__(self, obs_space, act_space, step, config: cfg.DreamerV3Cfg):
+    """World model that combines neural network components for prediction and planning in reinforcement learning.
+    
+    This class implements a world model that integrates encoders, decoders, dynamics models, and prediction heads
+    to learn an internal representation of the environment. It serves as the foundation for model-based 
+    reinforcement learning algorithms in the DreamerV3 framework.
+    
+        encoder (MultiEncoder): Encodes observations into latent embeddings.
+        embed_size (int): Size of the encoder's output embedding.
+        dynamics (RSSM): Recurrent state-space model for predicting state transitions.
+        heads (nn.ModuleDict): Dictionary of prediction heads including:
+            - decoder: Reconstructs observations from latent states
+            - reward: Predicts expected rewards
+            - cont: Predicts continuation probability (1-termination)
+        _step (int): Current training step.
+        _use_amp (bool): Whether to use automatic mixed precision.
+        _config (DreamerV3Cfg): Configuration object with model hyperparameters.
+    
+    Methods:
+        _train(data): Trains the model on a batch of data, computing losses and updating parameters.
+        preprocess(obs): Preprocesses observations for model input.
+        video_pred(data): Generates video prediction based on input data for visualization.
+    """
+    
+    def __init__(self, obs_space, act_space, step, config: "cfg.DreamerV3Cfg"):
         """Initialize the WorldModel class.
 
         This class represents a world model that combines various neural network components
@@ -325,7 +362,30 @@ class WorldModel(nn.Module):
 
 
 class ImagBehavior(nn.Module):
-    def __init__(self, config: cfg.DreamerV3Cfg, world_model, act_space):
+    """ImagBehavior is a neural network module for imagination-based behavior generation in the DreamerV3 model.
+
+    This class implements a behavior model that uses world model predictions to generate actions and 
+    estimate values through imagination-based planning. The model consists of actor and value networks 
+    that are trained using imagined trajectories from the world model.
+
+    Attributes:
+        actor (MLP): Policy network that maps latent states to action distributions
+        value (MLP): Value network that estimates state values
+        _slow_value (MLP): Target value network for stable learning (if enabled)
+        _actor_opt (Optimizer): Optimizer for the actor network
+        _value_opt (Optimizer): Optimizer for the value network
+        ema_vals (torch.Tensor): Buffer for exponential moving average values if reward_EMA is enabled
+        reward_ema (RewardEMA): Reward normalization using exponential moving average
+
+    Methods:
+        _train(start, objective): Train actor and value networks using imagined trajectories
+        _imagine(start, policy, horizon): Simulate trajectories using the world model
+        _compute_target(imag_feat, imag_state, reward): Compute target values using lambda returns
+        _compute_actor_loss(imag_feat, imag_action, target, weights, base): Calculate actor loss
+        _update_slow_target(): Update parameters of the slow target value network
+    """    
+        
+    def __init__(self, config: "cfg.DreamerV3Cfg", world_model, act_space):
         """
         Initialize the ImagBehavior class for imagination-based behavior generation.
 
@@ -510,7 +570,7 @@ class ImagBehavior(nn.Module):
         metrics.update(tools.tensorstats(value.mode(), "value"))
         metrics.update(tools.tensorstats(target, "target"))
         metrics.update(tools.tensorstats(reward, "imag_reward"))
-        if self._config.actor["dist"] in ["onehot"]:
+        if self._config.model.actor.dist in ["onehot"]:
             metrics.update(
                 tools.tensorstats(
                     torch.argmax(imag_action, dim=-1).float(), "imag_action"
@@ -627,7 +687,7 @@ class ImagBehavior(nn.Module):
         policy = self.actor(inp)
         # Q-val for actor is not transformed using symlog
         target = torch.stack(target, dim=1)
-        if self._config.reward_EMA:
+        if self._config.environment.reward_EMA:
             offset, scale = self.reward_ema(target, self.ema_vals)
             normed_target = (target - offset) / scale
             normed_base = (base - offset) / scale
@@ -672,16 +732,16 @@ class ImagBehavior(nn.Module):
         The method increments the update counter after performing the update.
 
         Configuration parameters:
-        - critic["slow_target"]: Boolean indicating whether to use slow target updates.
-        - critic["slow_target_update"]: Integer specifying the frequency of slow target updates.
-        - critic["slow_target_fraction"]: Float specifying the fraction of the current parameters
-          to use in the weighted average update.
+            - critic["slow_target"]: Boolean indicating whether to use slow target updates.
+            - critic["slow_target_update"]: Integer specifying the frequency of slow target updates.
+            - critic["slow_target_fraction"]: Float specifying the fraction of the current parameters
+            to use in the weighted average update.
 
         Attributes:
-        - self._config: Configuration object containing the parameters for the update.
-        - self._updates: Counter for the number of updates performed.
-        - self.value: Current value network.
-        - self._slow_value: Slow target value network.
+            - self._config: Configuration object containing the parameters for the update.
+            - self._updates: Counter for the number of updates performed.
+            - self.value: Current value network.
+            - self._slow_value: Slow target value network.
         """
         if self._config.model.critic.slow_target:
             if self._updates % self._config.model.critic.slow_target_update == 0:

@@ -49,6 +49,32 @@ def translate_to_channels_last(shapes):
 
 
 class RSSM(nn.Module):
+    """Recurrent State-Space Model (RSSM) for world modeling in DreamerV3.
+
+    This module implements the core world model component used in DreamerV3, representing
+    the environment dynamics through a combination of deterministic and stochastic state
+    components. The RSSM can use either discrete or continuous state representations.
+
+    The model consists of:
+        1. A deterministic recurrent component (GRU-based)
+        2. A stochastic component that can be discrete (OneHotDist) or continuous (Normal)
+        3. Transition model that predicts next states from current state and action
+        4. Posterior encoder that incorporates observation embeddings
+
+    Key methods:
+        - initial: Initialize state tensors for a new sequence
+        - observe: Process a sequence of observations to generate posterior and prior states
+        - imagine_with_action: Roll out state predictions using only actions (no observations)
+        - obs_step: Single step inference of posterior state given observation and prior
+        - img_step: Single step inference of prior state given previous state and action
+        - kl_loss: Compute KL divergence between posterior and prior distributions
+
+    The model supports:
+        - Multiple discrete/continuous distribution parameterizations
+        - Learned or zero-initialized state
+        - Variable recurrent depth
+        - Layer normalization
+    """
     def __init__(
         self,
         stoch=30,
@@ -379,12 +405,56 @@ class RSSM(nn.Module):
         return prior
 
     def get_stoch(self, deter):
+        """
+        Generates stochastic part of latent state from deterministic part.
+
+        This method processes the deterministic latent state through the image output layers and 
+        statistical layers to produce parameters for a distribution. It then returns the mode
+        of this distribution as the stochastic part of the latent state.
+
+        Args:
+            deter: Tensor representing the deterministic part of the latent state.
+
+        Returns:
+            Tensor representing the mode of the stochastic part of the latent state.
+        """
         x = self._img_out_layers(deter)
         stats = self._suff_stats_layer("ims", x)
         dist = self.get_dist(stats)
         return dist.mode()
 
     def _suff_stats_layer(self, name, x):
+        """Calculate sufficient statistics for a given layer.
+        
+        This method computes the distribution parameters for either discrete or continuous latent variables.
+        
+        Args:
+            name (str): The name of the layer, either "ims" for image statistics or "obs" for observation statistics.
+            x (torch.Tensor): The input tensor to transform.
+        
+        Returns:
+            dict: For discrete distributions, returns a dictionary with 'logit' key containing the logits.
+                  For continuous distributions, returns a dictionary with 'mean' and 'std' keys.
+                  - For discrete case, logits have shape [..., stoch, discrete]
+                  - For continuous case:
+                      - mean is transformed according to self._mean_act
+                      - std is transformed according to self._std_act and has minimum value added
+        
+        Raises:
+            NotImplementedError: If the name is neither "ims" nor "obs".
+            
+        Note:
+            - mean is transformed according to self._mean_act which can be either:
+                - "none": No transformation
+                - "tanh5": Tanh transformation scaled by 5.0
+            - std is transformed according to self._std_act which can be:
+                - "softplus": Apply softplus function
+                - "abs": Take absolute value and add 1
+                - "sigmoid": Apply sigmoid function
+                - "sigmoid2": Apply sigmoid and multiply by 2
+            - std has minimum value added from self._min_std
+        """
+        
         if self._discrete:
             if name == "ims":
                 x = self._imgs_stat_layer(x)
@@ -416,6 +486,29 @@ class RSSM(nn.Module):
             return {"mean": mean, "std": std}
 
     def kl_loss(self, post, prior, free, dyn_scale, rep_scale):
+        """
+        Calculate Kullback-Leibler divergence loss between posterior and prior distributions.
+        
+        This method computes two components of KL divergence:
+        1. Representation loss: KL divergence from posterior to prior (with prior gradients detached)
+        2. Dynamics loss: KL divergence from posterior (with gradients detached) to prior
+        
+        Both losses are clipped to a minimum value of 'free' and then combined with scaling factors.
+        
+        Args:
+            post (dict): Posterior distribution parameters
+            prior (dict): Prior distribution parameters
+            free (float): Minimum value for KL divergence (free bits)
+            dyn_scale (float): Scaling factor for dynamics loss
+            rep_scale (float): Scaling factor for representation loss
+            
+        Returns:
+            tuple:
+                - loss (Tensor): Combined KL divergence loss
+                - value (Tensor): Raw representation loss before clipping
+                - dyn_loss (Tensor): Clipped dynamics loss
+                - rep_loss (Tensor): Clipped representation loss
+        """
         kld = torchd.kl.kl_divergence
         dist = lambda x: self.get_dist(x)
         sg = lambda x: {k: v.detach() for k, v in x.items()}
@@ -437,6 +530,26 @@ class RSSM(nn.Module):
 
 
 class MultiEncoder(nn.Module):
+    """A flexible multi-modal encoder combining CNN and MLP networks for processing different observation types.
+    
+    This encoder handles both image-like (CNN-compatible) and vector (MLP-compatible) inputs, routing them
+    through appropriate neural network architectures and concatenating their features. It automatically 
+    determines which inputs should go to CNN vs MLP based on input shapes and regex patterns.
+        shapes (dict): Dictionary mapping observation keys to their shapes.
+
+    Attributes:
+        cnn_shapes (dict): Shapes of observations to be processed by CNN.
+        mlp_shapes (dict): Shapes of observations to be processed by MLP.
+        outdim (int): Total output dimension of the combined encoder.
+        _cnn (ConvEncoder, optional): CNN encoder network if CNN inputs are present.
+        _mlp (MLP, optional): MLP encoder network if MLP inputs are present.
+    
+    Notes:
+        - The encoder automatically filters out excluded keys like 'is_first', 'is_terminal', etc.
+        - The output dimension is the sum of CNN and MLP output dimensions.
+        - For CNN inputs, all observations are stacked along the channel dimension.
+    """
+    
     def __init__(
         self,
         shapes,
@@ -562,6 +675,42 @@ class MultiEncoder(nn.Module):
 
 
 class MultiDecoder(nn.Module):
+    """"MultiDecoder is a versatile neural network module for decoding latent features into multiple output formats.
+
+    This decoder can handle both CNN-based outputs (e.g., images) and MLP-based outputs (e.g., vectors),
+    supporting different distribution types for each. It automatically routes outputs to the appropriate
+    decoder network based on shape and naming patterns.
+
+    Attributes:
+        cnn_shapes (dict): Dictionary of shapes for CNN outputs
+        mlp_shapes (dict): Dictionary of shapes for MLP outputs
+        _cnn (ConvDecoder, optional): CNN-based decoder network
+        _mlp (MLP, optional): MLP-based decoder network
+        _image_dist (str): Type of distribution to use for image outputs
+
+    Example:
+        ```python
+        decoder = MultiDecoder(
+            feat_size=128,
+            shapes={"image": (64, 64, 3), "vector": (10,)},
+            mlp_keys=".*vector.*",
+            cnn_keys=".*image.*",
+            act="relu",
+            norm="none",
+            cnn_depth=3,
+            kernel_size=4,
+            minres=4,
+            mlp_layers=2,
+            mlp_units=100,
+            cnn_sigmoid=True,
+            image_dist="normal",
+            vector_dist="normal",
+            outscale=1.0
+        
+        features = torch.randn(32, 128)  # Batch size 32, feature size 128
+        distributions = decoder(features)
+        ```
+    """
     def __init__(
         self,
         feat_size,

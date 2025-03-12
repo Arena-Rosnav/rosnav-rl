@@ -1,7 +1,7 @@
 import os
 import pathlib
 import sys
-from typing import Generator
+from typing import TYPE_CHECKING, Dict, Generator
 
 sys.path.append(str(pathlib.Path(__file__).parent))
 
@@ -13,7 +13,9 @@ import torch.nn.functional as F
 
 from ..dreamerv3 import exploration as expl
 from ..dreamerv3 import models, tools
-from .cfg import DreamerV3Cfg
+
+if TYPE_CHECKING:
+    from .cfg import DreamerV3Cfg
 
 to_np = lambda x: x.detach().cpu().numpy()
 
@@ -23,7 +25,7 @@ class Dreamer(nn.Module):
         self,
         obs_space: gymnasium.Space,
         act_space: gymnasium.Space,
-        config: DreamerV3Cfg,
+        config: "DreamerV3Cfg",
         logger: tools.Logger,
         dataset: Generator,
     ):
@@ -270,3 +272,18 @@ class Dreamer(nn.Module):
                 self._metrics[name] = [value]
             else:
                 self._metrics[name].append(value)
+
+    @property
+    def metrics(self) -> Dict[str, float]:
+        """Return the current metrics tracked by the agent."""
+        return self._metrics
+    
+    @property
+    def dataset(self) -> Generator:
+        """Return the current dataset used by the agent."""
+        return self._dataset
+    
+    @dataset.setter
+    def dataset(self, dataset: Generator) -> None:
+        """Set the dataset used by the agent."""
+        self._dataset = dataset

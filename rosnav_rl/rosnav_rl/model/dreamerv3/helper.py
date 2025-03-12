@@ -1,130 +1,28 @@
 import functools
 import pathlib
 from collections import OrderedDict
-from functools import partial
-from typing import TYPE_CHECKING, Dict, Generator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Generator, List, Tuple
 
 import gym.spaces
 import gymnasium as gym
 import numpy as np
-import rospy
 import torch
+import wandb
 from torch import distributions as torchd
 
 import rosnav_rl.model.dreamerv3.data as data_tools
-import rosnav_rl.model.dreamerv3.envs.wrappers as wrappers
-import rosnav_rl.model.dreamerv3.exploration as expl
-import rosnav_rl.model.dreamerv3.models as models
-import rosnav_rl.model.dreamerv3.tools as tools
 import rosnav_rl.model.dreamerv3.dreamer as dreamer
-from rosnav_rl.model.dreamerv3.cfg import DreamerV3Cfg
-from rosnav_rl.model.dreamerv3.parallel import Damy, Parallel
+import rosnav_rl.model.dreamerv3.tools as tools
+from rosnav_rl.model.dreamerv3.parallel import Parallel
 
 if TYPE_CHECKING:
-    from rosnav_rl.reward.reward_function import RewardFunction
-    from rosnav_rl.rl_agent import RL_Agent
-    from rosnav_rl.spaces import BaseSpaceManager
-    from rosnav_rl.states import SimulationStateContainer
+    from rosnav_rl.model.dreamerv3.cfg import DreamerV3Cfg
+
 
 to_np = lambda x: x.detach().cpu().numpy()
 
 
-def setup_arena_env(config, id) -> gym.Env:
-    import rl_utils.cfg.train as arena_cfg
-    import rl_utils.envs.flatland_gymnasium_env as arena_flatland
-    import rl_utils.tools.config as arena_config
-    import rl_utils.tools.states as tools
-
-    import rosnav_rl.rl_agent as rosnav_rl_agent
-    import rosnav_rl.states.simulation as simulation_states
-
-    _config: arena_cfg.TrainingCfg = arena_config.load_training_config(
-        "training_config.yaml"
-    )
-
-    sim_states: simulation_states.SimulationStateContainer = tools.get_arena_states(
-        goal_radius=_config.framework_cfg.general.goal_radius,
-        max_steps=_config.framework_cfg.general.max_num_moves_per_eps,
-        is_discrete=_config.agent_cfg.action_space.is_discrete,
-        safety_distance=_config.framework_cfg.general.safety_distance,
-        robot_cfg=_config.framework_cfg.robot,
-        task_modules_cfg=_config.framework_cfg.task,
-    )
-    rl_agent = rosnav_rl_agent.RL_Agent(
-        agent_cfg=config,
-        agent_state_container=sim_states.to_agent_state_container(),
-    )
-    env = arena_flatland.FlatlandEnv(
-        ns=f"sim_{id+1}/sim_{id+1}_jackal",
-        rl_agent=rl_agent,
-        simulation_state_container=sim_states,
-        max_steps_per_episode=_config.framework_cfg.general.max_num_moves_per_eps,
-        init_ros_node=False,
-    )
-    env = wrappers.WoTruncatedFlag(env)
-    env = wrappers.TimeLimit(
-        env, duration=_config.framework_cfg.general.max_num_moves_per_eps
-    )
-    env = wrappers.SelectAction(env, key="action")
-    env = wrappers.UUID(env)
-    env = wrappers.ResetWoInfo(env)
-    env = wrappers.ChannelFirsttoLast(env)
-    return env
-
-
-def make_arena_env(
-    config: DreamerV3Cfg,
-    space_manager: "BaseSpaceManager",
-    reward_function: "RewardFunction",
-    sim_states: "SimulationStateContainer",
-    id: int = 0,
-):
-    """
-    Creates and configures a Flatland environment for robot navigation.
-
-    This function initializes a FlatlandEnv with appropriate wrappers for use
-    with DreamerV3 reinforcement learning architecture.
-
-    Args:
-        config (DreamerV3Cfg): Configuration object containing environment parameters.
-        space_manager (BaseSpaceManager, optional): Manager for action and observation spaces.
-        reward_function (RewardFunction, optional): Custom reward function for the environment.
-        sim_states (SimulationStateContainer, optional): Container for simulation states.
-        id (int, optional): Identifier for the environment instance, used to create unique namespaces.
-            Defaults to 0.
-
-    Returns:
-        gym.Env: The configured Flatland environment with all necessary wrappers applied.
-
-    Note:
-        The environment is wrapped with several layers:
-        - WoTruncatedFlag: Handles the truncated flag
-        - TimeLimit: Enforces maximum episode duration
-        - SelectAction: Simplifies action handling
-        - UUID: Adds unique identifier
-        - ResetWoInfo: Modifies reset behavior
-        - ChannelFirsttoLast: Adjusts observation channel order
-    """
-    import rl_utils.envs.flatland_gymnasium_env as arena_flatland
-
-    env = arena_flatland.FlatlandEnv(
-        ns=f"sim_{id+1}/sim_{id+1}_jackal",
-        space_manager=space_manager,
-        reward_function=reward_function,
-        simulation_state_container=sim_states,
-        max_steps_per_episode=config.environment.time_limit,
-        start_ros_node=True,
-    )
-    env = wrappers.WoTruncatedFlag(env)
-    env = wrappers.TimeLimit(env, duration=config.environment.time_limit)
-    env = wrappers.SelectAction(env, key="action")
-    env = wrappers.UUID(env)
-    env = wrappers.ResetWoInfo(env)
-    env = wrappers.ChannelFirsttoLast(env)
-    return env
-
-
-def set_runtime_configuration(config: DreamerV3Cfg):
+def set_runtime_configuration(config: "DreamerV3Cfg"):
     """
     Configure runtime settings for the Dreamer V3 agent.
 
@@ -140,7 +38,7 @@ def set_runtime_configuration(config: DreamerV3Cfg):
         tools.enable_deterministic_run()
 
 
-def prepare_config(config: DreamerV3Cfg):
+def prepare_config(config: "DreamerV3Cfg"):
     """
     Prepare the DreamerV3 configuration by adjusting directories and time parameters.
 
@@ -158,15 +56,16 @@ def prepare_config(config: DreamerV3Cfg):
 
     config.general.traindir = config.general.traindir or logdir / "train_eps"
     config.general.evaldir = config.general.evaldir or logdir / "eval_eps"
-    config.training.steps //= config.environment.action_repeat
-    config.training.eval_every //= config.environment.action_repeat
-    config.general.log_every //= config.environment.action_repeat
-    config.environment.time_limit //= config.environment.action_repeat
+    if config.environment.action_repeat > 1:
+        config.training.steps //= config.environment.action_repeat
+        config.training.eval_every //= config.environment.action_repeat
+        config.general.log_every //= config.environment.action_repeat
+        # config.environment.time_limit //= config.environment.action_repeat TODO: Adjust time limit of environment
 
     return logdir
 
 
-def prepare_directories(config: DreamerV3Cfg, logdir: pathlib.Path):
+def prepare_directories(config: "DreamerV3Cfg", logdir: pathlib.Path):
     """
     Prepare directories for the DreamerV3 model training and evaluation.
 
@@ -193,7 +92,7 @@ def prepare_directories(config: DreamerV3Cfg, logdir: pathlib.Path):
     config.general.evaldir.mkdir(parents=True, exist_ok=True)
 
 
-def prepare_logger(config: DreamerV3Cfg, logdir: pathlib.Path) -> tools.Logger:
+def prepare_logger(config: "DreamerV3Cfg", logdir: pathlib.Path) -> tools.Logger:
     """
     Prepare and initialize a logger for the DreamerV3 model.
 
@@ -212,7 +111,7 @@ def prepare_logger(config: DreamerV3Cfg, logdir: pathlib.Path) -> tools.Logger:
     return tools.Logger(logdir, config.environment.action_repeat * step)
 
 
-def load_episodes(config: DreamerV3Cfg) -> Tuple[OrderedDict, OrderedDict]:
+def load_episodes(config: "DreamerV3Cfg") -> Tuple[OrderedDict, OrderedDict]:
     """
     Load training and evaluation episodes for the DreamerV3 model.
 
@@ -244,63 +143,8 @@ def load_episodes(config: DreamerV3Cfg) -> Tuple[OrderedDict, OrderedDict]:
 
     return train_eps, eval_eps
 
-
-def make_envs(
-    config: DreamerV3Cfg, rl_agent: "RL_Agent", sim_states: "SimulationStateContainer"
-):
-    """
-    Creates training and evaluation environments for the DreamerV3 agent.
-
-    Args:
-        config (DreamerV3Cfg): Configuration object containing DreamerV3 parameters.
-        rl_agent (RL_Agent): Reinforcement learning agent with space_manager and reward_function attributes.
-        sim_states (SimulationStateContainer): Container for simulation states.
-
-    Returns:
-        tuple: Two lists containing:
-            - train_envs: List of training environments.
-            - eval_envs: List of evaluation environments.
-
-    Note:
-        Depending on the configuration, environments can be created in parallel or sequentially.
-        When not in parallel mode, environments are wrapped with a Damy wrapper.
-    """
-    env_args = dict(
-        config=config,
-        space_manager=rl_agent.space_manager,
-        reward_function=rl_agent.reward_function,
-        sim_states=sim_states,
-    )
-
-    def create_env_fnc(_id):
-        def make_env():
-            return make_arena_env(
-                id=_id,
-                **env_args,
-            )
-
-        return make_env
-
-    if config.general.parallel:
-        train_envs = [
-            Parallel(create_env_fnc(i), "daemon")
-            for i in range(config.environment.envs)
-        ]
-        eval_envs = train_envs
-    else:
-        train_envs = [
-            make_arena_env(id=i, **env_args) for i in range(config.environment.envs)
-        ]
-        eval_envs = train_envs
-
-        train_envs = [Damy(env) for env in train_envs]
-        eval_envs = [Damy(env) for env in eval_envs]
-
-    return train_envs, eval_envs
-
-
 def prefill_dataset(
-    config: DreamerV3Cfg,
+    config: "DreamerV3Cfg",
     train_envs: List[Parallel],
     train_eps: OrderedDict,
     logger: tools.Logger,
@@ -347,13 +191,13 @@ def prefill_dataset(
         print(f"Prefill dataset ({prefill} steps).")
         if hasattr(action_space, "discrete"):
             random_actor = tools.OneHotDist(
-                torch.zeros(_num_actions).repeat(config.environment.envs, 1)
+                torch.zeros(_num_actions).repeat(len(train_envs), 1)
             )
         else:
             random_actor = torchd.independent.Independent(
                 torchd.uniform.Uniform(
-                    torch.tensor(action_space.low).repeat(config.environment.envs, 1),
-                    torch.tensor(action_space.high).repeat(config.environment.envs, 1),
+                    torch.tensor(action_space.low).repeat(len(train_envs), 1),
+                    torch.tensor(action_space.high).repeat(len(train_envs), 1),
                 ),
                 1,
             )
@@ -379,7 +223,7 @@ def prefill_dataset(
 
 
 def make_datasets(
-    config: DreamerV3Cfg, train_eps: OrderedDict, eval_eps: OrderedDict
+    config: "DreamerV3Cfg", train_eps: OrderedDict, eval_eps: OrderedDict
 ) -> Tuple[
     Generator[Dict[str, np.ndarray], None, None],
     Generator[Dict[str, np.ndarray], None, None],
@@ -407,7 +251,7 @@ def make_datasets(
 
 
 def create_agent(
-    config: DreamerV3Cfg,
+    config: "DreamerV3Cfg",
     action_space: gym.spaces.Space,
     observation_space: gym.spaces.Dict,
     logger: tools.Logger,
@@ -449,7 +293,7 @@ def load_checkpoint(agent: dreamer.Dreamer, logdir: pathlib.Path):
 
 
 def train(
-    config: DreamerV3Cfg,
+    config: "DreamerV3Cfg",
     agent: dreamer.Dreamer,
     train_envs: List[Parallel],
     eval_envs: List[Parallel],
@@ -460,6 +304,7 @@ def train(
     logdir: pathlib.Path,
     is_image_available: bool,
     state: tools._State = None,
+    log_wandb: bool = False,
 ):
     """
     Train and evaluate a Dreamer agent using the specified configuration.
@@ -479,231 +324,143 @@ def train(
         logdir (pathlib.Path): Directory path to save model checkpoints.
         is_image_available (bool): Flag indicating if image observations are available.
         state (tools._State, optional): Training state object for resuming training. Defaults to None.
+        log_wandb (bool, optional): Whether to log metrics to Weights & Biases. Defaults to False.
 
     Returns:
         None: The function doesn't return a value but saves the model during training.
     """
-    # make sure eval will be executed once after config.steps
-    while agent._step < config.training.steps + config.training.eval_every:
-        logger.write()
-        if config.training.eval_episode_num > 0:
-            print("Start evaluation.")
-            eval_policy = functools.partial(agent, training=False)
-            tools.simulate(
-                eval_policy,
-                eval_envs,
-                eval_eps,
-                config.general.evaldir,
-                logger,
-                is_eval=True,
-                episodes=config.training.eval_episode_num,
-                no_image_key=not is_image_available,
+    try:
+        # Continue training until we reach or exceed the target steps
+        while agent._step < config.training.steps + config.training.eval_every:
+            logger.write()
+            
+            # Run evaluation phase if configured
+            if config.training.eval_episode_num > 0:
+                _run_evaluation(
+                    agent=agent,
+                    eval_envs=eval_envs,
+                    eval_eps=eval_eps,
+                    eval_dataset=eval_dataset,
+                    config=config,
+                    logger=logger,
+                    is_image_available=is_image_available,
+                )
+            
+            # Run training phase
+            print("Start training.")
+            state = _run_training(
+                agent=agent,
+                train_envs=train_envs,
+                train_eps=train_eps,
+                config=config,
+                logger=logger,
+                state=state,
+                is_image_available=is_image_available,
             )
-            if is_image_available and config.general.video_pred_log:
-                video_pred = agent._wm.video_pred(next(eval_dataset))
-                logger.video("eval_openl", to_np(video_pred))
-
-        print("Start training.")
-        state = tools.simulate(
-            agent,
-            train_envs,
-            train_eps,
-            config.general.traindir,
-            logger,
-            limit=config.training.dataset_size,
-            steps=config.training.eval_every,
-            state=state,
-        )
-        items_to_save = {
-            "agent_state_dict": agent.state_dict(),
-            "optims_state_dict": tools.recursively_collect_optim_state_dict(agent),
-        }
-        torch.save(items_to_save, logdir / "latest.pt")
-
-    for env in train_envs + eval_envs:
-        try:
-            env.close()
-        except Exception:
-            pass
+            
+            # Log metrics to Weights & Biases if configured
+            if log_wandb:
+                _log_to_wandb(agent.metrics)
+                
+            # Save model checkpoint
+            _save_checkpoint(agent=agent, logdir=logdir)
+    finally:
+        # Clean up environment resources
+        _close_environments(train_envs + eval_envs)
 
 
-def main(config: DreamerV3Cfg):
-    """
-    Main function to set up and run the Dreamer agent training and evaluation.
-
-    Args:
-        config: Configuration object containing all necessary parameters for training and evaluation.
-
-    Side Effects:
-        - Initializes ROS node
-        - Creates training and evaluation environments
-        - Loads or pre-fills datasets
-        - Trains and evaluates the Dreamer agent
-        - Logs metrics and saves checkpoints
-    """
-    tools.set_seed_everywhere(config.general.seed)
-
-    if config.general.deterministic_run:
-        tools.enable_deterministic_run()
-
-    logdir = pathlib.Path(config.general.logdir).expanduser()
-
-    config.general.traindir = config.general.traindir or logdir / "train_eps"
-    config.general.evaldir = config.general.evaldir or logdir / "eval_eps"
-    config.training.steps //= config.environment.action_repeat
-    config.training.eval_every //= config.environment.action_repeat
-    config.general.log_every //= config.environment.action_repeat
-    config.environment.time_limit //= config.environment.action_repeat
-    print("Logdir", logdir)
-
-    logdir.mkdir(parents=True, exist_ok=True)
-    logdir.mkdir(parents=True, exist_ok=True)
-    config.general.traindir.mkdir(parents=True, exist_ok=True)
-    config.general.evaldir.mkdir(parents=True, exist_ok=True)
-    step = data_tools.count_steps(config.general.traindir)
-
-    # step in logger is environmental step
-    logger = tools.Logger(logdir, config.environment.action_repeat * step)
-
-    print("Create envs.")
-
-    if config.general.offline_traindir:
-        directory = config.general.offline_traindir.format(**vars(config))
-    else:
-        directory = config.general.traindir
-
-    train_eps = tools.load_episodes(directory, limit=config.training.dataset_size)
-
-    if config.general.offline_evaldir:
-        directory = config.general.offline_evaldir.format(**vars(config))
-    else:
-        directory = config.general.evaldir
-
-    eval_eps = tools.load_episodes(directory, limit=1)
-
-    rospy.init_node("dreamerv3", anonymous=True)
-
-    make = lambda id: make_arena_env(config, id)
-    # make = lambda id: make_dmc_env(config, id)
-
-    # train_envs = [make(i) for i in range(config.environment.envs)]
-    # eval_envs = train_envs  # [make("eval", i) for i in range(config.envs)]
-
-    if config.general.parallel:
-        train_envs = [
-            Parallel(partial(make, i), "process")
-            for i in range(config.environment.envs)  # bind from functools
-        ]
-        eval_envs = train_envs
-    else:
-        train_envs = [Damy(env) for env in train_envs]
-        eval_envs = [Damy(env) for env in eval_envs]
-
-    acts = train_envs[0].action_space
-    print("Action Space", acts)
-
-    _num_actions = acts.n if hasattr(acts, "n") else acts.shape[0]
-    _image_available = train_envs[0].observation_space.get("image", None) is not None
-
-    state = None
-
-    # Prefill dataset if no offline dataset is provided
-    if not config.general.offline_traindir:
-        prefill = max(
-            0,
-            config.training.prefill_steps
-            - data_tools.count_steps(config.general.traindir),
-        )
-        print(f"Prefill dataset ({prefill} steps).")
-        if hasattr(acts, "discrete"):
-            random_actor = tools.OneHotDist(
-                torch.zeros(_num_actions).repeat(config.environment.envs, 1)
-            )
-        else:
-            random_actor = torchd.independent.Independent(
-                torchd.uniform.Uniform(
-                    torch.tensor(acts.low).repeat(config.environment.envs, 1),
-                    torch.tensor(acts.high).repeat(config.environment.envs, 1),
-                ),
-                1,
-            )
-
-        def random_agent(o, d, s):
-            action = random_actor.sample()
-            logprob = random_actor.log_prob(action)
-            return {"action": action, "logprob": logprob}, None
-
-        state = tools.simulate(
-            random_agent,
-            train_envs,
-            train_eps,
-            config.general.traindir,
-            logger,
-            limit=config.training.dataset_size,
-            steps=prefill,
-            no_image_key=not _image_available,
-        )
-        logger.step += prefill * config.environment.action_repeat
-        print(f"Logger: ({logger.step} steps).")
-
-    print("Simulate agent.")
-    train_dataset = data_tools.make_dataset(train_eps, config)
-    eval_dataset = data_tools.make_dataset(eval_eps, config)
-
-    agent = dreamer.Dreamer(
-        train_envs[0].observation_space,
-        train_envs[0].action_space,
-        config,
+def _run_evaluation(
+    agent: dreamer.Dreamer,
+    eval_envs: List[Parallel],
+    eval_eps: OrderedDict,
+    eval_dataset: Generator[Dict[str, np.ndarray], None, None],
+    config: "DreamerV3Cfg",
+    logger: tools.Logger,
+    is_image_available: bool,
+):
+    """Run the evaluation phase of training."""
+    print("Start evaluation.")
+    eval_policy = functools.partial(agent, training=False)
+    tools.simulate(
+        eval_policy,
+        eval_envs,
+        eval_eps,
+        config.general.evaldir,
         logger,
-        train_dataset,
-    ).to(config.general.device)
-    agent.requires_grad_(requires_grad=False)
+        is_eval=True,
+        episodes=config.training.eval_episode_num,
+        no_image_key=not is_image_available,
+    )
+    
+    # Log prediction videos if available and configured
+    if is_image_available and config.general.video_pred_log:
+        video_pred = agent._wm.video_pred(next(eval_dataset))
+        logger.video("eval_openl", to_np(video_pred))
 
-    if (logdir / "latest.pt").exists():
-        checkpoint = torch.load(logdir / "latest.pt")
-        agent.load_state_dict(checkpoint["agent_state_dict"])
-        tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
-        agent._should_pretrain._once = False
 
-    # make sure eval will be executed once after config.steps
-    while agent._step < config.training.steps + config.training.eval_every:
-        logger.write()
-        if config.training.eval_episode_num > 0:
-            print("Start evaluation.")
-            eval_policy = functools.partial(agent, training=False)
-            tools.simulate(
-                eval_policy,
-                eval_envs,
-                eval_eps,
-                config.general.evaldir,
-                logger,
-                is_eval=True,
-                episodes=config.training.eval_episode_num,
-                no_image_key=not _image_available,
-            )
-            if _image_available and config.general.video_pred_log:
-                video_pred = agent._wm.video_pred(next(eval_dataset))
-                logger.video("eval_openl", to_np(video_pred))
+def _run_training(
+    agent: dreamer.Dreamer,
+    train_envs: List[Parallel],
+    train_eps: OrderedDict,
+    config: "DreamerV3Cfg",
+    logger: tools.Logger,
+    state: tools._State,
+    is_image_available: bool,
+):
+    """Run the training phase and return the updated state."""
+    return tools.simulate(
+        agent,
+        train_envs,
+        train_eps,
+        config.general.traindir,
+        logger,
+        limit=config.training.dataset_size,
+        steps=config.training.eval_every,
+        state=state,
+        no_image_key=not is_image_available,
+    )
 
-        print("Start training.")
-        state = tools.simulate(
-            agent,
-            train_envs,
-            train_eps,
-            config.general.traindir,
-            logger,
-            limit=config.training.dataset_size,
-            steps=config.training.eval_every,
-            state=state,
-        )
-        items_to_save = {
-            "agent_state_dict": agent.state_dict(),
-            "optims_state_dict": tools.recursively_collect_optim_state_dict(agent),
-        }
-        torch.save(items_to_save, logdir / "latest.pt")
 
-    for env in train_envs + eval_envs:
+def _save_checkpoint(agent: dreamer.Dreamer, logdir: pathlib.Path):
+    """Save the agent and optimizer states to a checkpoint file."""
+    items_to_save = {
+        "agent_state_dict": agent.state_dict(),
+        "optims_state_dict": tools.recursively_collect_optim_state_dict(agent),
+    }
+    torch.save(items_to_save, logdir / "latest.pt")
+
+
+def _close_environments(envs: List[Parallel]):
+    """Safely close all environment instances."""
+    for env in envs:
         try:
             env.close()
         except Exception:
             pass
+
+
+def _log_to_wandb(metrics: Dict):
+    """Log metrics to Weights & Biases."""
+    for key, value in metrics.items():
+        wandb.log({key: wandb_format_value(value)})
+
+
+def wandb_format_value(value):
+    """Format values for Weights & Biases logging."""
+    if isinstance(value, float):
+        return value
+    elif isinstance(value, list):
+        if len(value) == 0:
+            return 0.0
+        if isinstance(value[-1], float):
+            return value[-1]
+        elif isinstance(value[-1], np.ndarray):
+            return wandb_format_value(value[-1])
+    elif isinstance(value, np.ndarray):
+        if value.size == 0:
+            return 0.0
+        if value.ndim == 1:
+            return value[-1]
+        else:
+            return value.mean()
+    return float(value)
