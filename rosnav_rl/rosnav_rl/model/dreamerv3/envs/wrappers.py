@@ -29,7 +29,9 @@ class TimeLimit(gym.Wrapper):
         self._step = None
 
     def step(self, action):
-        assert self._step is not None, "Must reset environment."
+        # assert self._step is not None, "Must reset environment."
+        if self._step is None:
+            raise AssertionError("Must reset environment.")
         obs, reward, done, info = self.env.step(action)
         self._step += 1
         if self._step >= self._duration:
