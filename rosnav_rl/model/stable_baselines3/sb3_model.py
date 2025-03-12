@@ -12,7 +12,6 @@ from stable_baselines3.common.vec_env import (
     VecNormalize,
 )
 
-from rosnav_rl.cfg import sb3_cfg
 from rosnav_rl.spaces import BaseObservationSpace
 from rosnav_rl.utils.stable_baselines3.config import check_batch_size
 from rosnav_rl.utils.stable_baselines3.model.learning_rate_schedules import (
@@ -37,36 +36,32 @@ from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicyDescription
 
 if TYPE_CHECKING:
     from rosnav_rl.rl_agent import RL_Agent
+    from rosnav_rl.model.stable_baselines3 import cfg as sb3_cfg
 
 DEVICE_CPU = "cpu"
 DEVICE_AUTO = "auto"
 
-_DUMMY_ALG_CFG = sb3_cfg.PPO_Cfg(
-    architecture_name="AGENT_1", parameters=sb3_cfg.PPO_Algorithm_Cfg()
-)
 
 
 class StableBaselinesModelState:
     """
-    StableBaselinesModelState is a class that manages the state of a model in the Stable Baselines framework.
+    A class to manage the state of a Stable Baselines model.
+
+    This class maintains the model's internal state between inference steps, 
+    tracking observations, actions, and reset status.
 
     Attributes:
-        last_observation (np.ndarray): The last observation received by the model.
-        last_action (np.ndarray): The last action taken by the model, initialized to an array of zeros.
-        _reset_state (bool): A private attribute indicating whether the state needs to be reset.
-        model_state (Tuple[np.ndarray, ...]): The current state of the model.
+        last_observation (np.ndarray): The most recent observation from the environment. Default is None.
+        last_action (np.ndarray): The most recent action taken by the model. Default is [0, 0, 0].
+        _reset_state (bool): Internal flag indicating if the state should be reset. Default is True.
+        model_state (Tuple[np.ndarray, ...]): The internal state of the model. Default is None.
 
     Methods:
-        reset():
-            Resets the model state, sets the reset_state to True, and initializes last_action to an array of zeros.
-
-        reset_state (property):
-            Getter:
-                Returns True if the state needs to be reset and sets _reset_state to False.
-                Otherwise, returns the current value of _reset_state.
-            Setter:
-                Sets the value of _reset_state.
+        reset(): Resets the model state to its initial values.
+        reset_state (property): Gets the current reset state and updates the internal flag.
+        reset_state (setter): Sets the internal reset state flag.
     """
+
 
     last_observation: np.ndarray = None
     last_action: np.ndarray = np.ndarray([0, 0, 0])
@@ -92,41 +87,27 @@ class StableBaselinesModelState:
 
 class StableBaselinesEnv:
     """
-    A wrapper class for Stable Baselines environments that provides additional functionality
-    such as normalization and frame stacking.
+    A wrapper class for Stable Baselines 3 vector environments that handles normalization and frame stacking.
+
+    This class provides an interface to work with vector environments from Stable Baselines 3,
+    specifically handling observation normalization via VecNormalize and frame stacking via VecFrameStack.
 
     Attributes:
-        _env (VecEnv): The vectorized environment.
-        _norm_wrapper (Union[None, VecNormalize]): The normalization wrapper, if any.
-        _stack_wrapper (Union[None, VecFrameStack]): The frame stacking wrapper, if any.
+        _env (VecEnv): The underlying vector environment.
+        _norm_wrapper (Union[None, VecNormalize]): Normalization wrapper if present, otherwise None.
+        _stack_wrapper (Union[None, VecFrameStack]): Frame stacking wrapper if present, otherwise None.
 
     Methods:
-        __init__(env: VecEnv):
-            Initializes the StableBaselinesEnv with the given environment.
-
-        save_normalization(path: Union[str, Path]) -> None:
-            Saves the normalization statistics to the specified path.
-
-        load_normalization(path: Union[str, Path]) -> None:
-            Loads the normalization statistics from the specified path.
-
-        normalize(observation: np.ndarray) -> np.ndarray:
-            Normalizes the given observation using the normalization wrapper.
-
-        stack(observation: np.ndarray) -> np.ndarray:
-            Stacks the given observation using the frame stacking wrapper.
-
-        reset(observation: np.ndarray) -> np.ndarray:
-            Resets the frame stacker with the given observation.
-
-        has_norm_wrapper() -> bool:
-            Returns True if a normalization wrapper is present, False otherwise.
-
-        has_stack_wrapper() -> bool:
-            Returns True if a frame stacking wrapper is present, False otherwise.
-
-        env() -> VecEnv:
-            Returns the underlying vectorized environment.
+        save_normalization: Save the normalization statistics to a file.
+        load_normalization: Load normalization statistics from a file.
+        normalize: Normalize an observation using the normalization wrapper.
+        stack: Update the stacked observations with a new observation.
+        reset: Reset the stacked observations with an initial observation.
+        
+    Properties:
+        has_norm_wrapper: Check if normalization wrapper is present.
+        has_stack_wrapper: Check if frame stacking wrapper is present.
+        env: Get the underlying vector environment.
     """
 
     _env: VecEnv
@@ -177,15 +158,28 @@ class StableBaselinesEnv:
 
 
 class StableBaselinesModel(RL_Model):
-    """
-    StableBaselinesModel is a class that integrates Stable Baselines3 algorithms with additional functionality
-    such as saving and loading models, transferring weights, and getting actions.
+    """A reinforcement learning model implementation using the Stable Baselines 3 (SB3) framework.
 
-    Attributes:
-        _model (_SupportedStableBaselinesModels): The Stable Baselines algorithm object.
+    This class provides an interface for training, loading, and using different types of
+    reinforcement learning algorithms from the Stable Baselines 3 library. It supports various
+    features such as frame stacking, observation normalization, weight transfer between models,
+    and both recurrent and non-recurrent policies.
+
+        _model (_SupportedStableBaselinesModels): The underlying SB3 model instance.
         _algorithm_cfg (sb3_cfg.SBAlgorithmCfg): Configuration for the SB3 algorithm.
-        __env (StableBaselinesEnv): The environment for the model.
-        __state (StableBaselinesModelState): The state of the model.
+        __env (StableBaselinesEnv): The environment wrapper used for interacting with the model.
+        __state (StableBaselinesModelState): Maintains the state of the model across steps.
+        _agent_factory (AgentFactory): Factory for creating agent instances.
+        _policy_description (StableBaselinesPolicyDescription): Description of the policy architecture.
+
+    Properties:
+        observation_space_list: List of observation spaces defined in the policy.
+        observation_space_kwargs: Additional keyword arguments for the observation space.
+        stack_size: The number of frames to stack, if frame stacking is used.
+        parameter_number: The total number of parameters in the policy network.
+        config: Dictionary containing the algorithm configuration.
+        environment: The environment wrapper used by the model.
+        model: The underlying SB3 model instance.
     """
 
     _model: _SupportedStableBaselinesModels = None
@@ -239,17 +233,25 @@ class StableBaselinesModel(RL_Model):
         *args,
         **kwargs,
     ):
-        """
-        Set up the model for training or resuming from a saved model.
-
+        """Set up the RL model based on the specified environment and configuration.
+        
+        This method initializes or loads an RL model with the appropriate algorithm arguments 
+        based on the provided environment, GPU availability, and configuration settings.
+        
         Args:
-            env (Union[VecEnv, gym.Env]): The environment to train the model on.
-            no_gpu (Optional[bool]): If True, disables GPU usage. Defaults to False.
-            tensorboard_log_path (Optional[str]): Path to save TensorBoard logs. Defaults to None.
-            checkpoint_path (Optional[str]): Path to a saved model file to resume training from. Defaults to None.
-            *args: Additional arguments.
+            env (Union[VecEnv, gym.Env]): The training environment for the model.
+            no_gpu (Optional[bool], default=False): If True, disables GPU usage even if available.
+            tensorboard_log_path (Optional[str], default=None): Path for TensorBoard logging.
+            checkpoint_path (Optional[str], default=None): Path to load a pre-trained model checkpoint.
+            *args: Additional positional arguments.
             **kwargs: Additional keyword arguments.
-
+            
+        Returns:
+            None: The method initializes the model internally but doesn't return it.
+            
+        Note:
+            If checkpoint_path is provided, the model is loaded from the specified path.
+            Otherwise, a new model is initialized using the configured algorithm parameters.
         """
         algorithm_args = self._setup_algorithm_arguments(
             self.algorithm_cfg.parameters, env, no_gpu, tensorboard_log_path
@@ -292,18 +294,22 @@ class StableBaselinesModel(RL_Model):
         *args,
         **kwargs,
     ) -> np.ndarray:
-        """
-        Get the action for a given observation.
-
+        """Processes the observation and returns an action using the trained model.
+        
+        This method handles observation encoding, environment initialization if needed,
+        stacking and normalization of observations (if applicable), and prediction of actions.
+        It manages the agent's internal state tracking as well.
+        
         Args:
-            observation (ObservationDict): The current observation from the environment.
+            observation (ObservationDict): The current observation from the environment
             deterministic (bool, optional): Whether to use deterministic actions. Defaults to True.
-            is_first_observation (bool, optional): Whether this is the first observation of the episode. Defaults to False.
-            *args: Additional arguments.
-            **kwargs: Additional keyword arguments.
-
+            is_first_observation (bool, optional): Whether this is the first observation in an episode. 
+                Will reset the agent's internal state if True. Defaults to False.
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+            
         Returns:
-            The action to be taken based on the given observation.
+            np.ndarray: The action to take in the environment (decoded from the model's output)
         """
         if is_first_observation:
             self.reset()
@@ -381,6 +387,8 @@ class StableBaselinesModel(RL_Model):
         Returns:
             None
         """
+        import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
+        
         config = load_yaml(source_dir / cfg_file_name)
         try:
             validated_algorithm_cfg = sb3_cfg.SBAlgorithmCfg.model_validate(
@@ -388,7 +396,9 @@ class StableBaselinesModel(RL_Model):
             )
         except Exception as e:
             print(f"Error validating algorithm configuration: {e}")
-            validated_algorithm_cfg = _DUMMY_ALG_CFG
+            validated_algorithm_cfg = sb3_cfg.PPO_Cfg(
+                architecture_name="AGENT_1", parameters=sb3_cfg.PPO_Algorithm_Cfg()
+            )
 
         source_model = StableBaselinesModel(
             rl_agent=self._rl_agent, algorithm_cfg=validated_algorithm_cfg
@@ -464,7 +474,7 @@ class StableBaselinesModel(RL_Model):
             "policy_kwargs": self._policy_description.get_kwargs(),
             "tensorboard_log": tensorboard_log_path or parameters.tensorboard_log,
             "device": DEVICE_CPU if no_gpu else DEVICE_AUTO,
-            **parameters.model_dump(exclude=["total_batch_size", "tensorboard_log"]),
+            **parameters.model_dump(exclude=["total_batch_size", "tensorboard_log", "total_timesteps", "show_progress_bar"]),
         }
 
     def _initialize_model(self, algorithm_parameters: Dict[str, Any]) -> None:
