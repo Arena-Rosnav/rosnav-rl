@@ -1,10 +1,12 @@
 from pathlib import Path
-from typing import Dict, Generator, OrderedDict
+from typing import TYPE_CHECKING, Dict, Generator, OrderedDict
 
 import numpy as np
 
-from ..dreamerv3 import cfg, tools
+from ..dreamerv3 import tools
 
+if TYPE_CHECKING:
+    from ..dreamerv3 import cfg
 
 def count_steps(folder: Path) -> int:
     """
@@ -30,7 +32,7 @@ def count_steps(folder: Path) -> int:
 
 
 def make_dataset(
-    episodes: OrderedDict[str, np.ndarray], config: cfg.DreamerV3Cfg
+    episodes: OrderedDict[str, np.ndarray], config: "cfg.DreamerV3Cfg"
 ) -> Generator[Dict[str, np.ndarray], None, None]:
     """Creates a dataset from a collection of episodes.
 

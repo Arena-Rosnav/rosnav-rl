@@ -1,15 +1,16 @@
+from typing import TYPE_CHECKING
+
 import torch
 from torch import distributions as torchd
 from torch import nn
 
-from ..dreamerv3 import cfg
-from ..dreamerv3 import models
-from ..dreamerv3 import networks
-from ..dreamerv3 import tools
+from ..dreamerv3 import models, networks, tools
 
+if TYPE_CHECKING:
+    from ..dreamerv3 import cfg
 
 class Random(nn.Module):
-    def __init__(self, config: cfg.DreamerV3Cfg, act_space):
+    def __init__(self, config: "cfg.DreamerV3Cfg", act_space):
         super(Random, self).__init__()
         self._config = config
         self._act_space = act_space
@@ -44,7 +45,7 @@ class Random(nn.Module):
 
 
 class Plan2Explore(nn.Module):
-    def __init__(self, config: cfg.DreamerV3Cfg, world_model, reward, act_space):
+    def __init__(self, config: "cfg.DreamerV3Cfg", world_model, reward, act_space):
         super(Plan2Explore, self).__init__()
         self._config = config
         self._use_amp = True if config.general.precision == 16 else False

@@ -29,7 +29,7 @@ def symexp(x):
 
 
 class RequiresGrad:
-    def __init__(self, model):
+    def __init__(self, model: torch.nn.Module):
         self._model = model
 
     def __enter__(self):
@@ -221,6 +221,12 @@ def simulate(
         Either steps or episodes should be non-zero to determine simulation length.
         The cache is cleared to keep only the last item when in evaluation mode.
     """
+    def reset_envs():
+        results = [env.reset() for env in envs]
+        results = [r() for r in results]
+    
+    first_iter = True
+    
     # initialize or unpack simulation state
     if state is None:
         step, episode = 0, 0
@@ -232,6 +238,9 @@ def simulate(
     else:
         step, episode, done, length, obs, agent_state, reward = state
     while (steps and step < steps) or (episodes and episode < episodes):
+        if first_iter:
+            first_iter = False
+            reset_envs()
         # reset envs if necessary
         if done.any():
             indices = [index for index, d in enumerate(done) if d]

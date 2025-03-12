@@ -1,9 +1,14 @@
-from pydantic import BaseModel
-from typing import List, Literal, Optional, Union
 from pathlib import Path
+from typing import ClassVar, List, Optional, Union
 
-# prefill_steps, pretrain_steps
+import rospkg
+from pydantic import BaseModel
+from typing_extensions import Literal
 
+from rosnav_rl.cfg.framework import FrameworkCfg
+from rosnav_rl.utils.type_aliases.rl_frameworks import SupportedRLFrameworks
+
+rp = rospkg.RosPack()
 
 class GeneralCfg(BaseModel):
     """Configuration for general training parameters.
@@ -28,7 +33,7 @@ class GeneralCfg(BaseModel):
         video_pred_log (bool): Whether to log video predictions. Defaults to True.
     """
 
-    logdir: Optional[Union[str, Path]] = "arena/dreamer"
+    logdir: Optional[Union[str, Path]] = rp.get_path("rosnav_rl") + "/agents"
     traindir: Optional[Union[str, Path]] = None
     evaldir: Optional[Union[str, Path]] = None
     offline_traindir: Union[str, Path] = ""
@@ -58,11 +63,8 @@ class EnvironmentCfg(BaseModel):
         prefill_steps (int): Number of random steps to take before training begins. Default is 2500.
         reward_EMA (bool): Whether to use Exponential Moving Average for rewards. Default is True.
     """
-
-    envs: int = 4
     reset_every: int = 0
     action_repeat: int = 1
-    time_limit: int = 50
     grayscale: bool = False
     reward_EMA: bool = True
 
@@ -74,8 +76,8 @@ class EncoderCfg(BaseModel):
     which can process both MLP and CNN inputs.
 
     Attributes:
-        mlp_keys (str): Observation Keys considered for MLP inputs. Default: "$^" (empty pattern)
-        cnn_keys (str): Observation Keys considered for CNN inputs. Default: "image"
+        mlp_keys (str): Observation Keys from EncodedObsDict considered for MLP inputs. Default: "$^" (empty pattern)
+        cnn_keys (str): Observation Keys from EncodedObsDict considered for CNN inputs. Default: "image"
         act (str): Activation function to use. Default: "SiLU"
         norm (bool): Whether to use normalization. Default: True
         cnn_depth (int): Number of channels in CNN layers. Default: 32
@@ -92,11 +94,11 @@ class EncoderCfg(BaseModel):
     )
     act: str = "SiLU"
     norm: bool = True
-    cnn_depth: int = 32
+    cnn_depth: int = 1
     kernel_size: int = 4
     minres: int = 5
     mlp_layers: int = 5
-    mlp_units: int = 1024
+    mlp_units: int = 128
     symlog_inputs: bool = True
     is_channels_first: bool = True
 
@@ -108,8 +110,8 @@ class DecoderCfg(BaseModel):
     both CNN-based (image) and MLP-based (vector) inputs.
 
     Attributes:
-        mlp_keys (str): Observation Keys considered for MLP inputs. Default: "$^" (empty pattern)
-        cnn_keys (str): Observation Keys considered for CNN inputs. Default: "image"
+        mlp_keys (str): Observation Keys from EncodedObsDict considered for MLP inputs. Default: "$^" (empty pattern)
+        cnn_keys (str): Observation Keys from EncodedObsDict considered for CNN inputs. Default: "image"
         act (str): Activation function, default "SiLU".
         norm (bool): Whether to use normalization, default True.
         cnn_depth (int): Base depth for CNN layers, default 32.
@@ -129,11 +131,11 @@ class DecoderCfg(BaseModel):
     )
     act: str = "SiLU"
     norm: bool = True
-    cnn_depth: int = 32
+    cnn_depth: int = 1
     kernel_size: int = 4
     minres: int = 5
     mlp_layers: int = 5
-    mlp_units: int = 1024
+    mlp_units: int = 128
     cnn_sigmoid: bool = False
     image_dist: str = "mse"
     vector_dist: str = "symlog_mse"
@@ -159,7 +161,7 @@ class ActorCfg(BaseModel):
         outscale (float): Output scaling factor.
     """
 
-    layers: int = 3
+    layers: int = 1
     dist: str = "normal"
     entropy: float = 3e-4
     unimix_ratio: float = 0.01
@@ -188,7 +190,7 @@ class CriticCfg(BaseModel):
         outscale (float): Output scaling factor.
     """
 
-    layers: int = 3
+    layers: int = 1
     dist: str = "symlog_disc"
     slow_target: bool = True
     slow_target_update: int = 1
@@ -209,7 +211,7 @@ class RewardHeadCfg(BaseModel):
         outscale (float): Output scaling factor.
     """
 
-    layers: int = 3
+    layers: int = 1
     dist: str = "symlog_disc"
     loss_scale: float = 1.0
     outscale: float = 0.0
@@ -224,7 +226,7 @@ class ContHeadCfg(BaseModel):
         outscale (float): Output scaling factor.
     """
 
-    layers: int = 3
+    layers: int = 1
     loss_scale: float = 1.0
     outscale: float = 1.0
 
@@ -319,8 +321,8 @@ class ModelCfg(BaseModel):
     weight_decay: float = 0.0
     unimix_ratio: float = 0.01
     initial: str = "learned"
-    dyn_hidden: int = 1024
-    dyn_deter: int = 1024
+    dyn_hidden: int = 128
+    dyn_deter: int = 128
     dyn_stoch: int = 32
     dyn_discrete: int = 32
     dyn_rec_depth: int = 1
@@ -328,7 +330,7 @@ class ModelCfg(BaseModel):
     dyn_std_act: str = "sigmoid2"
     dyn_min_std: float = 0.1
     grad_heads: List[str] = ["decoder", "reward", "cont"]
-    units: int = 1024
+    units: int = 128
     act: str = "SiLU"
     norm: bool = True
     encoder: EncoderCfg = EncoderCfg()
@@ -369,17 +371,17 @@ class TrainingCfg(BaseModel):
     batch_length: int = 64
     train_ratio: int = 16
     pretrain_steps: int = 100
-    prefill_steps: int = 5000
+    prefill_steps: int = 200
     model_lr: float = 1e-4
     opt_eps: float = 1e-8
     grad_clip: int = 1000
-    dataset_size: int = 1000000
+    dataset_size: int = 200
     opt: str = "adam"
-    eval_every: float = 1e5
+    eval_every: float = 200
     eval_episode_num: int = 5
 
 
-class DreamerV3Cfg(BaseModel):
+class DreamerV3Cfg(FrameworkCfg):
     """Configuration class for DreamerV3 agent.
 
     This class serves as the main configuration container for the DreamerV3 agent,
@@ -394,7 +396,9 @@ class DreamerV3Cfg(BaseModel):
     Note:
         This class inherits from BaseModel and allows for arbitrary types in its configuration.
     """
-
+    name: Literal[SupportedRLFrameworks.DREAMER_V3] = (
+        SupportedRLFrameworks.DREAMER_V3
+    )
     general: GeneralCfg = GeneralCfg()
     environment: EnvironmentCfg = EnvironmentCfg()
     model: ModelCfg = ModelCfg()
