@@ -1,8 +1,8 @@
 from typing import Optional, Union
-from typing_extensions import Annotated
 
 import rospy
-from pydantic import BaseModel, Field, model_validator, Discriminator
+from pydantic import BaseModel, Discriminator, Field, model_validator
+from typing_extensions import Annotated
 
 from rosnav_rl.utils.name_generator import generate_agent_name
 
