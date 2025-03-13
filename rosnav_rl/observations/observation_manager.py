@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import functools
 import re
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 import rospy
 from typing_extensions import Self
@@ -29,6 +28,41 @@ def map_crowdsim_topics(topic: Union[str, Topic], manager: ObservationManager) -
     if manager._is_single_env:
         return _topic.name
     return str(_topic)
+
+
+class ObservationHealth:
+    """Tracks the health status of an observation source."""
+    
+    def __init__(self, name: str):
+        self.name = name
+        self.last_update_time = rospy.Time(0)
+        self.update_count = 0
+        self.error_count = 0
+        self.consecutive_errors = 0
+        self.latest_error = None
+        
+    def record_update(self):
+        """Record a successful observation update."""
+        self.last_update_time = rospy.Time.now()
+        self.update_count += 1
+        self.consecutive_errors = 0
+        
+    def record_error(self, error: Exception):
+        """Record an observation error."""
+        self.error_count += 1
+        self.consecutive_errors += 1
+        self.latest_error = error
+        
+    @property
+    def is_healthy(self) -> bool:
+        """Check if the observation source is healthy."""
+        # Health criteria: received at least one update and no consecutive errors
+        return self.update_count > 0 and self.consecutive_errors < 3
+        
+    @property
+    def time_since_update(self) -> rospy.Duration:
+        """Get time elapsed since the last update."""
+        return rospy.Time.now() - self.last_update_time
 
 
 class ObservationManager:
@@ -62,6 +96,7 @@ class ObservationManager:
     _generators: Dict[str, ObservationGeneratorUnit]
     _collectable_observations: Dict[str, "GenericObservation"]
     _subscribers: Dict[str, rospy.Subscriber]
+    _health_monitors: Dict[str, ObservationHealth]
 
     _default_topic_mappings: Dict[Union[str, Topic], Callable] = {
         ".*crowdsim.*": map_crowdsim_topics
@@ -76,6 +111,7 @@ class ObservationManager:
         is_single_env: Optional[bool] = False,
         obs_unit_kwargs: Optional[dict] = None,
         wait_for_obs: Optional[bool] = True,
+        obs_timeout: Optional[float] = 10.0,
     ) -> None:
         """Initialize the ObservationManager.
         
@@ -92,6 +128,7 @@ class ObservationManager:
                 Will be set to True if "sim" is in namespace. Defaults to False.
             obs_unit_kwargs (dict, optional): Additional keyword arguments for observation units. Defaults to None.
             wait_for_obs (bool, optional): Whether to wait for observations before proceeding. Defaults to True.
+            obs_timeout (float, optional): Timeout in seconds when waiting for observations. Defaults to 10.0.
             
         Returns:
             None
@@ -106,8 +143,10 @@ class ObservationManager:
         obs_unit_kwargs = obs_unit_kwargs or {}
         self._collectable_observations = {}
         self._subscribers = {}
+        self._health_monitors = {}
 
         self._wait_for_obs = wait_for_obs
+        self._obs_timeout = obs_timeout
         self._is_single_env = is_single_env or "sim" in ns
 
         obs_unit_kwargs.update(
@@ -172,38 +211,51 @@ class ObservationManager:
         import rosnav_rl.observations.generic_observation as gen_obs
 
         for collector in self._collectors.values():
-            observation_container = gen_obs.GenericObservation(
-                initial_msg=collector.msg_data_class(),
-                process_fnc=collector.preprocess,
-            )
+            try:
+                observation_container = gen_obs.GenericObservation(
+                    initial_msg=collector.msg_data_class(),
+                    process_fnc=collector.safe_preprocess,
+                )
 
-            self._collectable_observations[collector.name] = observation_container
+                self._collectable_observations[collector.name] = observation_container
+                self._health_monitors[collector.name] = ObservationHealth(collector.name)
 
-            # Get the mapping function for the topic
-            _map_functions = [
-                mapping
-                for pattern, mapping in self._topic_mappings.items()
-                if re.match(pattern, str(collector.topic))
-            ]
+                # Get the mapping function for the topic
+                _map_functions = [
+                    mapping
+                    for pattern, mapping in self._topic_mappings.items()
+                    if re.match(pattern, str(collector.topic))
+                ]
 
-            _topic = (
-                self._ns(
-                    collector.topic
-                )  # in this case, the namespace contains /*simulation ns*/*agent ns*/
-                if collector.is_topic_agent_specific
-                else self._ns.simulation_ns(
-                    collector.topic
-                )  # in this case, the namespace contains /*simulation ns*/
-            )
+                _topic = (
+                    self._ns(
+                        collector.topic
+                    )  # in this case, the namespace contains /*simulation ns*/*agent ns*/
+                    if collector.is_topic_agent_specific
+                    else self._ns.simulation_ns(
+                        collector.topic
+                    )  # in this case, the namespace contains /*simulation ns*/
+                )
 
-            for func in _map_functions:
-                _topic = func(_topic, self)
+                for func in _map_functions:
+                    _topic = func(_topic, self)
 
-            self._subscribers[collector.name] = rospy.Subscriber(
-                str(_topic),
-                collector.msg_data_class,
-                functools.partial(observation_container.update),
-            )
+                # Create callback that updates health monitoring
+                def callback_with_health_monitoring(msg, collector_name=collector.name):
+                    try:
+                        self._collectable_observations[collector_name].update(msg)
+                        self._health_monitors[collector_name].record_update()
+                    except Exception as e:
+                        self._health_monitors[collector_name].record_error(e)
+                        rospy.logerr(f"Error updating observation '{collector_name}': {e}")
+                
+                self._subscribers[collector.name] = rospy.Subscriber(
+                    str(_topic),
+                    collector.msg_data_class,
+                    callback_with_health_monitoring,
+                )
+            except Exception as e:
+                rospy.logerr(f"Failed to initialize collector '{collector.name}': {e}")
 
     def _invalidate_observations(self) -> None:
         """
@@ -215,7 +267,7 @@ class ObservationManager:
         for collector in self._collectable_observations.values():
             collector.invalidate()
 
-    def _wait_for_observation(self, collector_name: str):
+    def _wait_for_observation(self, collector_name: str) -> bool:
         """
         Waits for a message from the specified observation collector unit.
 
@@ -226,19 +278,24 @@ class ObservationManager:
         Args:
             collector_name (str): The name of the observation collector to wait for.
 
-        Raises:
-            rospy.ROSException: If the message is not received within the timeout period.
+        Returns:
+            bool: True if the observation was received, False if timed out.
         """
         try:
             rospy.wait_for_message(
                 self._subscribers[collector_name].name,
                 self._collectors[collector_name].msg_data_class,
-                timeout=10,
+                timeout=self._obs_timeout,
             )
+            return True
         except rospy.ROSException:
             rospy.logwarn(
                 f"Waiting for observation '{collector_name}' timed out. The observation may be stale."
             )
+            return False
+        except Exception as e:
+            rospy.logerr(f"Error waiting for observation '{collector_name}': {e}")
+            return False
 
     def _get_collectable_observations(
         self, obs_dict: "ObservationDict"
@@ -289,7 +346,7 @@ class ObservationManager:
         # Generate observations from the generators
         for generator in self._generators.values():
             try:
-                obs_dict[generator.name] = generator.generate(
+                obs_dict[generator.name] = generator.safe_generate(
                     obs_dict=obs_dict,
                     simulation_state_container=simulation_state_container,
                 )
@@ -335,3 +392,22 @@ class ObservationManager:
             obs_dict[key] = val
 
         return obs_dict
+
+    def get_health_status(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the health status of all observation collectors.
+        
+        Returns:
+            Dict[str, Dict[str, Any]]: A dictionary mapping collector names to their health status.
+        """
+        result = {}
+        for name, monitor in self._health_monitors.items():
+            result[name] = {
+                "is_healthy": monitor.is_healthy,
+                "update_count": monitor.update_count,
+                "error_count": monitor.error_count,
+                "consecutive_errors": monitor.consecutive_errors,
+                "time_since_update": monitor.time_since_update.to_sec(),
+                "latest_error": str(monitor.latest_error) if monitor.latest_error else None,
+            }
+        return result
