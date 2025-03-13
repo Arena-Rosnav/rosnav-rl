@@ -87,12 +87,12 @@ class GenericObservation(Generic[_RospyMessage]):
         """
         return self._value
 
-    def update(self, msg: _RospyMessage):
+    def update(self, msg: _RospyMessage) -> None:
         """
         Updates the observation with a new message.
 
         Args:
-            msg (T): The new observation message.
+            msg (_RospyMessage): The new observation message.
         """
         self._msg = msg
         self._value = self._process_fnc(msg)
