@@ -49,7 +49,7 @@ class RL_Agent:
         agent.train()
     """
 
-    _name: str
+    _name: str = ""
     _model: Union[RL_Model, StableBaselinesModel, DreamerV3Model]
     _reward_function: Optional[RewardFunction] = None
     _space_manager: BaseSpaceManager
@@ -87,9 +87,13 @@ class RL_Agent:
         self._name = agent_cfg.name
         self._agent_cfg = agent_cfg
         self._agent_state_container = agent_state_container
-        
-        
 
+        self._initialize_model(agent_cfg)
+        self._initialize_space_manager(agent_cfg)
+        self._initialize_reward_function(agent_cfg)
+
+    def _initialize_model(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
+        """Initialize the RL model based on the provided configuration."""
         if isinstance(agent_cfg.framework, sb3_cfg.StableBaselinesCfg):
             self._model = StableBaselinesModel(
                 rl_agent=self,
@@ -103,14 +107,18 @@ class RL_Agent:
             raise ValueError(
                 f"Unsupported RL algorithm: {agent_cfg.framework.name}"
             )
-            
+
+    def _initialize_space_manager(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
+        """Initialize the space manager based on the provided configuration."""
         self._space_manager = BaseSpaceManager(
             action_space_kwargs={"is_discrete": agent_cfg.action_space.is_discrete},
             agent_state_container=self._agent_state_container,
             observation_space_list=self.model.observation_space_list,
             observation_space_kwargs=self.model.observation_space_kwargs,
         )
-        
+
+    def _initialize_reward_function(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
+        """Initialize the reward function if provided in the configuration."""
         if agent_cfg.reward is not None:
             self._reward_function = RewardFunction(
                 function_dict=agent_cfg.reward.reward_function_dict,
@@ -204,6 +212,15 @@ class RL_Agent:
 
     @property
     def config(self) -> Dict[str, dict]:
+        """
+        Get the configuration dictionary for the RL agent.
+
+        This property returns a dictionary containing the agent's configuration,
+        including model, space, state settings, and reward function if defined.
+
+        Returns:
+            Dict[str, dict]: Configuration dictionary with agent settings.
+        """
         config_dict = {
             "agent_cfg": asdict(self._agent_cfg),
             "model": self.model.config,
@@ -217,8 +234,6 @@ class RL_Agent:
 
     @property
     def model(self) -> Union[StableBaselinesModel, DreamerV3Model]:
-        if self._model is None:
-            raise ValueError("'RL_Model' not initialized.")
         return self._model
 
     @property
@@ -236,8 +251,17 @@ class RL_Agent:
     @property
     def action_space(self) -> Union[spaces.Discrete, spaces.Box]:
         return self._space_manager.action_space
-
+    
     @property
+    def agent_cfg(self) -> rosnav_rl_cfg.AgentCfg:
+        """
+        Get the agent configuration.
+
+        Returns:
+            rosnav_rl_cfg.AgentCfg: The configuration object for the agent.
+        """
+        return self._agent_cfg
+        
     def agent_state_container(self) -> AgentStateContainer:
         return self._agent_state_container
     
