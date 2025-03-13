@@ -17,4 +17,4 @@ class FrameworkCfg(BaseModel, ABC):
         __name__ (ClassVar[Union[str, SupportedRLFrameworks]]): Class variable storing 
             the name or enum value identifying the RL framework.
     """
-    name: ClassVar[Union[str, SupportedRLFrameworks]]
+    name: Union[str, SupportedRLFrameworks] = ""
