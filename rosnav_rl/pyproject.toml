@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Python Framework for Reinforcement Learning in Robotic Navigation based on ROS"
 authors = ["tuananhroman <anh.maxiking@hotmail.de>"]
 readme = "README.md"
-
 [tool.poetry.dependencies]
 python = "^3.8"
 docutils = "0.20"
@@ -24,7 +23,10 @@ pygments = "^2.18.0"
 stable-baselines3 = "^2.1.0"
 gymnasium = "^1.0.0"
 ruamel-yaml = "^0.17"
+pydantic = "^2.10.6"
 
+[tool.colcon-poetry-ros]
+package-mode = true  # Critical for ROS integration
 
 [tool.poetry.group.dev.dependencies]
 matplotlib = "^3.0.0"
