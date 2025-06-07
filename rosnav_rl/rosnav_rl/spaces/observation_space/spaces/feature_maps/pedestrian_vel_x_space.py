@@ -15,20 +15,20 @@ from .base_feature_map_space import BaseFeatureMapSpace
 @SpaceFactory.register("ped_vel_x")
 class PedestrianVelXSpace(BaseFeatureMapSpace):
     """A space for representing the feature map of pedestrian x-velocity.
-    
+
     This class creates a spatial representation of pedestrians' x-velocity in the robot's
     environment. The feature map is a 2D grid where each cell represents a location,
     and the value in each cell represents the x-component of the velocity of a pedestrian
     at that location, if present.
     The feature map uses relative positions to place pedestrians on the grid and assigns
     their x-velocity to the corresponding cells. Empty cells (without pedestrians) have zero values.
-    
+
     Attributes:
         name (str): The name identifier for this space ("PEDESTRIAN_VEL_X").
         required_observation_units (list): The observation generators required for this feature map:
             - PedestrianRelativeLocationGenerator: Provides relative positions of pedestrians
             - PedestrianRelativeVelXGenerator: Provides x-velocity component of pedestrians
-    
+
     Parameters:
         ped_min_speed_x (float): The minimum possible x-velocity of pedestrians.
         ped_max_speed_x (float): The maximum possible x-velocity of pedestrians.

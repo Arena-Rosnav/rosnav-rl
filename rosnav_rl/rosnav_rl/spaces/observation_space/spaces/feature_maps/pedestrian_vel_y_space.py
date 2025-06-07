@@ -15,12 +15,12 @@ from .base_feature_map_space import BaseFeatureMapSpace
 @SpaceFactory.register("ped_vel_y")
 class PedestrianVelYSpace(BaseFeatureMapSpace):
     """A class for creating and processing feature maps based on the y-component of pedestrians' velocities.
-    
+
     This class creates a 2D feature map where each cell represents a spatial location, and the value
     in that cell represents the y-component of a pedestrian's velocity if a pedestrian is present at
     that location. The feature map provides information about pedestrian movement in the y-direction
     (typically forward/backward movement in the robot's reference frame).
-    
+
     Attributes:
         name (str): The name identifier for this space, "PEDESTRIAN_VEL_Y".
         required_observation_units (list): List of required observation generators needed for this space.

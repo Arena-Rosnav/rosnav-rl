@@ -16,7 +16,8 @@ __all__ = [
 from typing import TYPE_CHECKING, List, Tuple, TypeVar
 
 import numpy as np
-import rospy
+
+# import rospy
 
 from rosnav_rl.states import SimulationStateContainer
 
@@ -37,11 +38,11 @@ from .base_generator import ObservationGeneratorUnit
 
 class GoalLocationInRobotFrameGenerator(ObservationGeneratorUnit[np.ndarray]):
     """Observation generator that provides the goal location in the robot's frame of reference.
-    
+
     This generator transforms the global goal coordinates into the robot's local coordinate frame,
     which is useful for navigation tasks where the robot needs to know the relative position
     of its goal.
-    
+
     Attributes:
         name (str): The name identifier for this generator.
         requires (List[BaseUnit]): The required collector units (GoalCollector and RobotPoseCollector).
@@ -54,21 +55,21 @@ class GoalLocationInRobotFrameGenerator(ObservationGeneratorUnit[np.ndarray]):
 
     def generate(self, obs_dict: "ObservationDict", *args, **kwargs) -> np.ndarray:
         """Generate an observation based on the robot and goal poses.
-        
+
         This method computes the relative position of the goal with respect to the robot's frame.
-        
+
         Args:
             obs_dict (ObservationDict): Dictionary containing observation data with at least:
                                         - goal pose from GoalCollector
                                         - robot pose from RobotPoseCollector
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
-        
+
         Returns:
             np.ndarray: A numpy array representing the goal's position relative to the robot's frame.
                         The array contains [x, y] coordinates after transformation.
         """
-        
+
         goal_pose: GoalCollector.data_class = obs_dict[GoalCollector.name]
         robot_pose: RobotPoseCollector.data_class = obs_dict[RobotPoseCollector.name]
 
@@ -94,6 +95,7 @@ class SubgoalLocationInRobotFrameGenerator(ObservationGeneratorUnit[np.ndarray])
         - SubgoalCollector: Provides the global coordinates of the current subgoal
         - RobotPoseCollector: Provides the current robot pose
     """
+
     name: str = "subgoal_location_in_robot_frame"
     requires: List[BaseUnit] = [SubgoalCollector, RobotPoseCollector]
     data_class = np.ndarray
@@ -101,16 +103,16 @@ class SubgoalLocationInRobotFrameGenerator(ObservationGeneratorUnit[np.ndarray])
     def generate(self, obs_dict: "ObservationDict", *args, **kwargs) -> np.ndarray:
         """
         Generates an observation vector containing the relative position of the goal with respect to the robot.
-        
+
         Args:
             obs_dict (ObservationDict): Dictionary containing observation data, including goal and robot poses
             *args: Additional positional arguments
             **kwargs: Additional keyword arguments
-            
+
         Returns:
             np.ndarray: A numpy array representing the relative position of the goal with respect to the robot frame
                        (usually [x, y] coordinates in the robot's coordinate system)
-        
+
         Note:
             This method extracts goal and robot poses from the observation dictionary and calculates
             their relative positions using the get_relative_pos_to_robot utility function.
@@ -150,6 +152,7 @@ class DistAngleToGoalGenerator(
               positive values mean the goal is to the left, and negative values mean
               the goal is to the right
     """
+
     name: str = "dist_angle_to_goal"
     requires: List[BaseUnit] = [GoalLocationInRobotFrameGenerator]
     data_class = Tuple[DistToGoal, AngleToGoal]
@@ -218,6 +221,7 @@ class LaserSafeDistanceGenerator(ObservationGeneratorUnit[bool]):
         bool: True if any laser scan point is closer than or equal to the robot's safety distance,
               False if all points are beyond the safety distance or if there are no laser readings.
     """
+
     name: str = "laser_safe_distance_violation"
     requires: List[BaseUnit] = [LaserCollector, FullRangeLaserCollector]
     data_class = bool
@@ -244,11 +248,11 @@ class LaserSafeDistanceGenerator(ObservationGeneratorUnit[bool]):
             bool: True if any laser scan reading is less than or equal to the safety distance (indicating danger),
                   False if all readings are greater than the safety distance or if no laser data is available
         """
-        if not isinstance(simulation_state_container, SimulationStateContainer):
-            rospy.logwarn_throttle(
-                60,
-                f"Can't calculate '{self.name}'-Generator! SimulationStateContainer not provided.",
-            )
+        # if not isinstance(simulation_state_container, SimulationStateContainer):
+        #     rospy.logwarn_throttle(
+        #         60,
+        #         f"Can't calculate '{self.name}'-Generator! SimulationStateContainer not provided.",
+        #     )
         laser_data = (
             obs_dict[LaserCollector.name]
             if FullRangeLaserCollector.name not in obs_dict

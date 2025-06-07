@@ -6,7 +6,6 @@ from typing import List
 import numpy as np
 import sensor_msgs.msg as sensor_msgs
 from cv_bridge import CvBridge
-from rl_utils.utils.constants import Simulator
 
 from .base_collector import ObservationCollectorUnit
 
@@ -15,11 +14,11 @@ __all__ = ["ImageColorCollector", "ImageDepthCollector"]
 
 class ImageCollector(ObservationCollectorUnit[sensor_msgs.Image, np.ndarray], ABC):
     """An abstract base class for collecting image observations from ROS topics.
-    
+
     This class extends ObservationCollectorUnit to handle image messages from ROS topics,
     converting them from sensor_msgs.Image format to numpy arrays for use in reinforcement
     learning environments.
-    
+
     Attributes:
         name (str): Name of the observation collector.
         topic (str): ROS topic to subscribe to for image data.
@@ -32,10 +31,6 @@ class ImageCollector(ObservationCollectorUnit[sensor_msgs.Image, np.ndarray], AB
     name: str
     topic: str
     up_to_date_required: bool = True
-    applicable_simulators: List[Simulator] = [
-        Simulator.UNITY,
-        Simulator.GAZEBO,
-    ]
 
     def __init__(self, *args, **kwargs) -> None:
         """

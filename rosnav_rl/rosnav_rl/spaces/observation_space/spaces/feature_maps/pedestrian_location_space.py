@@ -2,7 +2,7 @@ import numpy as np
 from gymnasium import spaces
 
 from rosnav_rl.observations import (
-    PedestrianLocationCollector,
+    PedestrianLocationGenerator,
     PedestrianRelativeLocationGenerator,
     RobotPoseCollector,
 )
@@ -16,16 +16,16 @@ from .base_feature_map_space import BaseFeatureMapSpace
 @SpaceFactory.register("ped_location")
 class PedestrianLocationSpace(BaseFeatureMapSpace):
     """A feature map observation space for pedestrian locations.
-    
+
     This class represents a feature map in the observation space that captures the locations of pedestrians
     in the environment relative to the robot's position. It creates a 2D grid representation where pedestrian
     locations are marked.
-    
+
     Attributes:
         name (str): Identifier for this observation space ("PEDESTRIAN_LOCATION").
-        required_observation_units (list): List of collector and generator classes required 
+        required_observation_units (list): List of collector and generator classes required
             to build this observation space.
-            
+
     Parameters:
         feature_map_size (int): The size of the feature map grid (N x N).
         roi_in_m (float): Region of interest in meters, representing the physical area covered by the feature map.
@@ -36,7 +36,7 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
 
     name = "PEDESTRIAN_LOCATION"
     required_observation_units = [
-        PedestrianLocationCollector,
+        PedestrianLocationGenerator,
         PedestrianRelativeLocationGenerator,
         RobotPoseCollector,
     ]
@@ -88,7 +88,10 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
             np.ndarray: The encoded observation as a numpy array.
         """
         return self._get_semantic_map(
-            observation[PedestrianLocationCollector.name],
-            observation[PedestrianRelativeLocationGenerator.name],
-            observation[RobotPoseCollector.name],
+            semantic_data=np.ones(
+                shape=(len(observation[PedestrianLocationGenerator.name]),)
+            ),
+            poses=observation[PedestrianLocationGenerator.name],
+            relative_poses=observation[PedestrianRelativeLocationGenerator.name],
+            robot_pose=observation[RobotPoseCollector.name],
         )

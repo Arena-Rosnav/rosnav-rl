@@ -3,8 +3,9 @@ from gymnasium import spaces
 
 from rosnav_rl.observations import (
     PedestrianRelativeLocationGenerator,
-    PedestrianTypeCollector,
+    PedestrianTypeGenerator,
     RobotPoseCollector,
+    PedestrianLocationGenerator,
 )
 from rosnav_rl.utils.type_aliases import ObservationDict
 
@@ -16,12 +17,12 @@ from .base_feature_map_space import BaseFeatureMapSpace
 @SpaceFactory.register("ped_type")
 class PedestrianTypeSpace(BaseFeatureMapSpace):
     """A space for representing pedestrian types as a feature map.
-    
+
     This class inherits from BaseFeatureMapSpace and creates a feature map that encodes
     different pedestrian types in the robot's environment. It uses pedestrian type information,
-    relative locations, and the robot's pose to generate a semantic map where each cell 
+    relative locations, and the robot's pose to generate a semantic map where each cell
     represents the type of pedestrian (if any) at that location.
-    
+
     Attributes:
         name (str): The name identifier for this space, set to "PEDESTRIAN_TYPE".
         required_observation_units (list): The observation collectors and generators required
@@ -32,7 +33,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
 
     name = "PEDESTRIAN_TYPE"
     required_observation_units = [
-        PedestrianTypeCollector,
+        PedestrianTypeGenerator,
         PedestrianRelativeLocationGenerator,
         RobotPoseCollector,
     ]
@@ -96,7 +97,8 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
 
         """
         return self._get_semantic_map(
-            observation[PedestrianTypeCollector.name],
-            observation[PedestrianRelativeLocationGenerator.name],
-            observation[RobotPoseCollector.name],
+            semantic_data=observation[PedestrianTypeGenerator.name],
+            poses=observation[PedestrianLocationGenerator.name],
+            relative_poses=observation[PedestrianRelativeLocationGenerator.name],
+            robot_pose=observation[RobotPoseCollector.name],
         )

@@ -1,7 +1,6 @@
 from collections import deque
 
 import numpy as np
-import rospy
 from gymnasium import spaces
 
 from rosnav_rl.observations import (
@@ -18,11 +17,11 @@ from .base_feature_map_space import BaseFeatureMapSpace
 @SpaceFactory.register("stacked_laser_map")
 class StackedLaserMapSpace(BaseFeatureMapSpace):
     """A feature map space that stacks laser scan data to create a 2D representation of the environment.
-    
+
     This class processes laser scan data by maintaining a queue of consecutive scans and
     transforming them into a feature map representation. The resulting map provides
     spatial information about the robot's surroundings based on laser readings.
-    
+
     Attributes:
         name (str): The identifier for this observation space ("STACKED_LASER_MAP").
         required_observation_units (list): List of required collectors, specifically LaserCollector.
@@ -32,7 +31,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         flatten (bool, optional): Whether to flatten the output feature map. Defaults to True.
         *args: Additional positional arguments for the parent class.
         **kwargs: Additional keyword arguments for the parent class.
-    
+
     Notes:
         - The feature map has shape (1, feature_map_size, feature_map_size)
         - Laser scans are processed to extract both minimum and average values
@@ -76,18 +75,18 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         self, laser_scan: LaserCollector.data_class, done: DoneObservation.data_class
     ) -> np.ndarray:
         """Process laser scan data and build a stacked laser map.
-        
+
         This method handles the processing of laser scan data to maintain a queue of scans
         and build a map representation. If no laser scan is available or the environment is reset,
         appropriate actions are taken.
-        
+
         Args:
             laser_scan (LaserCollector.data_class): The laser scan data, expected as a numpy array
             done (DoneObservation.data_class): Flag indicating if the episode is done
-            
+
         Returns:
             np.ndarray: The processed laser map or zeros array if no valid scan is available
-            
+
         Note:
             - If laser_scan is not a numpy array, returns a zero-filled array
             - If queue is empty or done flag is True, resets the laser stack
@@ -108,15 +107,15 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
 
     def _build_laser_map(self, laser_queue: deque) -> np.ndarray:
         """Builds a laser map from a queue of laser scans.
-        
-        This method processes laser scan data stored in a deque structure and transforms it into 
-        a feature map representation. The processing includes reshaping the data, calculating 
+
+        This method processes laser scan data stored in a deque structure and transforms it into
+        a feature map representation. The processing includes reshaping the data, calculating
         minimum and average values, and formatting the result as a map.
-        
+
         Args:
             laser_queue (deque): A queue containing laser scan data frames.
                                  Expected to contain 10 frames with 80×9 points each.
-        
+
         Returns:
             np.ndarray: A 3D array of shape (1, 80, 80) representing the processed laser map.
                        Even rows contain minimum values of laser readings,
@@ -125,7 +124,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         Raises:
             No exceptions are raised as they are caught internally and logged as warnings.
         """
-        
+
         try:
             temp = np.array(laser_queue, dtype=np.float32).flatten()
 
@@ -143,8 +142,8 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
             scan_avg = scan_avg.reshape(1600)
             scan_avg_map = np.tile(scan_avg, (4, 1)).reshape(1, 80, 80)
         except Exception as e:
-            rospy.logwarn(
-                f"[{rospy.get_name()}, {StackedLaserMapSpace.__name__}]: {e} \n Cannot build laser map. Instead return empty map."
+            print(
+                f"[{StackedLaserMapSpace.__name__}]: {e} \n Cannot build laser map. Instead return empty map."
             )
             return np.zeros(self.get_gym_space().shape)
 

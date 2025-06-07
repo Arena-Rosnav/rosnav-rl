@@ -4,12 +4,10 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, ClassVar, List, Union
 
 import numpy as np
-import rospy
 from gymnasium import spaces
 
 from rosnav_rl.observations import (
     RobotPoseCollector,
-    SemanticLayerCollector,
 )
 from rosnav_rl.observations.utils.semantic import (
     get_relative_pos_to_robot,
@@ -55,9 +53,9 @@ class BaseFeatureMapSpace(BaseObservationSpace):
     """
 
     name: ClassVar[str]
-    required_observation_units: ClassVar[List[
-        Union[ObservationCollector, ObservationGenerator]
-    ]] = []
+    required_observation_units: ClassVar[
+        List[Union[ObservationCollector, ObservationGenerator]]
+    ] = []
     background_value: ClassVar[int] = 0
 
     def __init__(
@@ -126,17 +124,18 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
     def _get_semantic_map(
         self,
-        semantic_data: SemanticLayerCollector.data_class,
-        relative_pos: np.ndarray = None,
+        semantic_data: np.ndarray,
+        poses: np.ndarray = None,
+        relative_poses: np.ndarray = None,
         robot_pose: RobotPoseCollector.data_class = None,
         *args,
         **kwargs,
     ) -> np.ndarray:
         """Creates a semantic feature map based on provided semantic data.
-        
+
         This method generates a 2D grid map representing semantic information in the robot's environment.
         Each cell in the map can contain evidence values from semantic data points.
-        
+
         Args:
             semantic_data: Collected semantic layer data containing points with locations and evidence values
             relative_pos: Optional array of positions relative to the robot. If None, will be calculated
@@ -144,7 +143,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             robot_pose: Robot's current pose (position and orientation), used for calculating relative positions
             *args: Additional positional arguments
             **kwargs: Additional keyword arguments
-            
+
         Returns:
             np.ndarray: A feature map of shape (1, feature_map_size, feature_map_size) with semantic evidence values
                    placed at corresponding grid cells. Cells with no data contain the background value.
@@ -153,37 +152,41 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             - If a data point falls outside the map boundaries, it will be ignored
             - Any exceptions during processing are logged as warnings
         """
+        assert (
+            isinstance(semantic_data, np.ndarray)
+            and semantic_data.ndim == 1
+            and semantic_data.shape[0] == 1
+        ), "Semantic data must be a 1D numpy array with shape (N,)"
+
+        assert (
+            poses or relative_poses
+        ), "Either poses or relative_poses must be provided"
+
         pos_map = (
             np.zeros((1, self._feature_map_size, self._feature_map_size))
             + self.background_value
         )
 
-        if relative_pos is None and len(semantic_data.points) == 0:
+        if relative_poses is None and len(semantic_data) == 0:
             return pos_map
 
         try:
             # If relative_pos is not provided, calculate it
-            if relative_pos is None and len(semantic_data.points) > 0:
-                ped_points = np.stack(
-                    [
-                        [frame.location.x, frame.location.y, 1]
-                        for frame in semantic_data.points
-                    ]
-                )
-                relative_pos = get_relative_pos_to_robot(robot_pose, ped_points)
+            if relative_poses is None and len(semantic_data) > 0:
+                relative_poses = get_relative_pos_to_robot(robot_pose, poses)
 
             for data, pos in zip(
-                semantic_data.points,
-                relative_pos,
+                semantic_data,
+                relative_poses,
             ):
                 index = self._get_map_index(pos)
                 if (
                     0 <= index[0] < self.feature_map_size
                     and 0 <= index[1] < self.feature_map_size
                 ):
-                    pos_map[0, index[0], index[1]] = data.evidence
+                    pos_map[0, index[0], index[1]] = data
         except Exception as e:
-            rospy.logwarn(e)
+            print(f"Exception occurred while processing semantic data: {e}")
 
         return pos_map
 
