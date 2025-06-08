@@ -1,20 +1,29 @@
 from __future__ import annotations
 
+import asyncio  # Add asyncio import
 import re
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Callable, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+)  # Removed Generic, Union
 
 import rclpy
-from rclpy.wait_for_message import wait_for_message
 from rclpy.node import Node
 from rclpy.qos import (
-    HistoryPolicy,
+    # HistoryPolicy, # Removed
     QoSDurabilityPolicy,
     QoSHistoryPolicy,
     QoSProfile,
     QoSReliabilityPolicy,
-    ReliabilityPolicy,
+    # ReliabilityPolicy, # Removed
 )
 from rclpy.subscription import Subscription
 from rclpy.time import Duration, Time
@@ -26,7 +35,7 @@ from ..observations import (
 )
 from ..observations.collectors.base_collector import SimulationNotCompatibleError
 from ..states import SimulationStateContainer
-from ..utils.rostopic import Namespace, Topic
+from ..utils.rostopic import Namespace  # Removed Topic
 from .dependency_resolution import explore_dependency_hierarchy
 from .generic_observation import GenericObservation
 
@@ -116,7 +125,8 @@ class ObservationManager:
             ns (Namespace): Namespace for the ROS topics
             obs_structure (List[BaseUnit]): List of observation units that define the structure of observations
             simulation_state_container (SimulationStateContainer): Container for simulation state data
-            topic_mappings (Optional[Dict[str, Callable]]): Dictionary mapping topic patterns to transformation functions
+            topic_mappings (Optional[Dict[str, Callable]]): Dictionary mapping topic patterns to transformation
+                                                            functions
             is_single_env (bool): Flag indicating if this is a single environment setup. Default: False
             obs_unit_kwargs (Optional[dict]): Additional keyword arguments to pass to observation units. Default: None
             wait_for_obs (bool): Whether to wait for initial observations before proceeding. Default: True
@@ -300,41 +310,74 @@ class ObservationManager:
         for collector in self._collectable_observations.values():
             collector.invalidate()
 
-    def _wait_for_observation(self, collector_name: str) -> bool:
-        """Wait for observation with improved timeout handling and diagnostics."""
+    async def _wait_for_observation(self, collector_name: str) -> bool:
+        """
+        Waits for a specific observation to become non-stale by repeatedly calling
+        spin_once in a thread until the observation's callback updates it or timeout.
+        """
         if collector_name not in self._collectors:
             self._logger.error(f"Cannot wait for unknown collector '{collector_name}'")
             return False
 
-        try:
-            topic = self._subscribers[collector_name].topic_name
-            msg_type = self._collectors[collector_name].msg_data_class
-            timeout = self._collectors[collector_name].timeout
+        observation = self._collectable_observations[collector_name]
+        timeout_duration = getattr(
+            self._collectors[collector_name], "timeout", self._obs_timeout
+        )
 
-            self._logger.debug(
-                f"Waiting for observation from {topic} (timeout: {self._obs_timeout}s)"
-            )
+        start_time = self._node.get_clock().now()
+        self._logger.debug(
+            f"Actively waiting for '{collector_name}' to be updated "
+            f"(current stale: {observation.stale}, timeout: {timeout_duration}s)."
+        )
 
-            flag, _ = wait_for_message(
-                msg_type,
-                self._node,
-                topic=topic,
-                time_to_wait=timeout,
-                qos_profile=self._qos_profile,
-            )
-
-            if flag:
-                return True
-            else:
-                raise TimeoutError(
-                    f"Timeout waiting for observation '{collector_name}'"
+        while observation.stale:
+            current_time = self._node.get_clock().now()
+            elapsed_s = (current_time - start_time).nanoseconds / 1e9
+            if elapsed_s > timeout_duration:
+                self._logger.warn(
+                    f"Timeout waiting for '{collector_name}' callback ({elapsed_s:.2f}s > {timeout_duration}s). "
+                    f"Observation remained stale."
                 )
+                if observation.stale:
+                    self._health_monitors[collector_name].record_error(
+                        TimeoutError(
+                            f"Timeout: {collector_name} not updated by callback within {timeout_duration}s"
+                        )
+                    )
+                return False
 
-        except Exception as e:
-            self._logger.error(f"Error waiting for observation '{collector_name}': {e}")
+            try:
+                await asyncio.to_thread(rclpy.spin_once, self._node, timeout_sec=0.01)
+                self._logger.debug(
+                    f"Spin complete for '{collector_name}'. Stale: {observation.stale}. Time: {elapsed_s:.3f}s"
+                )
+                if not observation.stale:
+                    self._logger.debug(
+                        f"'{collector_name}' became non-stale after spin."
+                    )
+                    break  # Exit while loop if updated
+            except Exception as e:
+                self._logger.error(
+                    f"Exception during rclpy.spin_once while waiting for '{collector_name}': {e}"
+                )
+                self._health_monitors[collector_name].record_error(e)
+                return False
+
+            await asyncio.sleep(0.001)  # Yield control
+
+        if not observation.stale:
+            self._logger.debug(
+                f"'{collector_name}' is now non-stale. Wait loop finished."
+            )
+            return True
+        else:
+            self._logger.warn(
+                f"'{collector_name}' is still stale after wait loop finished unexpectedly "
+                f"(e.g. not by timeout or update)."
+            )
             return False
 
-    def get_observations(self, **extra_observations) -> Dict[str, Any]:
+    async def get_observations(self, **extra_observations) -> Dict[str, Any]:
         """Collect and generate all observations with additional custom data.
 
         Args:
@@ -346,10 +389,10 @@ class ObservationManager:
         obs_dict = {}
 
         # Collect observations from topics
-        self._get_collectable_observations(obs_dict)
+        await self._get_collectable_observations(obs_dict)
 
         # Generate derived observations
-        self._get_generatable_observations(
+        await self._get_generatable_observations(
             obs_dict=obs_dict,
             simulation_state_container=self._simulation_state_container,
         )
@@ -359,34 +402,68 @@ class ObservationManager:
 
         return obs_dict
 
-    def _get_collectable_observations(self, obs_dict: Dict[str, Any]) -> Dict[str, Any]:
-        """Collect observations from ROS topics with staleness handling."""
-        for name, observation in self._collectable_observations.items():
-            # Check if observation is stale and requires update
-            if observation.stale and self._collectors[name].up_to_date_required:
-                self._logger.debug(f"Observation '{name}' is stale")
+    async def _get_collectable_observations(
+        self, obs_dict: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Collects observations from ROS topics, waiting if necessary."""
+        self._logger.debug("Starting _get_collectable_observations.")
+        for name, observation_container in self._collectable_observations.items():
+            collector_unit = self._collectors.get(name)
+            if not collector_unit:
+                self._logger.error(f"No collector unit found for '{name}', skipping.")
+                obs_dict[name] = None  # Or assign a default error value
+                continue
 
-                # Wait for fresh data if configured
-                if self._wait_for_obs:
-                    self._wait_for_observation(name)
+            # Check if observation is stale and an update is required by the collector
+            if observation_container.stale and collector_unit.up_to_date_required:
+                self._logger.debug(
+                    f"Observation '{name}' is stale and requires an update, attempting to wait..."
+                )
+                success = await self._wait_for_observation(name)
+                if not success:
+                    self._logger.warn(
+                        f"Failed to get a non-stale observation for '{name}' after waiting. "
+                        f"The current value (which may be stale or initial) will be used."
+                    )
+                    # The health monitor should have been updated by _wait_for_observation
+                    # or the callback if an error occurred.
+            # else:
+            #    self._logger.debug(
+            #        f"Observation '{name}' is not stale (stale={observation_container.stale}) "
+            #        f"or does not require an up-to-date value (up_to_date_required={collector_unit.up_to_date_required})."
+            #    )
 
-            # Add to observation dictionary
-            obs_dict[name] = observation.value
+            # Assign the value from the observation container.
+            # This value should be the latest if _wait_for_observation was successful,
+            # or the existing one if no wait was performed or if waiting failed.
+            obs_dict[name] = observation_container.value
 
-        # Mark all observations as stale for next cycle
-        self._invalidate_observations()
+            if observation_container.value is None:
+                # This might be normal if the initial message is None and no update has occurred yet,
+                # or if the preprocessing can result in None.
+                self._logger.debug(
+                    f"Observation '{name}' has a None value after processing."
+                )
+
+        self._invalidate_observations()  # Mark observations stale for the next collection cycle.
+        self._logger.debug("Finished _get_collectable_observations.")
         return obs_dict
 
-    def _get_generatable_observations(
+    async def _get_generatable_observations(
         self,
         obs_dict: Dict[str, Any],
         simulation_state_container: SimulationStateContainer,
     ) -> Dict[str, Any]:
-        """Generate derived observations from collected data."""
+        """Generate derived observations from collected data asynchronously."""
+        # Note: If generator.safe_generate methods are CPU-bound and long-running,
+        # they might still block the event loop if not handled carefully (e.g., run in executor).
+        # For now, we assume they are reasonably fast or their internal operations are async.
         for generator_name, generator in self._generators.items():
             try:
+                # If safe_generate itself becomes async, it should be awaited.
+                # For now, assume it's synchronous but called within an async method.
                 obs_dict[generator_name] = generator.safe_generate(
-                    obs_dict=obs_dict,
+                    obs_dict=obs_dict,  # This implies sequential dependency if generators use output of others
                     simulation_state_container=simulation_state_container,
                 )
             except KeyError as e:
@@ -394,13 +471,12 @@ class ObservationManager:
                     f"Missing dependency: {e}. "
                     f"Cannot generate observation for '{generator_name}'."
                 )
-                obs_dict[generator_name] = None
+                obs_dict[generator_name] = None  # Or some default error value
             except Exception as e:
                 self._logger.error(
                     f"Error generating observation '{generator_name}': {e}"
                 )
-                obs_dict[generator_name] = None
-
+                obs_dict[generator_name] = None  # Or some default error value
         return obs_dict
 
     def get_health_status(self) -> Dict[str, Dict[str, Any]]:
