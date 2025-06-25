@@ -27,7 +27,7 @@ class GenericObservation(Generic[_Ros2Message_T]):
         _value (ProcessedObservation): The processed observation data.
         _stale (bool): Flag indicating whether the observation is stale (True) or fresh (False).
         _msg (_Ros2Message): The latest raw message received.
-        _process_fnc (Callable): Function that processes raw messages into usable observation data.
+        _process_fnc (typing.Callable): Function that processes raw messages into usable observation data.
         _timestamp (Time): The rclpy.time.Time when the observation was last updated.
         _clock (rclpy.clock.Clock): Clock instance for getting current time.
 
@@ -56,7 +56,7 @@ class GenericObservation(Generic[_Ros2Message_T]):
 
         Args:
             initial_msg (_Ros2Message): The initial observation message.
-            process_fnc (Callable, optional): The function used to process the observation.
+            process_fnc (typing.Callable, optional): The function used to process the observation.
                 Defaults to lambda x: x.
         """
         self._msg = initial_msg

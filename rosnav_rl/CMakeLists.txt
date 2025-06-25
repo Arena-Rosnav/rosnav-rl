@@ -82,6 +82,7 @@ ament_export_dependencies(
   nav2_core
   pluginlib
   rclcpp
+  message_filters
 )
 
 ament_export_include_directories(include)
