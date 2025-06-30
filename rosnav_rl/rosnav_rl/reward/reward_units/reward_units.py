@@ -3,9 +3,27 @@ from typing import Any, Callable, Dict, Union
 from warnings import warn
 
 import numpy as np
-import rospy
 
-from rosnav_rl.observations import *
+# import rospy
+
+from rosnav_rl.observations import (
+    # CollisionCollector,
+    DistAngleToGoalGenerator,
+    DistAngleToSubgoalGenerator,
+    FullRangeLaserCollector,
+    GoalCollector,
+    LaserCollector,
+    LaserSafeDistanceGenerator,
+    LastActionCollector,
+    # ObsSafeDistCollector,
+    PedestrianDistanceGenerator,
+    PedestrianRelativeLocationGenerator,
+    PedestrianRelativeVelXGenerator,
+    PedestrianRelativeVelYGenerator,
+    # PedSafeDistCollector,
+    RobotPoseCollector,
+    SubgoalCollector,
+)
 from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.type_aliases.observation import ObservationDict
 
@@ -98,8 +116,8 @@ class RewardGoalReached(RewardUnit):
 class RewardSafeDistance(RewardUnit):
     required_observation_units = [
         LaserSafeDistanceGenerator,
-        PedSafeDistCollector,
-        ObsSafeDistCollector,
+        # PedSafeDistCollector,
+        # ObsSafeDistCollector,
     ]
     SAFE_DIST_VIOLATION_INFO = {"safe_dist_violation": True}
 
@@ -132,8 +150,8 @@ class RewardSafeDistance(RewardUnit):
     def check_safe_dist_violation(self, obs_dict: ObservationDict) -> bool:
         return (
             obs_dict[LaserSafeDistanceGenerator.name]
-            or obs_dict.get(PedSafeDistCollector.name, False)
-            or obs_dict.get(ObsSafeDistCollector.name, False)
+            # or obs_dict.get(PedSafeDistCollector.name, False)
+            # or obs_dict.get(ObsSafeDistCollector.name, False)
         )
 
     def __call__(
@@ -151,8 +169,8 @@ class RewardSafeDistance(RewardUnit):
 class RewardFactoredSafeDistance(RewardUnit):
     required_observation_units = [
         LaserSafeDistanceGenerator,
-        PedSafeDistCollector,
-        ObsSafeDistCollector,
+        # PedSafeDistCollector,
+        # ObsSafeDistCollector,
     ]
     SAFE_DIST_VIOLATION_INFO = {"safe_dist_violation": True}
 
@@ -185,8 +203,8 @@ class RewardFactoredSafeDistance(RewardUnit):
     def check_safe_dist_violation(self, obs_dict: ObservationDict) -> bool:
         return (
             obs_dict[LaserSafeDistanceGenerator.name]
-            or obs_dict.get(PedSafeDistCollector.name, False)
-            or obs_dict.get(ObsSafeDistCollector.name, False)
+            # or obs_dict.get(PedSafeDistCollector.name, False)
+            # or obs_dict.get(ObsSafeDistCollector.name, False)
         )
 
     def __call__(
@@ -401,10 +419,10 @@ class RewardCollision(RewardUnit):
         **kwargs: Any,
     ) -> Any:
         # quick Unity-specific check
-        if obs_dict.get(CollisionCollector.name, False):
-            self.add_reward(self._reward)
-            self.add_info(self.DONE_INFO)
-            return
+        # if obs_dict.get(CollisionCollector.name, False):
+        #     self.add_reward(self._reward)
+        #     self.add_info(self.DONE_INFO)
+        #     return
 
         coll_in_blind_spot = False
         crash_radius = simulation_state_container.robot.radius + self._bumper_zone
@@ -682,7 +700,7 @@ class RewardRootVelocityDifference(RewardUnit):
         last_action (numpy.ndarray): The last action taken.
 
     Methods:
-        __call__(self, action: np.ndarray, *args, **kwargs): Calculates the reward based on the velocity difference between
+        __call__(self, obs_dict: ObservationDict, *args, **kwargs): Calculates the reward based on the velocity difference between
             the current action and the last action.
         reset(self): Resets the last action to None.
     """
@@ -707,7 +725,7 @@ class RewardRootVelocityDifference(RewardUnit):
         Calculates and adds the reward based on the given action.
 
         Args:
-            action (np.ndarray): The action taken by the agent.
+            obs_dict (ObservationDict): Dictionary containing observations.
 
         Returns:
             None
@@ -952,92 +970,92 @@ class RewardActiveHeadingDirection(RewardUnit):
         return self._r_angle * (self._theta_m - abs(d_theta))
 
 
-@RewardUnitFactory.register("ped_safe_distance")
-class RewardPedSafeDistance(RewardUnit):
-    required_observation_units = [PedSafeDistCollector]
-    SAFE_DIST_VIOLATION_INFO = {"safe_dist_violation": True}
+# @RewardUnitFactory.register("ped_safe_distance")
+# class RewardPedSafeDistance(RewardUnit):
+#     required_observation_units = [PedSafeDistCollector]
+#     SAFE_DIST_VIOLATION_INFO = {"safe_dist_violation": True}
 
-    @check_params
-    def __init__(
-        self,
-        reward_function: RewardFunction,
-        reward: float = DEFAULTS.PED_SAFE_DISTANCE.REWARD,
-        safe_dist: float = DEFAULTS.PED_SAFE_DISTANCE.SAFE_DIST,
-        *args,
-        **kwargs,
-    ):
-        """Unity-specific class for calculating the reward when violating the ped-specific safe
-        distance.
+#     @check_params
+#     def __init__(
+#         self,
+#         reward_function: RewardFunction,
+#         reward: float = DEFAULTS.PED_SAFE_DISTANCE.REWARD,
+#         safe_dist: float = DEFAULTS.PED_SAFE_DISTANCE.SAFE_DIST,
+#         *args,
+#         **kwargs,
+#     ):
+#         """Unity-specific class for calculating the reward when violating the ped-specific safe
+#         distance.
 
-        Args:
-            reward_function (RewardFunction): The reward function object.
-            reward (float, optional): The reward value for violating the safe distance. Defaults to
-                DEFAULTS.PED_SAFE_DISTANCE.REWARD.
-            safe_dist (bool, optional): Safety distance which should not be passed. The value should
-                not include the radius of the robot body. Defaults to
-                DEFAULTS.PED_SAFE_DISTANCE.SAFE_DIST.
-        """
-        super().__init__(reward_function, True, *args, **kwargs)
-        self._reward = reward
+#         Args:
+#             reward_function (RewardFunction): The reward function object.
+#             reward (float, optional): The reward value for violating the safe distance. Defaults to
+#                 DEFAULTS.PED_SAFE_DISTANCE.REWARD.
+#             safe_dist (bool, optional): Safety distance which should not be passed. The value should
+#                 not include the radius of the robot body. Defaults to
+#                 DEFAULTS.PED_SAFE_DISTANCE.SAFE_DIST.
+#         """
+#         super().__init__(reward_function, True, *args, **kwargs)
+#         self._reward = reward
 
-    def check_parameters(self, *args, **kwargs):
-        if self._reward > 0.0:
-            warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
-                f"Positive rewards may lead to unfavorable behaviors. "
-                f"Current value: {self._reward}"
-            )
-            warn(warn_msg)
+#     def check_parameters(self, *args, **kwargs):
+#         if self._reward > 0.0:
+#             warn_msg = (
+#                 f"[{self.__class__.__name__}] Reconsider this reward. "
+#                 f"Positive rewards may lead to unfavorable behaviors. "
+#                 f"Current value: {self._reward}"
+#             )
+#             warn(warn_msg)
 
-    def __call__(self, obs_dict: ObservationDict, *args: Any, **kwargs: Any):
-        if obs_dict[PedSafeDistCollector.name]:
-            self.add_reward(self._reward)
-            self.add_info(self.SAFE_DIST_VIOLATION_INFO)
+#     def __call__(self, obs_dict: ObservationDict, *args: Any, **kwargs: Any):
+#         if obs_dict[PedSafeDistCollector.name]:
+#             self.add_reward(self._reward)
+#             self.add_info(self.SAFE_DIST_VIOLATION_INFO)
 
 
-@RewardUnitFactory.register("obs_safe_distance")
-class RewardObsSafeDistance(RewardUnit):
-    required_observation_units = [ObsSafeDistCollector]
-    SAFE_DIST_VIOLATION_INFO = {"safe_dist_violation": True}
+# @RewardUnitFactory.register("obs_safe_distance")
+# class RewardObsSafeDistance(RewardUnit):
+#     required_observation_units = [ObsSafeDistCollector]
+#     SAFE_DIST_VIOLATION_INFO = {"safe_dist_violation": True}
 
-    @check_params
-    def __init__(
-        self,
-        reward_function: RewardFunction,
-        reward: float = DEFAULTS.OBS_SAFE_DISTANCE.REWARD,
-        *args,
-        **kwargs,
-    ):
-        """Unity-specific class for calculating the reward when violating the obs-specific safe
-        distance.
+#     @check_params
+#     def __init__(
+#         self,
+#         reward_function: RewardFunction,
+#         reward: float = DEFAULTS.OBS_SAFE_DISTANCE.REWARD,
+#         *args,
+#         **kwargs,
+#     ):
+#         """Unity-specific class for calculating the reward when violating the obs-specific safe
+#         distance.
 
-        Args:
-            reward_function (RewardFunction): The reward function object.
-            reward (float, optional): The reward value for violating the safe distance. Defaults to
-                DEFAULTS.OBS_SAFE_DISTANCE.REWARD.
-            safe_dist (bool, optional): Safety distance which should not be passed. The value should
-                not include the radius of the robot body. Defaults to
-                DEFAULTS.OBS_SAFE_DISTANCE.SAFE_DIST.
-        """
-        super().__init__(reward_function, True, *args, **kwargs)
-        self._reward = reward
+#         Args:
+#             reward_function (RewardFunction): The reward function object.
+#             reward (float, optional): The reward value for violating the safe distance. Defaults to
+#                 DEFAULTS.OBS_SAFE_DISTANCE.REWARD.
+#             safe_dist (bool, optional): Safety distance which should not be passed. The value should
+#                 not include the radius of the robot body. Defaults to
+#                 DEFAULTS.OBS_SAFE_DISTANCE.SAFE_DIST.
+#         """
+#         super().__init__(reward_function, True, *args, **kwargs)
+#         self._reward = reward
 
-    def check_parameters(self, *args, **kwargs):
-        if self._reward > 0.0:
-            warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
-                f"Positive rewards may lead to unfavorable behaviors. "
-                f"Current value: {self._reward}"
-            )
-            warn(warn_msg)
+#     def check_parameters(self, *args, **kwargs):
+#         if self._reward > 0.0:
+#             warn_msg = (
+#                 f"[{self.__class__.__name__}] Reconsider this reward. "
+#                 f"Positive rewards may lead to unfavorable behaviors. "
+#                 f"Current value: {self._reward}"
+#             )
+#             warn(warn_msg)
 
-    def __call__(self, obs_dict: ObservationDict, *args: Any, **kwargs: Any):
-        if (
-            ObsSafeDistCollector.name in obs_dict
-            and obs_dict[ObsSafeDistCollector.name]
-        ):
-            self.add_reward(self._reward)
-            self.add_info(self.SAFE_DIST_VIOLATION_INFO)
+#     def __call__(self, obs_dict: ObservationDict, *args: Any, **kwargs: Any):
+#         if (
+#             ObsSafeDistCollector.name in obs_dict
+#             and obs_dict[ObsSafeDistCollector.name]
+#         ):
+#             self.add_reward(self._reward)
+#             self.add_info(self.SAFE_DIST_VIOLATION_INFO)
 
 
 @RewardUnitFactory.register("ped_type_safety_distance")
@@ -1090,11 +1108,14 @@ class RewardPedTypeSafetyDistance(RewardUnit):
     def __call__(self, obs_dict: ObservationDict, *args: Any, **kwargs: Any) -> None:
         ped_type_min_distances = obs_dict[PedestrianDistanceGenerator.name]
 
+        if not ped_type_min_distances:
+            warn(f"[{self.__class__.__name__}] No pedestrian type distances found.")
+            return
+
         for ped_type, reward in self._type_reward_pairs.items():
             if ped_type not in ped_type_min_distances:
-                rospy.logwarn_throttle(
-                    60,
-                    f"[{rospy.get_name()}, {self.__class__.__name__}] Pedestrian type {ped_type} not found.",
+                warn(
+                    f"[{self.__class__.__name__}] Pedestrian type {ped_type} not found."
                 )
                 continue
 
@@ -1134,11 +1155,20 @@ class RewardPedTypeFactoredSafetyDistance(RewardUnit):
     def __call__(self, obs_dict: ObservationDict, *args: Any, **kwargs: Any) -> None:
         ped_type_min_distances = obs_dict[PedestrianDistanceGenerator.name]
 
+        if not ped_type_min_distances:
+            warn(
+                f"[{self.__class__.__name__}] Won't apply reward unit. No pedestrian type distances found."
+            )
+            return
+
         for ped_type, factor in self._type_factor_pairs.items():
             if ped_type not in ped_type_min_distances:
-                rospy.logwarn_throttle(
-                    60,
-                    f"[{rospy.get_name()}, {self.__class__.__name__}] Pedestrian type {ped_type} not found.",
+                # TODO: rospy.logwarn_throttle(
+                #     60,
+                #     f"[{rospy.get_name()}, {self.__class__.__name__}] Pedestrian type {ped_type} not found.",
+                # )
+                warn(
+                    f"[{self.__class__.__name__}] Pedestrian type {ped_type} not found."
                 )
                 continue
 
@@ -1204,11 +1234,20 @@ class RewardPedTypeCollision(RewardUnit):
         """
         ped_type_min_distances = obs_dict[PedestrianDistanceGenerator.name]
 
+        if not ped_type_min_distances:
+            warn(
+                f"[{self.__class__.__name__}] Won't apply reward unit. No pedestrian type distances found."
+            )
+            return
+
         for ped_type, reward in self._type_reward_pairs.items():
             if ped_type not in ped_type_min_distances:
-                rospy.logwarn_throttle(
-                    60,
-                    f"[{rospy.get_name()}, {self.__class__.__name__}] Pedestrian type {ped_type} not found.",
+                # TODO: rospy.logwarn_throttle(
+                #     60,
+                #     f"[{rospy.get_name()}, {self.__class__.__name__}] Pedestrian type {ped_type} not found.",
+                # )
+                warn(
+                    f"[{self.__class__.__name__}] Pedestrian type {ped_type} not found."
                 )
                 continue
 
@@ -1252,16 +1291,23 @@ class RewardPedTypeVelocityConstraint(RewardUnit):
         )
 
         if action is None:
+            warn(
+                f"[{self.__class__.__name__}] Won't apply reward unit. No last action found."
+            )
             return
 
         if ped_type_min_distances is None:
+            warn(
+                f"[{self.__class__.__name__}] Won't apply reward unit. No pedestrian type distances found."
+            )
             return
 
         if self._type not in ped_type_min_distances:
-            rospy.logwarn_throttle(
-                60,
-                f"[{rospy.get_name()}, {self.__class__.__name__}] Pedestrian type {self._type} not found.",
-            )
+            # TODO: rospy.logwarn_throttle(
+            #     60,
+            #     f"[{rospy.get_name()}, {self.__class__.__name__}] Pedestrian type {self._type} not found.",
+            # )
+            warn(f"[{self.__class__.__name__}] Pedestrian type {self._type} not found.")
             return
 
         if ped_type_min_distances[self._type] < self._active_distance:

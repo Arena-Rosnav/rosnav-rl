@@ -1,6 +1,5 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
-import rospy
 from pydantic.dataclasses import Field, dataclass
 
 from rosnav_rl.cfg.reward import RewardFunctionDict
@@ -32,7 +31,7 @@ class RewardConfig:
 class RewardFunction:
     """The RewardFunction class manages reward calculation for reinforcement learning.
 
-    This class calculates rewards based on configured reward units, which can be combined 
+    This class calculates rewards based on configured reward units, which can be combined
     to create complex reward functions. It handles the instantiation of reward units,
     aggregation of rewards, and management of reward-related state information.
 
@@ -51,6 +50,7 @@ class RewardFunction:
         reward, info = reward_function.get_reward(observation, sim_state)
         ```
     """
+
     def __init__(
         self,
         function_dict: RewardFunctionDict,
@@ -71,13 +71,14 @@ class RewardFunction:
             verbose=verbose,
         )
         self.state = RewardState()
-        self._reward_units = self._create_reward_units()
+        self._reward_units: List["RewardUnit"] = []
+        self._create_reward_units()
 
-    def _create_reward_units(self) -> List["RewardUnit"]:
+    def _create_reward_units(self) -> None:
         """Create reward unit instances from configuration."""
         import rosnav_rl.reward as rew_pkg
 
-        return [
+        self._reward_units = [
             self._create_reward_unit(rew_pkg.RewardUnitFactory, unit_name, params)
             for unit_name, params in self.config.reward_function_dict.items()
         ]
@@ -85,9 +86,26 @@ class RewardFunction:
     def _create_reward_unit(
         self, factory: Any, unit_name: str, params: Dict[str, Any]
     ) -> "RewardUnit":
-        """Create a single reward unit instance."""
-        unit_class = factory.instantiate(unit_name)
-        return unit_class(reward_function=self, **self.config.unit_kwargs, **params)
+        """Create a single reward unit instance.
+
+        Args:
+            factory: The factory to create the reward unit.
+            unit_name: Name of the reward unit.
+            params: Parameters for the reward unit.
+
+        Returns:
+            An instance of the specified reward unit.
+
+        Raises:
+            ValueError: If the unit cannot be instantiated.
+        """
+        try:
+            unit_class = factory.instantiate(unit_name)
+            return unit_class(reward_function=self, **self.config.unit_kwargs, **params)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to create reward unit '{unit_name}': {str(e)}"
+            ) from e
 
     def calculate_reward(
         self,
@@ -95,19 +113,37 @@ class RewardFunction:
         simulation_state_container: SimulationStateContainer,
         **kwargs,
     ) -> None:
-        """Calculate rewards using all reward units."""
+        """Calculate rewards using all reward units.
+
+        Args:
+            obs_dict: Dictionary of observations.
+            simulation_state_container: Container for simulation state.
+            **kwargs: Additional arguments passed to reward units.
+        """
         for reward_unit in self._reward_units:
             if self._skip_on_safe_dist_violation(reward_unit):
                 continue
-
-            reward_unit(
-                obs_dict=obs_dict,
-                simulation_state_container=simulation_state_container,
-                **kwargs,
-            )
+            try:
+                reward_unit(
+                    obs_dict=obs_dict,
+                    simulation_state_container=simulation_state_container,
+                    **kwargs,
+                )
+            except KeyError as e:
+                raise KeyError(
+                    f"KeyError in reward unit '{reward_unit.name}': {str(e)}. Check if the "
+                    "observation dictionary contains the required observations."
+                ) from e
 
     def _skip_on_safe_dist_violation(self, reward_unit: "RewardUnit") -> bool:
-        """Determine if a reward unit should be skipped."""
+        """Determine if a reward unit should be skipped.
+
+        Args:
+            reward_unit: The reward unit to check.
+
+        Returns:
+            True if the unit should be skipped, False otherwise.
+        """
         return (
             self.state.info.get("safe_dist_violation", False)
             and not reward_unit._on_safe_dist_violation
@@ -121,6 +157,11 @@ class RewardFunction:
     ) -> Tuple[float, Dict[str, Any]]:
         """
         Calculate and return the current reward and information.
+
+        Args:
+            obs_dict: Dictionary of observations.
+            simulation_state_container: Container for simulation state.
+            **kwargs: Additional arguments for reward calculation.
 
         Returns:
             Tuple of (reward value, info dictionary)
@@ -151,7 +192,11 @@ class RewardFunction:
             self.state.reward_overview[called_by] = value
 
     def add_info(self, info: Dict[str, Any]) -> None:
-        """Update the info dictionary."""
+        """Update the info dictionary.
+
+        Args:
+            info: Dictionary of information to add.
+        """
         self.state.info.update(info)
 
     def reset(self) -> None:
@@ -178,7 +223,7 @@ class RewardFunction:
         ]
 
         for message in log_messages:
-            rospy.loginfo(message)
+            print(message)
 
     @property
     def reward_units(self) -> List["RewardUnit"]:
@@ -199,7 +244,11 @@ class RewardFunction:
         )
 
     def copy(self) -> "RewardFunction":
-        """Create a deep copy of the reward function."""
+        """Create a deep copy of the reward function.
+
+        Returns:
+            A new RewardFunction with the same configuration.
+        """
         return RewardFunction(
             function_dict=self.config.reward_function_dict,
             unit_kwargs=self.config.unit_kwargs,
