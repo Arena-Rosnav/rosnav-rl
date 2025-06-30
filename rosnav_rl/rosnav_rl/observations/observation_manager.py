@@ -510,20 +510,17 @@ class ObservationManager:
             return False
 
         observation = self._collectable_observations[collector_name]
-        timeout_duration = getattr(
-            self._collectors[collector_name], "timeout", self._obs_timeout
-        )
 
         try:
             await asyncio.wait_for(
                 self._poll_for_update(observation, collector_name),
-                timeout=timeout_duration,
+                timeout=self._collectors[collector_name].timeout,
             )
             self._logger.debug(f"Observation '{collector_name}' updated successfully.")
             return True
         except asyncio.TimeoutError:
             self._logger.warn(
-                f"Timeout waiting for '{collector_name}' after {timeout_duration}s. "
+                f"Timeout waiting for '{collector_name}' after {self._collectors[collector_name].timeout}s. "
                 "Observation remained stale."
             )
             # Ensure health monitor records the timeout
