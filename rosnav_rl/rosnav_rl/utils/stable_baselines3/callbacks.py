@@ -1,9 +1,8 @@
 import os
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 
 import gym
 import numpy as np
-import rospy
 from stable_baselines3.common.callbacks import (
     BaseCallback,
     EvalCallback,
@@ -177,11 +176,18 @@ class StopTrainingOnRewardThreshold(BaseCallback):
         to stop training.
     :param verbose: Verbosity level: 0 for no output, 1 for indicating when training ended because episodic reward
         threshold reached
+    :param is_last_state_getter: A callable that returns whether the last state has been reached
     """
 
-    def __init__(self, reward_threshold: float, verbose: int = 0):
+    def __init__(
+        self,
+        reward_threshold: float,
+        verbose: int = 0,
+        is_last_state_getter: Callable[[], bool] = lambda: True,
+    ):
         super().__init__(verbose=verbose)
         self.reward_threshold = reward_threshold
+        self.is_last_state_getter = is_last_state_getter
 
     def _on_step(self) -> bool:
         assert self.parent is not None, (
@@ -191,7 +197,7 @@ class StopTrainingOnRewardThreshold(BaseCallback):
         # Convert np.bool_ to bool, otherwise callback() is False won't work
         continue_training = bool(
             self.parent.best_mean_reward < self.reward_threshold
-            and not rospy.get_param("/last_state_reached", True)
+            and not self.is_last_state_getter()
         )
         if self.verbose >= 1 and not continue_training:
             print(
@@ -212,11 +218,18 @@ class StopTrainingOnSuccessThreshold(BaseCallback):
         to stop training.
     :param verbose: Verbosity level: 0 for no output, 1 for indicating when training ended because episodic reward
         threshold reached
+    :param is_last_state_getter: A callable that returns whether the last state has been reached
     """
 
-    def __init__(self, success_threshold: float, verbose: int = 0):
+    def __init__(
+        self,
+        success_threshold: float,
+        verbose: int = 0,
+        is_last_state_getter: Callable[[], bool] = lambda: True,
+    ):
         super().__init__(verbose=verbose)
         self.success_threshold = success_threshold
+        self.last_state_getter = is_last_state_getter
 
     def _on_step(self) -> bool:
         assert self.parent is not None, (
@@ -226,7 +239,7 @@ class StopTrainingOnSuccessThreshold(BaseCallback):
         # Convert np.bool_ to bool, otherwise callback() is False won't work
         continue_training = bool(
             self.parent.last_success_rate < self.success_threshold
-            and not rospy.get_param("/last_state_reached", True)
+            and not self.last_state_getter()
         )
         if self.verbose >= 1 and not continue_training:
             print(

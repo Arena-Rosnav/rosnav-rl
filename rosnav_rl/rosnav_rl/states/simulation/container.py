@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from rosnav_rl.states.agent import (
     ActionSpaceState,
@@ -6,7 +6,7 @@ from rosnav_rl.states.agent import (
     ObservationSpaceState,
 )
 
-from ..distributor import StateDistributor
+# from ..distributor import StateDistributor
 from .states import RobotState, TaskState
 
 
@@ -27,11 +27,11 @@ class SimulationStateContainer:
             Converts the simulation state to an agent state container, which includes the action space and observation space states.
     """
 
-    robot: RobotState
-    task: TaskState
+    robot: RobotState = field(default_factory=RobotState)
+    task: TaskState = field(default_factory=TaskState)
 
-    def distribute(self):
-        StateDistributor(self).distribute()
+    # def distribute(self):
+    #     StateDistributor(self).distribute()
 
     def to_agent_state_container(self) -> AgentStateContainer:
         return AgentStateContainer(

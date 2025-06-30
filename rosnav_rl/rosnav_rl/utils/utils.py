@@ -3,25 +3,14 @@ import os
 import random
 from typing import Tuple
 
-import rospkg
-import rospy
 import torch
 import yaml
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
-from rl_utils.utils.constants import Simulator
-from task_generator.utils import Utils
+
+# from task_generator.utils import Utils
 
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
-
-
-def get_robot_yaml_path(robot_model: str = None) -> str:
-    robot_model = rospy.get_param(os.path.join(rospy.get_namespace(), "model"))
-
-    simulation_setup_path = rospkg.RosPack().get_path("arena_simulation_setup")
-    return os.path.join(
-        simulation_setup_path, "entities", "robots", robot_model, f"model_params.yaml"
-    )
 
 
 def load_json(file_path: str) -> dict:
@@ -35,8 +24,9 @@ def load_yaml(file_path: str) -> dict:
 
 
 def make_mock_env(ns: str, space_manager: BaseSpaceManager) -> DummyVecEnv:
-    import rl_utils.envs.flatland_gymnasium_env as arena_flatland_gym_env
-    import rl_utils.envs.unity as arena_unity_env
+    # TODO: Make mock env
+    # import rl_utils.envs.flatland_gymnasium_env as arena_flatland_gym_env
+    # import rl_utils.envs.unity as arena_unity_env
 
     def _init_flatland_env():
         return arena_flatland_gym_env.FlatlandEnv(

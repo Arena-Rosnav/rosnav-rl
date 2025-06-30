@@ -1,10 +1,11 @@
 from dataclasses import dataclass
+from typing import Union
 
 
 # STATE NAMES HAVE TO RESEMBLE THE ARGUMENT NAMES IN THE ROSNAV_RL SPACES
-@dataclass(frozen=True)
+@dataclass
 class ActionSpaceState:
-    actions: list
+    actions: Union[list, dict]
     is_discrete: bool
     is_holonomic: bool
 
