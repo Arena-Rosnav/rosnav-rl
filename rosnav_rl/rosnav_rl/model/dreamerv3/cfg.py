@@ -10,6 +10,7 @@ from rosnav_rl.utils.type_aliases.rl_frameworks import SupportedRLFrameworks
 
 rp = rospkg.RosPack()
 
+
 class GeneralCfg(BaseModel):
     """Configuration for general training parameters.
 
@@ -33,7 +34,9 @@ class GeneralCfg(BaseModel):
         video_pred_log (bool): Whether to log video predictions. Defaults to True.
     """
 
-    logdir: Optional[Union[str, Path]] = rp.get_path("rosnav_rl") + "/agents"
+    logdir: Optional[Union[str, Path]] = (
+        "/home/le/arena4_ws/src/planners/rosnav_rl/rosnav_rl" + "/agents"
+    )  # TODO: get the path from the config rp.get_path("rosnav_rl")
     traindir: Optional[Union[str, Path]] = None
     evaldir: Optional[Union[str, Path]] = None
     offline_traindir: Union[str, Path] = ""
@@ -63,6 +66,7 @@ class EnvironmentCfg(BaseModel):
         prefill_steps (int): Number of random steps to take before training begins. Default is 2500.
         reward_EMA (bool): Whether to use Exponential Moving Average for rewards. Default is True.
     """
+
     reset_every: int = 0
     action_repeat: int = 1
     grayscale: bool = False
@@ -396,9 +400,8 @@ class DreamerV3Cfg(FrameworkCfg):
     Note:
         This class inherits from BaseModel and allows for arbitrary types in its configuration.
     """
-    name: Literal[SupportedRLFrameworks.DREAMER_V3] = (
-        SupportedRLFrameworks.DREAMER_V3
-    )
+
+    name: Literal[SupportedRLFrameworks.DREAMER_V3] = SupportedRLFrameworks.DREAMER_V3
     general: GeneralCfg = GeneralCfg()
     environment: EnvironmentCfg = EnvironmentCfg()
     model: ModelCfg = ModelCfg()

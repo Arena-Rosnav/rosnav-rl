@@ -48,7 +48,6 @@ from .model import (
     StableBaselinesModel,
     dreamerv3,
     stable_baselines3,
-    
 )
 from .observations import ObservationManager, collectors, generators, static
 from .reward import RewardFunction, reward_units

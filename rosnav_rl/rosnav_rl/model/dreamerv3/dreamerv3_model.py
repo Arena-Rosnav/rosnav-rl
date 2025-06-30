@@ -65,7 +65,11 @@ class DreamerV3Model(RL_Model):
     _logdir: pathlib.Path = None
 
     def __init__(
-        self, rl_agent: "rosnav_rl.RL_Agent", algorithm_cfg: "DreamerV3Cfg", *args, **kwargs
+        self,
+        rl_agent: "rosnav_rl.RL_Agent",
+        algorithm_cfg: "DreamerV3Cfg",
+        *args,
+        **kwargs,
     ) -> None:
         """
         Initialize the DreamerV3 Model.
@@ -80,8 +84,10 @@ class DreamerV3Model(RL_Model):
             **kwargs: Additional keyword arguments to pass to the parent class
         """
         super().__init__(rl_agent, algorithm_cfg, *args, **kwargs)
-        
-        algorithm_cfg.general.logdir = Path(algorithm_cfg.general.logdir) / rl_agent.name
+
+        algorithm_cfg.general.logdir = (
+            Path(algorithm_cfg.general.logdir) / rl_agent.name
+        )
         self._logdir = prepare_config(algorithm_cfg)
         self._logger = prepare_logger(algorithm_cfg, self._logdir)
 
@@ -172,7 +178,7 @@ class DreamerV3Model(RL_Model):
 
         self.load("latest")
         train(
-            self._algorithm_cfg, 
+            self._algorithm_cfg,
             self._model,
             train_envs,
             eval_envs,

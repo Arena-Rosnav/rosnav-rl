@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
-import rospy
+# import rospy
+# TODO: Retrieve robot model from ROS params
 from pydantic import BaseModel, Discriminator, Field, model_validator
 from typing_extensions import Annotated
 
@@ -17,7 +18,7 @@ class AgentCfg(BaseModel):
     """
     Configuration class for RL agents in ROS navigation.
 
-    This class represents the configuration of an RL agent, including its name, 
+    This class represents the configuration of an RL agent, including its name,
     robot model, framework, reward function, and action space settings.
 
     Attributes:
@@ -37,30 +38,30 @@ class AgentCfg(BaseModel):
         check_robot: Ensures the robot model is set and matches the one in ROS params.
             Raises ValueError if there's a mismatch.
     """
+
     name: Optional[str] = Field(None, description="Unique name of the agent.")
-    robot: Optional[str] = Field(None, description="Robot model name.", example="jackal")
+    robot: Optional[str] = Field(
+        None, description="Robot model name.", example="jackal"
+    )
     framework: Annotated[
-        Union[StableBaselinesCfg, DreamerV3Cfg], 
-        Discriminator(discriminator="name")
+        Union[StableBaselinesCfg, DreamerV3Cfg], Discriminator(discriminator="name")
     ]
     reward: Optional[RewardCfg] = None
     action_space: Optional[ActionSpaceCfg] = ActionSpaceCfg()
 
-    @model_validator(mode="after")
-    def check_robot(self):
-        if self.robot is None:
-            self.robot = rospy.get_param("model")
-        else:
-            if rospy.get_param("model") != self.robot:
-                raise ValueError(
-                    "Robot model in config does not match the one in ROS params."
-                )
-        return self
-    
+    # @model_validator(mode="after")
+    # def check_robot(self):
+    #     if self.robot is None:
+    #         self.robot = rospy.get_param("model")
+    #     else:
+    #         if rospy.get_param("model") != self.robot:
+    #             raise ValueError(
+    #                 "Robot model in config does not match the one in ROS params."
+    #             )
+    #     return self
+
     @model_validator(mode="after")
     def check_name(self):
         if self.name is None:
             self.name = generate_agent_name(self.framework, robot=self.robot)
         return self
-
-    

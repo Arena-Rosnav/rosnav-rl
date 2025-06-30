@@ -104,9 +104,7 @@ class RL_Agent:
                 rl_agent=self, algorithm_cfg=agent_cfg.framework
             )
         else:
-            raise ValueError(
-                f"Unsupported RL algorithm: {agent_cfg.framework.name}"
-            )
+            raise ValueError(f"Unsupported RL algorithm: {agent_cfg.framework.name}")
 
     def _initialize_space_manager(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
         """Initialize the space manager based on the provided configuration."""
@@ -251,7 +249,7 @@ class RL_Agent:
     @property
     def action_space(self) -> Union[spaces.Discrete, spaces.Box]:
         return self._space_manager.action_space
-    
+
     @property
     def agent_cfg(self) -> rosnav_rl_cfg.AgentCfg:
         """
@@ -261,10 +259,10 @@ class RL_Agent:
             rosnav_rl_cfg.AgentCfg: The configuration object for the agent.
         """
         return self._agent_cfg
-        
+
     def agent_state_container(self) -> AgentStateContainer:
         return self._agent_state_container
-    
+
     @property
     def name(self) -> str:
         return self._name
