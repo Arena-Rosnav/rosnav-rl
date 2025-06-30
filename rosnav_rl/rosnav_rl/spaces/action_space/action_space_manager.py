@@ -27,7 +27,7 @@ class ActionSpaceManager:
                         "y": [-1.0, 1.0]
                     },
                     "angular_range": [-1.0, 1.0]
-        
+
         For a non-holonomic robot with discrete actions:
             manager = ActionSpaceManager(
                 is_holonomic=False,
@@ -99,8 +99,8 @@ class ActionSpaceManager:
 
         if not self._holonomic:
             return spaces.Box(
-                low=np.array([linear_range[0], angular_range[0]]),
-                high=np.array([linear_range[1], angular_range[1]]),
+                low=np.array([linear_range[0], angular_range[0]], dtype=np.float32),
+                high=np.array([linear_range[1], angular_range[1]], dtype=np.float32),
                 dtype=np.float32,
             )
 

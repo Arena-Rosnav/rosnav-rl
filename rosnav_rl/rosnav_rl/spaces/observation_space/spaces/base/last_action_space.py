@@ -53,8 +53,8 @@ class LastActionSpace(BaseObservationSpace):
     ) -> None:
         self._min_linear_vel = min_linear_vel
         self._max_linear_vel = max_linear_vel
-        self._min_translational_vel = min_translational_vel
-        self._max_translational_vel = max_translational_vel
+        self._min_translational_vel = min_translational_vel or 0.0
+        self._max_translational_vel = max_translational_vel or 0.0
         self._min_angular_vel = min_angular_vel
         self._max_angular_vel = max_angular_vel
         super().__init__(*args, **kwargs)
