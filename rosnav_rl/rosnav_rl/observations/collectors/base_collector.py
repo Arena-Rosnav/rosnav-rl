@@ -87,7 +87,7 @@ class ObservationCollectorUnit(
     up_to_date_required: ClassVar[bool] = False
 
     # Timeout configuration
-    timeout: ClassVar[float] = 10  # seconds
+    timeout: ClassVar[float] = 0.05  # seconds
 
     # Error tolerance configuration
     max_consecutive_errors: ClassVar[int] = 3

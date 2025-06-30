@@ -13,6 +13,7 @@ __all__ = [
     "PedestrianSocialStateGenerator",
 ]
 
+from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List, Union
 
 import numpy as np
@@ -52,12 +53,14 @@ class PedestrianLocationGenerator(ObservationGeneratorUnit[np.ndarray]):
         Returns:
             np.ndarray: An array of pedestrian locations. Returns an empty array if no pedestrians are detected.
         """
-        people_data: PeopleDataCollector.data_class = obs_dict[PeopleDataCollector.name]
+        people_data = obs_dict.get(PeopleDataCollector.name)
 
-        if len(people_data) == 0:
+        if not people_data or not people_data.people:
             return np.array([])
 
-        return np.stack([[data.position.x, data.position.y] for data in people_data])
+        return np.stack(
+            [[data.position.x, data.position.y] for data in people_data.people]
+        )
 
 
 class PedestrianRelativeLocationGenerator(ObservationGeneratorUnit[np.ndarray]):
@@ -96,7 +99,9 @@ class PedestrianRelativeLocationGenerator(ObservationGeneratorUnit[np.ndarray]):
             np.ndarray: An array of pedestrian positions relative to the robot.
                 Returns an empty array if no pedestrians are detected.
         """
-        people_data: PeopleDataCollector.data_class = obs_dict[PeopleDataCollector.name]
+        people_data: PeopleDataCollector.data_class = obs_dict[
+            PeopleDataCollector.name
+        ].people
 
         if len(people_data) == 0:
             return np.array([])
@@ -154,14 +159,14 @@ class PedestrianRelativeVelGenerator(ObservationGeneratorUnit[np.ndarray]):
             np.ndarray: Array of relative pedestrian velocities with respect to the robot.
                        Returns an empty array if no pedestrian data is available.
         """
-        ped_vel_x: PeopleDataCollector.data_class = [
-            data.velocity.x for data in obs_dict[PeopleDataCollector.name]
-        ]
-        ped_vel_y: PeopleDataCollector.data_class = [
-            data.velocity.y for data in obs_dict[PeopleDataCollector.name]
-        ]
+        people_data = obs_dict.get(PeopleDataCollector.name)
+        if not people_data or not people_data.people:
+            return np.array([])
 
-        if len(ped_vel_x) == 0 or len(ped_vel_y) == 0:
+        ped_vel_x = [data.velocity.x for data in people_data.people]
+        ped_vel_y = [data.velocity.y for data in people_data.people]
+
+        if not ped_vel_x or not ped_vel_y:
             return np.array([])
 
         ped_vel = np.stack(
@@ -237,64 +242,51 @@ class PedestrianDistanceGenerator(
         obs_dict: ObservationDict,
         *args,
         **kwargs,
-    ) -> Dict[str, Dict[Union[str, int], float]]:
+    ) -> Dict[Union[str, int], float]:
         """
-        Generate a dictionary that maps each unique pedestrian type to the minimum distance
-        to a pedestrian of that type.
+        Generate a dictionary that maps each unique pedestrian group to the minimum distance
+        to a pedestrian of that group.
 
         Args:
             obs_dict (ObservationDict): Dictionary containing observation data, should include
-                                      pedestrian relative locations and types.
+                                      pedestrian relative locations and pedestrian data.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            Dict[str, float]: Dictionary mapping pedestrian types to minimum distances.
+            Dict[Union[str, int], float]: Dictionary mapping pedestrian group IDs to minimum distances.
                              Returns empty dictionary if required data is not available or inconsistent.
 
         Note:
-            - Requires 'PedestrianRelativeLocationGenerator.name' and 'PedestrianTypeCollector.name' in obs_dict.
-            - Warns if the number of pedestrian types and locations don't match.
+            - Requires 'PedestrianRelativeLocationGenerator.name' and 'PeopleDataCollector.name' in obs_dict.
+            - Warns if the number of pedestrian groups and locations do not match.
         """
-        ped_distances = {}
+        relative_locations = obs_dict.get(PedestrianRelativeLocationGenerator.name)
+        people_data = obs_dict.get(PeopleDataCollector.name)
 
-        relative_locations = obs_dict.get(
-            PedestrianRelativeLocationGenerator.name, None
-        )
+        if relative_locations is None or people_data is None or not people_data.people:
+            return {}
 
-        # determine index of 'group_id' in data.tagnames
-        try:
-            group_id_index = obs_dict[PeopleDataCollector.name].tagnames.index(
-                "group_id"
-            )
-        except ValueError:
-            warn(
-                "Pedestrian group ID not found in the data. Returning empty dictionary."
-            )
-            return ped_distances
+        if len(relative_locations) != len(people_data.people):
+            warn("Number of pedestrian locations and people do not match!")
+            return {}
 
-        ped_groups = [
-            data.tags[group_id_index] for data in obs_dict[PeopleDataCollector.name]
-        ]
-
-        if relative_locations is None or ped_groups is None:
-            return ped_distances
-
-        if len(relative_locations) == 0 or len(ped_groups) == 0:
-            return ped_distances
-
-        if len(ped_groups) != len(relative_locations):
-            warn("Number of pedestrian types and locations do not match!")
-            return ped_distances
-
+        # Vectorized distance calculation for efficiency
         distances = np.linalg.norm(relative_locations, axis=1)
-        groups = np.array(ped_groups)
+        min_distances = defaultdict(lambda: float("inf"))
 
-        # get the unique types
-        for _type in groups:
-            ped_distances[_type] = np.min(distances[groups == _type])
+        for i, person in enumerate(people_data.people):
+            try:
+                group_id = person.tags[person.tagnames.index("group_id")]
+                distance = distances[i]
 
-        return ped_distances
+                if distance < min_distances[group_id]:
+                    min_distances[group_id] = distance
+            except (ValueError, IndexError):
+                # Skip person if 'group_id' tag is missing or malformed
+                continue
+
+        return dict(min_distances)
 
 
 class PedestrianTypeGenerator(ObservationGeneratorUnit[np.ndarray]):
@@ -319,15 +311,15 @@ class PedestrianTypeGenerator(ObservationGeneratorUnit[np.ndarray]):
         Returns:
             np.ndarray: Array of social states for each pedestrian.
         """
+        people_data = obs_dict.get(PeopleDataCollector.name)
+        if not people_data or not people_data.people:
+            return np.array([])
         try:
-            behavior_idx = obs_dict[PeopleDataCollector.name].tagnames.index("group_id")
-            return np.array(
-                [data.tags[behavior_idx] for data in obs_dict[PeopleDataCollector.name]]
-            )
-        except ValueError:
-            warn(
-                "Pedestrian social state not found in the data. Returning empty array."
-            )
+            # Assuming tagnames are the same for all people
+            behavior_idx = people_data.people[0].tagnames.index("group_id")
+            return np.array([data.tags[behavior_idx] for data in people_data.people])
+        except (ValueError, AttributeError, IndexError):
+            warn("Pedestrian group ID not found in the data. Returning empty array.")
             return np.array([])
 
 
@@ -353,12 +345,14 @@ class PedestrianSocialStateGenerator(ObservationGeneratorUnit[np.ndarray]):
         Returns:
             np.ndarray: Array of social states for each pedestrian.
         """
+        people_data = obs_dict.get(PeopleDataCollector.name)
+        if not people_data or not people_data.people:
+            return np.array([])
         try:
-            behavior_idx = obs_dict[PeopleDataCollector.name].tagnames.index("behavior")
-            return np.array(
-                [data.tags[behavior_idx] for data in obs_dict[PeopleDataCollector.name]]
-            )
-        except ValueError:
+            # Assuming tagnames are the same for all people
+            behavior_idx = people_data.people[0].tagnames.index("behavior")
+            return np.array([data.tags[behavior_idx] for data in people_data.people])
+        except (ValueError, AttributeError, IndexError):
             warn(
                 "Pedestrian social state not found in the data. Returning empty array."
             )

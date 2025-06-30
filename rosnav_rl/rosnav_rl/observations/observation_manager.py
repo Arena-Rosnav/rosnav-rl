@@ -44,15 +44,22 @@ class ObservationHealth:
     """Tracks the health status of an observation source with improved metrics."""
 
     name: str
-    last_update_time: Time = field(default_factory=lambda: Time())
+    clock: rclpy.clock.Clock = rclpy.clock.Clock(
+        clock_type=rclpy.clock.ClockType.ROS_TIME
+    )
+    last_update_time: Time = field(init=False)
     update_count: int = 0
     error_count: int = 0
     consecutive_errors: int = 0
     latest_error: Optional[Exception] = None
 
+    def __post_init__(self):
+        """Initialize non-parameter fields."""
+        self.last_update_time = Time(clock_type=self.clock.clock_type)
+
     def record_update(self) -> None:
         """Record a successful observation update with timestamp."""
-        self.last_update_time = rclpy.clock.Clock().now()
+        self.last_update_time = self.clock.now()
         self.update_count += 1
         self.consecutive_errors = 0
 
@@ -70,7 +77,7 @@ class ObservationHealth:
     @property
     def time_since_update(self) -> Duration:
         """Time elapsed since last update, with millisecond precision."""
-        return rclpy.clock.Clock().now() - self.last_update_time
+        return self.clock.now() - self.last_update_time
 
     @property
     def status_summary(self) -> Dict[str, Any]:
@@ -112,7 +119,6 @@ class ObservationManager:
         topic_mappings: Optional[Dict[str, Callable]] = None,
         obs_unit_kwargs: Optional[dict] = None,
         wait_for_obs: bool = True,
-        obs_timeout: float = 10.0,
         qos_profile: Optional[QoSProfile] = None,
         enable_synchronization: bool = True,
         sync_tolerance_seconds: float = 0.05,
@@ -133,7 +139,6 @@ class ObservationManager:
                                                             functions
             obs_unit_kwargs (Optional[dict]): Additional keyword arguments to pass to observation units. Default: None
             wait_for_obs (bool): Whether to wait for initial observations before proceeding. Default: True
-            obs_timeout (float): Timeout in seconds for waiting for observations. Default: 10.0
             qos_profile (Optional[QoSProfile]): Quality of Service profile for subscribers. Default: None
                 If None, a RELIABLE profile with KEEP_LAST history policy and depth 5 will be used.
             enable_synchronization (bool): Enable temporal synchronization of observations. Default: True
@@ -186,7 +191,6 @@ class ObservationManager:
         self._subscribers: Dict[str, Subscription] = {}
         self._health_monitors: Dict[str, ObservationHealth] = {}
         self._wait_for_obs = wait_for_obs
-        self._obs_timeout = obs_timeout
 
         # Synchronization parameters
         self._enable_synchronization = enable_synchronization
@@ -285,7 +289,9 @@ class ObservationManager:
                 process_fnc=collector.safe_preprocess,
             )
             self._collectable_observations[collector_name] = observation_container
-            self._health_monitors[collector_name] = ObservationHealth(collector_name)
+            self._health_monitors[collector_name] = ObservationHealth(
+                name=collector_name, clock=self._node.get_clock()
+            )
 
             _topic = self._get_mapped_topic(collector)
             callback = partial(
@@ -374,25 +380,9 @@ class ObservationManager:
         """
         obs_dict = {}
 
-        if self._non_sync_collector_names:
-            obs_dict = asyncio.run(
-                self._get_collectable_observations(
-                    obs_dict, self._non_sync_collector_names
-                )
-            )
-
-        if self._enable_synchronization and self._message_filter_synchronizer:
-            with self._lock:
-                for name in self._sync_collector_names:
-                    if self._collectable_observations[name].stale:
-                        self._logger.info(
-                            f"Synchronized collector '{name}' has not been updated "
-                            "since last call."
-                        )
-                    obs_dict[name] = self._collectable_observations[name].value
-
-            # Mark synchronized observations as stale for the next cycle
-            self._invalidate_observations(self._sync_collector_names)
+        obs_dict = asyncio.run(
+            self._get_collectable_observations(obs_dict, self.collectors)
+        )
 
         obs_dict.update(extra_observations)
 
@@ -446,7 +436,11 @@ class ObservationManager:
                 obs_dict[name] = None
                 continue
 
-            if observation_container.stale and collector_unit.up_to_date_required:
+            if (
+                self._wait_for_obs
+                and observation_container.stale
+                and collector_unit.up_to_date_required
+            ):
                 self._logger.debug(f"Stale observation '{name}' requires update.")
                 tasks[name] = self._wait_for_observation(name)
 
@@ -460,11 +454,12 @@ class ObservationManager:
                         "Using existing value."
                     )
 
-        # Retrieve all observation values after waiting
-        for name in collector_names:
-            obs_dict[name] = self._collectable_observations[name].value
-            if obs_dict[name] is None:
-                self._logger.debug(f"Observation '{name}' has a None value.")
+        with self._lock:
+            # Retrieve all observation values after waiting
+            for name in collector_names:
+                obs_dict[name] = self._collectable_observations[name].value
+                if obs_dict[name] is None:
+                    self._logger.debug(f"Observation '{name}' has a None value.")
 
         self._invalidate_observations(collector_names)
         self._logger.debug("Finished parallel observation collection.")
@@ -584,3 +579,13 @@ class ObservationManager:
                     self._logger.error(
                         f"Error updating synchronized observation '{collector_name}': {str(e)}"
                     )
+
+    @property
+    def collectors(self) -> List[str]:
+        """Returns the names of all collectors managed by this ObservationManager."""
+        return self._collectors.keys()
+
+    @property
+    def generators(self) -> List[str]:
+        """Returns the names of all generators managed by this ObservationManager."""
+        return self._generators.keys()

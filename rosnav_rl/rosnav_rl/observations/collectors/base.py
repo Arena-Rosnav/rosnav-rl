@@ -132,6 +132,7 @@ class RobotPoseCollector(
     up_to_date_required: ClassVar[bool] = True
     data_class: Type[np.ndarray] = np.ndarray
     msg_data_class: Type[nav_msgs.Odometry] = nav_msgs.Odometry
+    timeout: ClassVar[float] = 0.05  # seconds
 
     def preprocess(self, msg: nav_msgs.Odometry) -> np.ndarray:
         """Preprocess the Odometry message to extract 2D pose information.

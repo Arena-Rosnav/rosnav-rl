@@ -223,7 +223,7 @@ class LaserSafeDistanceGenerator(ObservationGeneratorUnit[bool]):
     """
 
     name: str = "laser_safe_distance_violation"
-    requires: List[BaseUnit] = [LaserCollector, FullRangeLaserCollector]
+    requires: List[BaseUnit] = [LaserCollector]  # , FullRangeLaserCollector]
     data_class = bool
 
     def generate(
