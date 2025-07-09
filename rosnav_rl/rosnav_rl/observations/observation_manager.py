@@ -121,7 +121,7 @@ class ObservationManager:
         wait_for_obs: bool = True,
         qos_profile: Optional[QoSProfile] = None,
         enable_synchronization: bool = True,
-        sync_tolerance_seconds: float = 0.05,
+        sync_tolerance_seconds: float = 0.1,
         buffer_size: int = 50,
     ) -> None:
         """
@@ -583,7 +583,7 @@ class ObservationManager:
     @property
     def collectors(self) -> List[str]:
         """Returns the names of all collectors managed by this ObservationManager."""
-        return self._collectors.keys()
+        return list(self._collectors.keys())
 
     @property
     def generators(self) -> List[str]:
