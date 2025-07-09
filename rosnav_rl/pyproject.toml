@@ -31,6 +31,7 @@ package-mode = true  # Critical for ROS integration
 [tool.poetry.group.dev.dependencies]
 matplotlib = "^3.0.0"
 einops = "^0.3.0"
+pyinstrument = "^5.0.3"
 
 [build-system]
 requires = ["poetry-core"]
