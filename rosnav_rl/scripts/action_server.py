@@ -20,7 +20,7 @@ Raises:
 
 import argparse
 from rosnav_rl.action_server.arena_server import ArenaActionServer
-import rospy
+import rclpy
 
 
 def parse_args():

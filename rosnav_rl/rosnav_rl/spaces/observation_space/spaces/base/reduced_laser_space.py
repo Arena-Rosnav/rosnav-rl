@@ -6,17 +6,18 @@ from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
+from .laser_space import LaserScanSpace
 
 
 @SpaceFactory.register("reduce_laser")
 class ReducedLaserScanSpace(BaseObservationSpace):
     """A class representing a reduced laser scan observation space.
-    
-    This observation space reduces the dimensionality of laser scan data by 
+
+    This observation space reduces the dimensionality of laser scan data by
     selecting a subset of the original laser beams at evenly spaced intervals.
-    This can be useful for reducing computational complexity while still 
+    This can be useful for reducing computational complexity while still
     maintaining sufficient environmental awareness for navigation tasks.
-    
+
     Attributes:
         name (str): Identifier for this observation space type, set to "REDUCED_LASER".
         required_observation_units (list): List of required collectors, only LaserCollector needed.
@@ -89,5 +90,8 @@ class ReducedLaserScanSpace(BaseObservationSpace):
             ndarray: The encoded laser scan observation.
         """
         return ReducedLaserScanSpace.reduce_laserbeams(
-            observation[LaserCollector.name], self._reduced_num_beams
+            LaserScanSpace.apply_limit(
+                observation[LaserCollector.name], self._max_range
+            ),
+            self._reduced_num_beams,
         )

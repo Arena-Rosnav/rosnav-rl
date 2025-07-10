@@ -72,10 +72,6 @@ def main(args=None):
 
     node = Node("observation_test")
 
-    reward_function = RewardFunction(
-        function_dict=reward_dict,
-    )
-
     om = ObservationManager(
         node=node,
         ns="/task_generator_node/jackal",
@@ -92,7 +88,7 @@ def main(args=None):
     rclpy.spin_once(node, timeout_sec=0.1)
 
     for i in range(30):
-        obs = asyncio.run(om.get_observations())
+        obs = om.get_observations()
         # reward_function.get_reward(
         #     obs_dict=obs,
         #     simulation_state_container=om._simulation_state_container,
@@ -137,14 +133,14 @@ def test_env():
     )
 
     env = GazeboEnv(
-        node=Node("gazebo_env_test"),
         ns="/task_generator_node/jackal",
+        node=Node("gazebo_env_test"),
         space_manager=rl_agent.space_manager,
         reward_function=rl_agent.reward_function,
         simulation_state_container=simulation_state_container,
         max_steps_per_episode=3000,
     )
-    env = TimeSyncWrapper(env)
+    # env = TimeSyncWrapper(env, 1.0)
 
     for _ in range(10):
         obs = env.reset()

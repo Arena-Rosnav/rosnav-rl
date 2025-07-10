@@ -48,19 +48,36 @@ class LaserScanSpace(BaseObservationSpace):
             dtype=np.float32,
         )
 
+    @staticmethod
+    def apply_limit(laserbeams: np.ndarray, max_range: float) -> np.ndarray:
+        """
+        Applies a limit to the laser beams, setting values greater than max_range to max_range.
+
+        Args
+            laserbeams (np.ndarray): The array of laser beams.
+            max_range (float): The maximum range value to apply.
+
+        Returns:
+            np.ndarray: The modified laser beams with values capped at max_range.
+        """
+        laserbeams[laserbeams > max_range] = max_range
+        return laserbeams
+
     @BaseObservationSpace.apply_normalization
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
     ) -> LaserCollector.data_class:
         """
         Extracts laser scan data from the observation dictionary.
-        
+
         Args:
             observation (ObservationDict): A dictionary containing observation data.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
-            
+
         Returns:
             LaserCollector.data_class: The laser scan data extracted from the observation dictionary.
         """
-        return observation[LaserCollector.name]
+        return LaserScanSpace.apply_limit(
+            observation[LaserCollector.name], self._max_range
+        )
