@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Protocol
 
-import numpy as np
-import rospy
+import rclpy
+from geometry_msgs.msg import Twist
+from rclpy.node import Node
+from rosnav_rl_msgs.srv import GetCommand
 from std_msgs.msg import Int16
 
 from rosnav_rl.rl_agent import RL_Agent
-from rosnav_rl.srv import GetAction, GetActionResponse
 from rosnav_rl.utils.rostopic import Namespace
 from rosnav_rl.utils.type_aliases import ObservationDict
 
@@ -26,7 +27,7 @@ class ActionServer(ABC):
     agent: RL_Agent = None
     observation_collector: ObservationCollector = None
 
-    def __init__(self, agent_name: str, namespace: str = "") -> None:
+    def __init__(self, agent_name: str, namespace: str = "", node: Node = None) -> None:
         """
         Initializes the BaseServer.
 
@@ -36,6 +37,15 @@ class ActionServer(ABC):
         """
         self.agent_name = agent_name
         self.namespace = Namespace(namespace)
+        self.node = (
+            node
+            if node is not None
+            else rclpy.create_node(
+                "rosnav_rl/action_server",
+                namespace=str(self.namespace),
+            )
+        )
+        self.logger = self.node.get_logger()
 
     @abstractmethod
     def _initialize_agent(self) -> RL_Agent: ...
@@ -54,34 +64,45 @@ class ActionServer(ABC):
         Returns:
             None
         """
-        self._get_next_action_srv = rospy.Service(
-            str(self.namespace("rosnav_rl/get_action")),
-            GetAction,
+        self._get_next_action_srv = self.node.create_service(
+            GetCommand,
+            "get_command",
             self.__handle_next_action_srv,
         )
-        self._sub_reset_stacked_obs = rospy.Subscriber(
-            "/scenario_reset", Int16, self.__on_scene_reset
+        self._sub_reset_stacked_obs = self.node.create_subscription(
+            Int16,
+            "/scenario_reset",
+            self.__on_scene_reset,
         )
 
-    def __handle_next_action_srv(self, request: GetAction):
+    def __handle_next_action_srv(
+        self, request: GetCommand.Request, response: GetCommand.Response
+    ):
         """
         Handles the service request to get the next action.
 
         Args:
-            request (GetAction): The service request.
+            request (GetCommand.Request): The service request.
+            response (GetCommand.Response): The service response.
 
         Returns:
-            GetActionResponse: The service response containing the next action.
+            GetCommand.Response: The service response containing the next action.
         """
-        response = GetActionResponse()
-        response.action = np.array([0, 0, 0])
+        cmd_vel = Twist()
 
         if self.agent is None:
-            rospy.loginfo("Agent not initialized yet.")
+            self.logger.info("Agent not initialized yet.")
+            response.twist = cmd_vel
             return response
 
         action = self.agent.get_action(self.observation_collector.get_observations())
-        response.action = action
+
+        # Assuming the action is a numpy array with [linear.x, linear.y,angular.z]
+        cmd_vel.linear.x = float(action[0])
+        cmd_vel.linear.y = float(action[1])
+        cmd_vel.angular.z = float(action[2])
+
+        response.twist = cmd_vel
 
         return response
 
@@ -96,7 +117,7 @@ class ActionServer(ABC):
             None
         """
         if self.agent is None:
-            rospy.loginfo("Agent not initialized yet.")
+            self.logger.info("Agent not initialized yet.")
             return
         self.agent.model.reset()
 
@@ -111,12 +132,14 @@ class ActionServer(ABC):
         4. Enters a loop that keeps the node running until ROS is shut down.
         """
         self._initialize_ros()
-        rospy.loginfo("[Rosnav-RL | Action Server] ROS services initialized.")
+        self.logger.info("[Rosnav-RL | Action Server] ROS services initialized.")
         self.agent = self._initialize_agent()
-        rospy.loginfo("[Rosnav-RL | Action Server] Agent initialized.")
+        self.logger.info("[Rosnav-RL | Action Server] Agent initialized.")
         self.observation_collector = self._initialize_observation_collector()
-        rospy.loginfo("[Rosnav-RL | Action Server] Observation collector initialized.")
+        self.logger.info(
+            "[Rosnav-RL | Action Server] Observation collector initialized."
+        )
 
-        rospy.loginfo("[Rosnav-RL | Action Server] Spinning...")
-        while not rospy.is_shutdown():
-            rospy.spin()
+        self.logger.info("[Rosnav-RL | Action Server] Spinning...")
+        while not rclpy.ok():
+            rclpy.spin_once(self.node)
