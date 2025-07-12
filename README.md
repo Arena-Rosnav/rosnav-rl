@@ -120,30 +120,6 @@ You can then send requests to the `/rosnav_rl/get_action` service to get actions
 
 ---
 
-## 🏗️ Project Architecture
-
-The system is built around a modular RL architecture that separates concerns between the Reinforcement Learning Framework, Agent-specific Space Management, Reward Calculation, and Observation Handling. This design promotes flexibility and allows for easy modification of individual components without affecting the rest of the system.
-
-<p align="center">
-  <img width="70%" src="rosnav_rl/img/rosnav_rl.png" />
-</p>
-
-### Data Flow
-
-The data flow is designed to be a sequential pipeline, from sensor data collection to robot command execution.
-
-1.  **Input**: Raw data is collected from the environment from various sources.
-2.  **Processing**: The `Observation Manager` handles the data, and the `Space Manager` transforms it into the agent's specific observation space.
-3.  **Decision**: The agent's `Model` (including feature extractors and the policy network) processes the features and selects an action.
-4.  **Output**: The `Action Space Manager` prepares the command for the robot.
-5.  **Execution**: The command is sent to the robot for physical or simulated execution.
-
-<p align="center">
-  <img width="60%" src="rosnav_rl/img/dataflow.png" />
-</p>
-
----
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please read the contributing guidelines before submitting a pull request.
