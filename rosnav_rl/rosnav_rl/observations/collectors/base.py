@@ -9,6 +9,9 @@ import geometry_msgs.msg as geometry_msgs
 import nav_msgs.msg as nav_msgs
 import numpy as np
 import sensor_msgs.msg as sensor_msgs
+import nav2_msgs.msg as nav2_msgs
+
+# nav2_msgs::msg::CollisionMonitorState
 
 from ..utils.pose import Pose2DType, TwistType, pose3d_to_pose2d
 from .base_collector import ObservationCollectorUnit
@@ -82,6 +85,35 @@ class FullRangeLaserCollector(LaserCollector):
 
     name: ClassVar[str] = "full_range_laser_scan"
     topic: ClassVar[str] = "full_scan"
+
+
+# TODO: Test
+class CollisionMonitorCollector(
+    ObservationCollectorUnit[nav2_msgs.CollisionMonitorState, bool]
+):
+    name: ClassVar[str] = "collision_monitor"
+    topic: ClassVar[str] = "collision_monitor_state"
+    up_to_date_required: ClassVar[bool] = True
+    msg_data_class: ClassVar[Type[nav2_msgs.CollisionMonitorState]] = (
+        nav2_msgs.CollisionMonitorState
+    )
+
+    def preprocess(self, msg: nav2_msgs.CollisionMonitorState) -> bool:
+        return msg.name == "CollisionPolygon"
+
+
+class SafetyZoneMonitorCollector(
+    ObservationCollectorUnit[nav2_msgs.CollisionMonitorState, bool]
+):
+    name: ClassVar[str] = "safety_zone_monitor"
+    topic: ClassVar[str] = "safety_zone_monitor_state"
+    up_to_date_required: ClassVar[bool] = True
+    msg_data_class: ClassVar[Type[nav2_msgs.CollisionMonitorState]] = (
+        nav2_msgs.CollisionMonitorState
+    )
+
+    def preprocess(self, msg: nav2_msgs.CollisionMonitorState) -> bool:
+        return msg.name == "SafetyPolygon"
 
 
 class PoseCollector(

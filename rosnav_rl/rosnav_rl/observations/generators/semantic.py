@@ -58,9 +58,12 @@ class PedestrianLocationGenerator(ObservationGeneratorUnit[np.ndarray]):
         if not people_data or not people_data.people:
             return np.array([])
 
-        return np.stack(
-            [[data.position.x, data.position.y] for data in people_data.people]
-        )
+        num_peds = len(people_data.people)
+        locations = np.empty((num_peds, 2))
+        for i, data in enumerate(people_data.people):
+            locations[i, 0] = data.position.x
+            locations[i, 1] = data.position.y
+        return locations
 
 
 class PedestrianRelativeLocationGenerator(ObservationGeneratorUnit[np.ndarray]):
@@ -106,11 +109,15 @@ class PedestrianRelativeLocationGenerator(ObservationGeneratorUnit[np.ndarray]):
         if len(people_data) == 0:
             return np.array([])
 
+        num_peds = len(people_data)
+        distant_poses = np.ones((num_peds, 3))
+        for i, data in enumerate(people_data):
+            distant_poses[i, 0] = data.position.x
+            distant_poses[i, 1] = data.position.y
+
         return get_relative_pos_to_robot(
             robot_pose=obs_dict[RobotPoseCollector.name],
-            distant_poses=np.stack(
-                [[data.position.x, data.position.y, 1] for data in people_data]
-            ),
+            distant_poses=distant_poses,
         )
 
 
@@ -163,15 +170,11 @@ class PedestrianRelativeVelGenerator(ObservationGeneratorUnit[np.ndarray]):
         if not people_data or not people_data.people:
             return np.array([])
 
-        ped_vel_x = [data.velocity.x for data in people_data.people]
-        ped_vel_y = [data.velocity.y for data in people_data.people]
-
-        if not ped_vel_x or not ped_vel_y:
-            return np.array([])
-
-        ped_vel = np.stack(
-            [[data_x, data_y] for data_x, data_y in zip(ped_vel_x, ped_vel_y)]
-        )
+        num_peds = len(people_data.people)
+        ped_vel = np.empty((num_peds, 2))
+        for i, data in enumerate(people_data.people):
+            ped_vel[i, 0] = data.velocity.x
+            ped_vel[i, 1] = data.velocity.y
 
         return get_relative_vel_to_robot(
             robot_pose=obs_dict[RobotPoseCollector.name],
@@ -294,6 +297,11 @@ class PedestrianTypeGenerator(ObservationGeneratorUnit[np.ndarray]):
     requires: List[BaseUnit] = [PeopleDataCollector]
     data_class = np.ndarray
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ped_ids = []
+        self._ped_types = np.array([])
+
     def generate(
         self,
         obs_dict: ObservationDict,
@@ -313,14 +321,25 @@ class PedestrianTypeGenerator(ObservationGeneratorUnit[np.ndarray]):
         """
         people_data = obs_dict.get(PeopleDataCollector.name)
         if not people_data or not people_data.people:
-            return np.array([])
+            self._ped_ids = []
+            self._ped_types = np.array([])
+            return self._ped_types
+
+        current_ped_ids = [p.id for p in people_data.people]
+        if current_ped_ids == self._ped_ids:
+            return self._ped_types
+
+        self._ped_ids = current_ped_ids
         try:
             # Assuming tagnames are the same for all people
             behavior_idx = people_data.people[0].tagnames.index("group_id")
-            return np.array([data.tags[behavior_idx] for data in people_data.people])
+            self._ped_types = np.array(
+                [data.tags[behavior_idx] for data in people_data.people]
+            )
         except (ValueError, AttributeError, IndexError):
             warn("Pedestrian group ID not found in the data. Returning empty array.")
-            return np.array([])
+            self._ped_types = np.array([])
+        return self._ped_types
 
 
 class PedestrianSocialStateGenerator(ObservationGeneratorUnit[np.ndarray]):
@@ -328,6 +347,11 @@ class PedestrianSocialStateGenerator(ObservationGeneratorUnit[np.ndarray]):
     requires: List[BaseUnit] = [PeopleDataCollector]
     data_class = np.ndarray
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ped_ids = []
+        self._ped_social_states = np.array([])
+
     def generate(
         self,
         obs_dict: ObservationDict,
@@ -347,13 +371,24 @@ class PedestrianSocialStateGenerator(ObservationGeneratorUnit[np.ndarray]):
         """
         people_data = obs_dict.get(PeopleDataCollector.name)
         if not people_data or not people_data.people:
-            return np.array([])
+            self._ped_ids = []
+            self._ped_social_states = np.array([])
+            return self._ped_social_states
+
+        current_ped_ids = [p.id for p in people_data.people]
+        if current_ped_ids == self._ped_ids:
+            return self._ped_social_states
+
+        self._ped_ids = current_ped_ids
         try:
             # Assuming tagnames are the same for all people
             behavior_idx = people_data.people[0].tagnames.index("behavior")
-            return np.array([data.tags[behavior_idx] for data in people_data.people])
+            self._ped_social_states = np.array(
+                [data.tags[behavior_idx] for data in people_data.people]
+            )
         except (ValueError, AttributeError, IndexError):
             warn(
                 "Pedestrian social state not found in the data. Returning empty array."
             )
-            return np.array([])
+            self._ped_social_states = np.array([])
+        return self._ped_social_states

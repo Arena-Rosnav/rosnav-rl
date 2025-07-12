@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import traceback
 from dataclasses import dataclass, field
 from functools import partial
 from typing import (
@@ -436,13 +437,10 @@ class ObservationManager:
                 obs_dict[name] = None
                 continue
 
-            if (
-                self._wait_for_obs
-                and observation_container.stale
-                and collector_unit.up_to_date_required
-            ):
-                self._logger.debug(f"Stale observation '{name}' requires update.")
-                tasks[name] = self._wait_for_observation(name)
+            if observation_container.stale and collector_unit.up_to_date_required:
+                self._logger.debug(f"No update on stale observation '{name}'.")
+                if self._wait_for_obs:
+                    tasks[name] = self._wait_for_observation(name)
 
         if tasks:
             self._logger.debug(f"Awaiting updates for: {list(tasks.keys())}")
@@ -523,26 +521,23 @@ class ObservationManager:
                 self._health_monitors[collector_name].record_error(
                     TimeoutError(f"Timeout waiting for '{collector_name}'")
                 )
-            return False
         except Exception as e:
             self._logger.error(
-                f"Exception while waiting for '{collector_name}': {e}",
-                exc_info=True,
+                f"Exception while waiting for '{collector_name}': {e}\n{traceback.format_exc()}"
             )
             self._health_monitors[collector_name].record_error(e)
-            return False
+        return False
 
     async def _poll_for_update(
         self, observation: GenericObservation, collector_name: str
     ) -> None:
         """
-        Continuously polls for an observation update by spinning the ROS node.
+        Continuously polls for an observation update.
         This loop is intended to be wrapped by `asyncio.wait_for`.
+        The node is spun in a background thread, so we just need to sleep and wait.
         """
         self._logger.debug(f"Polling for update on '{collector_name}'...")
         while observation.stale:
-            # Run the blocking rclpy.spin_once in a separate thread
-            await asyncio.to_thread(rclpy.spin_once, self._node, timeout_sec=0.01)
             # Yield control to the event loop to prevent blocking
             await asyncio.sleep(0.001)
 
