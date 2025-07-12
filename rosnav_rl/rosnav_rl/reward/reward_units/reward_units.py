@@ -305,14 +305,10 @@ class RewardApproachGoal(RewardUnit):
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._pos_factor = pos_factor
         self._neg_factor = neg_factor
-        self._goal_update_threshold = _goal_update_threshold
+        self._goal_update_threshold_sq = _goal_update_threshold**2
 
         self._goal_key = (
             SubgoalCollector.name if _follow_subgoal else GoalCollector.name
-        )
-
-        self.euclidean_distance = lambda a, b: np.sqrt(
-            (a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2
         )
 
         self.last_robot_pose = None
@@ -333,41 +329,34 @@ class RewardApproachGoal(RewardUnit):
             warn(warn_msg)
 
     def __call__(self, obs_dict: ObservationDict, *args, **kwargs):
-        if (
-            self.last_robot_pose is not None and self.last_goal_pose is not None
-        ):  # and not _inter_has_replanned:
+        if self.last_robot_pose is not None and self.last_goal_pose is not None:
+            curr_goal_pose = obs_dict[self._goal_key]
+            goal_location_diff_sq = (
+                curr_goal_pose["x"] - self.last_goal_pose["x"]
+            ) ** 2 + (curr_goal_pose["y"] - self.last_goal_pose["y"]) ** 2
 
-            goal_location_diff = self.euclidean_distance(
-                obs_dict[self._goal_key], self.last_goal_pose
-            )
-            if goal_location_diff >= self._goal_update_threshold:
-                self.last_goal_pose: Union[
-                    GoalCollector.data_class, SubgoalCollector.data_class
-                ] = obs_dict[self._goal_key]
-                self.last_robot_pose: RobotPoseCollector.data_class = obs_dict[
-                    RobotPoseCollector.name
-                ]
+            if goal_location_diff_sq >= self._goal_update_threshold_sq:
+                self.last_goal_pose = curr_goal_pose
+                self.last_robot_pose = obs_dict[RobotPoseCollector.name]
                 return
 
-            robot_pose: RobotPoseCollector.data_class = obs_dict[
-                RobotPoseCollector.name
-            ]
+            robot_pose = obs_dict[RobotPoseCollector.name]
 
-            last_goal_dist = self.euclidean_distance(
-                self.last_goal_pose, self.last_robot_pose
+            last_goal_dist = np.sqrt(
+                (self.last_goal_pose["x"] - self.last_robot_pose["x"]) ** 2
+                + (self.last_goal_pose["y"] - self.last_robot_pose["y"]) ** 2
             )
-            curr_goal_dist = self.euclidean_distance(self.last_goal_pose, robot_pose)
+            curr_goal_dist = np.sqrt(
+                (self.last_goal_pose["x"] - robot_pose["x"]) ** 2
+                + (self.last_goal_pose["y"] - robot_pose["y"]) ** 2
+            )
 
             term = last_goal_dist - curr_goal_dist
             w = self._pos_factor if term > 0 else self._neg_factor
             self.add_reward(w * term)
 
-        self.last_robot_pose: RobotPoseCollector.data_class = obs_dict[
-            RobotPoseCollector.name
-        ]
-        self.last_goal_pose: Union[
-            GoalCollector.data_class, SubgoalCollector.data_class
-        ] = obs_dict[self._goal_key]
+        self.last_robot_pose = obs_dict[RobotPoseCollector.name]
+        self.last_goal_pose = obs_dict[self._goal_key]
 
     def reset(self):
         self.last_robot_pose = None
