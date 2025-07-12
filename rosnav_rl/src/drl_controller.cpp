@@ -84,7 +84,7 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
   cmd_vel.header.frame_id = pose.header.frame_id;
   cmd_vel.header.stamp = clock_->now();
   
-  RCLCPP_INFO(logger_, "[ROSNAV_CONTROLLER] computeVelocityCommands called - checking service availability");
+  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] computeVelocityCommands called - checking service availability");
   
   if (!client_->wait_for_service(std::chrono::seconds(1))) {
     RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Service not available, stopping robot");
@@ -93,7 +93,7 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
     return cmd_vel;
   }
 
-  RCLCPP_INFO(logger_, "[ROSNAV_CONTROLLER] Service available, sending request");
+  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] Service available, sending request");
   auto request = std::make_shared<rosnav_rl_msgs::srv::GetCommand::Request>();
   auto future = client_->async_send_request(request);
 
@@ -103,10 +103,10 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
   while (rclcpp::ok()) {
     if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       cmd_vel.twist = future.get()->twist;
-      RCLCPP_INFO(
-          logger_,
-          "[ROSNAV_CONTROLLER] Received velocity command: linear_x=%.2f, angular_z=%.2f",
-          cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
+      RCLCPP_DEBUG(
+        logger_,
+        "[ROSNAV_CONTROLLER] Received velocity command: linear_x=%.2f, linear_y=%.2f, angular_z=%.2f",
+        cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
       break;
     }
     if ((node->now() - start).seconds() > 2.0) {  // Timeout less than environment timeout (10s)
