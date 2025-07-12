@@ -70,11 +70,10 @@ class ReducedLaserScanSpace(BaseObservationSpace):
 
         """
         if x >= len(laserbeams):
-            return laserbeams
-        indices = np.round(np.linspace(0, len(laserbeams) - 1, x)).astype(int)[:x]
-        if type(laserbeams) == tuple:
-            laserbeams = np.array(laserbeams)
-        return laserbeams[indices]
+            return np.asarray(laserbeams)
+
+        indices = np.linspace(0, len(laserbeams) - 1, x, dtype=int)
+        return np.asarray(laserbeams)[indices]
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(

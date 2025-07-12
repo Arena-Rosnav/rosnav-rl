@@ -22,25 +22,30 @@ def get_relative_pos_to_robot(
         A numpy array of shape (N, 2) containing the x and y coordinates of the distant
         poses in the robot's frame of reference (excluding the homogeneous component)
     """
-    # Create the homogeneous transformation matrix map_T_robot
-    map_T_robot = np.array(
+    x = robot_pose["x"]
+    y = robot_pose["y"]
+    yaw = robot_pose["yaw"]
+
+    cos_yaw = np.cos(yaw)
+    sin_yaw = np.sin(yaw)
+
+    # Calculate the inverse transformation matrix robot_T_map directly
+    # to avoid computationally expensive matrix inversion.
+    robot_T_map = np.array(
         [
             [
-                np.cos(robot_pose["yaw"]),  # Rotation component: cos(yaw)
-                -np.sin(robot_pose["yaw"]),  # Rotation component: -sin(yaw)
-                robot_pose["x"],  # Translation component: x
+                cos_yaw,
+                sin_yaw,
+                -x * cos_yaw - y * sin_yaw,
             ],
             [
-                np.sin(robot_pose["yaw"]),  # Rotation component: sin(yaw)
-                np.cos(robot_pose["yaw"]),  # Rotation component: cos(yaw)
-                robot_pose["y"],  # Translation component: y
+                -sin_yaw,
+                cos_yaw,
+                x * sin_yaw - y * cos_yaw,
             ],
-            [0, 0, 1],  # Homogeneous component: 0, 0, 1
+            [0, 0, 1],
         ]
     )
-
-    # Calculate the inverse transformation matrix robot_T_map
-    robot_T_map = np.linalg.inv(map_T_robot)
 
     # Apply the transformation to the distant poses using einsum, return the transformed poses, excluding the homogeneous component
     return np.einsum("ij,kj->ki", robot_T_map, distant_poses)[:, :2]
