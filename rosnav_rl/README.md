@@ -4,6 +4,10 @@
   <img width="600" src="img/logo.png" alt="Rosnav-RL Logo"/>
 </p>
 
+> Welcome to the RosNav-RL Developer Guide! This document provides a deep dive into the framework's architecture, core concepts, and development workflows. It's intended for developers who want to **extend the framework, create custom agents, or integrate new reinforcement learning algorithms.**
+>
+> While the main [README.md](../README.md) offers a high-level overview, this guide provides the detailed technical information you need to build on top of RosNav-RL.
+
 ## 📚 Table of Contents
 - [Executive Summary](#1-executive-summary)
 - [Project Architecture](#2-project-architecture)
@@ -11,117 +15,133 @@
 - [Code Organization](#4-code-organization)
 - [Core Concepts and Abstractions](#5-core-concepts-and-abstractions)
 - [Development Workflow](#6-development-workflow)
-- [Common Tasks & Tutorials](#7-common-tasks--tutorials)
+- [Common Tasks & Tutorials](#-7-common-tasks--tutorials)
 
 ---
 
 ## 🎯 1. Executive Summary
 
 ### Project Purpose
-This is the official **Rosnav-RL** package. The Rosnav-RL framework provides tools to construct a
-deep reinforcement learning agent for autonomous robot navigation, straight-forward development of a training pipeline and further testing across different platforms. 
-It provides a highly-modular, flexible and unified interface for defining an agent with a neural network, reward function, action and observation space. 
-The configuration layout provides a wide range of settings to encourage experimentation. The framework is
-intended to facilitate multiple reinforcement learning libraries for the application on learning-based navigation systems for mobile robots in ROS1.
+**Rosnav-RL** is a powerful and flexible framework designed to accelerate the research and development of deep reinforcement learning-based navigation systems for mobile robots in ROS 2. Developing and testing RL agents for robot navigation is a complex task that often involves tightly coupled components and significant integration overhead. This framework was built to solve that problem.
 
-Rosnav-RL was initially developed for the [Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav) environment, which is a simulation platform for training and evaluating navigation systems. 
-Though, the framework can be easily integrated into other simulation environments. 
+It provides a **highly modular, framework-agnostic, and extensible toolkit** that simplifies the entire development pipeline—from agent design and training to deployment and testing. By offering a unified interface for different RL libraries (like Stable-Baselines3 and DreamerV3), standardized spaces, and plug-and-play components, Rosnav-RL empowers developers to focus on innovation rather than integration.
+
+While initially developed for the [Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav) simulation platform, its adaptable architecture allows for easy integration into a wide variety of robotic systems and simulation environments.
 
 <p align="center">
   <img width="50%" src="img/training_pipeline.png" />
 </p>
 
 ### Main Technologies
-- **ROS 1**: Robot Operating System
-- **Python 3**: Core programming language
-- **Stable-Baselines3**: RL framework
-- **DreamerV3**: Model-based RL framework
-- **PyTorch**: Deep Learning library
+- **ROS 2**: The backbone for communication, providing a standardized interface for robotic systems.
+- **Python 3**: The core programming language, chosen for its rapid development and extensive scientific libraries.
+- **PyTorch**: The primary deep learning library, offering flexibility and performance for building custom neural networks.
+- **Stable-Baselines3 & DreamerV3**: Integrated, state-of-the-art RL frameworks that serve as powerful, interchangeable backends for training agents.
 
 ### ✨ Key Features
-- **Flexible Infrastructure**: Framework-agnostic design supporting multiple reinforcement learning backends.
-- **Modular Design**: Clean separation between network architecture building blocks for easy customization.
-- **Unified Encoding**: Standardized observation and action space management.
-- **Robust Configuration**: Pydantic-based configuration management with automatic validation.
-- **Seamless Observation Handling**: Modular management for easy integration of new observation types.
-- **Extensible Components**: Pre-tested neural network architectures and reward functions for quick development.
-- **Deployment-Ready**: ROS action server for seamless agent deployment.
+- **Framework-Agnostic RL Backend**: Don't get locked into one library. A common interface allows you to seamlessly switch between different RL frameworks like Stable-Baselines3 and DreamerV3 to find the best algorithm for your task.
+- **Deeply Modular & Extensible**: Build custom agents with ease. Every component—from observation spaces and reward functions to network layers—is a plug-and-play module. This design encourages rapid prototyping and experimentation.
+- **Unified & Composable Spaces**: Tame the complexity of sensor data. Define complex observation spaces by simply combining smaller, reusable units. The framework automatically handles data collection and encoding.
+- **Type-Safe & Validated Configuration**: Eliminate frustrating runtime errors. Configurations are managed through Pydantic, providing auto-completion, static type checking, and validation, making your experiments robust and reproducible.
+- **Seamless ROS 2 Deployment**: Bridge the gap from simulation to reality. A built-in ROS 2 Action Server makes deploying your trained agent as simple as launching a node, enabling immediate integration into larger robotic systems.
 
 ---
 
 ## 🏗️ 2. Project Architecture
 
-### High-Level Overview
-The system is built around a modular reinforcement learning architecture that separates concerns between:
-- Reinforcement Learning Framework
-- Agent-specific Space Management
-- Reward Calculation
-- Observation Handling
-- Centralized Parameter Management
+### Architectural Philosophy
+The core philosophy of RosNav-RL is **modularity and separation of concerns**. The architecture is designed to decouple the main pillars of a reinforcement learning system, allowing you to modify or replace any part with minimal impact on the others. This includes:
+
+-   🧠 **Reinforcement Learning Framework**: The "brain" of the agent, which can be swapped out (e.g., Stable-Baselines3, DreamerV3).
+-   🔭 **Observation Handling**: The "eyes" of the agent, responsible for collecting and processing sensor data.
+-   🚀 **Space Management**: The translator between the world and the agent's brain, encoding observations and decoding actions.
+-   🎁 **Reward Calculation**: The "motivation" of the agent, defining its goals and providing feedback.
+-   ⚙️ **Parameter Management**: A centralized and type-safe system for configuring every aspect of the agent and training process.
 
 ### Key Components
+The framework is organized into three primary modules, as illustrated below:
+
 <p align="center">
   <img width="70%" src="img/rosnav_rl.png" />
 </p>
 
-```
-RosNav-RL
-├── RL Agent
-│   ├── Model Architecture
-│   ├── Space Manager (Action-/ Observation Space Manager)
-│   └── Reward Function
-├── Observations
-│   ├── Observation Manager
-│   └── Observation Units
-└── States
-    ├── Agent State Container
-    └── Simulation State Container
-```
+-   **🤖 RL Agent**: The core decision-making entity.
+    -   **Model Architecture**: The neural network itself (policy, value function, etc.).
+    -   **Space Manager**: Handles the agent's specific `Action` and `Observation` spaces.
+    -   **Reward Function**: A collection of `RewardUnits` that computes the reward signal.
+
+-   **👀 Observations**: Manages all incoming data from the environment.
+    -   **Observation Manager**: Orchestrates the collection and generation of data.
+    -   **Observation Units**: Individual modules for subscribing to topics (`Collectors`) or deriving new data (`Generators`).
+
+-   **📊 States**: Pydantic-based containers for structured, type-safe state management.
+    -   **Simulation State Container**: Holds global information about the environment (e.g., robot pose, goal).
+    -   **Agent State Container**: Holds agent-specific information derived from the simulation state.
 
 ### Data Flow
+The data flows through the system in a clear, sequential pipeline from sensor input to robot action.
+
 <p align="center">
   <img width="60%" src="img/dataflow.png" />
 </p>
 
-| Stage | Component | Function |
-|-------|-----------|----------|
-| 1. Input | Observations Dictionary | Raw data collection |
-| 2. Processing | Observation Manager | Data handling |
-| | (Observation) Space Manager | Space-specific transformation |
-| 3. Decision | Model (Feature Extractors) | Feature engineering |
-| | Model (Policy Network) | Action selection |
-| 4. Output | (Action) Space Manager | Command preparation |
-| 5. Execution | Robot Commands | Physical/ simulated execution |
+1.  **📥 Input: Sensor Data Collection**
+    -   **Component**: `ObservationManager`
+    -   **Function**: Collects raw data from various ROS 2 topics (e.g., laser scans, odometry) and organizes it into a structured `ObservationDict`.
+
+2.  **🧠 Processing: Observation Encoding**
+    -   **Component**: `ObservationSpaceManager`
+    -   **Function**: Takes the raw `ObservationDict` and transforms it into a format the agent's neural network can understand. This involves selecting, normalizing, and stacking observations according to the agent's configuration.
+
+3.  **🤖 Decision: Action Selection**
+    -   **Component**: `RL_Model` (Policy Network)
+    -   **Function**: The encoded observation is fed into the neural network, which outputs an action based on its learned policy.
+
+4.  **🚀 Output: Action Decoding**
+    -   **Component**: `ActionSpaceManager`
+    -   **Function**: The raw action from the model (often a continuous value) is decoded into a concrete command that the robot can execute (e.g., `Twist` message with linear and angular velocities).
+
+5.  **⚙️ Execution: Robot Command**
+    -   **Component**: Robot Hardware/Simulator
+    -   **Function**: The final command is sent to the robot for execution in the physical or simulated world.
 
 ---
 
 ## 🚀 3. Setup & Installation
 
+This section covers how to set up your development environment.
+
 ### Prerequisites
-- Working ROS Noetic installation
+- Working ROS 2 Humble installation
 - Python 3.8+
 - Poetry
 
 ### Environment Setup
-**Single-package installation:**
-```bash
-# Clone repository
-git clone https://github.com/your-org/rosnav-rl.git
-cd rosnav-rl
+For development, it's recommended to clone the repository into your ROS 2 workspace.
 
-# Install dependencies
-poetry install
-```
-**Add to existing workspace:**
-```bash
-# Clone repository into your workspace's src folder
-git clone https://github.com/your-org/rosnav-rl.git src/rosnav-rl
+1.  **Clone the repository into your `src` folder:**
+    ```bash
+    cd /path/to/your/colcon_ws/src
+    git clone https://github.com/Arena-Rosnav/rosnav-rl.git
+    ```
 
-# Navigate to workspace
-cd *path-to-workspace*
-poetry add src/rosnav-rl
-```
+2.  **Install dependencies using Poetry:**
+    Navigate to the `rosnav_rl` package directory. Poetry will create a virtual environment and install all necessary Python packages.
+    ```bash
+    cd rosnav-rl/rosnav_rl
+    poetry install
+    ```
 
+3.  **Build the workspace:**
+    Return to your workspace root and build the packages.
+    ```bash
+    cd /path/to/your/colcon_ws
+    colcon build --packages-select rosnav_rl rosnav_rl_msgs
+    ```
+4.  **Source the workspace:**
+    ```bash
+    source install/setup.bash
+    ```
 ---
 
 ## 📂 4. Code Organization
@@ -146,233 +166,102 @@ rosnav_rl/
 
 ## 🤖 5. Core Concepts and Abstractions
 
-#### Main Agent Interface
-- **File**: [`rosnav_rl/rl_agent.py`](rosnav_rl/rl_agent.py)
-- **Role**: Coordinates interactions between the Model, Space Manager, and Reward Function. Provides the main interface for Reinforcement Learning.
+This section breaks down the core building blocks of the RosNav-RL framework. Each component is designed to be modular and extensible, allowing you to customize any part of the agent's behavior.
 
-```python
-class RL_Agent:
-    def __init__(self, agent_cfg: AgentCfg, agent_state_container: AgentStateContainer):
-        self._model = self.initialize_model()
-        self._space_manager = self._initialize_space_manager()
-        self._reward_function = self._initialize_reward_function()
+### 🧠 The Agent: The Brain of the Operation
+-   **`RL_Agent`**: The master conductor. This class brings all the other components together—the model, the spaces, and the reward function—to form a complete, functioning agent. It's the main entry point for training and inference.
+    -   *File*: [`rosnav_rl/rl_agent.py`](rosnav_rl/rl_agent.py)
+-   **`RL_Model`**: The pluggable brain. This is an abstract interface that wraps different reinforcement learning libraries (like Stable-Baselines3 or DreamerV3). Want to use a new RL framework? Just implement this interface, and it will seamlessly integrate with the rest of the system.
+    -   *File*: [`rosnav_rl/model/model.py`](rosnav_rl/model/model.py)
 
-    def train(self, *args, **kwargs):
-        # Calls self._model.train() and trains the agent
+### 🔭 Perception: How the Agent Senses the World
+-   **`ObservationManager`**: The central nervous system for sensory input. It orchestrates all `ObservationUnits` to collect data from the environment (e.g., laser scans, odometry) and prepares it for the agent.
+    -   *File*: [`rosnav_rl/observations/observation_manager.py`](rosnav_rl/observations/observation_manager.py)
+-   **`ObservationCollectorUnit`**: The eyes and ears. These units subscribe to specific ROS 2 topics, grab the raw data, and perform any initial preprocessing. Each collector is a self-contained module for a single sensor.
+    -   *File*: [`rosnav_rl/observations/collectors/base_collector.py`](rosnav_rl/observations/collectors/base_collector.py)
+-   **`ObservationGeneratorUnit`**: The creative mind. These units don't subscribe to topics but instead derive new, meaningful data from observations that have already been collected (e.g., calculating the time to collision from laser scans).
+    -   *File*: [`rosnav_rl/observations/generators/base_generator.py`](rosnav_rl/observations/generators/base_generator.py)
 
-    def get_action(self, observation: ObservationDict) -> np.ndarray:
-        # Get action from model
-```
+### 🚀 Action & Observation Spaces: The Agent's Worldview
+-   **`BaseSpaceManager`**: The universal translator. This crucial component sits between the environment and the RL model, handling the vital tasks of encoding observations into a format the model understands and decoding the model's output into executable robot commands.
+    -   *File*: [`rosnav_rl/spaces/space_manager/base_space_manager.py`](rosnav_rl/spaces/space_manager/base_space_manager.py)
+-   **`ObservationSpaceManager`**: Defines *what the agent sees*. It's built from a collection of `BaseObservationSpace` modules, each corresponding to a piece of sensory data (e.g., a laser scan, the robot's velocity). You can mix and match these modules to construct complex, customized observation spaces for your agent.
+    -   *File*: [`rosnav_rl/spaces/observation_space/observation_space_manager.py`](rosnav_rl/spaces/observation_space/observation_space_manager.py)
+-   **`ActionSpaceManager`**: Defines *what the agent can do*. It translates the abstract actions from the policy network (e.g., an array `[-0.5, 0.8]`) into concrete, discrete, or continuous commands for the robot.
+    -   *File*: [`rosnav_rl/spaces/action_space/action_space_manager.py`](rosnav_rl/spaces/action_space/action_space_manager.py)
 
-#### Model Interface
-- Implemented in [`rosnav_rl/model/model.py`](rosnav_rl/model/model.py)
-- Encapsulates neural network and its framework-specific logic
-- Responsible for training, saving and loading the model
+### 🎁 The Reward System: The Agent's Motivation
+-   **`RewardFunction`**: The scorekeeper. This class orchestrates a collection of individual `RewardUnit`s, summing their outputs to calculate the final reward signal at each step. This composite structure makes it easy to build complex, multi-objective reward functions.
+    -   *File*: [`rosnav_rl/reward/reward_function.py`](rosnav_rl/reward/reward_function.py)
+-   **`RewardUnit`**: A single piece of motivation. Each unit is a self-contained module that calculates a specific reward or penalty (e.g., "reward for reaching the goal," "penalty for colliding"). You can combine these units like building blocks to shape the agent's behavior.
+    -   *File*: [`rosnav_rl/reward/base_reward_units.py`](rosnav_rl/reward/base_reward_units.py)
 
-```python
+### 📊 State Management: The Single Source of Truth
+-   **`SimulationStateContainer` & `AgentStateContainer`**: The memory banks. These Pydantic-based data containers provide a structured, type-safe way to manage and access state information throughout the framework. The `SimulationStateContainer` holds global environment data, while the `AgentStateContainer` holds data specific to an individual agent.
+    -   *Files*: [`rosnav_rl/states/simulation/container.py`](rosnav_rl/states/simulation/container.py), [`rosnav_rl/states/agent/container.py`](rosnav_rl/states/agent/container.py)
 
-class RL_Model:
-    @abstractmethod
-    def setup_model(self, *args, **kwargs):
-        pass
+### 🌐 Deployment: From Training to Reality
+-   **`ActionServer`**: The bridge to the ROS 2 world. This component wraps a trained agent in a ROS 2 Action Server, making it instantly deployable. Other nodes can request actions from your agent, allowing for easy integration into larger robotic systems.
+    -   *File*: [`rosnav_rl/action_server/base_server.py`](rosnav_rl/action_server/base_server.py)
 
-    @abstractmethod
-    def train(self, *args, **kwargs):
-        raise NotImplementedError()
+## 🛠️ 6. Development Workflow
 
-    @abstractmethod
-    def save(self, *args, **kwargs):
-        pass
+### Training a Custom Agent
+The typical workflow for training an agent involves creating a custom `gym.Env` that interfaces with your simulation environment.
 
-    @abstractmethod
-    def load(self, *args, **kwargs):
-        pass
+1.  **Create a Gym Environment**:
+    -   Inherit from `gym.Env`.
+    -   In the `__init__`, instantiate the `ObservationManager`, `BaseSpaceManager`, and `RewardFunction`.
+    -   Implement the `step`, `reset`, `render`, and `close` methods.
+    -   The `step` method will use the `ObservationManager` to get new sensor data, pass it to the agent to get an action, and use the `RewardFunction` to calculate the reward.
 
-    @abstractmethod
-    def get_action(self, observation: "EncodedObservationDict", *args, **kwargs):
-        pass
-```
+2.  **Configure Your Agent**:
+    -   Define your agent's configuration using the Pydantic models (e.g., `AgentCfg`, `StableBaselinesCfg`). This includes specifying the model architecture, observation spaces, and hyperparameters.
 
-#### Agent Spaces and Observation Management
-- Space Manager in [`rosnav_rl/spaces/space_manager/base_space_manager.py`](rosnav_rl/spaces/space_manager/base_space_manager.py)
-- Action Space Manager in [`rosnav_rl/spaces/action_space/action_space_manager.py`](rosnav_rl/spaces/action_space/action_space_manager.py)
-- Observation Space Manager in [`rosnav_rl/spaces/observation_space/observation_space_manager.py`](rosnav_rl/spaces/observation_space/observation_space_manager.py)
-- Observation Manager in [`rosnav_rl/observations/observation_manager.py`](rosnav_rl/observations/observation_manager.py)
-
-
-**Base Space Manager**
-- Processes agent observations and actions
-- Converts between different representations
-
-```python
-class BaseSpaceManager:
-    def encode_observation(
-        self, obs_dict: ObservationDict, *args, **kwargs
-    ) -> EncodedObservationDict:
-        pass
-
-    def decode_action(self, action: np.ndarray) -> np.ndarray:
-        pass
-```
-
-**Observation Space Manager**
-- An agent observation space is made up of multiple observation space units - each responsible for a specific observation type and its processing
-
-```python
-
-class ObservationSpaceManager:
-    _space_cls_list: ObservationSpaceList | Union[Type[BaseObservationSpace]]
-    _observation_space: spaces.Dict
-
-    def encode_observation(
-        self, observation: ObservationDict, *args, **kwargs
-    ) -> EncodedObservationDict:
-        # Retrieve observation and encode based on observation spaces
-```
-
-**Observation Spaces**
-- Modular observation space component that can be combined to form an observation space
-```python
-class BaseObservationSpace:
-    name: ClassVar[str]
-    required_observation_units: ClassVar[
-        List[Union[ObservationCollector, ObservationGenerator]]
-    ] = []
-
-    @property
-    def space(self) -> spaces.Space:
-        """
-        Get the gym.Space object representing the observation space.
-        """
-        return self._space
-
-    @abstractmethod
-    def encode_observation(self, observation: ObservationDict) -> np.ndarray:
-        pass
-```
-
-##### Observation Management
-
-- Observation Manager in [`rosnav_rl/observations/observation_manager.py`](rosnav_rl/observations/observation_manager.py)
-- Manages observation collection and generation
-
-```python
-class ObservationManager:
-    _collectors: Dict[str, ObservationCollectorUnit]
-    _generators: Dict[str, ObservationGeneratorUnit]
-
-    def get_observations(
-        self,
-        *args,
-        **extra_observations: ObservationDict,
-    ) -> ObservationDict:
-    # Collect and generate observations
-```
-
-**ObservationCollectorUnits**
-- Implemented in [`rosnav_rl/observations/observation_collector_unit.py`](rosnav_rl/observations/collectors/base_collector.py)
-- Collects observations from ROS topics and preprocesses them
-- Modular structure through Observation Units
-- Name, topic, and message type are defined in the class definition
-
-```python
-class ObservationCollectorUnit(
-    BaseUnit, Generic[MessageType, ProcessedObservationType], ABC
-):
-    name: ClassVar[str]
-    topic: ClassVar[str]
-    msg_data_class: ClassVar[Type[MessageType]]
-    data_class: ClassVar[Type[ProcessedObservationType]] = ProcessedObservationType
-
-    def preprocess(self, msg: MessageType) -> ProcessedObservationType:
-        # Preprocess message and return observation
-```
-
-**ObservationGeneratorUnits**
-- Implemented in [`rosnav_rl/observations/generators/base_generator.py`](rosnav_rl/observations/generators/base_generator.py)
-- Generates observations from collected data
-- Name, required observation units, data type of the generated data and observation generation logic are defined in the class definition
-
-```python
-class ObservationGeneratorUnit(BaseUnit, Generic[GeneratedDataType], ABC):
-    name: ClassVar[str]
-    requires: ClassVar[List[BaseUnit]]
-    data_class: Type[GeneratedDataType]
-
-    def generate(
-        self,
-        obs_dict: dict,
-        simulation_state_container: SimulationStateContainer,
-        *args,
-        **kwargs,
-    ) -> GeneratedDataType:
-        # Generate observation based on collected data
-```
-
-#### Reward System
-- Reward Function in [`rosnav_rl/reward/reward_function.py`](rosnav_rl/reward/reward_function.py)
-- Calculates rewards based on actions and states
-- Modular structure through Reward Units
-
-```python
-class RewardFunction:
-    self._reward_units: List[RewardUnit]
-    
-    def calculate_reward(self, obs_dict: ObservationDict, simulation_state_container: SimulationStateContainer):
-        # Calculate reward based on current observation and state
-```
-
-**Reward Units**
-- Modular reward components that be combined to form a reward function
-```python
-class RewardUnit(ABC):
-    def add_reward(self, value: float):
-    ...
-
-    @abstractmethod
-    def __call__(self, obs_dict: ObservationDict, state_container: SimulationStateContainer, *args, **kwargs):
-        # Logic for calculating reward then calls add_reward()
-```
-
-#### State Management
-- Agent States in [`rosnav_rl/states/agent/container.py`](rosnav_rl/states/agent/container.py)
-- Simulation States in [`rosnav_rl/states/simulation/container.py`](rosnav_rl/states/simulation/container.py)
-- Manages state of agent and simulation environment
-
-#### Deployment
-- Action Server in [`rosnav_rl/action_server/base_server.py`](rosnav_rl/action_server/base_server.py)
-- Enables deployment of trained agents
-- Provides ROS interface
-
-## 6. Development Workflow
+3.  **Write a Training Script**:
+    -   Instantiate your custom environment.
+    -   Instantiate the `RL_Agent` with your configuration.
+    -   Call the `agent.train()` method, passing in your environment.
 
 ### Deployment
-When using the Rosnav-RL Action Server, the agent seamlessly integrates into the ROS infrastructure. The action server handles communication between the agent and the ROS environment. Observations are collected and passed to the agent, which returns an action to be executed by the robot. 
+Once an agent is trained, it can be deployed using the ROS 2 Action Server.
 
-To use it, ensure the `ObservationUnit`s have the correct topics and message types. The action can be requested via an external service call to `/rosnav_rl/get_action`. A launch file is provided to start the action server.
+-   A launch file is provided to start the server with your trained agent's model.
+-   The server listens for requests on the `/rosnav_rl/get_action` service.
+-   An external node can request an action by calling this service, providing the necessary observation data if required by the agent's configuration. The server then returns the computed action.
 
 ```python
-import rospy
-from rosnav_rl.srv import GetAction, GetActionRequest
+# Example of a ROS 2 node calling the action service
+import rclpy
+from rosnav_rl_msgs.srv import GetAction
 
-rospy.wait_for_service(f"{self.ns}/rosnav_rl/get_action")
-self._get_action_srv = rospy.ServiceProxy(
-    f"{self.ns}/rosnav_rl/get_action", GetAction
-)
+# Initialize rclpy and create a node
+rclpy.init()
+node = rclpy.create_node('action_requester')
 
-action = self._get_action_srv(GetActionRequest()).action
+# Create a client for the service
+# Replace 'sim_1' with the appropriate namespace if used
+client = node.create_client(GetAction, "/sim_1/rosnav_rl/get_action")
+
+# Wait for the service to be available
+while not client.wait_for_service(timeout_sec=1.0):
+    node.get_logger().info('Service not available, waiting again...')
+
+# Create a request and call the service
+request = GetAction.Request()
+future = client.call_async(request)
+rclpy.spin_until_future_complete(node, future)
+
+if future.result() is not None:
+    action = future.result().action
+    node.get_logger().info(f'Received action: {action}')
+else:
+    node.get_logger().error('Exception while calling service: %r' % future.exception())
+
+# Clean up
+node.destroy_node()
+rclpy.shutdown()
 ```
-
-### Training
-1.  **Choose a simulator environment.**
-2.  **Derive an Environment class** from `gym.Env` and implement the necessary methods using the provided interfaces:
-    -   `BaseSpaceManager`: Preprocess observations for the model and decode actions for the environment.
-    -   `ObservationManager`: Subscribe to topics and collect/generate observations.
-    -   `RewardFunction`: Calculate rewards based on observations and state.
-3.  **Instantiate the `SimulationStateContainer`** with the necessary parameters. The `AgentStateContainer` is derived from it via `.to_agent_state_container()` and holds space-specific parameters.
-4.  **Initialize and train the agent** with your desired configuration and the new environment.
-
-> **Note**: Ensure that the `ObservationUnits` of the `observations` module have the right topics and message types to collect the necessary data.
 
 ---
 
@@ -382,57 +271,70 @@ Here are guides for common development tasks. For more details, check the docume
 - [Reward Functions](rosnav_rl/reward/reward_functions.md)
 - [Observation Spaces](rosnav_rl/spaces/spaces.md)
 
-> #### 🧩 Adding a New RL Framework
-> 1.  Implement a new `RL_Model` inheriting from the base class. Implement methods for training, saving, loading, and action selection.
-> 2.  Implement your new architectures. Define the required observation spaces for the model.
-> 3.  Define new Pydantic configuration files for all settings of the new framework.
-> 4.  For deployment, inherit a new action server for the new framework.
+> #### 🧩 **Tutorial: Adding a New RL Framework**
+> To integrate a new RL library (e.g., "MyRLFramework"), you need to create a new model interface.
+> 1.  **Implement a new `RL_Model`**: Inherit from the base class and implement the abstract methods for training, saving, loading, and action selection according to your new framework's API.
+> 2.  **Define Architectures**: Implement your network architectures (e.g., policies, critics) compatible with the new framework.
+> 3.  **Create Pydantic Configurations**: Define new configuration classes for all settings and hyperparameters of the new framework.
+> 4.  **Update the Action Server**: For deployment, you may need to create a new action server class that inherits from the base server and handles your new model.
 
-> #### 🏋️ Training a New Agent
-> For a working integration into a training pipeline, check out the [Arena](https://github.com/Arena-Rosnav/arena-rosnav) repository and its [documentation](https://arena-rosnav.readthedocs.io/en/latest/).
+> #### 🧩 **Tutorial: Training a New Agent**
+> For a complete, working example of a training pipeline, we highly recommend checking out the **[Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav)** repository and its [documentation](https://arena-rosnav.readthedocs.io/en/latest/). The code snippet below illustrates the core components involved in a typical training script.
 > ```python
 > import rosnav_rl
 > 
-> # Create configuration
-> config = rosnav_rl.model.dreamerv3.cfg.DreamerV3Cfg(...) # or
-> config = rosnav_rl.model.stable_baselines3.cfg.StableBaselinesCfg(...)
+> # 1. Create a configuration for the agent and RL framework
+> # (Here, we use DreamerV3 as an example)
+> config = rosnav_rl.model.dreamerv3.cfg.DreamerV3Cfg(...)
 > 
 > agent_cfg = rosnav_rl.AgentCfg(
->     name="my_agent",
+>     name="my_dreamer_agent",
 >     robot="jackal",
 >     framework=config,
 > )
 > 
-> # Create state containers
+> # 2. Create state containers
+> # SimulationStateContainer holds global simulation info
 > simulation_state_container = rosnav_rl.SimulationStateContainer(...)
+> # AgentStateContainer holds agent-specific info
 > agent_state_container = simulation_state_container.to_agent_state_container()
 > 
-> # Create agent
+> # 3. Create the agent instance
 > agent = rosnav_rl.RL_Agent(
 >     agent_cfg=agent_cfg,
 >     agent_state_container=agent_state_container
 > )
 > agent.initialize_model()
 > 
-> # Create environments
+> # 4. Create Gym environments for training and evaluation
+> # The `create_env` function is a helper you would write to instantiate
+> # your custom gym.Env, which handles the interaction with the simulator.
 > train_envs = [create_env("train", i) for i in range(config.general.envs)]
 > eval_envs = [create_env("eval", i) for i in range(config.general.envs)]
 > 
-> # Train agent
+> # 5. Start the training process
 > agent.train(
 >     train_envs=train_envs,
 >     eval_envs=eval_envs
 > )
 > ```
 
-> #### 🏗️ Adding New Model Architectures
-> Implementation depends on the preferred framework:
-> - [StableBaselines3 Guide](rosnav_rl/model/stable_baselines3/custommodel.md)
-> - [DreamerV3 Guide](rosnav_rl/model/dreamerv3/package_description.md)
+> #### 🧩 **Tutorial: Adding New Model Architectures**
+> The process for adding a new network architecture (e.g., a custom policy or feature extractor) depends on the RL framework you are using. Please refer to the framework-specific guides for detailed instructions.
+> - [StableBaselines3 Custom Policies Guide](rosnav_rl/model/stable_baselines3/custommodel.md)
+> - [DreamerV3 Model Details](rosnav_rl/model/dreamerv3/package_description.md)
 
-> #### 👀 Adding a New Observation Space
-> Inherit from `BaseObservationSpace` and register it with the `SpaceFactory`. Set the `required_observation_units` attribute for automatic resolution. Access collected data from the `ObservationDict` and encode it for the model.
+> #### 🧩 **Tutorial: Adding a New Observation Space**
+> To add a new type of observation (e.g., from a new sensor), you create a new `BaseObservationSpace`.
+> 1. Inherit from `BaseObservationSpace`.
+> 2. Register it with the `SpaceFactory` using a unique name.
+> 3. Set the `required_observation_units` attribute to specify which `ObservationCollectorUnit`s are needed.
+> 4. Implement `get_gym_space` to define the shape and type of the observation.
+> 5. Implement `encode_observation` to process the raw data from the `ObservationDict` into a NumPy array for the model.
+>
 > ```python
+> from rosnav_rl.observations.collectors import LaserCollector
+>
 > @SpaceFactory.register("laser")
 > class LaserScanSpace(BaseObservationSpace):
 >     name = "LASER"
@@ -442,56 +344,48 @@ Here are guides for common development tasks. For more details, check the docume
 >         # ...
 > 
 >     def get_gym_space(self) -> spaces.Space:
+>         # Define the gym space, e.g., Box(low=0, high=1, shape=(laser_num_beams,))
 >         # ...
 > 
 >     @BaseObservationSpace.apply_normalization
->     def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> LaserCollector.data_class:
+>     def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> np.ndarray:
+>         # Access the collected laser scan data and return it as a numpy array.
 >         return observation[LaserCollector.name]
 > ```
 
-> #### ➕ Adding a New Observation Unit
-> Use `ObservationCollectorUnit` to collect and preprocess data from ROS topics. Use `ObservationGeneratorUnit` to generate new observations from collected data.
+> #### 🧩 **Tutorial: Adding a New Observation Unit**
+> `ObservationUnit`s are responsible for fetching and processing data.
+> - **`ObservationCollectorUnit`**: Subscribes to a ROS 2 topic to get raw sensor data. You must implement the `preprocess` method to convert the ROS message into a more usable format (e.g., a NumPy array).
+> - **`ObservationGeneratorUnit`**: Creates new types of observations from data that has already been collected. You must implement the `generate` method.
+>
 > ```python
-> # Collector Example
-> class LaserCollector(ObservationCollectorUnit[sensor_msgs.LaserScan, np.ndarray]):
+> # Collector Example: Gets LaserScan messages and extracts ranges.
+> class LaserCollector(ObservationCollectorUnit[sensor_msgs.msg.LaserScan, np.ndarray]):
 >     name: ClassVar[str] = "laser_scan"
 >     topic: ClassVar[str] = "scan"
 >     # ...
->     def preprocess(self, msg: sensor_msgs.LaserScan) -> np.ndarray:
->         # ...
+>     def preprocess(self, msg: sensor_msgs.msg.LaserScan) -> np.ndarray:
+>         return np.array(msg.ranges, dtype=np.float32)
 > 
-> # Generator Example
-> class MyObservationGeneratorUnit(ObservationGeneratorUnit[np.ndarray]):
->     name: ClassVar[str] = "my_observation_generator"
+> # Generator Example: Calculates the distance to the closest obstacle.
+> class MinDistanceGenerator(ObservationGeneratorUnit[float]):
+>     name: ClassVar[str] = "min_obstacle_dist"
 >     requires: ClassVar[List[BaseUnit]] = [LaserCollector]
 >     # ...
->     def generate(self, obs_dict: ObservationDict, ...) -> np.ndarray:
->         # ...
+>     def generate(self, obs_dict: ObservationDict, ...) -> float:
+>         laser_scan = obs_dict[LaserCollector.name]
+>         return np.min(laser_scan)
 > ```
 
-> #### 🎁 Adding a New Reward Component
-> Inherit from `RewardUnit` and register it with the `RewardUnitFactory`.
+> #### 🧩 **Tutorial: Adding a New Reward Component**
+> To create a custom reward, you inherit from `RewardUnit` and register it with the `RewardUnitFactory`. The `__call__` method contains the logic for calculating the reward. You can then add this component to your agent's reward function configuration.
 > ```python
-> @RewardUnitFactory.register("my_reward")
-> class MyRewardUnit(RewardUnit):
->     def __call__(self, state_container, *args, **kwargs):
->         # Calculate and return reward
->         self.add_reward(...)
->         self.add_info(...)
+> @RewardUnitFactory.register("goal_reached_reward")
+> class GoalReachedReward(RewardUnit):
+>     def __call__(self, state_container: SimulationStateContainer, *args, **kwargs):
+>         if state_container.goal_reached:
+>             self.add_reward(100.0)
+>             self.add_info({"goal_reached": True})
+>         else:
+>             self.add_reward(0.0)
 > ```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1.  Fork the repository
-2.  Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
-
-For questions, please open an issue on the GitHub repository.
-
-> *Note: This guide provides a high-level overview. For detailed implementation specifics, refer to the inline documentation within the code.*

@@ -10,8 +10,8 @@
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
   </a>
-  <a href="http://wiki.ros.org/noetic">
-    <img src="https://img.shields.io/badge/ROS-Noetic-blue" alt="ROS Noetic">
+  <a href="https://docs.ros.org/en/humble/index.html">
+    <img src="https://img.shields.io/badge/ROS-Humble-blue" alt="ROS Humble">
   </a>
   <a href="https://www.python.org/downloads/release/python-380/">
     <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python 3.8+">
@@ -19,12 +19,17 @@
   <a href="https://pytorch.org/">
     <img src="https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=flat&logo=PyTorch&logoColor=white" alt="PyTorch">
   </a>
-  <a href="https://stable-baselines3.readthedocs.io/en/master/">
-    <img src="https://img.shields.io/badge/Stable--Baselines3-blue" alt="Stable-Baselines3">
-  </a>
   <a href="https://docs.arena-rosnav.org/">
     <img src="https://img.shields.io/badge/documentation-brightgreen" alt="Documentation">
   </a>
+</p>
+<p align="center">
+    <a href="https://stable-baselines3.readthedocs.io/en/master/">
+    <img src="https://img.shields.io/badge/Stable--Baselines3-blue" alt="Stable-Baselines3">
+    </a>
+    <a href="https://github.com/danijar/dreamerv3">
+    <img src="https://img.shields.io/badge/DreamerV3-blue.svg" alt="DreamerV3">
+    </a>
 </p>
 
 <p align="center">
@@ -35,20 +40,17 @@
 
 ## 📖 About The Project
 
-This repository contains the **Rosnav-RL** packages, a framework for constructing and training deep reinforcement learning agents for autonomous robot navigation. It provides a comprehensive set of tools for developing training pipelines and testing on various platforms.
+**Rosnav-RL** is a developer-centric framework for creating and training state-of-the-art navigation agents with deep reinforcement learning in ROS 2. It's built to accelerate your research by providing a flexible, modular, and powerful toolkit that gets out of your way.
 
-The framework is designed to be modular and flexible, with a unified interface for defining agents, reward functions, and action/observation spaces. It supports extensive configuration to encourage experimentation and is intended to facilitate the use of multiple reinforcement learning libraries.
-
-Originally developed for the [Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav) simulation environment, Rosnav-RL can be easily integrated into other simulation environments.
+Forget being locked into a single RL library. Rosnav-RL's core strength is its plug-and-play architecture. Swap backends like **Stable-Baselines3** and **DreamerV3** with ease, and focus on what matters: designing, training, and deploying better navigation agents, faster.
 
 ### ✨ Key Features
 
-*   **Flexible Infrastructure**: A framework-agnostic design that supports multiple reinforcement learning backends for model development.
-*   **Modular Design**: Clean separation between network architecture building blocks, allowing for straightforward customization and extension.
-*   **Unified Encoding**: Standardized management of observation and action spaces across different navigation tasks and robot configurations.
-*   **Robust Configuration**: Pydantic-based configuration management providing automatic validation, schema documentation, and serialization support.
-*   **Extensible Components**: Easily add new observation types, neural network architectures, and reward functions for rapid agent development.
-*   **Deployment-Ready**: Includes a ROS action server for seamless agent deployment and integration into larger systems.
+*   **Experiment with Multiple RL Frameworks**: Don't get locked in. Our framework-agnostic design lets you leverage the best of different libraries like Stable-Baselines3 and DreamerV3 in the same project.
+*   **Build Custom Agents in Minutes**: A deeply modular architecture with plug-and-play components for rewards, observations, and network layers means you can prototype new agent designs rapidly.
+*   **Standardize Your Experiments**: Tame the complexity of multiple robot setups and tasks with a unified system for managing observation and action spaces.
+*   **Configure with Confidence**: Pydantic-based configuration provides type-safety, auto-validation, and self-documenting schemas, eliminating frustrating runtime errors.
+*   **Deploy Seamlessly in ROS 2**: Move from training to deployment effortlessly. A built-in ROS action server ensures your agent integrates perfectly into your robotics ecosystem.
 
 ---
 
@@ -69,35 +71,52 @@ For a deep dive into the architecture and development workflow, please refer to 
 
 ### Prerequisites
 
-*   ROS Noetic installation
+*   ROS 2 Humble installation
 *   Python 3.8+
 *   Poetry
 
 ### 🛠️ Installation
 
-You can add `rosnav-rl` to your catkin workspace.
-
-1.  **Clone the repository into your `src` folder:**
+1.  **Clone the repository into your colcon workspace's `src` directory:**
 
     ```bash
-    git clone <repository-url>
+    cd /path/to/your/colcon_ws/src
+    git clone https://github.com/Arena-Rosnav/rosnav-rl.git
     ```
 
 2.  **Install dependencies using Poetry:**
 
-    Navigate to the `rosnav_rl` package directory and run:
+    Navigate to the `rosnav_rl` package directory and run `poetry install`. This will install the necessary Python packages in a virtual environment.
     ```bash
-    cd rosnav_rl
+    cd rosnav-rl/rosnav_rl
     poetry install
     ```
 
 3.  **Build your workspace:**
 
+    Navigate back to the root of your workspace and build the packages.
     ```bash
-    catkin_make
-    # or
-    catkin build
+    cd /path/to/your/colcon_ws
+    colcon build --packages-select rosnav_rl rosnav_rl_msgs
     ```
+
+4.  **Source the workspace:**
+    
+    ```bash
+    source install/setup.bash
+    ```
+
+---
+
+## 🖥️ Usage
+
+To run the trained agent, you can use the provided launch file to start the ROS action server. This will make your agent available for navigation tasks within the ROS 2 ecosystem.
+
+```bash
+ros2 launch rosnav_rl rl_agent.launch.py
+```
+
+You can then send requests to the `/rosnav_rl/get_action` service to get actions from your agent.
 
 ---
 
