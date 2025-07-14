@@ -325,7 +325,7 @@ class PedestrianTypeGenerator(ObservationGeneratorUnit[np.ndarray]):
             self._ped_types = np.array([])
             return self._ped_types
 
-        current_ped_ids = [p.id for p in people_data.people]
+        current_ped_ids = [p.name for p in people_data.people]
         if current_ped_ids == self._ped_ids:
             return self._ped_types
 
@@ -375,7 +375,7 @@ class PedestrianSocialStateGenerator(ObservationGeneratorUnit[np.ndarray]):
             self._ped_social_states = np.array([])
             return self._ped_social_states
 
-        current_ped_ids = [p.id for p in people_data.people]
+        current_ped_ids = [p.name for p in people_data.people]
         if current_ped_ids == self._ped_ids:
             return self._ped_social_states
 

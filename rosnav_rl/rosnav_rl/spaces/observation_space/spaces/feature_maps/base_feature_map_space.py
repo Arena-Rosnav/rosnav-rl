@@ -152,20 +152,14 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             - If a data point falls outside the map boundaries, it will be ignored
             - Any exceptions during processing are logged as warnings
         """
-        assert (
-            isinstance(semantic_data, np.ndarray)
-            and semantic_data.ndim == 1
-            and semantic_data.shape[0] == 1
-        ), "Semantic data must be a 1D numpy array with shape (N,)"
-
-        assert (
-            poses or relative_poses
-        ), "Either poses or relative_poses must be provided"
-
         pos_map = (
             np.zeros((1, self._feature_map_size, self._feature_map_size))
             + self.background_value
         )
+
+        assert (
+            isinstance(semantic_data, np.ndarray) and semantic_data.ndim == 1
+        ), "Semantic data must be a 1D numpy array with shape (N,)"
 
         if relative_poses is None and len(semantic_data) == 0:
             return pos_map

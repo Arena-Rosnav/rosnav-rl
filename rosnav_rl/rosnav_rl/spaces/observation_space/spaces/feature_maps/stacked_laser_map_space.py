@@ -13,6 +13,8 @@ from ...observation_space_factory import SpaceFactory
 from ..base_observation_space import BaseObservationSpace
 from .base_feature_map_space import BaseFeatureMapSpace
 
+from ..base.laser_space import LaserScanSpace
+
 
 @SpaceFactory.register("stacked_laser_map")
 class StackedLaserMapSpace(BaseFeatureMapSpace):
@@ -46,13 +48,14 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         laser_stack_size: int,
         feature_map_size: int,
         roi_in_m: float,
+        laser_max_range: float,
         flatten: bool = True,
         *args,
         **kwargs,
     ) -> None:
         self._laser_queue = deque()
         self._laser_stack_size = laser_stack_size
-        self._default_reward_info = {}
+        self._laser_max_range = laser_max_range
         super().__init__(
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
@@ -95,6 +98,8 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         if type(laser_scan) is not np.ndarray:
             return np.zeros(self.get_gym_space().shape)
 
+        laser_scan = LaserScanSpace.apply_limit(laser_scan, self._laser_max_range)
+
         if len(self._laser_queue) == 0 or done:
             self._reset_laser_stack(laser_scan)
 
@@ -114,10 +119,12 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
 
         Args:
             laser_queue (deque): A queue containing laser scan data frames.
-                                 Expected to contain 10 frames with 80×9 points each.
+                                 Expected to contain `_laser_stack_size` frames, each with a number of points
+                                 divisible by `_feature_map_size`.
 
         Returns:
-            np.ndarray: A 3D array of shape (1, 80, 80) representing the processed laser map.
+            np.ndarray: A 3D array of shape (1, `_feature_map_size`, `_feature_map_size`)
+                        representing the processed laser map.
                        Even rows contain minimum values of laser readings,
                        odd rows contain average values of laser readings.
                        If processing fails, returns an empty map of the same shape.
@@ -126,28 +133,41 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         """
 
         try:
-            temp = np.array(laser_queue, dtype=np.float32).flatten()
+            laser_scans_array = np.array(laser_queue, dtype=np.float32)
 
-            # Single reshape for all operations
-            reshaped = temp.reshape(10, 80, 9)
+            # Reshape to group laser points for feature extraction.
+            # e.g., (10, 720) -> (10, 80, 9)
+            grouped_scans = laser_scans_array.reshape(
+                self._laser_stack_size, self._feature_map_size, -1
+            )
 
-            # Pre-allocate output with matching dtype
-            scan_avg = np.zeros((20, 80), dtype=np.float32)
+            # Calculate min and mean for each group of points.
+            min_features = grouped_scans.min(axis=2)
+            mean_features = grouped_scans.mean(axis=2)
 
-            # Vectorized calculations using axis reduction
-            scan_avg[::2] = reshaped.min(axis=2)  # Even rows: minima
-            scan_avg[1::2] = reshaped.mean(axis=2)  # Odd rows: averages
+            # Interleave min and mean features more concisely using np.stack and reshape.
+            # This creates a (20, 80) array where even rows are min and odd rows are mean.
+            interleaved_features = np.stack(
+                (min_features, mean_features), axis=1
+            ).reshape(self._laser_stack_size * 2, self._feature_map_size)
 
-            # Final transformations
-            scan_avg = scan_avg.reshape(1600)
-            scan_avg_map = np.tile(scan_avg, (4, 1)).reshape(1, 80, 80)
+            # Tile the features vertically to create a square map.
+            # e.g., tile (20, 80) array 4 times to get (80, 80).
+            num_tiles = self._feature_map_size // interleaved_features.shape[0]
+            tiled_features = np.tile(interleaved_features, (num_tiles, 1))
+
+            # Reshape to the final (1, size, size) feature map.
+            feature_map = tiled_features.reshape(
+                1, self._feature_map_size, self._feature_map_size
+            )
+
         except Exception as e:
             print(
                 f"[{StackedLaserMapSpace.__name__}]: {e} \n Cannot build laser map. Instead return empty map."
             )
             return np.zeros(self.get_gym_space().shape)
 
-        return scan_avg_map
+        return feature_map
 
     def get_gym_space(self) -> spaces.Space:
         """
