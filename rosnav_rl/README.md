@@ -182,7 +182,7 @@ This section breaks down the core building blocks of the RosNav-RL framework. Ea
 -   **`ObservationGeneratorUnit`**: The creative mind. These units don't subscribe to topics but instead derive new, meaningful data from observations that have already been collected (e.g., calculating the time to collision from laser scans).
     -   *File*: [`rosnav_rl/observations/generators/base_generator.py`](rosnav_rl/observations/generators/base_generator.py)
 
-### 🚀 Action & Observation Spaces: The Agent's Worldview
+### 🌐 Action & Observation Spaces: The Agent's Worldview
 -   **`BaseSpaceManager`**: The universal translator. This crucial component sits between the environment and the RL model, handling the vital tasks of encoding observations into a format the model understands and decoding the model's output into executable robot commands.
     -   *File*: [`rosnav_rl/spaces/space_manager/base_space_manager.py`](rosnav_rl/spaces/space_manager/base_space_manager.py)
 -   **`ObservationSpaceManager`**: Defines *what the agent sees*. It's built from a collection of `BaseObservationSpace` modules, each corresponding to a piece of sensory data (e.g., a laser scan, the robot's velocity). You can mix and match these modules to construct complex, customized observation spaces for your agent.
@@ -200,7 +200,7 @@ This section breaks down the core building blocks of the RosNav-RL framework. Ea
 -   **`SimulationStateContainer` & `AgentStateContainer`**: The memory banks. These Pydantic-based data containers provide a structured, type-safe way to manage and access state information throughout the framework. The `SimulationStateContainer` holds global environment data, while the `AgentStateContainer` holds data specific to an individual agent.
     -   *Files*: [`rosnav_rl/states/simulation/container.py`](rosnav_rl/states/simulation/container.py), [`rosnav_rl/states/agent/container.py`](rosnav_rl/states/agent/container.py)
 
-### 🌐 Deployment: From Training to Reality
+### 🚀 Deployment: From Training to Reality
 -   **`ActionServer`**: The bridge to the ROS 2 world. This component wraps a trained agent in a ROS 2 Action Server, making it instantly deployable. Other nodes can request actions from your agent, allowing for easy integration into larger robotic systems.
     -   *File*: [`rosnav_rl/action_server/base_server.py`](rosnav_rl/action_server/base_server.py)
 
