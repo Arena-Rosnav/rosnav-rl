@@ -8,6 +8,7 @@
 #include <tf2_ros/buffer.h>
 #include <nav2_costmap_2d/costmap_2d_ros.hpp>
 #include <rosnav_rl_msgs/srv/get_command.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 
 namespace rosnav_rl_planner
 {
@@ -29,9 +30,12 @@ public:
   void setSpeedLimit(const double & speed_limit, const bool & percentage) override;
 
 protected:
+  void publishSubgoal();
+
   rclcpp_lifecycle::LifecycleNode::WeakPtr node_;
   std::string plugin_name_;
   std::shared_ptr<tf2_ros::Buffer> tf_;
+  std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros_;
   rclcpp::Clock::SharedPtr clock_;
   rclcpp::Logger logger_ {rclcpp::get_logger("Rosnav_DRL_Controller")};
   
@@ -39,6 +43,14 @@ protected:
   rclcpp::Client<rosnav_rl_msgs::srv::GetCommand>::SharedPtr client_;
 
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>> global_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::PoseStamped>> subgoal_pub_;
+  rclcpp::TimerBase::SharedPtr subgoal_timer_;
   nav_msgs::msg::Path global_plan_;
+  geometry_msgs::msg::Twist current_velocity_;
+
+  // Adaptive lookahead parameters
+  double min_lookahead_dist_;
+  double max_lookahead_dist_;
+  double lookahead_time_;
 };
 } // namespace rosnav_rl_planner
