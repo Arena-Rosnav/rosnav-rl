@@ -45,6 +45,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         PedestrianSocialStateGenerator,
         PedestrianRelativeLocationGenerator,
     ]
+    background_value = -1
 
     def __init__(
         self,
