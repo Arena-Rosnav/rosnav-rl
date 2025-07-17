@@ -164,23 +164,20 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         if relative_poses is None and len(semantic_data) == 0:
             return pos_map
 
-        try:
-            # If relative_pos is not provided, calculate it
-            if relative_poses is None and len(semantic_data) > 0:
-                relative_poses = get_relative_pos_to_robot(robot_pose, poses)
+        # If relative_pos is not provided, calculate it
+        if relative_poses is None and len(semantic_data) > 0:
+            relative_poses = get_relative_pos_to_robot(robot_pose, poses)
 
-            for data, pos in zip(
-                semantic_data,
-                relative_poses,
+        for data, pos in zip(
+            semantic_data,
+            relative_poses,
+        ):
+            index = self._get_map_index(pos)
+            if (
+                0 <= index[0] < self.feature_map_size
+                and 0 <= index[1] < self.feature_map_size
             ):
-                index = self._get_map_index(pos)
-                if (
-                    0 <= index[0] < self.feature_map_size
-                    and 0 <= index[1] < self.feature_map_size
-                ):
-                    pos_map[0, index[0], index[1]] = data
-        except Exception as e:
-            print(f"Exception occurred while processing semantic data: {e}")
+                pos_map[0, index[0], index[1]] = data
 
         return pos_map
 

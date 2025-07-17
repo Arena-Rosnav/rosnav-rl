@@ -334,7 +334,7 @@ class PedestrianTypeGenerator(ObservationGeneratorUnit[np.ndarray]):
             # Assuming tagnames are the same for all people
             behavior_idx = people_data.people[0].tagnames.index("group_id")
             self._ped_types = np.array(
-                [data.tags[behavior_idx] for data in people_data.people]
+                [int(data.tags[behavior_idx]) for data in people_data.people]
             )
         except (ValueError, AttributeError, IndexError):
             warn("Pedestrian group ID not found in the data. Returning empty array.")
@@ -384,7 +384,7 @@ class PedestrianSocialStateGenerator(ObservationGeneratorUnit[np.ndarray]):
             # Assuming tagnames are the same for all people
             behavior_idx = people_data.people[0].tagnames.index("behavior")
             self._ped_social_states = np.array(
-                [data.tags[behavior_idx] for data in people_data.people]
+                [int(data.tags[behavior_idx]) for data in people_data.people]
             )
         except (ValueError, AttributeError, IndexError):
             warn(
