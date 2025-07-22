@@ -314,7 +314,6 @@ class GlobalPlanCollector(ObservationCollectorUnit[nav_msgs.Path, np.ndarray]):
                 map(
                     lambda p: [p.pose.position.x, p.pose.position.y],
                     msg.poses,
-                    copyright,
                 )
             )
         )
