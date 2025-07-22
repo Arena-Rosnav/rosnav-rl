@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 from gymnasium import spaces
 
 from rosnav_rl.observations import LastActionCollector
@@ -88,7 +89,7 @@ class LastActionSpace(BaseObservationSpace):
     @BaseObservationSpace.apply_normalization
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
-    ) -> LastActionCollector.data_class:
+    ) -> Any:  # Intended: LastActionCollector.data_class
         """
         Encodes the observation by extracting the last action from the observation dictionary.
 

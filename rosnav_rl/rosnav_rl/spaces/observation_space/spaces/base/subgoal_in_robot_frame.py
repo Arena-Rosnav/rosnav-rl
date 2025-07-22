@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 from gymnasium import spaces
 
@@ -21,6 +22,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
         required_observation_units (list): List of required observation generators.
         _max_dist (float): Maximum distance in meters for the subgoal position.
     """
+
     name = "SUBGOAL_IN_ROBOT_FRAME"
     required_observation_units = [SubgoalLocationInRobotFrameGenerator]
 
@@ -45,7 +47,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
     @BaseObservationSpace.apply_normalization
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
-    ) -> SubgoalLocationInRobotFrameGenerator.data_class:
+    ) -> Any:  # Intended: SubgoalLocationInRobotFrameGenerator.data_class
         """
         Encodes the goal observation.
 

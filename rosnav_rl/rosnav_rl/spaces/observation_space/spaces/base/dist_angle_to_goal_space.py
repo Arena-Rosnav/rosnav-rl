@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 from gymnasium import spaces
 
@@ -29,6 +30,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
             - First dimension: distance to goal [0, goal_max_dist]
             - Second dimension: angle to goal [-π, π]
     """
+
     name = "DIST_ANGLE_TO_GOAL"
     required_observation_units = [DistAngleToGoalGenerator]
 
@@ -55,7 +57,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
     @BaseObservationSpace.check_dtype
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
-    ) -> DistAngleToGoalGenerator.data_class:
+    ) -> Any:  # Intended: DistAngleToGoalGenerator.data_class
         """
         Encodes the goal observation.
 

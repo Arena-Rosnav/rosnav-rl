@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 from gymnasium import spaces
 
@@ -78,7 +79,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
     @BaseObservationSpace.apply_normalization
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
-    ) -> LaserCollector.data_class:
+    ) -> Any:  # Intended: ReducedLaserGenerator.data_class
         """
         Encodes the laser scan observation.
 

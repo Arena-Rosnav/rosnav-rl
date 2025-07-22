@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
@@ -11,11 +13,11 @@ from ..base_observation_space import BaseObservationSpace
 @SpaceFactory.register("dist_angle_to_subgoal")
 class DistAngleToSubgoalSpace(BaseObservationSpace):
     """A space for representing the distance and angle to a subgoal.
-    
+
     This observation space encodes the distance and angle to a subgoal as a 2D vector.
     The first component represents the distance to the subgoal (normalized from 0 to max_dist),
     and the second component represents the angle to the subgoal (from -π to π).
-    
+
     Attributes:
         name (str): The name of the observation space.
         required_observation_units (list): List of required observation generators.
@@ -23,6 +25,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
         *args: Variable length argument list passed to the parent class.
         **kwargs: Arbitrary keyword arguments passed to the parent class.
     """
+
     name = "DIST_ANGLE_TO_SUBGOAL"
     required_observation_units = [DistAngleToSubgoalGenerator]
 
@@ -49,7 +52,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
     @BaseObservationSpace.check_dtype
     def encode_observation(
         self, observation: ObservationDict, *args, **kwargs
-    ) -> DistAngleToSubgoalGenerator.data_class:
+    ) -> Any:  # Intended: DistAngleToSubgoalGenerator.data_class
         """
         Encodes the goal observation.
 
@@ -57,7 +60,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
             observation (ObservationDict): The observation dictionary.
 
         Returns:
-            ndarray: The encoded goal observation.
+            DistAngleToSubgoalGenerator.data_class: The encoded goal observation.
 
         """
         return observation[DistAngleToSubgoalGenerator.name]
