@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Dict, List, Optional, Type, TypeVar, Generic
+from typing import Any, ClassVar, Dict, Generic, List, Optional, Type, TypeVar
 
 import rclpy.logging
+from rclpy.node import Node
+
 from rosnav_rl.states import SimulationStateContainer
 
 from ..collectors import BaseUnit
@@ -55,9 +57,9 @@ class ObservationGeneratorUnit(BaseUnit, Generic[GeneratedDataType], ABC):
     fallback_value: ClassVar[Optional[Any]] = None
     max_consecutive_errors: ClassVar[int] = 3
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, node: Node = None, *args, **kwargs) -> None:
         """Initialize the observation generator unit."""
-        super().__init__(*args, **kwargs)
+        super().__init__(node=node, *args, **kwargs)
         self._error_count = 0
         self._consecutive_errors = 0
         self._logger = rclpy.logging.get_logger(f"rosnav_rl.observation.{self.name}")

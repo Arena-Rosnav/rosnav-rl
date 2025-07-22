@@ -120,7 +120,7 @@ class ObservationManager:
         topic_mappings: Optional[Dict[str, Callable]] = None,
         obs_unit_kwargs: Optional[dict] = None,
         wait_for_obs: bool = True,
-        qos_profile: Optional[QoSProfile] = None,
+        qos_profile: Optional[QoSProfile] = 10,
         enable_synchronization: bool = True,
         sync_tolerance_seconds: float = 0.1,
         buffer_size: int = 50,
@@ -204,12 +204,13 @@ class ObservationManager:
         self._sync_collector_names: List[str] = []
 
         # Set default QoS profile with reliability guarantees if not provided
-        self._qos_profile = qos_profile or QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.VOLATILE,
-            history=QoSHistoryPolicy.KEEP_LAST,
-            depth=10,
-        )
+        self._qos_profile = qos_profile
+        # self._qos_profile = qos_profile or QoSProfile(
+        #     reliability=QoSReliabilityPolicy.RELIABLE,
+        #     durability=QoSDurabilityPolicy.VOLATILE,
+        #     history=QoSHistoryPolicy.KEEP_LAST,
+        #     depth=10,
+        # )
 
         # Initialize unit parameters
         obs_unit_kwargs = obs_unit_kwargs or {}

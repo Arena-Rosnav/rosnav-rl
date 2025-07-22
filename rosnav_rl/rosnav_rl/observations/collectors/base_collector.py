@@ -41,8 +41,8 @@ class BaseUnit(ABC):
 
     name: ClassVar[str]
 
-    def __init__(self, *args, **kwargs) -> None:
-        pass
+    def __init__(self, node: Optional[Node] = None, *args, **kwargs) -> None:
+        self._node = node
 
     def __repr__(self) -> str:
         return f"{self.name}"
@@ -108,9 +108,9 @@ class ObservationCollectorUnit(
         Raises:
             SimulationNotCompatibleError: If the current simulator is not compatible with this collector.
         """
+        super().__init__(node=node, *args, **kwargs)
         self._error_count = 0
         self._consecutive_errors = 0
-        self._node = node
         self._logger = get_logger(self.__class__.__name__)
 
     def validate_message(self, msg: MessageType) -> bool:
