@@ -163,7 +163,6 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
 
 void DRLController::publishSubgoal()
 {
-  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] Attempting to publish subgoal using adaptive lookahead.");
   if (global_plan_.poses.empty() || !costmap_ros_) {
     RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] Global plan is empty or costmap_ros is null. Cannot publish subgoal.");
     return;
@@ -172,14 +171,14 @@ void DRLController::publishSubgoal()
   // Get robot's current pose
   geometry_msgs::msg::PoseStamped robot_pose;
   if (!costmap_ros_->getRobotPose(robot_pose)) {
-    RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Failed to get robot pose. Cannot publish subgoal.");
+    RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Failed to get robot pose. This is likely a TF issue. Check that the transform from '%s' to '%s' is available.",
+                 costmap_ros_->getGlobalFrameID().c_str(), costmap_ros_->getBaseFrameID().c_str());
     return;
   }
 
   // Adaptive lookahead distance
   double lookahead_dist = current_velocity_.linear.x * lookahead_time_;
   lookahead_dist = std::clamp(lookahead_dist, min_lookahead_dist_, max_lookahead_dist_);
-  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] Adaptive lookahead distance: %.2f", lookahead_dist);
 
   // Find the point on the global plan that is 'lookahead_dist' away from the robot
   for (const auto & plan_pose : global_plan_.poses) {
