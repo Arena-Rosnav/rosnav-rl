@@ -1,183 +1,207 @@
-from typing import Any, Dict, List, Type, Union
+"""Simple Observation Space Manager
 
+Clean, lightweight manager for hierarchical observation spaces using SpaceFactory.
+No bloat, just essential functionality.
+"""
+
+from typing import Any, Dict, List
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.utils.space import extract_init_arguments
-from rosnav_rl.utils.type_aliases import (
-    EncodedObservationDict,
-    ObservationDict,
-    ObservationSpaceList,
-)
-
+try:
+    from rosnav_rl.utils.type_aliases import ObservationDict
+except ImportError:
+    # Fallback for when type aliases aren't available
+    from typing import Dict as ObservationDict
 from .spaces.base_observation_space import BaseObservationSpace
 
 
 class ObservationSpaceManager:
-    """ObservationSpaceManager manages multiple observation spaces for reinforcement learning.
+    """Simple hierarchical observation space manager using SpaceFactory."""
 
-    This class creates, manages, and combines different observation spaces into a unified
-    observation space for an RL agent. It provides functionality to access individual spaces,
-    encode observations, and retrieve configuration details.
-
-    Attributes:
-        _space_cls_list (ObservationSpaceList): List of observation space classes to initialize.
-        _space_kwargs (Dict[str, Any]): Arguments to initialize observation spaces.
-        _space_containers (Dict[str, BaseObservationSpace]): Dictionary of initialized observation spaces.
-        _observation_space (spaces.Dict): Combined gym observation space from all individual spaces.
-        
-    Example:
-        ```
-        space_list = [LaserScanSpace, GoalSpace]
-        space_kwargs = {"robot_state_size": 4, "laser_scan_size": 720}
-        
-        obs_manager = ObservationSpaceManager(space_list, space_kwargs)
-        encoded_obs = obs_manager.encode_observation(observation_dict)
-        ```
-    """
     def __init__(
-        self, space_list: ObservationSpaceList, space_kwargs: Dict[str, Any]
-    ) -> None:
-        """
-        Initialize the ObservationSpaceManager with a list of observation spaces.
-
-        This class manages multiple observation spaces and combines them into a single
-        observation space.
+        self,
+        space_factory=None,
+        auto_load_spaces=True,
+        parallel_encoding=True,
+    ):
+        """Initialize simple observation space manager.
 
         Args:
-            space_list (ObservationSpaceList): List of observation space classes.
-            space_kwargs (Dict[str, Any]): Dictionary of keyword arguments for initializing
-                the observation spaces.
-
-        Attributes:
-            _space_cls_list (ObservationSpaceList): List of observation space classes.
-            _space_kwargs (Dict[str, Any]): Dictionary of keyword arguments.
-            _space_containers (Dict[str, BaseObservationSpace]): Dictionary mapping space names
-                to their respective observation space instances.
-            _observation_space: The combined observation space created from all individual spaces.
+            space_factory: SpaceFactory instance to use. If None, will auto-import.
+            auto_load_spaces: If True, automatically imports all space modules to register them.
+            parallel_encoding: If True, encode observations in parallel threads.
         """
-        self._space_cls_list = space_list
-        self._space_kwargs = space_kwargs
-        self._space_containers: Dict[str, BaseObservationSpace] = {}
+        self.spaces = OrderedDict()  # Preserve space order
+        self.config = {}
+        self.parallel_encoding = parallel_encoding
+        self.space_factory = space_factory
 
-        self._initialize_spaces()
-        self._observation_space = self._create_combined_observation_space()
+        # Auto-load SpaceFactory and register all spaces
+        if self.space_factory is None:
+            self.space_factory = self._auto_load_spacefactory(auto_load_spaces)
 
-    def _initialize_spaces(self) -> None:
-        """Initialize all observation space containers based on the provided space classes.
-        
-        This method instantiates each observation space class in the _space_cls_list
-        and stores the instances in the _space_containers dictionary, using the
-        class name as the key. It passes any keyword arguments stored in _space_kwargs
-        to the constructor of each space class.
-        
-        Raises:
-            TypeError: If any space class constructor is missing required arguments
-                      or receives incompatible arguments.
+    def _auto_load_spacefactory(self, auto_load_spaces=True):
+        """Automatically load SpaceFactory and register all spaces."""
+        try:
+            from .observation_space_factory import SpaceFactory
+
+            if auto_load_spaces:
+                # Import all space modules to trigger registration
+                try:
+                    from .spaces import (  # noqa: F401
+                        localization,
+                        perception,
+                        navigation,
+                        dynamics,
+                        environment,
+                        meta,
+                    )
+
+                    print(
+                        f"Auto-loaded {len(SpaceFactory.registry)} observation spaces"
+                    )
+                except ImportError as e:
+                    print(f"Warning: Could not auto-load all spaces: {e}")
+
+            return SpaceFactory
+        except ImportError:
+            print(
+                "Warning: Could not import SpaceFactory. You'll need to provide it manually."
+            )
+            return None
+
+    def load_configuration(self, config: Dict[str, Dict[str, Any]]):
+        """Load configuration and instantiate spaces using SpaceFactory.
+
+        Args:
+            config: Configuration dict {space_name: {params}}
         """
-        
-        for space_cls in self._space_cls_list:
+        if self.space_factory is None:
+            raise RuntimeError("SpaceFactory not available. Cannot load configuration.")
+
+        self.config = config
+        self.spaces = OrderedDict()
+
+        # Simply load spaces in config order (or alphabetically for consistency)
+        space_names = sorted(config.keys())  # Alphabetical for consistency
+
+        for space_name in space_names:
+            space_config = config[space_name]
+            space_instance = self.space_factory.instantiate(space_name, **space_config)
+            self.spaces[space_name] = space_instance
+
+        print(f"Loaded {len(self.spaces)} spaces: {list(self.spaces.keys())}")
+
+    def get_available_spaces(self) -> List[str]:
+        """Get list of all available spaces from SpaceFactory registry."""
+        if self.space_factory is None:
+            return []
+        return list(self.space_factory.registry.keys())
+
+    def get_available_spaces_by_category(self) -> Dict[str, List[str]]:
+        """Get available spaces organized by category from SpaceFactory."""
+        if self.space_factory is None:
+            return {}
+        return self.space_factory.get_spaces_by_category()
+
+    def encode_observation(self, observations: ObservationDict) -> Dict[str, Any]:
+        """Encode observations for all loaded spaces.
+        Can use parallel encoding for better performance.
+
+        Args:
+            observations: Raw observation dictionary
+
+        Returns:
+            Encoded observations by space
+        """
+        if not self.spaces:
+            return {}
+
+        if self.parallel_encoding and len(self.spaces) > 1:
+            return self._encode_parallel(observations)
+        else:
+            return self._encode_sequential(observations)
+
+    def _encode_sequential(self, observations: ObservationDict) -> Dict[str, Any]:
+        """Encode observations sequentially."""
+        encoded = OrderedDict()
+
+        for space_name, space in self.spaces.items():
             try:
-                self._space_containers[space_cls.name] = space_cls(**self._space_kwargs)
-            except TypeError as e:
-                raise TypeError(
-                    f"Error initializing the observation space '{space_cls.name}'. "
-                    f"Ensure all required arguments are passed. Error: {e}"
-                )
+                encoded[space_name] = space.encode_observation(observations)
+            except Exception as e:
+                print(f"Error encoding space '{space_name}': {e}")
+                # Provide fallback zero observation
+                gym_space = space.get_gym_space()
+                encoded[space_name] = np.zeros_like(gym_space.sample())
 
-    def _create_combined_observation_space(self) -> spaces.Dict:
-        """Creates a combined observation space by merging individual observation spaces.
-        
-        This method combines all registered observation spaces from the _space_containers
-        dictionary into a single Dict space, where each key corresponds to the name of
-        an observation space container, and the value is the actual space object.
-        
-        Returns:
-            spaces.Dict: A dictionary space containing all registered observation spaces.
-        """
-        
-        return spaces.Dict(
-            {name: space.space for name, space in self._space_containers.items()}
-        )
+        # If single space, return value directly
+        if len(encoded) == 1:
+            return list(encoded.values())[0]
 
-    def __getitem__(
-        self, space: Union[str, Type[BaseObservationSpace]]
-    ) -> BaseObservationSpace:
-        """
-        Retrieve the observation space with the given name or instance.
+        return dict(encoded)
 
-        Parameters:
-            space (Union[str, BaseObservationSpace]): The name or instance of the observation space.
+    def _encode_parallel(self, observations: ObservationDict) -> Dict[str, Any]:
+        """Encode observations in parallel using ThreadPoolExecutor."""
 
-        Returns:
-            BaseObservationSpace: The requested observation space.
-        """
-        space_name = self._get_space_name(space)
-        return self._space_containers[space_name.upper()]
+        def encode_single_space(space_name, space):
+            try:
+                return space_name, space.encode_observation(observations), None
+            except Exception as e:
+                return space_name, None, e
 
-    def __contains__(self, space: Union[str, BaseObservationSpace]) -> bool:
-        """
-        Check if the observation space with the given name or instance exists.
+        encoded = OrderedDict()
 
-        Parameters:
-            space (Union[str, BaseObservationSpace]): The name or instance of the observation space.
+        # Use ThreadPoolExecutor for parallel encoding
+        with ThreadPoolExecutor(max_workers=min(len(self.spaces), 4)) as executor:
+            # Submit all encoding tasks
+            future_to_space = {
+                executor.submit(encode_single_space, space_name, space): space_name
+                for space_name, space in self.spaces.items()
+            }
 
-        Returns:
-            bool: Whether the observation space exists.
-        """
-        space_name = self._get_space_name(space)
-        return space_name.upper() in self._space_containers
+            # Collect results as they complete
+            results = {}
+            for future in as_completed(future_to_space):
+                space_name, result, error = future.result()
+                if error is not None:
+                    print(f"Error encoding space '{space_name}': {error}")
+                    # Provide fallback zero observation
+                    gym_space = self.spaces[space_name].get_gym_space()
+                    results[space_name] = np.zeros_like(gym_space.sample())
+                else:
+                    results[space_name] = result
 
-    def _get_space_name(self, space: Union[str, BaseObservationSpace]) -> str:
-        """Extract the name from the provided space."""
-        return space.name if isinstance(space, BaseObservationSpace) else str(space)
+            # Rebuild in original order
+            for space_name in self.spaces.keys():
+                encoded[space_name] = results[space_name]
 
-    def __iter__(self):
-        """Iterate over the observation space containers."""
-        return iter(self._space_containers.values())
+        # If single space, return value directly
+        if len(encoded) == 1:
+            return list(encoded.values())[0]
 
-    def encode_observation(
-        self, observation: ObservationDict, *args, **kwargs
-    ) -> EncodedObservationDict:
-        """Encodes the observation for all spaces in the manager.
-        
-        This method applies the encoding function of each space container to the 
-        observation dictionary and returns a dictionary with the encoded observations.
-        
-        Args:
-            observation (ObservationDict): The original observation dictionary to be encoded.
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments passed to each space container's encode_observation method.
-            
-        Returns:
-            EncodedObservationDict: A dictionary where each key is a space name and each value is the
-                                   encoded observation for that space.
-        """
-        return {
-            name: space.encode_observation(observation, **kwargs)
-            for name, space in self._space_containers.items()
-        }
+        return dict(encoded)
 
     @property
-    def space_list(self) -> ObservationSpaceList:
+    def space_list(self) -> List[BaseObservationSpace]:
         """Return the list of observation spaces."""
-        return self._space_cls_list
+        return list(self.spaces.values())
 
     @property
-    def observation_space(self) -> spaces.Dict:
+    def observation_space(self) -> spaces.Space:
         """Return the combined observation space."""
-        return self._observation_space
+        if not self.spaces:
+            return spaces.Box(low=0, high=0, shape=(0,), dtype=np.float32)
 
-    @property
-    def config(self) -> Dict[str, Any]:
-        """Return configuration details for the manager."""
-        return {
-            "space": self.observation_space,
-            "params": {
-                name: space.config for name, space in self._space_containers.items()
-            },
-        }
-
-    @property
-    def space_keywords(self) -> Dict[str, Dict[str, str]]:
-        """Return initialization arguments for each observation space."""
-        return extract_init_arguments(self._space_cls_list)
+        if len(self.spaces) == 1:
+            # Single space - return directly
+            return list(self.spaces.values())[0].get_gym_space()
+        else:
+            # Multiple spaces - combine as flat Dict
+            space_dict = OrderedDict()
+            for name, space in self.spaces.items():
+                space_dict[name] = space.get_gym_space()
+            return spaces.Dict(space_dict)
