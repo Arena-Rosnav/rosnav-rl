@@ -29,8 +29,8 @@ class ReliableLaserSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        num_beams: int = 360,
-        max_range: float = 30.0,
+        laser_num_beams: int = 360,
+        laser_max_range: float = 30.0,
         min_range: float = 0.1,
         reduced_beams: int = None,
         enable_median_filter: bool = False,
@@ -41,8 +41,8 @@ class ReliableLaserSpace(BaseObservationSpace):
         """Initialize reliable laser space.
 
         Args:
-            num_beams: Expected number of laser beams
-            max_range: Maximum valid range
+            laser_num_beams: Expected number of laser beams
+            laser_max_range: Maximum valid range
             min_range: Minimum valid range
             reduced_beams: Target number of beams (None = no reduction)
             enable_median_filter: Enable simple median filtering
@@ -50,10 +50,10 @@ class ReliableLaserSpace(BaseObservationSpace):
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
-        self.num_beams = num_beams
-        self.max_range = max_range
+        self.num_beams = laser_num_beams
+        self.max_range = laser_max_range
         self.min_range = min_range
-        self.reduced_beams = reduced_beams or num_beams
+        self.reduced_beams = reduced_beams or laser_num_beams
         self.enable_median_filter = enable_median_filter
         self.filter_window = filter_window
 
@@ -148,9 +148,9 @@ class MultiRangeLaserSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        num_beams: int = 360,
+        laser_num_beams: int = 360,
         range_scales: list = None,
-        base_max_range: float = 30.0,
+        laser_max_range: float = 30.0,
         min_range: float = 0.1,
         *args,
         **kwargs
@@ -158,16 +158,16 @@ class MultiRangeLaserSpace(BaseObservationSpace):
         """Initialize multi-range laser space.
 
         Args:
-            num_beams: Number of laser beams
+            laser_num_beams: Number of laser beams
             range_scales: List of range scale factors [0.2, 1.0, 3.0] = [short, medium, long]
-            base_max_range: Base maximum range
+            laser_max_range: Base maximum range
             min_range: Minimum valid range
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
-        self.num_beams = num_beams
+        self.num_beams = laser_num_beams
         self.range_scales = range_scales or [0.3, 1.0, 2.0]  # Conservative defaults
-        self.base_max_range = base_max_range
+        self.base_max_range = laser_max_range
         self.min_range = min_range
 
         super().__init__(*args, **kwargs)
