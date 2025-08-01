@@ -1,12 +1,6 @@
-"""Legacy Meta Spaces - Migrated from Extra
-
-Original episode and meta information spaces integrated into hierarchical architecture.
-"""
-
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
@@ -33,20 +27,20 @@ class IsFirstStepSpace(BaseObservationSpace):
         """
         return spaces.Discrete(2)
 
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> int:
+    def encode_observation(self, is_first: int = 0, *args, **kwargs) -> int:
         """
         Encodes the is_first observation.
 
         Args:
-            observation (ObservationDict): The observation dictionary.
+            is_first (int): 1 if first step, 0 otherwise.
 
         Returns:
             int: 1 if first step, 0 otherwise.
         """
-        return int(observation.get("is_first", 0))
+        return is_first
 
 
-@SpaceFactory.register("is_terminal")
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.META)
 class IsTerminalStepSpace(BaseObservationSpace):
     """Original observation space indicating if this is a terminal step of an episode.
 
@@ -65,20 +59,20 @@ class IsTerminalStepSpace(BaseObservationSpace):
         """
         return spaces.Discrete(2)
 
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> int:
+    def encode_observation(self, is_terminal: int = 0, *args, **kwargs) -> int:
         """
         Encodes the is_terminal observation.
 
         Args:
-            observation (ObservationDict): The observation dictionary.
+            is_terminal (int): 1 if terminal step, 0 otherwise.
 
         Returns:
             int: 1 if terminal step, 0 otherwise.
         """
-        return int(observation.get("is_terminal", 0))
+        return is_terminal
 
 
-@SpaceFactory.register("episode_step")
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.META)
 class EpisodeStepSpace(BaseObservationSpace):
     """Episode step counter for temporal awareness.
 
@@ -110,17 +104,14 @@ class EpisodeStepSpace(BaseObservationSpace):
             low=0, high=self.max_episode_steps, shape=(1,), dtype=np.int32
         )
 
-    def encode_observation(
-        self, observation: ObservationDict, *args, **kwargs
-    ) -> np.ndarray:
+    def encode_observation(self, episode_step: int = 0, *args, **kwargs) -> np.ndarray:
         """
         Encodes the episode step observation.
 
         Args:
-            observation (ObservationDict): The observation dictionary.
+            episode_step (int): The current episode step.
 
         Returns:
             np.ndarray: Current episode step number.
         """
-        step = observation.get("episode_step", 0)
-        return np.array([step], dtype=np.int32)
+        return np.array([episode_step], dtype=np.int32)

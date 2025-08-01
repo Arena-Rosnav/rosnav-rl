@@ -3,31 +3,41 @@
 Standard laser-based perception spaces integrated into hierarchical architecture.
 """
 
-from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations import LaserCollector
-from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from ...base_observation_space import BaseObservationSpace
+from rosnav_rl.observations.type_annotations import (
+    LidarRanges,
+)
 
 
-@SpaceFactory.register("laser", SpaceCategory.PERCEPTION)
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
 class LaserScanSpace(BaseObservationSpace):
-    """
-    Original laser scan observation space.
+    """Basic laser scan observation space for front-facing lidar perception.
 
-    Represents the observation space for laser scan data with basic range limiting.
+    Provides a production-ready, normalized representation of raw laser scan data from a front-facing lidar sensor.
+    Applies range limiting and outputs a fixed-length vector for robust perception and navigation.
 
-    Args:
-        laser_num_beams (int): The number of laser beams.
-        laser_max_range (float): The maximum range of the laser.
+    Technical Specifications:
+    - Laser Range Limiting: Clamps all values to a configurable maximum range
+    - Full Resolution: Uses all available beams from the sensor
+
+    Configuration:
+    - laser_num_beams: Number of beams in the laser scan
+    - laser_max_range: Maximum valid range for each beam (meters)
+
+    Output Format: 1D numpy array of length laser_num_beams, with all values ∈ [0, laser_max_range].
+
+    Applications: Obstacle avoidance, mapping, and raw sensor fusion.
     """
 
     name = "LASER"
-    required_observation_units = [LaserCollector]
+    requires = {
+        "front_laser": LidarRanges,  # Front-facing laser scanner range measurements
+    }
 
     def __init__(
         self, laser_num_beams: int, laser_max_range: float, *args, **kwargs
@@ -66,33 +76,56 @@ class LaserScanSpace(BaseObservationSpace):
         return laserbeams
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> Any:
-        """
-        Extracts laser scan data from the observation dictionary.
+    def encode_observation(
+        self, front_laser: LidarRanges, *args, **kwargs
+    ) -> LidarRanges:
+        """Encode full-resolution laser scan with range limiting for robust perception.
 
         Args:
-            observation (ObservationDict): A dictionary containing observation data.
+            front_laser (LidarRanges): Preprocessed laser scan ranges from front-facing lidar
+                - Shape: (laser_num_beams,) - Full resolution
+                - Dtype: np.float32
+                - Units: meters
+                - Source: lidar sensor
+                - Constraints: ranges ∈ [0, laser_max_range], NaN replaced with max_range
+                - Example: [0.5, 1.2, 3.4, ..., 2.1] (array of distance measurements)
 
         Returns:
-            Laser scan data with applied range limits.
+            LidarRanges: Laser scan data with applied range limits.
+                - Shape: (laser_num_beams,) - Full resolution laser scan
+                - Dtype: np.float32
+                - Range: [0.0, laser_max_range] - Distances clamped to max range
+                - Units: meters
+                - Example: [0.5, 1.2, 3.4, 2.8, 1.9] for 5-beam laser
         """
-        return LaserScanSpace.apply_limit(
-            observation[LaserCollector.name], self._max_range
-        )
+        return LaserScanSpace.apply_limit(front_laser, self._max_range)
 
 
-@SpaceFactory.register("reduce_laser", SpaceCategory.PERCEPTION)
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
 class ReducedLaserScanSpace(BaseObservationSpace):
-    """A class representing a reduced laser scan observation space.
+    """Reduced laser scan observation space for efficient perception.
 
-    This observation space reduces the dimensionality of laser scan data by
-    selecting a subset of the original laser beams at evenly spaced intervals.
-    This can be useful for reducing computational complexity while still
-    maintaining sufficient environmental awareness for navigation tasks.
+    Provides a subsampled, range-limited representation of laser scan data by selecting a subset of beams
+    at evenly spaced intervals. Reduces computational complexity while maintaining environmental awareness.
+
+    Technical Specifications:
+    - Laser Range Limiting: Clamps all values to a configurable maximum range
+    - Subsampling: Evenly selects reduced_num_beams from the full scan
+
+    Configuration:
+    - laser_num_beams: Number of beams in the original laser scan
+    - laser_max_range: Maximum valid range for each beam (meters)
+    - reduced_num_beams: Number of beams in the reduced scan
+
+    Output Format: 1D numpy array of length reduced_num_beams, with all values ∈ [0, laser_max_range].
+
+    Applications: Lightweight navigation, embedded systems, and fast obstacle avoidance.
     """
 
     name = "REDUCED_LASER"
-    required_observation_units = [LaserCollector]
+    requires = {
+        "front_laser": LidarRanges,  # Front-facing laser scanner range measurements (reduced)
+    }
 
     def __init__(
         self,
@@ -150,20 +183,31 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         return indices
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> Any:
-        """
-        Encodes a reduced version of the laser scan observation.
+    def encode_observation(
+        self, front_laser: LidarRanges, *args, **kwargs
+    ) -> LidarRanges:
+        """Encode reduced laser scan with range limiting and subsampling for efficient perception.
 
         Args:
-            observation (ObservationDict): A dictionary containing observation data.
+            front_laser (LidarRanges): Preprocessed laser scan ranges (full resolution before reduction)
+                - Shape: (laser_num_beams,) - Full resolution
+                - Dtype: np.float32
+                - Units: meters
+                - Source: lidar sensor
+                - Constraints: ranges ∈ [0, laser_max_range], NaN replaced with max_range
+                - Example: [0.5, 1.2, 3.4, ..., 2.1] (will be subsampled to reduced_num_beams)
 
         Returns:
-            Reduced laser scan data with applied range limits.
+            LidarRanges: Reduced laser scan data with applied range limits.
+                - Shape: (reduced_num_beams,) - Subsampled laser scan
+                - Dtype: np.float32
+                - Range: [0.0, laser_max_range] - Distances clamped to max range
+                - Units: meters
+                - Sampling: Evenly spaced indices from full laser scan
+                - Example: [0.5, 3.4, 1.9] for 3-beam reduction from 360-beam laser
         """
         # Get full laser scan and apply range limits
-        full_laser = LaserScanSpace.apply_limit(
-            observation[LaserCollector.name], self._max_range
-        )
+        full_laser = LaserScanSpace.apply_limit(front_laser, self._max_range)
 
         # Get indices for reduction
         indices = self.get_indices()

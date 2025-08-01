@@ -1,16 +1,4 @@
-"""Meta Spaces # Basic spaces
-from .basic_meta_spaces import (
-    IsFirstStepSpace,
-    IsTerminalStepSpace,
-    EpisodeStepSpace
-)
-
-# Advanced spaces
-from .advanced_meta_spaces import (
-    MissionContextSpace,
-    PerformanceContextSpace,
-    SafetyContextSpace
-)Ready & Legacy
+"""Meta Spaces - Production Ready & Legacy
 
 This module contains both production-ready and legacy meta observation spaces.
 
@@ -25,15 +13,15 @@ Legacy Spaces:
     - EpisodeStepSpace: Episode step counter
 """
 
-# Legacy spaces
-from .legacy_episode_spaces import (
+# Basic spaces
+from .basic_meta_spaces import (
     IsFirstStepSpace,
     IsTerminalStepSpace,
     EpisodeStepSpace,
 )
 
-# Production ready spaces
-from .robust_meta_space import (
+# Advanced spaces
+from .advanced_meta_spaces import (
     MissionContextSpace,
     PerformanceContextSpace,
     SafetyContextSpace,

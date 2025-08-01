@@ -1,16 +1,4 @@
-"""Environment # Basic spaces
-from .basic_environment_spaces import (
-    PedestrianVelXSpace,
-    PedestrianVelYSpace,
-    StackedLaserMapSpace
-)
-
-# Advanced spaces
-from .advanced_environment_spaces import (
-    EnvironmentContextSpace,
-    SpatialAwarenessSpace,
-    ObstacleProximitySpace
-)uction Ready & Legacy
+"""Environment Spaces - Production Ready & Legacy
 
 This module contains both production-ready and legacy environment observation spaces.
 
@@ -19,21 +7,27 @@ Production Spaces:
     - SpatialAwarenessSpace: Spatial awareness with corridors
     - ObstacleProximitySpace: Obstacle proximity zones
 
-Legacy Spaces:
+Feature Map Spaces:
     - PedestrianVelXSpace: Pedestrian X velocity feature map
     - PedestrianVelYSpace: Pedestrian Y velocity feature map
     - StackedLaserMapSpace: Stacked laser feature map
+    - PedestrianLocationSpace: Pedestrian location feature map
+    - PedestrianSocialStateSpace: Pedestrian social state feature map
+    - PedestrianTypeSpace: Pedestrian type feature map
 """
 
-# Legacy spaces
-from .legacy_feature_maps import (
+# Feature map spaces
+from .feature_map_spaces import (
     PedestrianVelXSpace,
     PedestrianVelYSpace,
     StackedLaserMapSpace,
+    PedestrianLocationSpace,
+    PedestrianSocialStateSpace,
+    PedestrianTypeSpace,
 )
 
-# Production ready spaces
-from .robust_environment_space import (
+# Advanced environment spaces
+from .advanced_environment_spaces import (
     EnvironmentContextSpace,
     SpatialAwarenessSpace,
     ObstacleProximitySpace,
@@ -43,6 +37,9 @@ __all__ = [
     "PedestrianVelXSpace",
     "PedestrianVelYSpace",
     "StackedLaserMapSpace",
+    "PedestrianLocationSpace",
+    "PedestrianSocialStateSpace",
+    "PedestrianTypeSpace",
     "EnvironmentContextSpace",
     "SpatialAwarenessSpace",
     "ObstacleProximitySpace",

@@ -3,12 +3,12 @@
 Original goal and subgoal navigation spaces integrated into hierarchical architecture.
 """
 
-from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations import DistAngleToGoalGenerator, DistAngleToSubgoalGenerator
-from rosnav_rl.utils.type_aliases import ObservationDict
+from rosnav_rl.observations.type_annotations import (
+    DistanceAngleMetrics,
+)
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
@@ -16,21 +16,32 @@ from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
 )
 
 
-@SpaceFactory.register("dist_angle_to_goal", SpaceCategory.NAVIGATION)
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.NAVIGATION)
 class DistAngleToGoalSpace(BaseObservationSpace):
-    """Original observation space for distance and angle to goal.
+    """Basic navigation observation space for distance and angle to goal.
 
-    This class defines an observation space that represents the distance and angle
-    to the goal for a robot. It uses the DistAngleToGoalGenerator to provide the
-    required observation data.
+    This space provides a minimal, production-ready representation of the robot's position relative to its navigation goal.
+    It encodes the distance and angle to the goal as a 2D vector, supporting both continuous and discrete navigation tasks.
 
-    A 2-dimensional observation space where:
-        - First dimension: distance to goal [0, goal_max_dist]
-        - Second dimension: angle to goal [-π, π]
+    Technical Specifications:
+    - Distance to Goal: Euclidean distance from robot to goal position
+    - Angle to Goal: Relative heading from robot to goal in robot-centric frame
+
+    Configuration:
+    - goal_max_dist: Maximum distance to goal (meters)
+
+    Output Format: 2-dimensional vector [distance, angle] for navigation control and reward shaping.
+
+    Applications: Goal-reaching, path planning, reward computation, and curriculum learning.
     """
 
     name = "DIST_ANGLE_TO_GOAL"
-    required_observation_units = [DistAngleToGoalGenerator]
+
+    # Schema-based requirements: defines the data sources needed from observations.yaml
+    # Each key corresponds to a data source name, each value provides rich type metadata
+    requires = {
+        "dist_angle_to_goal": DistanceAngleMetrics,  # Distance and angle to navigation goal
+    }
 
     def __init__(self, goal_max_dist: float = 30, *args, **kwargs) -> None:
         self._max_dist = goal_max_dist
@@ -52,30 +63,53 @@ class DistAngleToGoalSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     @BaseObservationSpace.check_dtype
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> Any:
-        """
-        Encodes the goal observation.
+    def encode_observation(
+        self, dist_angle_to_goal: DistanceAngleMetrics, *args, **kwargs
+    ) -> DistanceAngleMetrics:
+        """Encode distance and angle to navigation goal for minimal navigation context.
 
         Args:
-            observation (dict): The observation dictionary.
+            dist_angle_to_goal (DistanceAngleMetrics): Distance and angle measurements to navigation goal
+                - Shape: (2,) - [distance, angle]
+                - Dtype: np.float32
+                - Units: [meters, radians]
+                - Constraints: distance ≥ 0, angle ∈ [-π, π]
+                - Example: [2.5, 0.785] (2.5m away, 45° to the right)
 
         Returns:
-            ndarray: The encoded goal observation.
+            DistanceAngleMetrics: Encoded navigation goal vector.
+                - Shape: (2,) - [distance, angle]
+                - Dtype: np.float32
+                - Units: [meters, radians]
+                - Range: distance ∈ [0, max_dist], angle ∈ [-π, π]
+                - Example: [2.5, 0.785] (2.5m away, 45° to the right)
         """
-        return observation[DistAngleToGoalGenerator.name]
+        return dist_angle_to_goal
 
 
-@SpaceFactory.register("dist_angle_to_subgoal", SpaceCategory.NAVIGATION)
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.NAVIGATION)
 class DistAngleToSubgoalSpace(BaseObservationSpace):
-    """A space for representing the distance and angle to a subgoal.
+    """Basic navigation observation space for distance and angle to subgoal.
 
-    This observation space encodes the distance and angle to a subgoal as a 2D vector.
-    The first component represents the distance to the subgoal (normalized from 0 to max_dist),
-    and the second component represents the angle to the subgoal (from -π to π).
+    This space provides a minimal, production-ready representation of the robot's position relative to a navigation subgoal.
+    It encodes the distance and angle to the subgoal as a 2D vector, supporting hierarchical and curriculum-based navigation tasks.
+
+    Technical Specifications:
+    - Distance to Subgoal: Euclidean distance from robot to subgoal position
+    - Angle to Subgoal: Relative heading from robot to subgoal in robot-centric frame
+
+    Configuration:
+    - subgoal_max_dist: Maximum distance to subgoal (meters)
+
+    Output Format: 2-dimensional vector [distance, angle] for subgoal navigation and reward shaping.
+
+    Applications: Hierarchical navigation, curriculum learning, subgoal-based planning, and reward computation.
     """
 
     name = "DIST_ANGLE_TO_SUBGOAL"
-    required_observation_units = [DistAngleToSubgoalGenerator]
+    requires = {
+        "dist_angle_to_subgoal": DistanceAngleMetrics,  # Distance and angle to navigation subgoal
+    }
 
     def __init__(self, subgoal_max_dist: float = 30, *args, **kwargs) -> None:
         self._max_dist = subgoal_max_dist
@@ -97,14 +131,25 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     @BaseObservationSpace.check_dtype
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> Any:
-        """
-        Encodes the subgoal observation.
+    def encode_observation(
+        self, dist_angle_to_subgoal: DistanceAngleMetrics, *args, **kwargs
+    ) -> DistanceAngleMetrics:
+        """Encode distance and angle to navigation subgoal for hierarchical navigation context.
 
         Args:
-            observation (dict): The observation dictionary.
+            dist_angle_to_subgoal (DistanceAngleMetrics): Distance and angle measurements to navigation subgoal
+                - Shape: (2,) - [distance, angle]
+                - Dtype: np.float32
+                - Units: [meters, radians]
+                - Constraints: distance ≥ 0, angle ∈ [-π, π]
+                - Example: [1.2, -0.524] (1.2m away, 30° to the left)
 
         Returns:
-            ndarray: The encoded subgoal observation.
+            DistanceAngleMetrics: Encoded navigation subgoal vector.
+                - Shape: (2,) - [distance, angle]
+                - Dtype: np.float32
+                - Units: [meters, radians]
+                - Range: distance ∈ [0, max_dist], angle ∈ [-π, π]
+                - Example: [1.2, -0.524] (1.2m away, 30° to the left)
         """
-        return observation[DistAngleToSubgoalGenerator.name]
+        return dist_angle_to_subgoal

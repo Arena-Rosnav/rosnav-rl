@@ -1,9 +1,4 @@
-"""Localizat# Advanced spaces
-from .advanced_localization_spaces import (
-    RobustOdometrySpace,
-    PoseStabilizedSpace,
-    LocalizationCombinedSpace
-)aces - Production Ready & Legacy
+"""Localization Spaces - Production Ready & Legacy
 
 This module contains both production-ready and legacy localization observation spaces.
 
@@ -15,8 +10,8 @@ Production Spaces:
 Legacy Spaces: (Currently none in base localization)
 """
 
-# Production ready spaces
-from .robust_localization_space import (
+# Advanced spaces
+from .advanced_localization_spaces import (
     RobustOdometrySpace,
     PoseStabilizedSpace,
     LocalizationCombinedSpace,

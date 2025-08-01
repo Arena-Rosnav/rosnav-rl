@@ -7,17 +7,16 @@ from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations import (
-    LastActionCollector,
-    SubgoalLocationInRobotFrameGenerator,
+from rosnav_rl.observations.type_annotations import (
+    RobotActionVector,
+    SubgoalRelativePosition,
 )
-from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from ..base_observation_space import BaseObservationSpace
 
 
-@SpaceFactory.register("last_action", SpaceCategory.DYNAMICS)
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.DYNAMICS)
 class LastActionSpace(BaseObservationSpace):
     """
     Original observation space representing the last action taken by the agent.
@@ -27,7 +26,9 @@ class LastActionSpace(BaseObservationSpace):
     """
 
     name = "LAST_ACTION"
-    required_observation_units = [LastActionCollector]
+    requires = {
+        "last_action": RobotActionVector,  # Last action taken by the agent
+    }
 
     def __init__(
         self,
@@ -84,20 +85,32 @@ class LastActionSpace(BaseObservationSpace):
             )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> Any:
+    def encode_observation(
+        self, last_action: RobotActionVector, *args, **kwargs
+    ) -> RobotActionVector:
         """
         Encodes the last action observation.
 
         Args:
-            observation (ObservationDict): The observation dictionary.
+            last_action: Robot action command vector (last executed action)
+                - Shape: (2,) or (3,)
+                - Dtype: np.float32
+                - Units: [m/s, rad/s] or [m/s, m/s, rad/s]
+                - Format: 2D: [linear_vel, angular_vel], 3D: [linear_vel, translational_vel, angular_vel]
+                - Example: [0.5, 0.2] (differential drive) or [0.5, 0.1, 0.2] (holonomic)
 
         Returns:
-            Last action data.
+            RobotActionVector: (Normalized) Robot action command vector (last executed action).
+                - Shape: (2,) or (3,)
+                - Dtype: np.float32
+                - Units: [m/s, rad/s] or [m/s, m/s, rad/s]
+                - Format: 2D: [linear_vel, angular_vel], 3D: [linear_vel, translational_vel, angular_vel]
+                - Example: [0.5, 0.2] (differential drive) or [0.5, 0.1, 0.2] (holonomic)
         """
-        return observation[LastActionCollector.name]
+        return last_action
 
 
-@SpaceFactory.register("subgoal_in_robot_frame")
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.DYNAMICS)
 class SubgoalInRobotFrameSpace(BaseObservationSpace):
     """Original observation space representing the subgoal position in the robot's coordinate frame.
 
@@ -107,7 +120,9 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
     """
 
     name = "SUBGOAL_IN_ROBOT_FRAME"
-    required_observation_units = [SubgoalLocationInRobotFrameGenerator]
+    requires = {
+        "subgoal_in_robot_frame": SubgoalRelativePosition,  # Subgoal position in robot's local coordinate frame
+    }
 
     def __init__(self, subgoal_max_dist: float = 5, *args, **kwargs) -> None:
         self._max_dist = subgoal_max_dist
@@ -127,14 +142,28 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
         )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> Any:
+    def encode_observation(
+        self, subgoal_in_robot_frame: SubgoalRelativePosition, *args, **kwargs
+    ) -> SubgoalRelativePosition:
         """
         Encodes the subgoal observation in robot frame.
 
         Args:
-            observation (ObservationDict): The observation dictionary.
+            subgoal_in_robot_frame: Subgoal position in robot's local coordinate frame
+                - Shape: (2,) - [x, y] coordinates
+                - Dtype: np.float32
+                - Units: meters
+                - Range: [-subgoal_max_dist, subgoal_max_dist] for both x and y
+                - Coordinate frame: x=forward/backward, y=left/right from robot perspective
+                - Example: [2.5, -1.3] (2.5m forward, 1.3m to the right)
 
         Returns:
-            Subgoal position in robot frame.
+            SubgoalRelativePosition: (Normalized) Subgoal position in robot's local coordinate frame.
+                - Shape: (2,) - [x, y] coordinates
+                - Dtype: np.float32
+                - Units: meters
+                - Range: [-subgoal_max_dist, subgoal_max_dist] for both x and y
+                - Coordinate frame: x=forward/backward, y=left/right from robot perspective
+                - Example: [2.5, -1.3] (2.5m forward, 1.3m to the right)
         """
-        return observation[SubgoalLocationInRobotFrameGenerator.name]
+        return subgoal_in_robot_frame

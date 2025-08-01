@@ -16,6 +16,7 @@ except ImportError:
     # Fallback for when type aliases aren't available
     from typing import Dict as ObservationDict
 from .spaces.base_observation_space import BaseObservationSpace
+from .utils import validate_observation_spaces
 
 
 class ObservationSpaceManager:
@@ -26,6 +27,7 @@ class ObservationSpaceManager:
         space_factory=None,
         auto_load_spaces=True,
         parallel_encoding=True,
+        validate_observations=True,
     ):
         """Initialize simple observation space manager.
 
@@ -33,11 +35,18 @@ class ObservationSpaceManager:
             space_factory: SpaceFactory instance to use. If None, will auto-import.
             auto_load_spaces: If True, automatically imports all space modules to register them.
             parallel_encoding: If True, encode observations in parallel threads.
+            validate_observations: If True, validates observation keys before encoding.
         """
-        self.spaces = OrderedDict()  # Preserve space order
+        self.spaces: OrderedDict[str, BaseObservationSpace] = (
+            OrderedDict()
+        )  # Preserve space order
         self.config = {}
         self.parallel_encoding = parallel_encoding
+        self.validate_observations = validate_observations
         self.space_factory = space_factory
+
+        # Performance optimization: cache required keys per space
+        self._space_required_keys: Dict[str, List[str]] = {}
 
         # Auto-load SpaceFactory and register all spaces
         if self.space_factory is None:
@@ -93,6 +102,9 @@ class ObservationSpaceManager:
             space_instance = self.space_factory.instantiate(space_name, **space_config)
             self.spaces[space_name] = space_instance
 
+            # Cache required keys for performance optimization
+            self._space_required_keys[space_name] = list(space_instance.requires.keys())
+
         print(f"Loaded {len(self.spaces)} spaces: {list(self.spaces.keys())}")
 
     def get_available_spaces(self) -> List[str]:
@@ -108,35 +120,64 @@ class ObservationSpaceManager:
         return self.space_factory.get_spaces_by_category()
 
     def encode_observation(self, observations: ObservationDict) -> Dict[str, Any]:
-        """Encode observations for all loaded spaces.
-        Can use parallel encoding for better performance.
+        """Encode observations for all loaded spaces with optional validation.
 
         Args:
             observations: Raw observation dictionary
 
         Returns:
             Encoded observations by space
+
+        Raises:
+            MissingObservationError: If validation enabled and required keys are missing
+            Various space-specific exceptions: Propagated from individual spaces
         """
         if not self.spaces:
             return {}
+
+        # Optional validation - can be disabled for performance
+        if self.validate_observations:
+            validate_observation_spaces(observations, self.spaces)
 
         if self.parallel_encoding and len(self.spaces) > 1:
             return self._encode_parallel(observations)
         else:
             return self._encode_sequential(observations)
 
+    def _extract_space_args(
+        self, space_name: str, observations: ObservationDict
+    ) -> Dict[str, Any]:
+        """Extract required arguments for a specific space from observations.
+
+        Args:
+            space_name: Name of the space
+            observations: Full observation dictionary
+
+        Returns:
+            Dictionary containing only the arguments required by this space
+        """
+        return {key: observations[key] for key in self._space_required_keys[space_name]}
+
     def _encode_sequential(self, observations: ObservationDict) -> Dict[str, Any]:
-        """Encode observations sequentially."""
+        """Encode observations sequentially using new space interface.
+
+        Args:
+            observations: Raw observation dictionary
+
+        Returns:
+            Encoded observations by space
+
+        Note:
+            Space-specific errors are propagated to caller for proper error handling.
+        """
         encoded = OrderedDict()
 
         for space_name, space in self.spaces.items():
-            try:
-                encoded[space_name] = space.encode_observation(observations)
-            except Exception as e:
-                print(f"Error encoding space '{space_name}': {e}")
-                # Provide fallback zero observation
-                gym_space = space.get_gym_space()
-                encoded[space_name] = np.zeros_like(gym_space.sample())
+
+            # Call space with specific arguments - let space errors propagate
+            encoded[space_name] = space.encode_observation(
+                **self._extract_space_args(space_name, observations)
+            )
 
         # If single space, return value directly
         if len(encoded) == 1:
@@ -145,15 +186,27 @@ class ObservationSpaceManager:
         return dict(encoded)
 
     def _encode_parallel(self, observations: ObservationDict) -> Dict[str, Any]:
-        """Encode observations in parallel using ThreadPoolExecutor."""
+        """Encode observations in parallel using new space interface.
 
-        def encode_single_space(space_name, space):
-            try:
-                return space_name, space.encode_observation(observations), None
-            except Exception as e:
-                return space_name, None, e
+        Args:
+            observations: Raw observation dictionary
 
-        encoded = OrderedDict()
+        Returns:
+            Encoded observations by space
+
+        Note:
+            Space-specific errors are propagated to caller for proper error handling.
+        """
+
+        def encode_single_space(space_name: str, space: BaseObservationSpace) -> tuple:
+            """Encode a single space's observation in a separate thread."""
+            # Call space with specific arguments - let exceptions propagate
+            return (
+                space_name,
+                space.encode_observation(
+                    **self._extract_space_args(space_name, observations)
+                ),
+            )
 
         # Use ThreadPoolExecutor for parallel encoding
         with ThreadPoolExecutor(max_workers=min(len(self.spaces), 4)) as executor:
@@ -164,26 +217,21 @@ class ObservationSpaceManager:
             }
 
             # Collect results as they complete
-            results = {}
+            results: Dict[str, Any] = {}
             for future in as_completed(future_to_space):
-                space_name, result, error = future.result()
-                if error is not None:
-                    print(f"Error encoding space '{space_name}': {error}")
-                    # Provide fallback zero observation
-                    gym_space = self.spaces[space_name].get_gym_space()
-                    results[space_name] = np.zeros_like(gym_space.sample())
-                else:
+                try:
+                    space_name, result = future.result()
                     results[space_name] = result
-
-            # Rebuild in original order
-            for space_name in self.spaces.keys():
-                encoded[space_name] = results[space_name]
+                except Exception as e:
+                    # Re-raise the first space error encountered
+                    # This propagates space-specific errors to the caller
+                    raise e
 
         # If single space, return value directly
-        if len(encoded) == 1:
-            return list(encoded.values())[0]
+        if len(results) == 1:
+            return list(results.values())[0]
 
-        return dict(encoded)
+        return results
 
     @property
     def space_list(self) -> List[BaseObservationSpace]:
@@ -205,3 +253,8 @@ class ObservationSpaceManager:
             for name, space in self.spaces.items():
                 space_dict[name] = space.get_gym_space()
             return spaces.Dict(space_dict)
+
+    @property
+    def required_observa(self) -> Dict[str, List[str]]:
+        """Return required keys for each space."""
+        return self._space_required_keys

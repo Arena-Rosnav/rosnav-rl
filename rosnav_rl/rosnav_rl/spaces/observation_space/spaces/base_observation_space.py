@@ -1,22 +1,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, List, Union
+from typing import ClassVar, List, Union, Dict, Any
 from warnings import warn
 
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.utils.type_aliases import (
-    ObservationCollector,
-    ObservationDict,
-    ObservationGenerator,
-)
-
 from ..normalization import get_normalizer, Normalizer
+from ..utils import RequiresProtocol
 
 
-class BaseObservationSpace(ABC):
+class BaseObservationSpace(ABC, RequiresProtocol):
     """An abstract base class for observation spaces in reinforcement learning environments.
 
     This class defines the interface for observation spaces and provides common
@@ -25,8 +20,18 @@ class BaseObservationSpace(ABC):
 
     Attributes:
         name (ClassVar[str]): The name of the observation space.
-        required_observation_units (ClassVar[List[Union[ObservationCollector, ObservationGenerator]]]):
-            List of observation collectors or generators required by this observation space.
+        requires (ClassVar[Dict[str, Any]]): Schema-based requirements defining the data sources
+            needed by this observation space. Each key corresponds to a data source name from
+            the observations.yaml configuration file, and each value is a type annotation
+            specifying the expected data format. This provides rich metadata including
+            descriptions, shapes, units, and constraints for each required data source.
+
+            Example:
+                requires = {
+                    "dist_angle_to_goal": DistanceAngleMetrics,
+                    "front_laser": LidarRanges,
+                    "robot_pose_from_odom": Pose2D,
+                }
 
     Parameters:
         normalize (bool, optional): Whether to normalize observations. Defaults to False.
@@ -50,9 +55,8 @@ class BaseObservationSpace(ABC):
     """
 
     name: ClassVar[str]
-    required_observation_units: ClassVar[
-        List[Union[ObservationCollector, ObservationGenerator]]
-    ] = []
+    # Schema-based requirements with rich metadata (optional, for enhanced documentation)
+    requires: ClassVar[Dict[str, Any]] = {}
 
     def __init__(
         self,
@@ -123,7 +127,7 @@ class BaseObservationSpace(ABC):
 
     @abstractmethod
     def encode_observation(
-        self, observation: ObservationDict, *args, **kwargs
+        self, observation: Dict[str, Any], *args, **kwargs
     ) -> np.ndarray:
         """
         Abstract method to encode the observation into a numpy array.
@@ -153,7 +157,7 @@ class BaseObservationSpace(ABC):
         """Decorator to apply normalization after observation encoding."""
 
         def wrapper(
-            self: BaseObservationSpace, observation: ObservationDict, *args, **kwargs
+            self: BaseObservationSpace, observation: Dict[str, Any], *args, **kwargs
         ) -> np.ndarray:
             observation_arr = func(self, observation, **kwargs)
             return self._apply_normalization(observation_arr)
@@ -165,7 +169,7 @@ class BaseObservationSpace(ABC):
         """Decorator to validate observation array data types."""
 
         def wrapper(
-            self: BaseObservationSpace, observation: ObservationDict, *args, **kwargs
+            self: BaseObservationSpace, observation: Dict[str, Any], *args, **kwargs
         ) -> np.ndarray:
             observation_arr = func(self, observation, **kwargs)
             return self._validate_observation(observation_arr)

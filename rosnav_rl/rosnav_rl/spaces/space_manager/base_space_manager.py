@@ -9,12 +9,13 @@ from ...spaces import (
     ObservationSpaceManager,
 )
 from ...states import AgentStateContainer
-from ...utils.type_aliases import (
-    EncodedObservationDict,
-    ObservationDict,
-    ObservationSpaceList,
-    ObservationSpaceUnit,
+from ...spaces.observation_space.spaces.base_observation_space import (
+    BaseObservationSpace,
 )
+
+EncodedObservationDict = Dict[str, np.ndarray]
+ObservationDict = Dict[str, Any]
+ObservationSpaceList = List[BaseObservationSpace]
 
 
 class BaseSpaceManager:
@@ -101,15 +102,15 @@ class BaseSpaceManager:
         observation_space_kwargs: Dict[str, Any],
     ):
         """Initialize the observation space manager.
-        
+
         This method creates an ObservationSpaceManager instance by combining
         the provided observation space list and keyword arguments with
         the agent state container's observation space settings.
-        
+
         Args:
             observation_space_list (ObservationSpaceList): The list of observation spaces to include
             observation_space_kwargs (Dict[str, Any]): Additional keyword arguments for observation space configuration
-        
+
         Returns:
             None
         """
@@ -125,15 +126,15 @@ class BaseSpaceManager:
         self, obs_dict: ObservationDict, *args, **kwargs
     ) -> EncodedObservationDict:
         """Encode observation dictionary using the observation space manager.
-        
+
         This method takes an observation dictionary and forwards it to the observation space manager
         for encoding.
-        
+
         Args:
             obs_dict (ObservationDict): The raw observation dictionary to encode.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments passed to the observation space manager.
-        
+
         Returns:
             EncodedObservationDict: The encoded observation dictionary.
         """
@@ -142,14 +143,14 @@ class BaseSpaceManager:
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         """
         Decodes an action from the agent's action space to the robot's action space.
-        
+
         Args:
             action (np.ndarray): The action to decode, represented as a numpy array in the agent's action space.
-        
+
         Returns:
             np.ndarray: The decoded action in the robot's action space.
         """
-        
+
         return self._action_space_manager.decode_action(action)
 
     @property
@@ -170,7 +171,7 @@ class BaseSpaceManager:
         return self._observation_space_manager.observation_space
 
     @property
-    def observation_space_list(self) -> List[ObservationSpaceUnit]:
+    def observation_space_list(self) -> List[BaseObservationSpace]:
         return self._observation_space_manager.space_list
 
     @property

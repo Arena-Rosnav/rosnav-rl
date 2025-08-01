@@ -5,25 +5,33 @@ RGBD and vision-based perception spaces integrated into hierarchical architectur
 
 import numpy as np
 from gymnasium import spaces
-from numpy import ndarray
 
-from rosnav_rl.observations import ImageColorCollector, ImageDepthCollector
-from rosnav_rl.utils.type_aliases import ObservationDict
+
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
+from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from ...base_observation_space import BaseObservationSpace
+from rosnav_rl.observations.type_annotations import ImageData
 
 
-@SpaceFactory.register("rgbd")
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
 class RGBDSpace(BaseObservationSpace):
-    """A base observation space implementation that combines RGB color images with depth information.
+    """RGBD observation space combining RGB color and depth images for perception.
 
-    This class implements the RGBD (Red, Green, Blue, Depth) observation space,
-    processing both color images and depth data into a combined representation suitable
-    for machine learning models.
+    Provides a 4-channel (RGB + Depth) image suitable for deep learning models.
+
+    Technical Specifications:
+    - Input: RGB color image, depth image
+    - Output: Combined RGBD image (H, W, 4)
+    - Normalization: [0, 255] uint8
+
+    Applications: Visual navigation, semantic segmentation, end-to-end learning.
     """
 
-    name: str = "RGBD"
-    required_observation_units = [ImageColorCollector, ImageDepthCollector]
+    name = "RGBD"
+    requires = {
+        "color_image": ImageData,  # RGB color image
+        "depth_image": ImageData,  # Depth image
+    }
 
     def __init__(
         self, rgbd_image_height: int, rgbd_image_width: int, *args, **kwargs
@@ -51,28 +59,31 @@ class RGBDSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
-        self, observation: ObservationDict, *args, **kwargs
-    ) -> ndarray:
+        self, color_image: ImageData, depth_image: ImageData, *args, **kwargs
+    ) -> ImageData:
         """
         Encodes RGBD observation by combining color and depth images.
 
         Args:
-            observation (ObservationDict): Dictionary containing color and depth image data.
+            color_image (ImageData): RGB color image, shape (H, W, 3) or (3, H, W)
+            depth_image (ImageData): Depth image, shape (H, W) or (H, W, 1)
 
         Returns:
-            ndarray: Combined RGBD image as a 4-channel array.
+            ImageData: Combined RGBD image as a 4-channel array (H, W, 4)
         """
-        # Extract color image (RGB, 3 channels)
-        color_image = observation[ImageColorCollector.name]
+        # Ensure color image is (H, W, 3)
+        if color_image.ndim == 3 and color_image.shape[0] in (3, 4):
+            # Convert from CHW to HWC if needed
+            color_image = np.transpose(color_image, (1, 2, 0))
 
-        # Extract depth image (1 channel)
-        depth_image = observation[ImageDepthCollector.name]
-
-        # Ensure depth image has correct shape (add channel dimension if needed)
+        # Ensure depth image has shape (H, W, 1)
         if depth_image.ndim == 2:
             depth_image = np.expand_dims(depth_image, axis=-1)
+        elif depth_image.ndim == 3 and depth_image.shape[-1] != 1:
+            # If depth image is (1, H, W), convert to (H, W, 1)
+            if depth_image.shape[0] == 1:
+                depth_image = np.transpose(depth_image, (1, 2, 0))
 
         # Combine RGB and Depth into RGBD (4 channels)
         rgbd_image = np.concatenate([color_image, depth_image], axis=-1)
-
         return rgbd_image.astype(np.uint8)
