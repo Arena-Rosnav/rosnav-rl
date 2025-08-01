@@ -2,7 +2,7 @@ import numpy as np
 
 
 def get_relative_pos_to_robot(
-    robot_pose: np.ndarray, distant_poses: np.ndarray
+    robot_pose: np.ndarray, distant_poses: np.ndarray, output_buffer: np.ndarray = None
 ) -> np.ndarray:
     """Transforms distant poses from map frame to robot frame coordinates.
 
@@ -17,10 +17,12 @@ def get_relative_pos_to_robot(
             - "yaw": orientation of the robot in the map frame (in radians)
         distant_poses: A numpy array of shape (N, 3) where each row represents a pose
             in homogeneous coordinates [x, y, 1] in the map frame
+        output_buffer: Optional numpy array of shape (N, 2) to store the result in-place.
 
     Returns:
         A numpy array of shape (N, 2) containing the x and y coordinates of the distant
-        poses in the robot's frame of reference (excluding the homogeneous component)
+        poses in the robot's frame of reference (excluding the homogeneous component).
+        If output_buffer is provided, the result is written in-place and returned.
     """
     x = robot_pose["x"]
     y = robot_pose["y"]
@@ -30,7 +32,6 @@ def get_relative_pos_to_robot(
     sin_yaw = np.sin(yaw)
 
     # Calculate the inverse transformation matrix robot_T_map directly
-    # to avoid computationally expensive matrix inversion.
     robot_T_map = np.array(
         [
             [
@@ -47,8 +48,13 @@ def get_relative_pos_to_robot(
         ]
     )
 
-    # Apply the transformation to the distant poses using einsum, return the transformed poses, excluding the homogeneous component
-    return np.einsum("ij,kj->ki", robot_T_map, distant_poses)[:, :2]
+    # Apply the transformation to the distant poses using einsum.
+    # Return the transformed poses, excluding the homogeneous component.
+    result = np.einsum("ij,kj->ki", robot_T_map, distant_poses)[:, :2]
+    if output_buffer is not None:
+        output_buffer[: result.shape[0], :2] = result
+        return output_buffer[: result.shape[0], :2]
+    return result
 
 
 def get_relative_vel_to_robot(
