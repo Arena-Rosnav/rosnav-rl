@@ -55,5 +55,9 @@ class SimulationStateContainer:
                 max_translational_vel=self.robot.action_state.velocity_state.max_translational_vel,
                 min_angular_vel=self.robot.action_state.velocity_state.min_angular_vel,
                 max_angular_vel=self.robot.action_state.velocity_state.max_angular_vel,
+                # Default values for commonly used parameters
+                goal_max_dist=10.0,  # Default value used across all agents
+                subgoal_max_dist=10.0,  # Default value used across all agents
+                normalize=True,  # Default normalization setting
             ),
         )

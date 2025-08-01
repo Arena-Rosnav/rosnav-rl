@@ -12,17 +12,25 @@ class ActionSpaceState:
 
 @dataclass(frozen=True)
 class ObservationSpaceState:
+    # Laser configuration
     laser_num_beams: int
     laser_max_range: float
+    # Velocity configuration
     min_linear_vel: float
     max_linear_vel: float
     min_translational_vel: float
     max_translational_vel: float
     min_angular_vel: float
     max_angular_vel: float
+    # Pedestrian configuration
     ped_num_types: int
     ped_min_speed_x: float
     ped_max_speed_x: float
     ped_min_speed_y: float
     ped_max_speed_y: float
     ped_social_state_num: int
+    # Navigation configuration
+    goal_max_dist: float
+    subgoal_max_dist: float
+    # General configuration
+    normalize: bool
