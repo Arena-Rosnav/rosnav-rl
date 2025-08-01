@@ -143,6 +143,7 @@ def load_episodes(config: "DreamerV3Cfg") -> Tuple[OrderedDict, OrderedDict]:
 
     return train_eps, eval_eps
 
+
 def prefill_dataset(
     config: "DreamerV3Cfg",
     train_envs: List[Parallel],
@@ -333,7 +334,7 @@ def train(
         # Continue training until we reach or exceed the target steps
         while agent._step < config.training.steps + config.training.eval_every:
             logger.write()
-            
+
             # Run evaluation phase if configured
             if config.training.eval_episode_num > 0:
                 _run_evaluation(
@@ -345,7 +346,7 @@ def train(
                     logger=logger,
                     is_image_available=is_image_available,
                 )
-            
+
             # Run training phase
             print("Start training.")
             state = _run_training(
@@ -357,11 +358,11 @@ def train(
                 state=state,
                 is_image_available=is_image_available,
             )
-            
+
             # Log metrics to Weights & Biases if configured
             if log_wandb:
                 _log_to_wandb(agent.metrics)
-                
+
             # Save model checkpoint
             _save_checkpoint(agent=agent, logdir=logdir)
     finally:
@@ -391,7 +392,7 @@ def _run_evaluation(
         episodes=config.training.eval_episode_num,
         no_image_key=not is_image_available,
     )
-    
+
     # Log prediction videos if available and configured
     if is_image_available and config.general.video_pred_log:
         video_pred = agent._wm.video_pred(next(eval_dataset))

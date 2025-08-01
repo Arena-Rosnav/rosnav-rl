@@ -11,7 +11,9 @@ from ..utils.type_aliases import (
 if TYPE_CHECKING:
     from .stable_baselines3.cfg.base import SBAlgorithmCfg
     from ..rl_agent import RL_Agent
-    from ..spaces import BaseObservationSpace
+    from ..spaces.observation_space.spaces.base_observation_space import (
+        BaseObservationSpace,
+    )
 
 
 class RL_Model(ABC):
