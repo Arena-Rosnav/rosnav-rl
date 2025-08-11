@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict
 from warnings import warn
 import numpy as np
 
-from rosnav_rl.observations.type_annotations import (
+from rosnav_rl.observations.utils.types import (
     DistanceAngleMetrics,
     GoalRelativePosition,
     LidarRanges,
