@@ -1,22 +1,27 @@
 from __future__ import annotations
 
-from typing import Any, Dict, TypeVar, Union, TYPE_CHECKING, Type, List
+from typing import TYPE_CHECKING, Any, Dict, List, Type, TypeVar, Union
 
-from rosnav_rl.observations import (
-    ObservationCollectorUnit,
-    ObservationGeneratorUnit,
+from rosnav_rl.observations.data_sources import (
+    Collector,
+    Generator,
 )
 
 if TYPE_CHECKING:
-    from rosnav_rl.spaces import BaseFeatureMapSpace, BaseObservationSpace
+    from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
+        BaseObservationSpace,
+    )
+    from rosnav_rl.spaces.observation_space.spaces.environment.feature_map_spaces import (
+        BaseFeatureMapSpace,
+    )
 
 
 ObservationName = str
 ObservationDict = Dict[ObservationName, Any]
 ObservationSpaceUnit = Union["BaseObservationSpace", "BaseFeatureMapSpace"]
 
-ObservationCollector = TypeVar("ObservationCollector", bound=ObservationCollectorUnit)
-ObservationGenerator = TypeVar("ObservationGenerator", bound=ObservationGeneratorUnit)
+ObservationCollector = TypeVar("ObservationCollector", bound=Collector)
+ObservationGenerator = TypeVar("ObservationGenerator", bound=Generator)
 
 ObservationSpaceList = TypeVar(
     "ObservationSpaceList", bound=List[Type[ObservationSpaceUnit]]
