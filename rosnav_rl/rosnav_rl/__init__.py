@@ -49,7 +49,7 @@ from .model import (
     dreamerv3,
     stable_baselines3,
 )
-from .observations import ObservationManager, collectors, generators, static
+from .observations import ObservationManager
 from .reward import RewardFunction, reward_units
 from .rl_agent import RL_Agent
 from .spaces import ActionSpaceManager, BaseSpaceManager, ObservationSpaceManager
