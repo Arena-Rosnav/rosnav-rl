@@ -15,11 +15,11 @@ from typing import Dict, Any, List, Type, Protocol, runtime_checkable
 from difflib import get_close_matches
 
 try:
-    from ...observations.type_annotations import DataSpec
+    from ...observations.utils.types import DataSpec
 except ImportError:
     # Fallback for direct execution or different import contexts
     try:
-        from rosnav_rl.observations.type_annotations import DataSpec
+        from rosnav_rl.observations.utils.types import DataSpec
     except ImportError:
         # Create a minimal DataSpec for standalone usage
         class DataSpec:
@@ -58,12 +58,12 @@ class MissingObservationError(ValueError):
         self.missing_keys = missing_keys or []
 
 
-class SchemaValidator:
+class BaseSchemaValidator:
     """
-    Universal validator for schema-based requirements.
+    Base class for schema-based validators.
 
-    Works with any component that has a 'requires' attribute containing
-    observation type mappings.
+    Provides common validation infrastructure that can be extended
+    for specific validation strategies.
     """
 
     @staticmethod
@@ -104,7 +104,7 @@ class SchemaValidator:
                 }
 
         if all_missing:
-            error_msg = SchemaValidator._format_error_message(
+            error_msg = BaseSchemaValidator._format_error_message(
                 observations, all_missing, component_type
             )
             missing_keys_list = [
@@ -149,7 +149,7 @@ class SchemaValidator:
             for i, key in enumerate(missing_keys):
                 if hasattr(component, "requires") and key in component.requires:
                     obs_type = component.requires[key]
-                    metadata = SchemaValidator._extract_metadata(obs_type)
+                    metadata = BaseSchemaValidator._extract_metadata(obs_type)
 
                     lines.append(f"  {i+1}. 🔍 '{key}'")
 
@@ -176,6 +176,27 @@ class SchemaValidator:
                             else "N/A"
                         )
                         details.append(f"📏 Units: {units}")
+                    if metadata.get("constraints"):
+                        constraints = (
+                            metadata["constraints"]
+                            if metadata.get("constraints") is not None
+                            else "N/A"
+                        )
+                        details.append(f"🔒 Constraints: {constraints}")
+                    if metadata.get("source"):
+                        source = (
+                            metadata["source"]
+                            if metadata.get("source") is not None
+                            else "N/A"
+                        )
+                        details.append(f"🌐 Source: {source}")
+                    if metadata.get("example"):
+                        example = (
+                            metadata["example"]
+                            if metadata.get("example") is not None
+                            else "N/A"
+                        )
+                        details.append(f"💡 Example: {example}")
                     for detail in details:
                         lines.append(f"     {detail}")
 
@@ -227,11 +248,49 @@ class SchemaValidator:
             "shape": None,
             "units": None,
             "constraints": None,
+            "example": None,
+            "source": None,
         }
 
         try:
-            # Check if it's a DataSpec type with metadata
-            if hasattr(obs_type, "__annotations__"):
+            # Handle typing.Annotated types (Python 3.9+)
+            if hasattr(obs_type, "__metadata__") and hasattr(obs_type, "__origin__"):
+                # This is an Annotated type, extract the metadata
+                for annotation in obs_type.__metadata__:
+                    if isinstance(annotation, DataSpec):
+                        metadata["description"] = annotation.description
+                        metadata["shape"] = getattr(annotation, "shape", None)
+                        metadata["units"] = getattr(annotation, "units", None)
+                        metadata["constraints"] = getattr(
+                            annotation, "constraints", None
+                        )
+                        metadata["source"] = getattr(annotation, "source", None)
+                        metadata["example"] = getattr(annotation, "example", None)
+                        break
+
+                # If no DataSpec found, try to get basic info from the origin type
+                if not metadata["description"] and hasattr(obs_type, "__origin__"):
+                    origin_type = obs_type.__origin__
+                    metadata["description"] = getattr(
+                        origin_type, "__doc__", str(origin_type)
+                    )
+
+            # Handle typing_extensions.Annotated (Python < 3.9)
+            elif hasattr(obs_type, "__args__") and hasattr(obs_type, "__metadata__"):
+                for annotation in obs_type.__metadata__:
+                    if isinstance(annotation, DataSpec):
+                        metadata["description"] = annotation.description
+                        metadata["shape"] = getattr(annotation, "shape", None)
+                        metadata["units"] = getattr(annotation, "units", None)
+                        metadata["constraints"] = getattr(
+                            annotation, "constraints", None
+                        )
+                        metadata["source"] = getattr(annotation, "source", None)
+                        metadata["example"] = getattr(annotation, "example", None)
+                        break
+
+            # Check if it's a DataSpec type with metadata directly
+            elif hasattr(obs_type, "__annotations__"):
                 # Try to get DataSpec metadata
                 spec = getattr(obs_type, "_spec", None)
                 if spec and isinstance(spec, DataSpec):
@@ -239,16 +298,174 @@ class SchemaValidator:
                     metadata["shape"] = getattr(spec, "shape", None)
                     metadata["units"] = getattr(spec, "units", None)
                     metadata["constraints"] = getattr(spec, "constraints", None)
+                    metadata["source"] = getattr(spec, "source", None)
+                    metadata["example"] = getattr(spec, "example", None)
 
             # Fallback to basic type information
             if not metadata["description"]:
-                metadata["description"] = getattr(obs_type, "__doc__", str(obs_type))
+                # Try to get the actual type name instead of Annotated wrapper
+                if hasattr(obs_type, "__origin__"):
+                    type_name = getattr(
+                        obs_type.__origin__, "__name__", str(obs_type.__origin__)
+                    )
+                elif hasattr(obs_type, "__name__"):
+                    type_name = obs_type.__name__
+                else:
+                    type_name = str(obs_type)
 
-        except Exception:
-            # Safe fallback
-            metadata["description"] = str(obs_type)
+                metadata["description"] = f"Data type: {type_name}"
+
+        except Exception as e:
+            # Safe fallback with error info for debugging
+            metadata["description"] = (
+                f"Type: {str(obs_type)} (metadata extraction failed: {e})"
+            )
 
         return metadata
+
+
+class SchemaValidator(BaseSchemaValidator):
+    """
+    Standard validator for schema-based requirements.
+
+    Works with any component that has a 'requires' attribute containing
+    observation type mappings. Validates all requirements upfront.
+    """
+
+    pass
+
+
+class GeneratorSchemaValidator(BaseSchemaValidator):
+    """
+    Specialized validator for generator dependencies with dependency resolution awareness.
+
+    Handles the unique case where generators depend on other generators, creating
+    dependency chains that need to be validated in the correct order.
+    """
+
+    @staticmethod
+    def validate_configuration_dependencies(
+        generators: Dict[str, RequiresProtocol], collectors: Dict[str, Any]
+    ) -> None:
+        """
+        Validate that all generator dependencies exist in the configuration.
+        This catches configuration errors early during initialization.
+
+        Args:
+            generators: Dictionary of generators with 'requires' attributes
+            collectors: Dictionary of available collectors
+
+        Raises:
+            MissingObservationError: If any required dependencies are missing from config
+        """
+        all_available_keys = set(collectors.keys()) | set(generators.keys())
+
+        missing_dependencies = {}
+        for name, generator in generators.items():
+            if not hasattr(generator, "requires"):
+                continue
+
+            missing_keys = []
+            for dep_key in generator.requires.keys():
+                if dep_key not in all_available_keys:
+                    missing_keys.append(dep_key)
+
+            if missing_keys:
+                missing_dependencies[name] = {
+                    "missing_keys": missing_keys,
+                    "component": generator,
+                }
+
+        if missing_dependencies:
+            error_msg = BaseSchemaValidator._format_error_message(
+                {}, missing_dependencies, "Generator"
+            )
+
+            missing_keys_list = [
+                key
+                for info in missing_dependencies.values()
+                for key in info["missing_keys"]
+            ]
+
+            raise MissingObservationError(
+                f"Generator dependency configuration validation failed:\n{error_msg}",
+                missing_keys=missing_keys_list,
+            )
+
+    @staticmethod
+    def validate_root_generators(
+        observations: Dict[str, Any], generators: Dict[str, RequiresProtocol]
+    ) -> None:
+        """
+        Validate generators that only depend on collectors (root generators).
+        These can be validated upfront since their dependencies should be available.
+
+        Args:
+            observations: Available observations (from collectors)
+            generators: All generators
+        """
+        root_generators = {}
+
+        for name, generator in generators.items():
+            if not hasattr(generator, "requires"):
+                continue
+
+            # Check if all dependencies are collectors (not other generators)
+            is_root_generator = True
+            for dep_key in generator.requires.keys():
+                if dep_key in generators:
+                    is_root_generator = False
+                    break
+
+            if is_root_generator:
+                root_generators[name] = generator
+
+        if root_generators:
+            BaseSchemaValidator.validate_requirements(
+                observations, root_generators, "Generator"
+            )
+
+    @staticmethod
+    def validate_single_generator(
+        observations: Dict[str, Any], generator_name: str, generator: RequiresProtocol
+    ) -> None:
+        """
+        Validate a single generator's requirements against current observation state.
+        Used for just-in-time validation during dependency-resolved execution.
+
+        Args:
+            observations: Current observation state
+            generator_name: Name of the generator being validated
+            generator: Generator instance to validate
+
+        Raises:
+            MissingObservationError: If required dependencies are missing
+        """
+        if not hasattr(generator, "requires"):
+            return
+
+        missing_keys = []
+        for key in generator.requires.keys():
+            if key not in observations:
+                missing_keys.append(key)
+
+        if missing_keys:
+            # Create a single-generator missing components dict for error formatting
+            missing_components = {
+                generator_name: {
+                    "missing_keys": missing_keys,
+                    "component": generator,
+                }
+            }
+
+            error_msg = BaseSchemaValidator._format_error_message(
+                observations, missing_components, "Generator"
+            )
+
+            raise MissingObservationError(
+                f"Generator '{generator_name}' validation failed:\n{error_msg}",
+                missing_keys=missing_keys,
+            )
 
 
 # Convenience functions for specific component types
@@ -262,8 +479,8 @@ def validate_observation_spaces(
 def validate_generators(
     observations: Dict[str, Any], generators: Dict[str, RequiresProtocol]
 ) -> None:
-    """Validate generator requirements."""
-    SchemaValidator.validate_requirements(observations, generators, "Generator")
+    """Validate generator requirements using the specialized generator validator."""
+    GeneratorSchemaValidator.validate_root_generators(observations, generators)
 
 
 def validate_reward_units(
@@ -278,7 +495,9 @@ ObservationValidator = SchemaValidator
 
 # Export all public components
 __all__ = [
+    "BaseSchemaValidator",
     "SchemaValidator",
+    "GeneratorSchemaValidator",
     "RequiresProtocol",
     "MissingObservationError",
     "validate_observation_spaces",

@@ -6,7 +6,7 @@ Original goal and subgoal navigation spaces integrated into hierarchical archite
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.type_annotations import (
+from rosnav_rl.observations.utils.types import (
     DistanceAngleMetrics,
 )
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory

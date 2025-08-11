@@ -6,7 +6,7 @@ Robot dynamics and motion-related spaces with proven features.
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.type_annotations import (
+from rosnav_rl.observations.utils.types import (
     KinematicStateVector,
     MotionStateVector,
     Pose2D,

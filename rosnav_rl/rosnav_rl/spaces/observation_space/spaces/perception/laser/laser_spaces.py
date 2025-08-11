@@ -6,7 +6,7 @@ Enhanced laser processing with proven, reliable features for production use.
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.type_annotations import LidarRanges
+from rosnav_rl.observations.utils.types import LidarRanges
 from ....observation_space_factory import SpaceFactory
 from ....space_categories import SpaceCategory
 from ...base_observation_space import BaseObservationSpace

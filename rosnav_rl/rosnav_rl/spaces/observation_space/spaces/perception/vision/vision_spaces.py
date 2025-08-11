@@ -10,7 +10,7 @@ from gymnasium import spaces
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from ...base_observation_space import BaseObservationSpace
-from rosnav_rl.observations.type_annotations import ImageData
+from rosnav_rl.observations.utils.types import ImageData
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)

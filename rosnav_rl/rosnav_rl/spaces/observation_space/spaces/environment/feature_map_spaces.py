@@ -11,7 +11,7 @@ from typing import ClassVar, Union
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.type_annotations import (
+from rosnav_rl.observations.utils.types import (
     IsTerminal,
     LaserFeatureMap,
     LidarRanges,
