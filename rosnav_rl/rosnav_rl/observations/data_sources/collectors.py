@@ -12,9 +12,9 @@ import sensor_msgs.msg as sensor_msgs
 import nav2_msgs.msg as nav2_msgs
 import people_msgs.msg as people_msgs
 
-from .utils.pose import Pose2DType, pose3d_to_pose2d
+from ..utils.pose import Pose2DType, pose3d_to_pose2d
 from .base import Collector
-from .type_annotations import (
+from ..utils.types import (
     Pose2D,
     LidarRanges,
     RobotVelocity,

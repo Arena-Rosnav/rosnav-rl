@@ -18,11 +18,11 @@ import rclpy
 import tf2_ros
 from tf_transformations import euler_from_quaternion
 
-from ..states import SimulationStateContainer
+from ...states import SimulationStateContainer
 from .base import Generator
-from .utils.pose import Pose2DType
-from .utils.semantic import get_relative_pos_to_robot, get_relative_vel_to_robot
-from .type_annotations import (
+from ..utils.pose import Pose2DType
+from ..utils.semantic import get_relative_pos_to_robot, get_relative_vel_to_robot
+from ..utils.types import (
     Pose2D,
     GoalLocation,
     SubgoalLocation,
@@ -59,8 +59,8 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
     # This generator doesn't depend on other data sources - it gets data from TF
     requires = {}
 
-    def __init__(self, name: str, inputs: List[str], **kwargs):
-        super().__init__(name, inputs, **kwargs)
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name, **kwargs)
         self._node = kwargs.get("node")
         if not self._node:
             raise ValueError("RobotPoseTFGenerator requires a ROS 2 node.")
@@ -383,8 +383,8 @@ class PedestrianRelativeLocationGenerator(Generator[PedestrianRelativeLocations]
         "people_data": PedestrianDetections,
     }
 
-    def __init__(self, name: str, inputs: List[str], **kwargs):
-        super().__init__(name, inputs, **kwargs)
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name, **kwargs)
         self._pose_buffer = None
         self._result_buffer = None
         self._last_num_peds = 0
@@ -453,8 +453,8 @@ class PedestrianLocationGenerator(Generator[PedestrianWorldLocations]):
         "people_data": PedestrianDetections,
     }
 
-    def __init__(self, name: str, inputs: List[str], **kwargs):
-        super().__init__(name, inputs, **kwargs)
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name, **kwargs)
         self._locations_buffer = None
         self._last_num_peds = 0
 
@@ -512,8 +512,8 @@ class PedestrianRelativeVelGenerator(Generator[PedestrianRelativeVelocities]):
         "people_data": PedestrianDetections,
     }
 
-    def __init__(self, name: str, inputs: List[str], **kwargs):
-        super().__init__(name, inputs, **kwargs)
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name, **kwargs)
         self._vel_buffer = None
         self._last_num_peds = 0
 
@@ -616,19 +616,19 @@ class PedestrianRelativeVelYGenerator(Generator[PedestrianRelativeVelocities]):
 
     # Schema-based requirements with rich metadata
     requires = {
-        "pedestrian_relative_vel": PedestrianRelativeVelocities,
+        "pedestrian_relative_velocities": PedestrianRelativeVelocities,
     }
 
     def _generate(
         self,
-        pedestrian_relative_vel: PedestrianRelativeVelocities,
+        pedestrian_relative_velocities: PedestrianRelativeVelocities,
         simulation_state_container: SimulationStateContainer,
         **kwargs,
     ) -> PedestrianRelativeVelocities:
         """Extracts the Y component of pedestrian velocities in the robot's frame.
 
         Args:
-            pedestrian_relative_vel (PedestrianRelativeVelocities): np.ndarray (N, 2) of velocities
+            pedestrian_relative_velocities (PedestrianRelativeVelocities): np.ndarray (N, 2) of velocities
             simulation_state_container (SimulationStateContainer): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
@@ -639,9 +639,9 @@ class PedestrianRelativeVelYGenerator(Generator[PedestrianRelativeVelocities]):
             [1.2, 0.3]
         """
         return (
-            pedestrian_relative_vel[:, 1]
-            if len(pedestrian_relative_vel) > 0
-            else pedestrian_relative_vel
+            pedestrian_relative_velocities[:, 1]
+            if len(pedestrian_relative_velocities) > 0
+            else pedestrian_relative_velocities
         )
 
 
@@ -733,8 +733,8 @@ class PedestrianTypeGenerator(Generator[PedestrianTypeArray]):
         "people_data": PedestrianDetections,
     }
 
-    def __init__(self, name: str, inputs: List[str], **kwargs):
-        super().__init__(name, inputs, **kwargs)
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name, **kwargs)
         self._ped_ids = []
         self._ped_types_buffer = None
         self._last_num_peds = 0
@@ -819,8 +819,8 @@ class PedestrianSocialStateGenerator(Generator[PedestrianSocialStates]):
         "people_data": PedestrianDetections,
     }
 
-    def __init__(self, name: str, inputs: List[str], **kwargs):
-        super().__init__(name, inputs, **kwargs)
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name, **kwargs)
         self._ped_ids = []
         self._ped_social_states_buffer = None
         self._last_num_peds = 0

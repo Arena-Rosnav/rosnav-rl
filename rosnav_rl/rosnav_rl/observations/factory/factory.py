@@ -7,7 +7,7 @@ configuration and instantiated data sources.
 """
 
 from typing import Dict, Any, Type
-from .base import DataSource, Collector, Generator
+from ..data_sources.base import DataSource, Collector, Generator
 
 
 class ObservationFactory:
@@ -26,7 +26,7 @@ class ObservationFactory:
         """Register all available collector classes."""
         # Get all collector classes from the collectors module
         import inspect
-        from . import collectors
+        from ..data_sources import collectors
 
         for name, obj in inspect.getmembers(collectors):
             if inspect.isclass(obj) and issubclass(obj, Collector) and obj != Collector:
@@ -36,7 +36,7 @@ class ObservationFactory:
         """Register all available generator classes."""
         # Get all generator classes from the generators module
         import inspect
-        from . import generators
+        from ..data_sources import generators
 
         for name, obj in inspect.getmembers(generators):
             if inspect.isclass(obj) and issubclass(obj, Generator) and obj != Generator:
@@ -61,16 +61,21 @@ class ObservationFactory:
         aliases = config.get("aliases", {})
         datasources_config = config.get("datasources", {})
 
+        # Get the set of datasource names that have aliases
+        aliased_datasources = set(aliases.values())
+
         # Create all data sources first
         for name, ds_config in datasources_config.items():
             data_source = self._create_data_source(name, ds_config, **kwargs)
             if data_source:
-                data_sources[name] = data_source
+                # Only store with original name if it's not aliased
+                if name not in aliased_datasources:
+                    data_sources[name] = data_source
 
-        # Apply aliases by copying references
-        for alias, target in aliases.items():
-            if target in data_sources:
-                data_sources[alias] = data_sources[target]
+                # Store with alias name if it has one
+                for alias, target in aliases.items():
+                    if target == name:
+                        data_sources[alias] = data_source
 
         return data_sources
 
@@ -92,18 +97,14 @@ class ObservationFactory:
             collector_class = self._collectors[ds_type]
 
             # Extract topic from config or use name as default
-            topic = params.get("topic", name)
+            topic = merged_kwargs.pop("topic", name)
 
             return collector_class(name=name, topic=topic, **merged_kwargs)
 
         # Try to create generator
         elif ds_type in self._generators:
             generator_class = self._generators[ds_type]
-
-            # Generators need inputs mapping
-            inputs = params.get("inputs", {})
-
-            return generator_class(name=name, inputs=inputs, **merged_kwargs)
+            return generator_class(name=name, **merged_kwargs)
 
         else:
             raise ValueError(f"Unknown data source type: {ds_type}")
@@ -132,7 +133,7 @@ def create_observation_manager_from_config(
     Returns:
         Configured ObservationManager instance
     """
-    from .observation_manager import ObservationManager
+    from ..core.manager import ObservationManager
 
     factory = ObservationFactory()
 

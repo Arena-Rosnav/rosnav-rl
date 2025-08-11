@@ -25,24 +25,15 @@
 aliases:
   # Core robot state
   robot_pose: robot_pose_from_odom    # Primary robot localization source
-  robot_pose_tf: robot_pose_from_tf   # Alternative TF-based localization
-  
-  # Sensor data
-  laser_scan: front_laser             # Primary lidar sensor
-  camera: front_camera                # Primary camera feed
+  # robot_pose_tf: robot_pose_from_tf   # Alternative TF-based localization
   
   # Navigation targets
-  goal: goal_pose                     # Final navigation target
-  subgoal: subgoal_pose              # Intermediate waypoint
-  nav_path: navigation_path          # Planned trajectory
+  # goal: goal_pose                     # Final navigation target
+  # subgoal: subgoal_pose              # Intermediate waypoint
+  # nav_path: navigation_path          # Planned trajectory
   
   # Social navigation - pedestrian data
-  people: people_detections          # Raw pedestrian detections
-  ped_locations: pedestrian_relative_locations    # Pedestrian positions relative to robot
-  ped_velocities: pedestrian_relative_velocities  # Pedestrian motion in robot frame
-  ped_distances: pedestrian_distances            # Distance metrics to pedestrian groups
-  ped_types: pedestrian_types                   # Pedestrian classification/grouping
-  ped_social: pedestrian_social_states          # Social behavior states
+  people_data: people_detections          # Raw pedestrian detections
 
 datasources:
   # ---------------------------------------------------------------------------
@@ -60,28 +51,28 @@ datasources:
       topic: "odom"                    # Standard odometry topic
       up_to_date_required: true        # Require fresh data for temporal synchronization
 
-  robot_pose_from_tf:
-    type: RobotPoseTFGenerator         # Listens to TF tree → Pose2D  
-    params: {}                         # Uses simulation_state_container for frame config
+  # robot_pose_from_tf:
+  #   type: RobotPoseTFGenerator         # Listens to TF tree → Pose2D 
+  #   params: {}                         # Uses simulation_state_container for frame config
 
   # Sensor data collectors
   front_laser:
     type: LaserScanCollector           # Processes sensor_msgs/LaserScan → LidarRanges
     params:
-      topic: "scan"                    # Primary lidar topic
+      topic: "lidar"                    # Primary lidar topic
       up_to_date_required: true        # Critical for obstacle avoidance
 
   # Navigation target collectors  
   goal_pose:
     type: PoseStampedCollector         # Processes geometry_msgs/PoseStamped → Pose2D
     params:
-      topic: "goal_pose"               # Navigation goal from planner
+      topic: "goal"               # Navigation goal from planner
       up_to_date_required: false       # Goal updates less frequently
 
   subgoal_pose:
     type: PoseStampedCollector         # Processes geometry_msgs/PoseStamped → Pose2D
     params:
-      topic: "subgoal_pose"            # Intermediate waypoint
+      topic: "subgoal"            # Intermediate waypoint
       up_to_date_required: false       # Subgoal updates less frequently
 
   # Robot control and action data
@@ -89,31 +80,33 @@ datasources:
     type: TwistCollector               # Processes geometry_msgs/Twist → RobotVelocity
     params:
       topic: "cmd_vel"                 # Robot velocity commands
+      # up_to_date_required: true
 
   # Social navigation - people detection
   people_detections:
     type: PeopleCollector              # Processes people_msgs/People → PedestrianDetections
     params:
-      topic: "people"                  # People tracker output
+      topic: "/task_generator_node/people"                  # People tracker output
+      up_to_date_required: false
 
   # Visual perception
-  front_camera:
-    type: ImageColorCollector          # Processes sensor_msgs/Image → ImageData
-    params:
-      topic: "camera/image_raw"        # Camera feed (supports multiple encodings)
+  # front_camera:
+  #   type: ImageColorCollector          # Processes sensor_msgs/Image → ImageData
+  #   params:
+  #     topic: "camera/image_raw"        # Camera feed (supports multiple encodings)
 
   # Navigation planning data
-  navigation_path:
-    type: PathCollector                # Processes nav_msgs/Path → NavigationPath  
-    params:
-      topic: "plan"                    # Global planner output
+  # navigation_path:
+  #   type: PathCollector                # Processes nav_msgs/Path → NavigationPath  
+  #   params:
+  #     topic: "global_plan"                    # Global planner output
 
   # Safety monitoring
-  collision_monitor:
-    type: CollisionMonitorStateCollector  # Processes nav2_msgs/CollisionMonitorState → SafetyStatus
-    params:
-      topic: "collision_monitor_state"
-      state_key: "collision"            # Specific collision state to monitor
+  # collision_monitor:
+  #   type: CollisionMonitorStateCollector  # Processes nav2_msgs/CollisionMonitorState → SafetyStatus
+  #   params:
+  #     topic: "collision_monitor_state"
+  #     state_key: "collision"            # Specific collision state to monitor
 
   # ---------------------------------------------------------------------------
   # OPTIONAL COLLECTORS: Additional sensors for advanced configurations
