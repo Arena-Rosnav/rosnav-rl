@@ -62,7 +62,6 @@ class DistAngleToGoalSpace(BaseObservationSpace):
         )
 
     @BaseObservationSpace.apply_normalization
-    @BaseObservationSpace.check_dtype
     def encode_observation(
         self, dist_angle_to_goal: DistanceAngleMetrics, *args, **kwargs
     ) -> DistanceAngleMetrics:
@@ -130,7 +129,6 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
         )
 
     @BaseObservationSpace.apply_normalization
-    @BaseObservationSpace.check_dtype
     def encode_observation(
         self, dist_angle_to_subgoal: DistanceAngleMetrics, *args, **kwargs
     ) -> DistanceAngleMetrics:
