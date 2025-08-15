@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Union
 
 import torch
 
-from ...spaces import observation_space as spaces
+import rosnav_rl.spaces.observation_space.spaces as spaces
+
 from ...spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
@@ -275,15 +276,15 @@ class DreamerV3Model(RL_Model):
             instantiated to create the actual observation spaces for the model.
         """
         return [
-            spaces.StackedLaserMapSpace,
-            spaces.PedestrianVelXSpace,
-            spaces.PedestrianVelYSpace,
-            spaces.PedestrianTypeSpace,
-            spaces.PedestrianSocialStateSpace,
-            spaces.DistAngleToSubgoalSpace,
-            spaces.LastActionSpace,
-            spaces.IsFirstStepSpace,
-            spaces.IsTerminalStepSpace,
+            spaces.environment.StackedLaserMapSpace,
+            spaces.environment.PedestrianVelXSpace,
+            spaces.environment.PedestrianVelYSpace,
+            spaces.environment.PedestrianTypeSpace,
+            spaces.environment.PedestrianSocialStateSpace,
+            spaces.navigation.DistAngleToSubgoalSpace,
+            spaces.dynamics.LastActionSpace,
+            spaces.meta.IsFirstStepSpace,
+            spaces.meta.IsTerminalStepSpace,
         ]
 
     @property

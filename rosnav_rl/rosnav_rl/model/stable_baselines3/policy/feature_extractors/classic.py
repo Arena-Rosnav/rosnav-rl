@@ -1,7 +1,12 @@
 from typing import Tuple, Union
 
 import gymnasium as gym
-import rosnav_rl.spaces.observation_space as SPACE
+from rosnav_rl.spaces.observation_space.spaces.perception import (
+    LaserScanSpace,
+    ReducedLaserScanSpace,
+)
+from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
+from rosnav_rl.spaces.observation_space.spaces.dynamics import LastActionSpace
 import torch as th
 from torch import nn
 
@@ -30,14 +35,14 @@ class EXTRACTOR_1(RosnavBaseExtractor):
         **kwargs
     ):
         self._laser_key = (
-            SPACE.LaserScanSpace.name
-            if SPACE.LaserScanSpace.name in observation_space
-            else SPACE.ReducedLaserScanSpace.name
+            LaserScanSpace.name
+            if LaserScanSpace.name in observation_space
+            else ReducedLaserScanSpace.name
         )
         self._laser_size, self._goal_size, self._last_action_size = (
             observation_space[self._laser_key].shape[-1],
-            observation_space[SPACE.DistAngleToSubgoalSpace.name].shape[-1],
-            observation_space[SPACE.LastActionSpace.name].shape[-1],
+            observation_space[DistAngleToSubgoalSpace.name].shape[-1],
+            observation_space[LastActionSpace.name].shape[-1],
         )
 
         self._stack_size = stack_size
@@ -95,8 +100,8 @@ class EXTRACTOR_1(RosnavBaseExtractor):
             #     )
         elif isinstance(observations, dict):
             laser_scan = observations[self._laser_key]
-            goal = observations[SPACE.DistAngleToSubgoalSpace.name]
-            last_action = observations[SPACE.LastActionSpace.name]
+            goal = observations[DistAngleToSubgoalSpace.name]
+            last_action = observations[LastActionSpace.name]
         else:
             raise ValueError("Invalid input type.")
 

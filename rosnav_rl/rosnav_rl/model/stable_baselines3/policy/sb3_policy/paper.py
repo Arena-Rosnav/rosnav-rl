@@ -4,7 +4,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.base_class import BaseAlgorithm
 from torch import nn
 
-import rosnav_rl.spaces.observation_space as spaces
+import rosnav_rl.spaces.observation_space.spaces as spaces
 
 from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
@@ -49,9 +49,9 @@ class AGENT_1(StableBaselinesPolicyDescription):
         "reduced_num_beams": 360,
     }
     observation_spaces: ObservationSpaceList = [
-        spaces.ReducedLaserScanSpace,
-        spaces.DistAngleToSubgoalSpace,
-        spaces.LastActionSpace,
+        spaces.perception.ReducedLaserScanSpace,
+        spaces.navigation.DistAngleToSubgoalSpace,
+        spaces.dynamics.LastActionSpace,
     ]
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=256)
@@ -97,9 +97,9 @@ class AGENT_2(StableBaselinesPolicyDescription):
         "reduced_num_beams": 360,
     }
     observation_spaces = [
-        spaces.ReducedLaserScanSpace,
-        spaces.DistAngleToSubgoalSpace,
-        spaces.LastActionSpace,
+        spaces.perception.ReducedLaserScanSpace,
+        spaces.navigation.DistAngleToSubgoalSpace,
+        spaces.dynamics.LastActionSpace,
     ]
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=256)
@@ -148,9 +148,9 @@ class AGENT_3(StableBaselinesPolicyDescription):
         "reduced_num_beams": 360,
     }
     observation_spaces = [
-        spaces.ReducedLaserScanSpace,
-        spaces.DistAngleToSubgoalSpace,
-        spaces.LastActionSpace,
+        spaces.perception.ReducedLaserScanSpace,
+        spaces.navigation.DistAngleToSubgoalSpace,
+        spaces.dynamics.LastActionSpace,
     ]
     features_extractor_class = EXTRACTOR_5_extended
     features_extractor_kwargs = dict(features_dim=256)
@@ -199,9 +199,9 @@ class AGENT_4(StableBaselinesPolicyDescription):
         "reduced_num_beams": 360,
     }
     observation_spaces = [
-        spaces.ReducedLaserScanSpace,
-        spaces.DistAngleToSubgoalSpace,
-        spaces.LastActionSpace,
+        spaces.perception.ReducedLaserScanSpace,
+        spaces.navigation.DistAngleToSubgoalSpace,
+        spaces.dynamics.LastActionSpace,
     ]
     features_extractor_class = EXTRACTOR_5
     features_extractor_kwargs = dict(features_dim=512)
@@ -241,13 +241,13 @@ class AGENT_5(StableBaselinesPolicyDescription):
 
     algorithm_class: Type[BaseAlgorithm] = PPO
     observation_spaces = [
-        spaces.StackedLaserMapSpace,
-        spaces.PedestrianVelXSpace,
-        spaces.PedestrianVelYSpace,
-        spaces.PedestrianTypeSpace,
-        spaces.PedestrianSocialStateSpace,
-        spaces.DistAngleToSubgoalSpace,
-        spaces.LastActionSpace,
+        spaces.environment.StackedLaserMapSpace,
+        spaces.environment.PedestrianVelXSpace,
+        spaces.environment.PedestrianVelYSpace,
+        spaces.environment.PedestrianTypeSpace,
+        spaces.environment.PedestrianSocialStateSpace,
+        spaces.navigation.DistAngleToSubgoalSpace,
+        spaces.dynamics.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,
@@ -298,13 +298,13 @@ class AGENT_6(StableBaselinesPolicyDescription):
 
     algorithm_class: Type[BaseAlgorithm] = RecurrentPPO
     observation_spaces = [
-        spaces.StackedLaserMapSpace,
-        spaces.PedestrianVelXSpace,
-        spaces.PedestrianVelYSpace,
-        spaces.PedestrianTypeSpace,
-        spaces.PedestrianSocialStateSpace,
-        spaces.DistAngleToSubgoalSpace,
-        spaces.LastActionSpace,
+        spaces.environment.StackedLaserMapSpace,
+        spaces.environment.PedestrianVelXSpace,
+        spaces.environment.PedestrianVelYSpace,
+        spaces.environment.PedestrianTypeSpace,
+        spaces.environment.PedestrianSocialStateSpace,
+        spaces.navigation.DistAngleToSubgoalSpace,
+        spaces.dynamics.LastActionSpace,
     ]
     observation_space_kwargs = {
         "roi_in_m": 20,

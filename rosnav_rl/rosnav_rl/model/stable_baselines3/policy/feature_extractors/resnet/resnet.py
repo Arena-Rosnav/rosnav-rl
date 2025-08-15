@@ -1,17 +1,17 @@
 """
-This file contains the definition of a custom CNN model `MID_FUSION_BOTTLENECK_EXTRACTOR_1` 
-for feature extraction in a reinforcement learning environment. 
+This file contains the definition of a custom CNN model `MID_FUSION_BOTTLENECK_EXTRACTOR_1`
+for feature extraction in a reinforcement learning environment.
 
 Source:
     https://ieeexplore.ieee.org/document/10089196
 
 Details:
     - The model is implemented using PyTorch and inherits from the BaseFeaturesExtractor class.
-    - It includes a Bottleneck class that implements a variant of the ResNet architecture known as 
+    - It includes a Bottleneck class that implements a variant of the ResNet architecture known as
         ResNet V1.5, designed to improve accuracy for image recognition tasks.
-    - The MID_FUSION_BOTTLENECK_EXTRACTOR_1 class defines a custom feature extractor that is part of 
+    - The MID_FUSION_BOTTLENECK_EXTRACTOR_1 class defines a custom feature extractor that is part of
         a middle-fusion-network.
-    - The feature extractor takes input observations and performs a series of convolutional and 
+    - The feature extractor takes input observations and performs a series of convolutional and
         batch normalization operations, followed by fusion and goal networks to extract features.
 """
 
@@ -19,7 +19,18 @@ from copy import deepcopy
 from typing import Callable, List, Tuple
 
 import gymnasium as gym
-import rosnav_rl.spaces.observation_space as SPACE
+from rosnav_rl.spaces.observation_space.spaces.environment import (
+    StackedLaserMapSpace,
+    PedestrianVelXSpace,
+    PedestrianVelYSpace,
+    PedestrianTypeSpace,
+    PedestrianSocialStateSpace,
+)
+from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
+from rosnav_rl.spaces.observation_space.spaces.dynamics import (
+    LastActionSpace,
+    SubgoalInRobotFrameSpace,
+)
 import torch
 import torch.nn as nn
 
@@ -70,12 +81,13 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         width_per_group (int): Width of each group in group convolution, default is 64
         replace_stride_with_dilation (List[bool]): Whether to replace stride with dilation, default is None
         norm_layer (nn.Module): Normalization layer, default is nn.BatchNorm2d
-"""
+    """
+
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.DistAngleToSubgoalSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        DistAngleToSubgoalSpace,
     ]
 
     def __init__(
@@ -144,18 +156,18 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             None
         """
         self._feature_map_size = self._observation_space[
-            SPACE.StackedLaserMapSpace.name
+            StackedLaserMapSpace.name
         ].shape[-1]
-        self._scan_map_size = self._observation_space[
-            SPACE.StackedLaserMapSpace.name
-        ].shape[-1]
+        self._scan_map_size = self._observation_space[StackedLaserMapSpace.name].shape[
+            -1
+        ]
 
         self._goal_size = 2
 
         self._last_action_size = 0
-        if SPACE.LastActionSpace.name in self._observation_space.spaces:
+        if LastActionSpace.name in self._observation_space.spaces:
             self._last_action_size = self._observation_space[
-                SPACE.LastActionSpace.name
+                LastActionSpace.name
             ].shape[-1]
 
         self._ped_map_size = 0
@@ -465,14 +477,12 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     def _get_input(
         self, observations: TensorDict
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        laser_map = observations[
-            SPACE.StackedLaserMapSpace.name
-        ]  # (num_envs, 1, 80, 80)
+        laser_map = observations[StackedLaserMapSpace.name]  # (num_envs, 1, 80, 80)
 
         goal_key = (
-            SPACE.DistAngleToSubgoalSpace.name
-            if SPACE.DistAngleToSubgoalSpace.name in observations
-            else SPACE.SubgoalInRobotFrameSpace.name
+            DistAngleToSubgoalSpace.name
+            if DistAngleToSubgoalSpace.name in observations
+            else SubgoalInRobotFrameSpace.name
         )
         dist_angle_to_goal = observations[goal_key]  # (num_envs, 2)
 
@@ -488,8 +498,8 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             )  # (num_envs, num_semantic_layers, 80, 80)
 
         last_action = None
-        if SPACE.LastActionSpace.name in self._observation_space.spaces:
-            last_action = observations[SPACE.LastActionSpace.name]  # (num_envs, 3)
+        if LastActionSpace.name in self._observation_space.spaces:
+            last_action = observations[LastActionSpace.name]  # (num_envs, 3)
 
         return {
             "ped_map": ped_map,
@@ -530,13 +540,13 @@ class DRL_VO_NAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        PedestrianTypeSpace,
+        PedestrianSocialStateSpace,
+        DistAngleToSubgoalSpace,
+        LastActionSpace,
     ]
 
     def _setup_network(self, inplanes: int = 64):
@@ -570,12 +580,12 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        PedestrianTypeSpace,
+        PedestrianSocialStateSpace,
+        DistAngleToSubgoalSpace,
     ]
 
     def _setup_network(self, inplanes: int = 64):
@@ -850,36 +860,36 @@ class RESNET_MID_FUSION_EXTRACTOR_3(RESNET_MID_FUSION_EXTRACTOR_2):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        PedestrianTypeSpace,
+        PedestrianSocialStateSpace,
+        DistAngleToSubgoalSpace,
+        LastActionSpace,
     ]
 
 
 class RESNET_MID_FUSION_EXTRACTOR_4(RESNET_MID_FUSION_EXTRACTOR_1):
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        PedestrianTypeSpace,
+        PedestrianSocialStateSpace,
+        DistAngleToSubgoalSpace,
     ]
 
 
 class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        PedestrianTypeSpace,
+        PedestrianSocialStateSpace,
+        DistAngleToSubgoalSpace,
+        LastActionSpace,
     ]
 
     def _setup_network(self):
@@ -995,13 +1005,13 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
     """
 
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        PedestrianTypeSpace,
+        PedestrianSocialStateSpace,
+        DistAngleToSubgoalSpace,
+        LastActionSpace,
     ]
 
     def _setup_network(self):
@@ -1085,13 +1095,13 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
 
 class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
-        SPACE.LastActionSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        PedestrianTypeSpace,
+        PedestrianSocialStateSpace,
+        DistAngleToSubgoalSpace,
+        LastActionSpace,
     ]
 
     def _setup_network(self, inplanes: int = 64):
@@ -1357,8 +1367,8 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
 
 class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.DistAngleToSubgoalSpace,
+        StackedLaserMapSpace,
+        DistAngleToSubgoalSpace,
     ]
 
     def _forward_impl(
@@ -1416,7 +1426,7 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
         combination = (
             (fusion_out, goal)
             if self._last_action_size == 0
-            else (fusion_out, goal, kwargs[SPACE.LastActionSpace.name])
+            else (fusion_out, goal, kwargs[LastActionSpace.name])
         )
         fc_in = torch.cat(combination, dim=1)
         x = self.linear_fc(fc_in)
@@ -1426,8 +1436,8 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
 
 class _LaserTest_deep(DRL_VO_NAV_EXTRACTOR_TEST):
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.DistAngleToSubgoalSpace,
+        StackedLaserMapSpace,
+        DistAngleToSubgoalSpace,
     ]
 
     def _forward_impl(
@@ -1495,7 +1505,7 @@ class _LaserTest_deep(DRL_VO_NAV_EXTRACTOR_TEST):
         combination = (
             (fusion_out, goal)
             if self._last_action_size == 0
-            else (fusion_out, goal, kwargs[SPACE.LastActionSpace.name])
+            else (fusion_out, goal, kwargs[LastActionSpace.name])
         )
         fc_in = torch.cat(combination, dim=1)
         x = self.linear_fc(fc_in)
@@ -1505,12 +1515,12 @@ class _LaserTest_deep(DRL_VO_NAV_EXTRACTOR_TEST):
 
 class DRL_VO_DEEP(DRL_VO_NAV_EXTRACTOR_TEST):
     REQUIRED_OBSERVATIONS = [
-        SPACE.StackedLaserMapSpace,
-        SPACE.PedestrianVelXSpace,
-        SPACE.PedestrianVelYSpace,
-        SPACE.PedestrianTypeSpace,
-        SPACE.PedestrianSocialStateSpace,
-        SPACE.DistAngleToSubgoalSpace,
+        StackedLaserMapSpace,
+        PedestrianVelXSpace,
+        PedestrianVelYSpace,
+        PedestrianTypeSpace,
+        PedestrianSocialStateSpace,
+        DistAngleToSubgoalSpace,
     ]
 
 
