@@ -1,18 +1,15 @@
 """
-Unified Schema-Based Validation Framework
+Base validation functionality.
 
-This module provides a universal validation solution for any component that follows
-the RequiresProtocol pattern (has a 'requires' attribute).
-
-Features:
-- Works with observation spaces, generators, reward units, and any future components
-- Rich error reporting with metadata extraction
-- Performance optimizations with fast path checks
-- Beautiful visual error messages with smart suggestions
+This module contains the core validation infrastructure that can be extended
+for specific validation strategies.
 """
 
-from typing import Dict, Any, List, Type, Protocol, runtime_checkable
+from typing import Dict, Any, Type
 from difflib import get_close_matches
+
+from .protocols import RequiresProtocol
+from .exceptions import MissingObservationError
 
 try:
     from ...observations.utils.types import DataSpec
@@ -30,32 +27,6 @@ except ImportError:
                 self.shape = shape
                 self.units = units
                 self.constraints = constraints
-
-
-@runtime_checkable
-class RequiresProtocol(Protocol):
-    """Protocol for components that have observation requirements."""
-
-    requires: Dict[str, Any]
-    """
-    'requires' is a mapping from logical input names (str) to string keys referencing
-    the Annotated data type schema of required dependencies. This enables schema-based
-    configuration and validation of generator inputs, decoupling logical names from
-    concrete data source classes.
-    Example:
-        requires = {
-            "front_laser": "LaserScanSchema",
-            "odom": "OdometrySchema"
-        }
-    """
-
-
-class MissingObservationError(ValueError):
-    """Raised when required observations are missing from the observation space."""
-
-    def __init__(self, message: str, missing_keys: List[str] = None):
-        super().__init__(message)
-        self.missing_keys = missing_keys or []
 
 
 class BaseSchemaValidator:
@@ -324,184 +295,4 @@ class BaseSchemaValidator:
         return metadata
 
 
-class SchemaValidator(BaseSchemaValidator):
-    """
-    Standard validator for schema-based requirements.
-
-    Works with any component that has a 'requires' attribute containing
-    observation type mappings. Validates all requirements upfront.
-    """
-
-    pass
-
-
-class GeneratorSchemaValidator(BaseSchemaValidator):
-    """
-    Specialized validator for generator dependencies with dependency resolution awareness.
-
-    Handles the unique case where generators depend on other generators, creating
-    dependency chains that need to be validated in the correct order.
-    """
-
-    @staticmethod
-    def validate_configuration_dependencies(
-        generators: Dict[str, RequiresProtocol], collectors: Dict[str, Any]
-    ) -> None:
-        """
-        Validate that all generator dependencies exist in the configuration.
-        This catches configuration errors early during initialization.
-
-        Args:
-            generators: Dictionary of generators with 'requires' attributes
-            collectors: Dictionary of available collectors
-
-        Raises:
-            MissingObservationError: If any required dependencies are missing from config
-        """
-        all_available_keys = set(collectors.keys()) | set(generators.keys())
-
-        missing_dependencies = {}
-        for name, generator in generators.items():
-            if not hasattr(generator, "requires"):
-                continue
-
-            missing_keys = []
-            for dep_key in generator.requires.keys():
-                if dep_key not in all_available_keys:
-                    missing_keys.append(dep_key)
-
-            if missing_keys:
-                missing_dependencies[name] = {
-                    "missing_keys": missing_keys,
-                    "component": generator,
-                }
-
-        if missing_dependencies:
-            error_msg = BaseSchemaValidator._format_error_message(
-                {}, missing_dependencies, "Generator"
-            )
-
-            missing_keys_list = [
-                key
-                for info in missing_dependencies.values()
-                for key in info["missing_keys"]
-            ]
-
-            raise MissingObservationError(
-                f"Generator dependency configuration validation failed:\n{error_msg}",
-                missing_keys=missing_keys_list,
-            )
-
-    @staticmethod
-    def validate_root_generators(
-        observations: Dict[str, Any], generators: Dict[str, RequiresProtocol]
-    ) -> None:
-        """
-        Validate generators that only depend on collectors (root generators).
-        These can be validated upfront since their dependencies should be available.
-
-        Args:
-            observations: Available observations (from collectors)
-            generators: All generators
-        """
-        root_generators = {}
-
-        for name, generator in generators.items():
-            if not hasattr(generator, "requires"):
-                continue
-
-            # Check if all dependencies are collectors (not other generators)
-            is_root_generator = True
-            for dep_key in generator.requires.keys():
-                if dep_key in generators:
-                    is_root_generator = False
-                    break
-
-            if is_root_generator:
-                root_generators[name] = generator
-
-        if root_generators:
-            BaseSchemaValidator.validate_requirements(
-                observations, root_generators, "Generator"
-            )
-
-    @staticmethod
-    def validate_single_generator(
-        observations: Dict[str, Any], generator_name: str, generator: RequiresProtocol
-    ) -> None:
-        """
-        Validate a single generator's requirements against current observation state.
-        Used for just-in-time validation during dependency-resolved execution.
-
-        Args:
-            observations: Current observation state
-            generator_name: Name of the generator being validated
-            generator: Generator instance to validate
-
-        Raises:
-            MissingObservationError: If required dependencies are missing
-        """
-        if not hasattr(generator, "requires"):
-            return
-
-        missing_keys = []
-        for key in generator.requires.keys():
-            if key not in observations:
-                missing_keys.append(key)
-
-        if missing_keys:
-            # Create a single-generator missing components dict for error formatting
-            missing_components = {
-                generator_name: {
-                    "missing_keys": missing_keys,
-                    "component": generator,
-                }
-            }
-
-            error_msg = BaseSchemaValidator._format_error_message(
-                observations, missing_components, "Generator"
-            )
-
-            raise MissingObservationError(
-                f"Generator '{generator_name}' validation failed:\n{error_msg}",
-                missing_keys=missing_keys,
-            )
-
-
-# Convenience functions for specific component types
-def validate_observation_spaces(
-    observations: Dict[str, Any], spaces: Dict[str, RequiresProtocol]
-) -> None:
-    """Validate observation space requirements."""
-    SchemaValidator.validate_requirements(observations, spaces, "Observation Space")
-
-
-def validate_generators(
-    observations: Dict[str, Any], generators: Dict[str, RequiresProtocol]
-) -> None:
-    """Validate generator requirements using the specialized generator validator."""
-    GeneratorSchemaValidator.validate_root_generators(observations, generators)
-
-
-def validate_reward_units(
-    observations: Dict[str, Any], reward_units: Dict[str, RequiresProtocol]
-) -> None:
-    """Validate reward unit requirements."""
-    SchemaValidator.validate_requirements(observations, reward_units, "Reward Unit")
-
-
-# Backward compatibility alias
-ObservationValidator = SchemaValidator
-
-# Export all public components
-__all__ = [
-    "BaseSchemaValidator",
-    "SchemaValidator",
-    "GeneratorSchemaValidator",
-    "RequiresProtocol",
-    "MissingObservationError",
-    "validate_observation_spaces",
-    "validate_generators",
-    "validate_reward_units",
-    "ObservationValidator",  # Legacy alias
-]
+__all__ = ["BaseSchemaValidator"]

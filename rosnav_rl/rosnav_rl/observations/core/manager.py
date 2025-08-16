@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, TypeVar, Type
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 
-from rosnav_rl.spaces.observation_space.utils import GeneratorSchemaValidator
+from rosnav_rl.utils.validation import GeneratorSchemaValidator
 from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.rostopic import Namespace
 from ..data_sources.base import Collector, DataSource, Generator

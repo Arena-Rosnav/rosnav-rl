@@ -8,13 +8,13 @@ The components are:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, List, Type, Union, Optional
+from typing import Any, Dict, Generic, Type, Union, Optional
 from rclpy.client import TypeVar
 from rclpy.clock import Clock, ClockType
-from rclpy.time import Time, Duration
+from rclpy.time import Time
 from rclpy.qos import QoSProfile
 
-from rosnav_rl.spaces.observation_space.utils import RequiresProtocol
+from rosnav_rl.utils.validation import RequiresProtocol
 
 
 class DataSource(ABC):
@@ -211,7 +211,28 @@ class Generator(DataSource, RequiresProtocol, Generic[ProcessedDataType]):
             ) from e
         except TypeError as e:
             # This can catch missing or unexpected arguments
-            raise TypeError(
-                f"Generator '{self.name}' argument mismatch when calling '_generate': {e}. "
-                f"Required: {sorted(self.required_keys)}, Provided: {sorted(obs_dict.keys())}"
-            ) from e
+            raise TypeError(self._format_type_error(e, obs_dict)) from e
+
+    def _format_type_error(self, error: TypeError, obs_dict: Dict[str, Any]) -> str:
+        """Format a detailed error message for type/argument errors."""
+        lines = [
+            "\n📋 Type Mismatch in '_generate' Method:",
+            "",
+            f"🔧 Generator: {self.name}",
+            f"🆔 Type: {self.__class__.__name__}",
+            f"❌ Error: {str(error)}",
+            "",
+            "get_observation() will return None.",
+        ]
+
+        # lines.extend(
+        #     [
+        #         "🔧 Solution Steps:",
+        #         "   1. Check the '_generate' method signature matches 'requires' keys",
+        #         "   2. Verify all required dependencies have compatible data types",
+        #         "   3. Ensure '_generate' method accepts the provided argument types",
+        #         "   4. Check for any type conversion issues in the data pipeline",
+        #     ]
+        # )
+
+        return "\n".join(lines)

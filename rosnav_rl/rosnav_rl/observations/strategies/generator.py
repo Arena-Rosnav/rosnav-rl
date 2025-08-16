@@ -10,7 +10,7 @@ from typing import Any, Dict
 
 from rclpy.node import Node
 
-from rosnav_rl.spaces.observation_space.utils import GeneratorSchemaValidator
+from rosnav_rl.utils.validation import GeneratorSchemaValidator
 from rosnav_rl.states import SimulationStateContainer
 
 from ..data_sources.base import Generator
@@ -98,7 +98,6 @@ class GeneratorManager:
             )
 
             self._logger.debug(f"Successfully generated observation '{name}'")
-
         except Exception as e:
             self._logger.error(f"Error generating observation '{name}': {e}")
             obs_dict[name] = None  # Graceful degradation

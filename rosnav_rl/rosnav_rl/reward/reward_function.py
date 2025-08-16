@@ -6,7 +6,7 @@ import threading
 from rosnav_rl.cfg.reward import RewardFunctionDict
 from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict
-from rosnav_rl.spaces.observation_space.utils import validate_reward_units
+from rosnav_rl.utils.validation import validate_reward_units
 
 if TYPE_CHECKING:
     from .reward_units.base_reward_units import RewardUnit

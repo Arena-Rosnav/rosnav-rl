@@ -118,8 +118,15 @@ class BaseSpaceManager:
             asdict(self._agent_state_container.observation_space)
         )
         self._observation_space_manager = ObservationSpaceManager(
-            space_list=observation_space_list,
-            space_kwargs=observation_space_kwargs,
+            parallel_encoding=False,
+            validate_observations=True,
+        )
+
+        self._observation_space_manager.load_configuration(
+            config={
+                spaces.__name__: observation_space_kwargs
+                for spaces in observation_space_list
+            },
         )
 
     def encode_observation(

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 import logging
 
-from rosnav_rl.spaces.observation_space.utils import RequiresProtocol
+from rosnav_rl.utils.validation import RequiresProtocol
 
 from ..reward_function import RewardFunction
 
@@ -28,18 +28,6 @@ class RewardUnit(RequiresProtocol, ABC):
                 "dist_angle_to_goal": DistanceAngleMetrics,
                 "robot_action": RobotVelocity,
             }
-
-    Performance Features:
-        - Fast path validation with early exit
-        - Cached requirement extraction
-        - Optional validation for production environments
-        - Efficient argument filtering
-
-    Robustness Features:
-        - Comprehensive error handling with context
-        - Parameter validation with warnings
-        - State management and cleanup
-        - Safe fallback mechanisms
 
     Attributes:
         requires (Dict[str, Any]): Schema-based requirement mapping (class attribute)

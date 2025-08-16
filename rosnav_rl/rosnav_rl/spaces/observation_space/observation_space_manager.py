@@ -16,7 +16,7 @@ except ImportError:
     # Fallback for when type aliases aren't available
     from typing import Dict as ObservationDict
 from .spaces.base_observation_space import BaseObservationSpace
-from .utils import validate_observation_spaces
+from rosnav_rl.utils.validation import validate_observation_spaces
 
 
 class ObservationSpaceManager:
@@ -174,8 +174,8 @@ class ObservationSpaceManager:
 
         for space_name, space in self.spaces.items():
 
-            # Call space with specific arguments - let space errors propagate
-            encoded[space_name] = space.encode_observation(
+            # Call space with safe encoding that handles errors gracefully
+            encoded[space_name] = space.safe_encode_observation(
                 **self._extract_space_args(space_name, observations)
             )
 
@@ -200,10 +200,10 @@ class ObservationSpaceManager:
 
         def encode_single_space(space_name: str, space: BaseObservationSpace) -> tuple:
             """Encode a single space's observation in a separate thread."""
-            # Call space with specific arguments - let exceptions propagate
+            # Call space with safe encoding that handles errors gracefully
             return (
                 space_name,
-                space.encode_observation(
+                space.safe_encode_observation(
                     **self._extract_space_args(space_name, observations)
                 ),
             )
@@ -255,6 +255,6 @@ class ObservationSpaceManager:
             return spaces.Dict(space_dict)
 
     @property
-    def required_observa(self) -> Dict[str, List[str]]:
+    def required_observations(self) -> Dict[str, List[str]]:
         """Return required keys for each space."""
         return self._space_required_keys
