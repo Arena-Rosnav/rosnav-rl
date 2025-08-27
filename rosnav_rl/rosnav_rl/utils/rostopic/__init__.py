@@ -65,6 +65,10 @@ class Namespace:
     def robot_ns(self) -> Namespace:
         return Namespace(self.name[1] if len(self.name) > 1 else "")
 
+    def to_string(self) -> str:
+        """Returns the string representation of the namespace."""
+        return str(self)
+
 
 class Topic:
     """
@@ -172,6 +176,10 @@ class Topic:
             namespace = Namespace(namespace)
 
         return Topic(self.name, namespaces=[namespace] + self.namespaces)
+
+    def to_string(self) -> str:
+        """Returns the string representation of the topic."""
+        return self.full_topic
 
     @classmethod
     def from_full_topic(cls, full_topic: str) -> Topic:

@@ -412,34 +412,26 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         # The reference implementation expects a fixed structure.
         # We assume laser_stack_size=10, feature_map_size=80, and laser scan length = 720
         # to match the logic.
-        SEGMENT_SIZE = 9
-
         temp = np.array(laser_queue, dtype=np.float32).flatten()
 
         # Single reshape for all operations
-        reshaped = temp.reshape(
-            self._laser_stack_size, self._feature_map_size, SEGMENT_SIZE
-        )
+        reshaped = temp.reshape(10, 80, 9)
 
         # Pre-allocate output with matching dtype
-        scan_avg = np.zeros(
-            (2 * self._laser_stack_size, self._feature_map_size), dtype=np.float32
-        )
+        scan_avg = np.zeros((20, 80), dtype=np.float32)
 
         # Vectorized calculations using axis reduction
         scan_avg[::2] = reshaped.min(axis=2)  # Even rows: minima
         scan_avg[1::2] = reshaped.mean(axis=2)  # Odd rows: averages
 
         # Final transformations
-        scan_avg = scan_avg.reshape(2 * self._laser_stack_size * self._feature_map_size)
-        scan_avg_map = np.tile(scan_avg, (4, 1)).reshape(
-            1, self._feature_map_size, self._feature_map_size
-        )
+        scan_avg = scan_avg.reshape(1600)
+        scan_avg_map = np.tile(scan_avg, (4, 1)).reshape(1, 80, 80)
 
         return scan_avg_map
 
     def _process_laser_scan(
-        self, laser_scan: LidarRanges, done: IsTerminal
+        self, laser_scan: LidarRanges, is_terminal: IsTerminal
     ) -> np.ndarray:
         """Process laser scan data and build a stacked laser map."""
         if not isinstance(laser_scan, np.ndarray) or laser_scan.size == 0:
@@ -448,7 +440,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
                 dtype=np.float32,
             )
 
-        if len(self._laser_queue) == 0 or done:
+        if len(self._laser_queue) == 0 or is_terminal:
             self._reset_laser_stack(laser_scan)
 
         self._laser_queue.pop()
@@ -470,7 +462,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
                 - Source: lidar sensor
                 - Constraints: ranges ∈ [0, max_range], NaN replaced with max_range
                 - Example: [0.5, 1.2, 3.4, ..., 2.1] (array of distance measurements)
-            done (Done): Flag indicating if the episode has ended
+            is_terminal (IsTerminal): Flag indicating if the episode has ended
                 - Shape: scalar boolean
                 - Units: boolean flag
                 - Source: episode termination system
