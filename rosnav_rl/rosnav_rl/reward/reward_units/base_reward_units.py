@@ -3,13 +3,14 @@ from typing import Any, Dict, List, Optional
 import logging
 
 from rosnav_rl.utils.validation import RequiresProtocol
+from rosnav_rl.utils.logging import ErrorReportingMixin, ComponentType
 
 from ..reward_function import RewardFunction
 
 logger = logging.getLogger(__name__)
 
 
-class RewardUnit(RequiresProtocol, ABC):
+class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
     """
     Enhanced RewardUnit base class with schema-based validation and improved robustness.
 
@@ -59,6 +60,13 @@ class RewardUnit(RequiresProtocol, ABC):
             AttributeError: If required schema is not properly defined
             ValueError: If initialization parameters are invalid
         """
+        super().__init__(
+            component_type=ComponentType.REWARD_UNIT,
+            component_name=self.__class__.__name__,
+            *args,
+            **kwargs,
+        )
+
         self._reward_function = reward_function
         self._on_safe_dist_violation = _on_safe_dist_violation
         self._cached_requirements: Optional[set] = None
@@ -69,21 +77,19 @@ class RewardUnit(RequiresProtocol, ABC):
     def _validate_schema_definition(self) -> None:
         """Validate that the schema-based requirements are properly defined.
 
-        Raises:
-            AttributeError: If 'requires' is not properly defined
-            ValueError: If 'requires' contains invalid entries
+        Uses unified error reporting instead of raising exceptions directly.
         """
         if not hasattr(self, "requires"):
-            raise AttributeError(
-                f"RewardUnit '{self.__class__.__name__}' must define 'requires' attribute. "
-                "See RequiresProtocol documentation for examples."
+            self._report_critical(
+                "Must define 'requires' attribute. See RequiresProtocol documentation for examples."
             )
+            return
 
         if not isinstance(self.requires, dict):
-            raise ValueError(
-                f"RewardUnit '{self.__class__.__name__}' 'requires' must be a dictionary, "
-                f"got {type(self.requires)}"
+            self._report_critical(
+                f"'requires' must be a dictionary, got {type(self.requires)}"
             )
+            return
 
         # Cache requirement keys for performance
         self._cached_requirements = set(self.requires.keys())
@@ -91,9 +97,8 @@ class RewardUnit(RequiresProtocol, ABC):
         # Validate requirement entries
         for key, value in self.requires.items():
             if not isinstance(key, str):
-                raise ValueError(
-                    f"RewardUnit '{self.__class__.__name__}' requirement key '{key}' "
-                    f"must be a string, got {type(key)}"
+                self._report_error(
+                    f"Requirement key '{key}' must be a string, got {type(key)}"
                 )
 
     @property
@@ -106,26 +111,23 @@ class RewardUnit(RequiresProtocol, ABC):
 
         Args:
             value (float): The reward value to add
-
-        Raises:
-            TypeError: If value is not a numeric type
-            ValueError: If value is NaN or infinite
         """
         if not isinstance(value, (int, float)):
-            raise TypeError(
-                f"RewardUnit '{self.__class__.__name__}' reward value must be numeric, "
-                f"got {type(value)}: {value}"
+            self._report_error(
+                f"Reward value must be numeric, got {type(value)}: {value}",
+                error_type="TypeError",
             )
+            return
 
-        if not isinstance(value, (int, float)) or value != value:  # NaN check
-            raise ValueError(
-                f"RewardUnit '{self.__class__.__name__}' reward value cannot be NaN"
-            )
+        if value != value:  # NaN check
+            self._report_error("Reward value cannot be NaN", error_type="ValueError")
+            return
 
         if abs(value) == float("inf"):
-            raise ValueError(
-                f"RewardUnit '{self.__class__.__name__}' reward value cannot be infinite"
+            self._report_error(
+                "Reward value cannot be infinite", error_type="ValueError"
             )
+            return
 
         self._reward_function.add_reward(value=value, called_by=self.__class__.__name__)
 
@@ -134,15 +136,12 @@ class RewardUnit(RequiresProtocol, ABC):
 
         Args:
             info (Dict[str, Any]): Information to add to the episode's info dict
-
-        Raises:
-            TypeError: If info is not a dictionary
         """
         if not isinstance(info, dict):
-            raise TypeError(
-                f"RewardUnit '{self.__class__.__name__}' info must be a dictionary, "
-                f"got {type(info)}"
+            self._report_error(
+                f"Info must be a dictionary, got {type(info)}", error_type="TypeError"
             )
+            return
 
         self._reward_function.add_info(info=info)
 
@@ -160,8 +159,8 @@ class RewardUnit(RequiresProtocol, ABC):
         if hasattr(self, "_reward_value"):
             reward = getattr(self, "_reward_value", None)
             if reward is not None and abs(reward) > 100:
-                logger.warning(
-                    f"RewardUnit '{self.__class__.__name__}' has large reward magnitude: {reward}. "
+                self._report_warning(
+                    f"Has large reward magnitude: {reward}. "
                     "Consider scaling rewards for better training stability."
                 )
 

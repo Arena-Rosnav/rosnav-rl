@@ -2,26 +2,45 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 import concurrent.futures
 import threading
 
-
 from rosnav_rl.cfg.reward import RewardFunctionDict
 from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.utils.validation import validate_reward_units
+from rosnav_rl.utils.logging import (
+    ErrorReportingMixin,
+    ComponentType,
+    ErrorSeverity,
+)
+
+from dataclasses import dataclass
 
 if TYPE_CHECKING:
     from .reward_units.base_reward_units import RewardUnit
 
 
+# Configuration constants
+DEFAULT_MAX_WORKERS = 8
+DEFAULT_TIMEOUT_SECONDS = 0.1
+ERROR_MESSAGE_SUFFIX = " ---> thus not applied (+/- 0.0)."
+
+
+@dataclass
 class RewardState:
-    """Container for reward calculation state."""
+    """
+    A class to represent the state of the reward during reinforcement learning.
 
-    def __init__(self):
-        self.current_reward: float = 0.0
-        self.info: Dict[str, Any] = {}
-        self.reward_overview: Dict[str, float] = {}
+    Attributes:
+        current_reward (float): The current reward value.
+        info (Dict[str, Any]): Additional information related to the reward calculation.
+        reward_overview (Dict[str, float]): Overview of different reward components and their values.
+    """
+
+    current_reward: float = 0.0
+    info: Dict[str, Any] = {}
+    reward_overview: Dict[str, float] = {}
 
 
-class RewardFunction:
+class RewardFunction(ErrorReportingMixin):
     """The RewardFunction class manages reward calculation for reinforcement learning.
 
     This class calculates rewards based on configured reward units, which can be combined
@@ -48,39 +67,50 @@ class RewardFunction:
         self,
         function_dict: RewardFunctionDict,
         unit_kwargs: Optional[Dict[str, Any]] = None,
-        validate_units: bool = True,
-        verbose: bool = False,
+        enable_validation: bool = True,
+        verbose: bool = True,
         parallel: bool = False,
-        max_workers: Optional[int] = None,
-        timeout: Optional[float] = 5.0,
+        max_workers: Optional[int] = DEFAULT_MAX_WORKERS,
+        timeout: Optional[float] = DEFAULT_TIMEOUT_SECONDS,
     ):
-        """
-        Initialize the reward function.
+        """Initialize the reward function.
 
         Args:
-            function_dict (Dict[str, Union[str, float, int]]): Dictionary containing reward function parameters.
-            unit_kwargs (Optional[Dict[str, Any]]): Additional arguments for reward units. Defaults to None.
-            validate_units (bool): Whether to validate reward units. Defaults to True.
-            verbose (bool): Enable detailed logging. Defaults to False.
-            parallel (bool): Enable parallel calculation of reward units. Defaults to False.
-            max_workers (Optional[int]): Maximum number of worker threads for parallel execution.
-                                       Defaults to None (uses system default).
-            timeout (Optional[float]): Timeout in seconds for parallel execution. Defaults to 5.0.
+            function_dict: Dictionary containing reward function parameters.
+            unit_kwargs: Additional arguments for reward units.
+            enable_validation: Whether to validate reward units.
+            verbose: Enable detailed logging.
+            parallel: Enable parallel calculation of reward units.
+            max_workers: Maximum number of worker threads for parallel execution.
+            timeout: Timeout in seconds for parallel execution.
         """
+        super().__init__(
+            component_type=ComponentType.REWARD_FUNCTION,
+            component_name="RewardFunction",
+        )
+
+        # Configuration
         self.reward_function_dict = function_dict
         self.unit_kwargs = unit_kwargs or {}
         self.verbose = verbose
         self.parallel = parallel
         self.max_workers = max_workers
         self.timeout = timeout
-        self.state = RewardState()
-        self._validate_units = validate_units
-        self._reward_units: List["RewardUnit"] = []
-        self._lock = threading.Lock() if parallel else None
-        self._create_reward_units()
 
-    def _create_reward_units(self) -> None:
-        """Create reward unit instances from configuration."""
+        # State
+        self.state = RewardState()
+        self._validate_units = enable_validation
+        self._lock = threading.Lock() if parallel else None
+
+        # Reward units
+        self._reward_units: List["RewardUnit"] = []
+        self._safe_dist_sensitive_units: List["RewardUnit"] = []
+        self._safe_dist_insensitive_units: List["RewardUnit"] = []
+
+        self._initialize_reward_units()
+
+    def _initialize_reward_units(self) -> None:
+        """Initialize and categorize reward units for optimal performance."""
         import rosnav_rl.reward as rew_pkg
 
         self._reward_units = [
@@ -88,10 +118,23 @@ class RewardFunction:
             for unit_name, params in self.reward_function_dict.items()
         ]
 
+        self._categorize_units_by_safety_sensitivity()
+
+    def _categorize_units_by_safety_sensitivity(self) -> None:
+        """Categorize units based on safe distance violation sensitivity."""
+        for unit in self._reward_units:
+            if (
+                hasattr(unit, "_on_safe_dist_violation")
+                and unit._on_safe_dist_violation
+            ):
+                self._safe_dist_sensitive_units.append(unit)
+            else:
+                self._safe_dist_insensitive_units.append(unit)
+
     def _create_reward_unit(
         self, factory: Any, unit_name: str, params: Dict[str, Any]
     ) -> "RewardUnit":
-        """Create a single reward unit instance.
+        """Create a single reward unit instance with error handling.
 
         Args:
             factory: The factory to create the reward unit.
@@ -100,17 +143,10 @@ class RewardFunction:
 
         Returns:
             An instance of the specified reward unit.
-
-        Raises:
-            ValueError: If the unit cannot be instantiated.
         """
-        try:
+        with self._error_context(f"creating reward unit '{unit_name}'"):
             unit_class = factory.instantiate(unit_name)
             return unit_class(reward_function=self, **self.unit_kwargs, **params)
-        except Exception as e:
-            raise ValueError(
-                f"Failed to create reward unit '{unit_name}': {str(e)}"
-            ) from e
 
     def calculate_reward(
         self,
@@ -124,151 +160,173 @@ class RewardFunction:
             obs_dict: Dictionary of observations.
             simulation_state_container: Container for simulation state.
             **kwargs: Additional arguments passed to reward units.
-
-        Raises:
-            KeyError: If required observations are missing (with detailed error context)
-            RuntimeError: If reward unit execution fails (with unit context)
-            ValueError: If reward values are invalid (NaN, infinite, etc.)
-            TimeoutError: If parallel execution exceeds timeout
         """
-        # Optional validation of reward unit requirements
-        # Only validate in verbose mode to avoid performance overhead in production
+        self._validate_if_enabled(obs_dict)
+        eligible_units = self._get_eligible_units()
+
+        if not eligible_units:
+            return
+
+        execution_kwargs = self._prepare_execution_kwargs(
+            obs_dict, simulation_state_container, **kwargs
+        )
+        self._execute_reward_units(eligible_units, execution_kwargs)
+
+    def _validate_if_enabled(self, obs_dict: ObservationDict) -> None:
+        """Validate reward unit requirements if validation is enabled."""
         if self._validate_units:
-            try:
+            with self._error_context("validating reward unit requirements"):
                 validate_reward_units(
                     obs_dict,
                     {unit.__class__.__name__: unit for unit in self._reward_units},
                 )
-            except Exception as e:
-                raise RuntimeError(
-                    f"Reward unit validation failed: {str(e)}. "
-                    "Check that all required observations are available in obs_dict."
-                ) from e
 
-        # Prepare all available arguments for reward units
-        # Include commonly needed arguments in a structured way
-        all_kwargs = {
-            "obs_dict": obs_dict,
-            "simulation_state_container": simulation_state_container,
-            **obs_dict,  # Flatten observations for direct access
-            **kwargs,
-        }
+    def _get_eligible_units(self) -> List["RewardUnit"]:
+        """Get eligible reward units based on safety state."""
+        safe_dist_violation = self.state.info.get("safe_dist_violation", False)
+        return (
+            self._safe_dist_sensitive_units
+            if safe_dist_violation
+            else self._reward_units
+        )
 
-        # Filter reward units that should be processed
-        eligible_units = [
-            unit
-            for unit in self._reward_units
-            if not self._skip_on_safe_dist_violation(unit)
-        ]
+    def _prepare_execution_kwargs(
+        self,
+        obs_dict: ObservationDict,
+        simulation_state_container: SimulationStateContainer,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Prepare arguments for reward unit execution."""
+        execution_kwargs = obs_dict.copy()
+        # hardcoded observation keys
+        execution_kwargs["obs_dict"] = obs_dict
+        execution_kwargs["simulation_state_container"] = simulation_state_container
+        execution_kwargs.update(kwargs)
+        return execution_kwargs
 
-        # Choose execution strategy based on configuration
-        if self.parallel and len(eligible_units) > 1:
-            self._calculate_reward_parallel(eligible_units, all_kwargs)
+    def _execute_reward_units(
+        self, units: List["RewardUnit"], kwargs: Dict[str, Any]
+    ) -> None:
+        """Execute reward units using the appropriate strategy."""
+        if len(units) == 1:
+            self._execute_single_unit(units[0], kwargs)
+        elif self.parallel and len(units) > 1:
+            self._calculate_reward_parallel(units, kwargs)
         else:
-            self._calculate_reward_sequential(eligible_units, all_kwargs)
+            self._calculate_reward_sequential(units, kwargs)
+
+    def _execute_single_unit(self, unit: "RewardUnit", kwargs: Dict[str, Any]) -> None:
+        """Execute a single reward unit with optimized error handling."""
+        try:
+            unit(**kwargs)
+        except Exception as e:
+            self._handle_unit_error(unit.__class__.__name__, e)
+
+    def _handle_unit_error(self, unit_name: str, error: Exception) -> None:
+        """Handle errors from reward unit execution."""
+        error_message = (
+            f"Error during reward calculation: {str(error)}{ERROR_MESSAGE_SUFFIX}"
+        )
+        if self.verbose:
+            self._report_error(message=error_message, component_name=unit_name)
 
     def _calculate_reward_sequential(
         self, reward_units: List["RewardUnit"], all_kwargs: Dict[str, Any]
     ) -> None:
-        """Calculate rewards sequentially (original behavior).
-
-        Args:
-            reward_units: List of reward units to process.
-            all_kwargs: Arguments to pass to reward units.
-        """
+        """Calculate rewards sequentially with optimized error handling."""
         for reward_unit in reward_units:
             try:
                 reward_unit(**all_kwargs)
             except Exception as e:
-                if self.verbose:
-                    print(
-                        f"Warning: Reward unit {reward_unit.__class__.__name__} failed: {e}"
-                    )
-                # Continue with other units even if one fails
+                self._handle_unit_error(reward_unit.__class__.__name__, e)
 
     def _calculate_reward_parallel(
         self, reward_units: List["RewardUnit"], all_kwargs: Dict[str, Any]
     ) -> None:
-        """Calculate rewards in parallel using ThreadPoolExecutor.
-
-        Args:
-            reward_units: List of reward units to process.
-            all_kwargs: Arguments to pass to reward units.
-
-        Raises:
-            TimeoutError: If execution exceeds configured timeout.
-            RuntimeError: If parallel execution fails critically.
-        """
-
-        def execute_reward_unit(
-            unit: "RewardUnit",
-        ) -> Tuple[bool, str, Optional[Exception]]:
-            """Execute a single reward unit and return success status.
-
-            Returns:
-                Tuple of (success, unit_name, exception_if_any)
-            """
-            try:
-                unit(**all_kwargs)
-                return True, unit.__class__.__name__, None
-            except Exception as e:
-                return False, unit.__class__.__name__, e
-
+        """Calculate rewards in parallel using ThreadPoolExecutor."""
         try:
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=self.max_workers
             ) as executor:
-                # Submit all reward unit tasks
-                future_to_unit = {
-                    executor.submit(execute_reward_unit, unit): unit
-                    for unit in reward_units
-                }
+                results = self._execute_parallel_tasks(
+                    executor, reward_units, all_kwargs
+                )
+                self._process_parallel_results(results, len(reward_units))
+        except concurrent.futures.TimeoutError as e:
+            self._handle_timeout_error(e)
+        except Exception as e:
+            self._handle_parallel_execution_error(e, reward_units, all_kwargs)
 
-                # Wait for completion with timeout
-                completed_futures = concurrent.futures.as_completed(
-                    future_to_unit, timeout=self.timeout
+    def _execute_parallel_tasks(
+        self,
+        executor: concurrent.futures.ThreadPoolExecutor,
+        reward_units: List["RewardUnit"],
+        all_kwargs: Dict[str, Any],
+    ) -> List[Tuple[bool, str, Optional[Exception]]]:
+        """Execute reward units in parallel and collect results."""
+        future_to_unit = {
+            executor.submit(self._execute_unit_safely, unit, all_kwargs): unit
+            for unit in reward_units
+        }
+
+        completed_futures = concurrent.futures.as_completed(
+            future_to_unit, timeout=self.timeout
+        )
+
+        return [future.result() for future in completed_futures]
+
+    def _execute_unit_safely(
+        self, unit: "RewardUnit", kwargs: Dict[str, Any]
+    ) -> Tuple[bool, str, Optional[Exception]]:
+        """Execute a single reward unit and return success status."""
+        try:
+            unit(**kwargs)
+            return True, unit.__class__.__name__, None
+        except Exception as e:
+            return False, unit.__class__.__name__, e
+
+    def _process_parallel_results(
+        self, results: List[Tuple[bool, str, Optional[Exception]]], total_units: int
+    ) -> None:
+        """Process results from parallel execution."""
+        failed_units = [(name, exc) for success, name, exc in results if not success]
+
+        for unit_name, exception in failed_units:
+            if self.verbose and exception:
+                self._report_error(
+                    component_type=ComponentType.REWARD_UNIT,
+                    component_name=unit_name,
+                    severity=ErrorSeverity.WARNING,
+                    message=str(exception),
+                    error_type=type(exception).__name__,
                 )
 
-                # Process results
-                failed_units = []
-                for future in completed_futures:
-                    success, unit_name, exception = future.result()
-                    if not success:
-                        failed_units.append((unit_name, exception))
-                        if self.verbose:
-                            print(
-                                f"Warning: Reward unit {unit_name} failed: {exception}"
-                            )
+        if self.verbose and failed_units:
+            self._report_warning(
+                f"Parallel reward calculation: {len(failed_units)} units failed out of {total_units}"
+            )
 
-                # Log summary if verbose
-                if self.verbose and failed_units:
-                    print(
-                        f"Parallel reward calculation: {len(failed_units)} units failed out of {len(reward_units)}"
-                    )
+    def _handle_timeout_error(self, error: concurrent.futures.TimeoutError) -> None:
+        """Handle timeout errors in parallel execution."""
+        error_msg = f"Parallel reward calculation exceeded timeout of {self.timeout}s"
+        self._report_error(error_msg, error_type="TimeoutError")
+        raise TimeoutError(error_msg) from error
 
-        except concurrent.futures.TimeoutError as e:
-            raise TimeoutError(
-                f"Parallel reward calculation exceeded timeout of {self.timeout}s"
-            ) from e
-        except Exception as e:
-            if self.verbose:
-                print(f"Parallel execution failed, falling back to sequential: {e}")
-            # Fallback to sequential execution
-            self._calculate_reward_sequential(reward_units, all_kwargs)
+    def _handle_parallel_execution_error(
+        self,
+        error: Exception,
+        reward_units: List["RewardUnit"],
+        all_kwargs: Dict[str, Any],
+    ) -> None:
+        """Handle general errors in parallel execution with fallback."""
+        error_msg = f"Parallel execution failed: {str(error)}"
 
-    def _skip_on_safe_dist_violation(self, reward_unit: "RewardUnit") -> bool:
-        """Determine if a reward unit should be skipped.
+        if self.verbose:
+            self._report_warning(f"{error_msg}, falling back to sequential")
+        else:
+            self._report_error(error_msg, error_type=type(error).__name__)
 
-        Args:
-            reward_unit: The reward unit to check.
-
-        Returns:
-            True if the unit should be skipped, False otherwise.
-        """
-        return (
-            self.state.info.get("safe_dist_violation", False)
-            and not reward_unit._on_safe_dist_violation
-        )
+        self._calculate_reward_sequential(reward_units, all_kwargs)
 
     def get_reward(
         self,
@@ -276,8 +334,7 @@ class RewardFunction:
         simulation_state_container: SimulationStateContainer,
         **kwargs,
     ) -> Tuple[float, Dict[str, Any]]:
-        """
-        Calculate and return the current reward and information.
+        """Calculate and return the current reward and information.
 
         Args:
             obs_dict: Dictionary of observations.
@@ -288,11 +345,7 @@ class RewardFunction:
             Tuple of (reward value, info dictionary)
         """
         self._reset_state()
-        self.calculate_reward(
-            obs_dict=obs_dict,
-            simulation_state_container=simulation_state_container,
-            **kwargs,
-        )
+        self.calculate_reward(obs_dict, simulation_state_container, **kwargs)
 
         if self.verbose:
             self._log_reward_overview()
@@ -300,22 +353,27 @@ class RewardFunction:
         return self.state.current_reward, self.state.info
 
     def add_reward(self, value: float, **kwargs) -> None:
-        """
-        Add a reward value and track its source.
+        """Add a reward value and track its source.
 
         Args:
             value: Reward value to add
             **kwargs: Additional metadata about the reward
         """
-        if self.parallel:
+        called_by = kwargs.get("called_by")
+
+        if self.parallel and self._lock:
             with self._lock:
-                self.state.current_reward += value
-                if called_by := kwargs.get("called_by"):
-                    self.state.reward_overview[called_by] = value
+                self._update_reward_and_overview(value, called_by)
         else:
-            self.state.current_reward += value
-            if called_by := kwargs.get("called_by"):
-                self.state.reward_overview[called_by] = value
+            self._update_reward_and_overview(value, called_by)
+
+    def _update_reward_and_overview(
+        self, value: float, called_by: Optional[str]
+    ) -> None:
+        """Update current reward and overview tracking."""
+        self.state.current_reward += value
+        if called_by:
+            self.state.reward_overview[called_by] = value
 
     def add_info(self, info: Dict[str, Any]) -> None:
         """Update the info dictionary.
@@ -378,6 +436,7 @@ class RewardFunction:
         return RewardFunction(
             function_dict=self.reward_function_dict,
             unit_kwargs=self.unit_kwargs,
+            enable_validation=self._validate_units,
             verbose=self.verbose,
             parallel=self.parallel,
             max_workers=self.max_workers,

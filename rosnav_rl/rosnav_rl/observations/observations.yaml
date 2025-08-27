@@ -66,7 +66,7 @@ datasources:
   goal_pose:
     type: PoseStampedCollector         # Processes geometry_msgs/PoseStamped → Pose2D
     params:
-      topic: "goal"               # Navigation goal from planner
+      topic: "/goal_pose"               # Navigation goal from planner
       up_to_date_required: false       # Goal updates less frequently
 
   subgoal_pose:

@@ -12,7 +12,6 @@ from rosnav_rl.observations.utils.types import (
     PedestrianRelativeVelocities,
     PedestrianTypeMinDistances,
     RobotActionVector,
-    RobotActionVector,
     SafetyStatus,
     SubgoalRelativePosition,
 )
@@ -67,7 +66,7 @@ class RewardGoalReached(RewardUnit):
         self,
         reward_function: RewardFunction,
         reward: float = DEFAULTS.GOAL_REACHED.REWARD,
-        following_subgoal: bool = False,
+        _follow_subgoal: bool = False,
         _on_safe_dist_violation: bool = DEFAULTS.GOAL_REACHED._ON_SAFE_DIST_VIOLATION,
         *args,
         **kwargs,
@@ -85,12 +84,12 @@ class RewardGoalReached(RewardUnit):
         """
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._reward = reward
-        self._following_subgoal = following_subgoal
+        self._follow_subgoal = _follow_subgoal
 
     def check_parameters(self, *args, **kwargs):
         if self._reward < 0.0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
+                f"Reconsider this reward. "
                 f"Negative rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
@@ -113,9 +112,7 @@ class RewardGoalReached(RewardUnit):
         """
         # Choose which target to check based on _following_subgoal flag
         target_distance = (
-            dist_angle_to_subgoal[0]
-            if self._following_subgoal
-            else dist_angle_to_goal[0]
+            dist_angle_to_subgoal[0] if self._follow_subgoal else dist_angle_to_goal[0]
         )
 
         if target_distance < simulation_state_container.task.goal_radius:
@@ -174,7 +171,7 @@ class RewardSafeDistance(RewardUnit):
     def check_parameters(self, *args, **kwargs):
         if self._reward > 0.0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
+                f"Reconsider this reward. "
                 f"Positive rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
@@ -255,7 +252,7 @@ class RewardFactoredSafeDistance(RewardUnit):
     def check_parameters(self, *args, **kwargs):
         if self._factor >= 0.0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
+                f"Reconsider this reward. "
                 f"Positive factor may lead to unfavorable behaviors. "
                 f"Current value: {self._factor}"
             )
@@ -359,7 +356,7 @@ class RewardNoMovement(RewardUnit):
     def check_parameters(self, *args, **kwargs):
         if self._reward > 0.0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
+                f"Reconsider this reward. "
                 f"Positive rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
@@ -456,7 +453,7 @@ class RewardApproachGoal(RewardUnit):
     def check_parameters(self, *args, **kwargs):
         if self._pos_factor < 0 or self._neg_factor < 0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Both factors should be positive. "
+                f"Both factors should be positive. "
                 f"Current values: [pos_factor={self._pos_factor}], "
                 f"[neg_factor={self._neg_factor}]"
             )
@@ -551,7 +548,7 @@ class RewardCollision(RewardUnit):
 
     requires = {
         "front_laser": LidarRanges,
-        "collision_monitor": SafetyStatus,
+        # "collision_monitor": SafetyStatus,
         "simulation_state_container": SimulationStateContainer,
     }
 
@@ -586,7 +583,7 @@ class RewardCollision(RewardUnit):
     def check_parameters(self, *args, **kwargs):
         if self._reward > 0.0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
+                f"Reconsider this reward. "
                 f"Positive rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
@@ -595,8 +592,8 @@ class RewardCollision(RewardUnit):
     def __call__(
         self,
         front_laser: LidarRanges,
-        collision_monitor: SafetyStatus,
         simulation_state_container: SimulationStateContainer,
+        collision_monitor: SafetyStatus = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -626,6 +623,7 @@ class RewardCollision(RewardUnit):
                 - Source: simulation environment
                 - Used for: collision zone configuration and episode termination
         """
+        # TODO: Integrate collision monitor
         # If no collision monitor detection, check laser-based collision
         if not collision_monitor:
             robot_radius = simulation_state_container.robot.radius
@@ -636,9 +634,9 @@ class RewardCollision(RewardUnit):
             collision_monitor = min_laser_distance <= collision_threshold
 
         # Apply penalty and terminate episode if collision detected from either source
-        if collision_monitor:
-            self.add_reward(self._reward)
-            self.add_info(self.DONE_INFO)
+        # if collision_monitor:
+        #     self.add_reward(self._reward)
+        #     self.add_info(self.DONE_INFO)
 
 
 @RewardUnitFactory.register("distance_travelled")
@@ -784,7 +782,7 @@ class RewardReverseDrive(RewardUnit):
         """Validate reward parameters and issue warnings for positive values."""
         if self._reward > 0.0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
+                f"Reconsider this reward. "
                 f"Positive rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
@@ -872,7 +870,7 @@ class RewardFactoredReverseDrive(RewardUnit):
         """Validate factor parameters and issue warnings for positive values."""
         if self._factor > 0.0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this factor. "
+                f"Reconsider this factor. "
                 f"Positive factors may lead to unfavorable behaviors. "
                 f"Current value: {self._factor}"
             )
@@ -1469,14 +1467,12 @@ class RewardPedTypeSafetyDistance(RewardUnit):
                 - Example: {1: 2.5, 2: 4.1, 3: 1.8} (type-specific distance monitoring)
         """
         if not pedestrian_distances:
-            warn(f"[{self.__class__.__name__}] No pedestrian type distances found.")
+            self._report_warning(f"No pedestrian type distances found.")
             return
 
         for ped_type, reward in self._type_reward_pairs.items():
             if ped_type not in pedestrian_distances:
-                warn(
-                    f"[{self.__class__.__name__}] Pedestrian type {ped_type} not found."
-                )
+                self._report_warning(f"Pedestrian type {ped_type} not found.")
                 continue
 
             if pedestrian_distances[ped_type] < self._safety_distance:
@@ -1570,16 +1566,14 @@ class RewardPedTypeFactoredSafetyDistance(RewardUnit):
                 - Example: {1: 2.5, 2: 4.1, 3: 1.8} (factored scaling per type)
         """
         if not pedestrian_distances:
-            warn(
-                f"[{self.__class__.__name__}] Won't apply reward unit. No pedestrian type distances found."
+            self._report_warning(
+                "Won't apply reward unit. No pedestrian type distances found."
             )
             return
 
         for ped_type, factor in self._type_factor_pairs.items():
             if ped_type not in pedestrian_distances:
-                warn(
-                    f"[{self.__class__.__name__}] Pedestrian type {ped_type} not found."
-                )
+                self._report_warning(f"Pedestrian type {ped_type} not found.")
                 continue
 
             # Apply proportional penalty based on safety distance violation
@@ -1678,8 +1672,8 @@ class RewardPedTypeCollision(RewardUnit):
                 - Used for: robot radius in collision detection calculations
         """
         if not pedestrian_distances:
-            warn(
-                f"[{self.__class__.__name__}] Won't apply reward unit. No pedestrian type distances found."
+            self._report_warning(
+                "Won't apply reward unit. No pedestrian type distances found."
             )
             return
 
@@ -1690,9 +1684,7 @@ class RewardPedTypeCollision(RewardUnit):
 
         for ped_type, reward in self._type_reward_pairs.items():
             if ped_type not in pedestrian_distances:
-                warn(
-                    f"[{self.__class__.__name__}] Pedestrian type {ped_type} not found."
-                )
+                self._report_warning(f"Pedestrian type {ped_type} not found.")
                 continue
 
             # Apply collision penalty if pedestrian within collision zone
@@ -1786,19 +1778,17 @@ class RewardPedTypeVelocityConstraint(RewardUnit):
                 - Example: (0.5, 0.0, 0.2) (forward velocity used for penalty scaling)
         """
         if not pedestrian_distances:
-            warn(
-                f"[{self.__class__.__name__}] Won't apply reward unit. No pedestrian type distances found."
+            self._report_warning(
+                "Won't apply reward unit. No pedestrian type distances found."
             )
             return
 
         if last_action is None:
-            warn(
-                f"[{self.__class__.__name__}] Won't apply reward unit. No last action found."
-            )
+            self._report_warning("Won't apply reward unit. No last action found.")
             return
 
         if self._type not in pedestrian_distances:
-            warn(f"[{self.__class__.__name__}] Pedestrian type {self._type} not found.")
+            self._report_warning(f"Pedestrian type {self._type} not found.")
             return
 
         # Apply velocity penalty when pedestrian within active distance
@@ -1940,7 +1930,7 @@ class RewardMaxStepsExceeded(RewardUnit):
     def check_parameters(self, *args, **kwargs):
         if self._penalty < 0.0:
             warn_msg = (
-                f"[{self.__class__.__name__}] Reconsider this reward. "
+                f"Reconsider this reward. "
                 f"The penalty should be a positive value as it is going to be subtracted from the total reward."
                 f"Current value: {self._penalty}"
             )
