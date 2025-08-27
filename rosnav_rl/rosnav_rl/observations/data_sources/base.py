@@ -15,6 +15,7 @@ from rclpy.time import Time
 from rclpy.qos import QoSProfile
 
 from rosnav_rl.utils.validation import RequiresProtocol
+from rosnav_rl.utils.logging import ErrorReportingMixin, ComponentType
 
 
 class DataSource(ABC):
@@ -42,15 +43,63 @@ RosMessageType = TypeVar("RosMessageType")
 ProcessedDataType = TypeVar("ProcessedDataType")
 
 
-class Collector(Generic[RosMessageType, ProcessedDataType], DataSource):
+class Collector(
+    Generic[RosMessageType, ProcessedDataType], DataSource, ErrorReportingMixin
+):
     """
-    A data source that collects data from an external source, like a ROS topic.
+    Collector is a generic data source class for collecting and processing data from external sources, such as ROS topics.
 
-    This class combines the functionality of the old Collector and GenericObservation,
-    providing a self-contained observation unit that handles:
-    - Message subscription and preprocessing
-    - Data storage and staleness tracking
-    - Timestamping and health monitoring
+    This class serves as a unified observation unit, combining message subscription, preprocessing, data storage, staleness tracking, timestamping, and health monitoring. It is designed to be subclassed with specific ROS message and processed data types.
+
+    Type Parameters:
+        RosMessageType: The type of ROS message this collector handles (e.g., sensor_msgs.LaserScan).
+        ProcessedDataType: The type of processed data output after preprocessing.
+
+    Attributes:
+        message_type (Type[RosMessageType]): The ROS message type handled by this collector.
+        data_class (Type[ProcessedDataType]): The processed data type output.
+        timeout (float): Timeout in seconds for data freshness (default: 0.1).
+        fallback_value (Union[ProcessedDataType, None]): Value to use if data is unavailable.
+        up_to_date_required (bool): Whether fresh data is required for this collector.
+
+    Args:
+        name (str): Name of the collector.
+        topic (str): ROS topic to subscribe to.
+        node: Optional ROS node for time and subscription management.
+        up_to_date_required (bool): Whether fresh data is required (default: False).
+        **kwargs: Additional keyword arguments.
+
+    Methods:
+        _preprocess(msg: RosMessageType) -> ProcessedDataType:
+            Abstract method to convert a raw ROS message to the internal processed format.
+
+        update(msg: RosMessageType) -> None:
+            Updates the collector with a new message, processes it, and updates state.
+
+        stale (property) -> bool:
+            Indicates whether the current observation is stale.
+
+        age (property) -> float:
+            Returns the age of the last observation in seconds.
+
+        timestamp (property) -> Optional[Time]:
+            Returns the timestamp of the last update.
+
+        set_qos_profile(profile: QoSProfile) -> None:
+            Sets the QoS profile for ROS subscriptions.
+
+        qos_profile (property) -> Optional[QoSProfile]:
+            Returns the current QoS profile.
+
+        get_observation() -> Optional[ProcessedDataType]:
+            Returns the current processed observation value.
+
+    Health Monitoring:
+        update_count (int): Number of successful updates.
+        error_count (int): Number of errors encountered during updates.
+
+    Error Reporting:
+        Inherits error reporting functionality from ErrorReportingMixin.
     """
 
     # The ROS message type this collector handles (e.g., sensor_msgs.LaserScan)
@@ -86,17 +135,24 @@ class Collector(Generic[RosMessageType, ProcessedDataType], DataSource):
         **kwargs,
     ):
         super().__init__(name, **kwargs)
+        # Unified error reporting
+        ErrorReportingMixin.__init__(
+            self, component_type=ComponentType.COLLECTOR, component_name=name
+        )
+
         self.topic = topic
         self._node = node
         self.up_to_date_required = up_to_date_required
 
         # Initialize observation state (formerly GenericObservation functionality)
         self._clock = Clock(clock_type=ClockType.ROS_TIME) if node else None
-        self._value: Optional[ProcessedDataType] = None
+        self._value: Optional[ProcessedDataType] = self._preprocess(
+            self.message_type()  # Initialize with a default message type instance
+        )
         self._stale: bool = True
         self._timestamp: Optional[Time] = None
         self._qos_profile: Optional[QoSProfile] = None
-        self._latest_msg: Optional[RosMessageType] = None
+        self._latest_msg: Optional[RosMessageType] = self.message_type()
 
         # Health tracking
         self.update_count: int = 0
@@ -120,6 +176,9 @@ class Collector(Generic[RosMessageType, ProcessedDataType], DataSource):
             self.update_count += 1
         except Exception as e:
             self.error_count += 1
+            self._report_error(
+                f"Failed to update from message: {e}", error_type=type(e).__name__
+            )
             raise e
 
     @property
@@ -164,9 +223,45 @@ class Collector(Generic[RosMessageType, ProcessedDataType], DataSource):
         return self._value
 
 
-class Generator(DataSource, RequiresProtocol, Generic[ProcessedDataType]):
+class Generator(
+    DataSource, RequiresProtocol, Generic[ProcessedDataType], ErrorReportingMixin
+):
     """
-    A data source that generates new data from one or more other data sources.
+    A base class for data sources that generate new data from one or more other data sources.
+
+    This class is intended to be subclassed by concrete generator implementations. It manages
+    dependency requirements, error reporting, and enforces the implementation of a core data
+    generation method.
+
+    Type Parameters:
+        ProcessedDataType: The type of data produced by the generator.
+
+    Class Attributes:
+        requires (Dict[str, str]): A mapping of required dependency names to their descriptions or types.
+        data_class (Type[ProcessedDataType]): The output data type, automatically set via generics.
+
+    Methods:
+        __init_subclass__(cls, **kwargs):
+            Automatically extracts the generic type parameter and sets the `data_class` attribute.
+
+        __init__(self, name: str, **kwargs):
+            Initializes the generator with a name and sets up error reporting and required keys.
+
+        _generate(self, **kwargs: Any) -> ProcessedDataType:
+            Abstract method to be implemented by subclasses. Contains the core logic for generating data.
+            For dict inputs, dependencies are passed as keyword arguments.
+            For list inputs, dependencies are passed under the 'inputs' keyword.
+
+        get_observation(self, obs_dict: Dict[str, Any], **kwargs) -> ProcessedDataType:
+            Retrieves an observation by invoking the `_generate` method with the required dependencies.
+            Handles missing or unexpected arguments and reports errors accordingly.
+
+        _format_type_error(self, error: TypeError, obs_dict: Dict[str, Any]) -> str:
+            Formats a detailed error message for type or argument errors in the `_generate` method.
+
+    Usage:
+        Subclass `Generator` and implement the `_generate` method to define custom data generation logic.
+        Specify required dependencies via the `requires` class attribute.
     """
 
     requires: Dict[str, str] = {}
@@ -187,6 +282,10 @@ class Generator(DataSource, RequiresProtocol, Generic[ProcessedDataType]):
 
     def __init__(self, name: str, **kwargs):
         super().__init__(name, **kwargs)
+        # Set up error reporting
+        ErrorReportingMixin.__init__(
+            self, component_type=ComponentType.GENERATOR, component_name=name
+        )
         self.required_keys = list(self.requires.keys())
 
     @abstractmethod
@@ -205,34 +304,22 @@ class Generator(DataSource, RequiresProtocol, Generic[ProcessedDataType]):
             )
         except KeyError as e:
             missing = e.args[0]
-            raise ValueError(
-                f"Generator '{self.name}' missing required dependency: '{missing}'. "
+            error_msg = (
+                f"Missing required dependency: '{missing}'. "
                 f"Required: {sorted(self.required_keys)}, Provided: {sorted(obs_dict.keys())}"
-            ) from e
+            )
+            self._report_error(error_msg, error_type="KeyError")
+            return None
         except TypeError as e:
             # This can catch missing or unexpected arguments
-            raise TypeError(self._format_type_error(e, obs_dict)) from e
+            self._report_error(
+                self._format_type_error(e, obs_dict), error_type="TypeError"
+            )
+            return None
 
     def _format_type_error(self, error: TypeError, obs_dict: Dict[str, Any]) -> str:
         """Format a detailed error message for type/argument errors."""
-        lines = [
-            "\n📋 Type Mismatch in '_generate' Method:",
-            "",
-            f"🔧 Generator: {self.name}",
-            f"🆔 Type: {self.__class__.__name__}",
-            f"❌ Error: {str(error)}",
-            "",
-            "get_observation() will return None.",
-        ]
-
-        # lines.extend(
-        #     [
-        #         "🔧 Solution Steps:",
-        #         "   1. Check the '_generate' method signature matches 'requires' keys",
-        #         "   2. Verify all required dependencies have compatible data types",
-        #         "   3. Ensure '_generate' method accepts the provided argument types",
-        #         "   4. Check for any type conversion issues in the data pipeline",
-        #     ]
-        # )
-
-        return "\n".join(lines)
+        return (
+            f"Type mismatch in '_generate' method: {str(error)}. "
+            f"Check method signature matches 'requires' keys and data types are compatible."
+        )

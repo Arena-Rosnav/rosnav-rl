@@ -129,9 +129,7 @@ class BaseSpaceManager:
             },
         )
 
-    def encode_observation(
-        self, obs_dict: ObservationDict, *args, **kwargs
-    ) -> EncodedObservationDict:
+    def encode_observation(self, obs_dict: ObservationDict) -> EncodedObservationDict:
         """Encode observation dictionary using the observation space manager.
 
         This method takes an observation dictionary and forwards it to the observation space manager
@@ -145,7 +143,7 @@ class BaseSpaceManager:
         Returns:
             EncodedObservationDict: The encoded observation dictionary.
         """
-        return self._observation_space_manager.encode_observation(obs_dict, **kwargs)
+        return self._observation_space_manager.encode_observation(obs_dict)
 
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         """
