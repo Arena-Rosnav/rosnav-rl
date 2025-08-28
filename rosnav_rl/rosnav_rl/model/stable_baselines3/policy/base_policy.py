@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Type
+from typing import List, Type, Dict, Any
 
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -25,7 +25,6 @@ class StableBaselinesPolicyDescription(ABC):
         BASE_AGENT_ATTR (list): List of attribute names that are common to all agents
                                (defined elsewhere in the codebase)
     """
-
 
     @property
     @abstractmethod

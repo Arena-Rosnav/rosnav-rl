@@ -34,11 +34,11 @@ from .policy.agent_factory import AgentFactory
 from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicyDescription
 
 if TYPE_CHECKING:
+    from rosnav_rl.model.stable_baselines3 import cfg as sb3_cfg
+    from rosnav_rl.rl_agent import RL_Agent
     from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
         BaseObservationSpace,
     )
-    from rosnav_rl.rl_agent import RL_Agent
-    from rosnav_rl.model.stable_baselines3 import cfg as sb3_cfg
 
 DEVICE_CPU = "cpu"
 DEVICE_AUTO = "auto"
@@ -217,9 +217,7 @@ class StableBaselinesModel(RL_Model):
             self._agent_factory (AgentFactory): The factory responsible for creating agent instances.
             self._policy_description (StableBaselinesPolicyDescription): The policy description instantiated by the agent factory.
         """
-        import rosnav_rl.model.stable_baselines3 as sb3_pkg
-
-        self._agent_factory: AgentFactory = sb3_pkg.import_models()
+        self._agent_factory: AgentFactory = AgentFactory
         self._policy_description: StableBaselinesPolicyDescription = (
             self._agent_factory.instantiate(self.algorithm_cfg.architecture_name)
         )

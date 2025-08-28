@@ -58,3 +58,35 @@ class AgentFactory:
             return agent_class(**kwargs)
         else:
             return agent_class
+
+
+def _auto_load(cls: AgentFactory):
+    """Automatically import and register all agent classes in the sb3_policy directory."""
+    import importlib
+    import pkgutil
+    import inspect
+    import sys
+    from . import sb3_policy
+
+    # Find all modules in the sb3_policy package
+    package = sb3_policy
+    prefix = package.__name__ + "."
+    for _, modname, ispkg in pkgutil.iter_modules(package.__path__, prefix):
+        if ispkg:
+            continue
+
+        module = importlib.import_module(modname)
+
+        # Register all subclasses of StableBaselinesPolicyDescription or BasePolicy
+        for name, obj in inspect.getmembers(module, inspect.isclass):
+            if obj.__module__ != module.__name__:
+                continue
+            if issubclass(obj, StableBaselinesPolicyDescription) or issubclass(
+                obj, BasePolicy
+            ):
+                # Use class name as registry key if not already registered
+                if name not in cls.registry:
+                    cls.registry[name] = obj
+
+
+_auto_load(AgentFactory)
