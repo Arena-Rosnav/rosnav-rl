@@ -5,8 +5,6 @@ import numpy as np
 from gym import spaces
 
 import rosnav_rl.cfg as rosnav_rl_cfg
-import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
-import rosnav_rl.model.dreamerv3.cfg as dreamerv3_cfg
 
 from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
 from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
@@ -74,7 +72,8 @@ class RL_Agent:
         Attributes:
             _name (str): Name identifier for the agent.
             _agent_state_container (AgentStateContainer): Reference to the state container.
-            _model (Union[StableBaselinesModel, DreamerV3Model]): The underlying RL model using stable-baselines3 or DreamerV3.
+            _model (Union[StableBaselinesModel, DreamerV3Model]): The underlying RL model
+                using stable-baselines3 or DreamerV3.
             _space_manager (BaseSpaceManager): Manages observation and action spaces.
             _reward_function (RewardFunction, optional): Function to calculate rewards,
                 initialized if reward configuration is provided.
@@ -93,18 +92,12 @@ class RL_Agent:
         self._initialize_reward_function(agent_cfg)
 
     def _initialize_model(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
-        """Initialize the RL model based on the provided configuration."""
-        if isinstance(agent_cfg.framework, sb3_cfg.StableBaselinesCfg):
-            self._model = StableBaselinesModel(
-                rl_agent=self,
-                algorithm_cfg=agent_cfg.framework.algorithm,
-            )
-        elif isinstance(agent_cfg.framework, dreamerv3_cfg.DreamerV3Cfg):
-            self._model = DreamerV3Model(
-                rl_agent=self, algorithm_cfg=agent_cfg.framework
-            )
-        else:
-            raise ValueError(f"Unsupported RL algorithm: {agent_cfg.framework.name}")
+        """Initialize the RL model based on the provided configuration using model factory."""
+        from rosnav_rl.model.model_factory import ModelFactory
+
+        self._model = ModelFactory.create_model_instance(
+            framework_cfg=agent_cfg.framework, rl_agent=self
+        )
 
     def _initialize_space_manager(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
         """Initialize the space manager based on the provided configuration."""
@@ -266,7 +259,3 @@ class RL_Agent:
     @property
     def name(self) -> str:
         return self._name
-
-    @property
-    def agent_cfg(self) -> rosnav_rl_cfg.AgentCfg:
-        return self._agent_cfg
