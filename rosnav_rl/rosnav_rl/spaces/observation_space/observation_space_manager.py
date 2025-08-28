@@ -4,19 +4,18 @@ Clean, lightweight manager for hierarchical observation spaces using SpaceFactor
 No bloat, just essential functionality.
 """
 
-from typing import Any, Dict, List
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List
+
 import numpy as np
 from gymnasium import spaces
 
-try:
-    from rosnav_rl.utils.type_aliases import ObservationDict
-except ImportError:
-    # Fallback for when type aliases aren't available
-    from typing import Dict as ObservationDict
-from .spaces.base_observation_space import BaseObservationSpace
+from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.utils.validation import validate_observation_spaces
+
+from .observation_space_factory import SpaceFactory
+from .spaces.base_observation_space import BaseObservationSpace
 
 
 class ObservationSpaceManager:
@@ -24,8 +23,6 @@ class ObservationSpaceManager:
 
     def __init__(
         self,
-        space_factory=None,
-        auto_load_spaces=True,
         parallel_encoding=True,
         validate_observations=True,
     ):
@@ -43,30 +40,25 @@ class ObservationSpaceManager:
         self.config = {}
         self.parallel_encoding = parallel_encoding
         self.validate_observations = validate_observations
-        self.space_factory = space_factory
+        self.space_factory = SpaceFactory
 
         # Performance optimization: cache required keys per space
         self._space_required_keys: Dict[str, List[str]] = {}
 
-        # Auto-load SpaceFactory and register all spaces
-        if self.space_factory is None:
-            self.space_factory = self._auto_load_spacefactory(auto_load_spaces)
-
     def _auto_load_spacefactory(self, auto_load_spaces=True):
         """Automatically load SpaceFactory and register all spaces."""
         try:
-            from .observation_space_factory import SpaceFactory
 
             if auto_load_spaces:
                 # Import all space modules to trigger registration
                 try:
                     from .spaces import (  # noqa: F401
-                        localization,
-                        perception,
-                        navigation,
                         dynamics,
                         environment,
+                        localization,
                         meta,
+                        navigation,
+                        perception,
                     )
 
                     print(

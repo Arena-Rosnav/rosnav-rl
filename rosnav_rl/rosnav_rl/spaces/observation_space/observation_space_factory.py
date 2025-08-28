@@ -161,3 +161,24 @@ class SpaceFactory:
             if space_info["class_name"] == class_name:
                 matches.append(reg_name)
         return matches
+
+
+def _auto_load_spacefactory():
+    """Automatically load SpaceFactory and register all spaces."""
+    # Import all space modules to trigger registration
+    try:
+        from .spaces import (  # noqa: F401
+            dynamics,
+            environment,
+            localization,
+            meta,
+            navigation,
+            perception,
+        )
+
+        print(f"Auto-loaded {len(SpaceFactory.registry)} observation spaces")
+    except ImportError as e:
+        print(f"Warning: Could not auto-load all spaces: {e}")
+
+
+_auto_load_spacefactory()
