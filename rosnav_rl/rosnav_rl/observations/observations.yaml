@@ -89,6 +89,12 @@ datasources:
       topic: "/task_generator_node/people"                  # People tracker output
       up_to_date_required: false
 
+  collision_monitor:
+    type: CollisionMonitorStateCollector  # Processes nav2_msgs/CollisionMonitorState → SafetyStatus
+    params:
+      topic: "collision_monitor_state"
+      state_key: "StopPolygon"            # Specific collision state to monitor
+
   # Visual perception
   # front_camera:
   #   type: ImageColorCollector          # Processes sensor_msgs/Image → ImageData

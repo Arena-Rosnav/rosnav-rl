@@ -548,7 +548,7 @@ class RewardCollision(RewardUnit):
 
     requires = {
         "front_laser": LidarRanges,
-        # "collision_monitor": SafetyStatus,
+        "collision_monitor": SafetyStatus,
         "simulation_state_container": SimulationStateContainer,
     }
 
@@ -623,7 +623,6 @@ class RewardCollision(RewardUnit):
                 - Source: simulation environment
                 - Used for: collision zone configuration and episode termination
         """
-        # TODO: Integrate collision monitor
         # If no collision monitor detection, check laser-based collision
         if not collision_monitor:
             robot_radius = simulation_state_container.robot.radius
@@ -634,9 +633,9 @@ class RewardCollision(RewardUnit):
             collision_monitor = min_laser_distance <= collision_threshold
 
         # Apply penalty and terminate episode if collision detected from either source
-        # if collision_monitor:
-        #     self.add_reward(self._reward)
-        #     self.add_info(self.DONE_INFO)
+        if collision_monitor:
+            self.add_reward(self._reward)
+            self.add_info(self.DONE_INFO)
 
 
 @RewardUnitFactory.register("distance_travelled")
