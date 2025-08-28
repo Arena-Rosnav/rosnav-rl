@@ -1,22 +1,20 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 import concurrent.futures
 import threading
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from rosnav_rl.cfg.reward import RewardFunctionDict
 from rosnav_rl.states import SimulationStateContainer
-from rosnav_rl.utils.type_aliases import ObservationDict
-from rosnav_rl.utils.validation import validate_reward_units
 from rosnav_rl.utils.logging import (
-    ErrorReportingMixin,
     ComponentType,
+    ErrorReportingMixin,
     ErrorSeverity,
 )
-
-from dataclasses import dataclass
+from rosnav_rl.utils.type_aliases import ObservationDict
+from rosnav_rl.utils.validation import validate_reward_units
 
 if TYPE_CHECKING:
     from .reward_units.base_reward_units import RewardUnit
-
 
 # Configuration constants
 DEFAULT_MAX_WORKERS = 8
@@ -36,8 +34,8 @@ class RewardState:
     """
 
     current_reward: float = 0.0
-    info: Dict[str, Any] = {}
-    reward_overview: Dict[str, float] = {}
+    info: Dict[str, Any] = field(default_factory=dict)
+    reward_overview: Dict[str, float] = field(default_factory=dict)
 
 
 class RewardFunction(ErrorReportingMixin):
@@ -68,7 +66,7 @@ class RewardFunction(ErrorReportingMixin):
         function_dict: RewardFunctionDict,
         unit_kwargs: Optional[Dict[str, Any]] = None,
         enable_validation: bool = True,
-        verbose: bool = True,
+        verbose: int = 0,
         parallel: bool = False,
         max_workers: Optional[int] = DEFAULT_MAX_WORKERS,
         timeout: Optional[float] = DEFAULT_TIMEOUT_SECONDS,
@@ -197,12 +195,8 @@ class RewardFunction(ErrorReportingMixin):
         **kwargs,
     ) -> Dict[str, Any]:
         """Prepare arguments for reward unit execution."""
-        execution_kwargs = obs_dict.copy()
-        # hardcoded observation keys
-        execution_kwargs["obs_dict"] = obs_dict
-        execution_kwargs["simulation_state_container"] = simulation_state_container
-        execution_kwargs.update(kwargs)
-        return execution_kwargs
+        obs_dict["simulation_state_container"] = simulation_state_container
+        return obs_dict
 
     def _execute_reward_units(
         self, units: List["RewardUnit"], kwargs: Dict[str, Any]
@@ -347,7 +341,7 @@ class RewardFunction(ErrorReportingMixin):
         self._reset_state()
         self.calculate_reward(obs_dict, simulation_state_container, **kwargs)
 
-        if self.verbose:
+        if self.verbose >= 2:
             self._log_reward_overview()
 
         return self.state.current_reward, self.state.info
@@ -389,8 +383,10 @@ class RewardFunction(ErrorReportingMixin):
             reward_unit.reset()
 
     def _reset_state(self) -> None:
-        """Reset the reward state between steps."""
-        self.state = RewardState()
+        """Reset the reward state between steps (optimized for performance)."""
+        self.state.current_reward = 0.0
+        self.state.info.clear()
+        self.state.reward_overview.clear()
 
     def _log_reward_overview(self) -> None:
         """Log detailed reward breakdown."""
