@@ -64,6 +64,7 @@ class CurriculumBase(ABC):
             one `{i}` placeholder for env index when `num_envs>1`. Default replicates
             existing behaviour: '/task_generator_node' or '/task_generator_node_{i}'
         parameter_service_name: suffix for service (default 'set_parameters')
+        starting_stage: initial curriculum stage index (default 0)
         verbose: verbosity level (0 quiet, >0 prints/logs)
         timeout: service call timeout in seconds
 
@@ -80,6 +81,7 @@ class CurriculumBase(ABC):
         num_envs: int,
         parameter_node_template: Optional[str] = None,
         parameter_service_name: str = "set_parameters",
+        starting_stage: int = 0,
         verbose: int = 0,
         timeout: float = 10.0,
     ):
@@ -106,7 +108,9 @@ class CurriculumBase(ABC):
         if not self._stages:
             raise ValueError("No curriculum stages provided")
 
-        self.curriculum_index = 0
+        # Validate and set starting stage
+        self.starting_stage = max(0, min(starting_stage, len(self._stages) - 1))
+        self.curriculum_index = self.starting_stage
         self.max_index = len(self._stages)
 
         # Parameter clients keyed by node_name

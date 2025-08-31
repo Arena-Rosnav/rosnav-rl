@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Union
 
 from pydantic import BaseModel
 
@@ -9,11 +9,12 @@ from ..utils.type_aliases import (
 )
 
 if TYPE_CHECKING:
-    from .stable_baselines3.cfg.base import SBAlgorithmCfg
     from ..rl_agent import RL_Agent
     from ..spaces.observation_space.spaces.base_observation_space import (
         BaseObservationSpace,
     )
+    from .dreamerv3.cfg import DreamerV3Cfg
+    from .stable_baselines3.cfg.base import SBAlgorithmCfg
 
 
 class RL_Model(ABC):
@@ -92,7 +93,7 @@ class RL_Model(ABC):
         self._model = model
 
     @property
-    def algorithm_cfg(self) -> "SBAlgorithmCfg":
+    def algorithm_cfg(self) -> Union["SBAlgorithmCfg", "DreamerV3Cfg"]:
         return self._algorithm_cfg
 
     @property
