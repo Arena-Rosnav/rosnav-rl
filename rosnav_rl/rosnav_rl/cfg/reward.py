@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from pydantic import BaseModel
 
 RewardUnitDict = Dict[str, Any]
@@ -13,13 +13,14 @@ class RewardCfg(BaseModel):
     in a reinforcement learning navigation setup.
 
     Attributes:
-        reward_function_dict (RewardFunctionDict): Dictionary containing the reward functions 
+        reward_function_dict (RewardFunctionDict): Dictionary containing the reward functions
                                                   to be used during training.
-        reward_unit_kwargs (dict, optional): Additional keyword arguments for reward unit 
+        reward_unit_kwargs (dict, optional): Additional keyword arguments for reward unit
                                             configuration. Defaults to None.
-        verbose (bool, optional): Flag to enable verbose logging of reward calculations. 
+        verbose (bool, optional): Flag to enable verbose logging of reward calculations.
                                  Defaults to False.
     """
+
     reward_function_dict: RewardFunctionDict
     reward_unit_kwargs: Optional[dict] = None
-    verbose: Optional[bool] = False
+    verbose: Optional[Union[bool, int]] = False
