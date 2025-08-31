@@ -176,7 +176,9 @@ def _auto_load_spacefactory():
             perception,
         )
 
-        print(f"Auto-loaded {len(SpaceFactory.registry)} observation spaces")
+        print(
+            f"[ROSNAV-RL] Auto-loaded {len(SpaceFactory.registry)} observation spaces"
+        )
     except ImportError as e:
         print(f"Warning: Could not auto-load all spaces: {e}")
 

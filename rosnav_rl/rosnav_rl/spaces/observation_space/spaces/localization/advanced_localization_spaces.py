@@ -51,7 +51,7 @@ class RobustOdometrySpace(BaseObservationSpace):
     - Real-time odometry quality monitoring and validation
     """
 
-    name = "ROBUST_ODOMETRY"
+    name = "RobustOdometrySpace"
     requires = {"last_action": RobotActionVector}
 
     def __init__(
@@ -239,7 +239,7 @@ class PoseStabilizedSpace(BaseObservationSpace):
     - Localization quality assessment and pose validation systems
     """
 
-    name = "POSE_STABILIZED"
+    name = "PoseStabilizedSpace"
     requires = {"robot_pose": Pose2D}
 
     def __init__(
@@ -390,7 +390,7 @@ class LocalizationCombinedSpace(BaseObservationSpace):
     - Comprehensive localization quality assessment and validation systems
     """
 
-    name = "LOCALIZATION_COMBINED"
+    name = "LocalizationCombinedSpace"
     requires = {
         "robot_pose": Pose2D,  # Robot pose from TF system
         "last_action": RobotActionVector,  # Last action taken by the robot

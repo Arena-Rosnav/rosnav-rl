@@ -41,7 +41,7 @@ class EnvironmentContextSpace(BaseObservationSpace):
     Applications: Adaptive navigation, environment classification, obstacle avoidance, and exploration.
     """
 
-    name = "ENVIRONMENT_CONTEXT"
+    name = "EnvironmentContextSpace"
     requires = {
         "front_laser": LidarRanges,  # Front-facing laser for environment context analysis
     }
@@ -197,7 +197,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
     Applications: Path planning, corridor following, spatial reasoning, and constraint-aware navigation.
     """
 
-    name = "SPATIAL_AWARENESS"
+    name = "SpatialAwarenessSpace"
     requires = {
         "front_laser": LidarRanges,  # Front-facing laser for spatial awareness analysis
     }
@@ -402,7 +402,7 @@ class ObstacleProximitySpace(BaseObservationSpace):
     Applications: Collision avoidance, risk-aware navigation, and emergency stop behaviors.
     """
 
-    name = "OBSTACLE_PROXIMITY"
+    name = "ObstacleProximitySpace"
     requires = {
         "front_laser": LidarRanges,  # Front-facing laser for obstacle proximity detection
     }

@@ -25,7 +25,7 @@ class LastActionSpace(BaseObservationSpace):
     the agent with information about its recent control decisions.
     """
 
-    name = "LAST_ACTION"
+    name = "LastActionSpace"
     requires = {
         "last_action": RobotActionVector,  # Last action taken by the agent
     }
@@ -119,7 +119,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
     parameter.
     """
 
-    name = "SUBGOAL_IN_ROBOT_FRAME"
+    name = "SubgoalInRobotFrameSpace"
     requires = {
         "subgoal_in_robot_frame": SubgoalRelativePosition,  # Subgoal position in robot's local coordinate frame
     }

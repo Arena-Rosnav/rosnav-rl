@@ -37,7 +37,7 @@ class RobustGoalSpace(BaseObservationSpace):
     Applications: Goal-reaching, reward shaping, curriculum learning, and progress-based exploration.
     """
 
-    name = "ROBUST_GOAL"
+    name = "RobustGoalSpace"
     requires = {
         "dist_angle_to_goal": DistanceAngleMetrics,
     }
@@ -164,7 +164,7 @@ class MultiScaleGoalSpace(BaseObservationSpace):
     Applications: Curriculum learning, multi-scale planning, and reward shaping.
     """
 
-    name = "MULTI_SCALE_GOAL"
+    name = "MultiScaleGoalSpace"
     requires = {
         "dist_angle_to_goal": DistanceAngleMetrics,  # Distance and angle to goal for multi-scale analysis
     }
@@ -256,7 +256,7 @@ class SubgoalContextSpace(BaseObservationSpace):
     Applications: Hierarchical navigation, curriculum learning, and relational planning.
     """
 
-    name = "SUBGOAL_CONTEXT"
+    name = "SubgoalContextSpace"
 
     # Schema-based requirements: defines the data sources needed from observations.yaml
     # Each key corresponds to a data source name, each value provides rich type metadata

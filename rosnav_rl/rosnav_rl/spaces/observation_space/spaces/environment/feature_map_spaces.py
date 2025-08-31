@@ -149,7 +149,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
     Applications: Crowd flow prediction, dynamic obstacle avoidance, and social navigation.
     """
 
-    name = "PEDESTRIAN_VEL_X"
+    name = "PedestrianVelXSpace"
     requires = {
         "pedestrian_relative_locations": PedestrianRelativeLocations,
         "pedestrian_vel_x": PedestrianRelativeVelocities,
@@ -256,7 +256,7 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
     Applications: Social group detection, lateral flow analysis, and crowd navigation.
     """
 
-    name = "PEDESTRIAN_VEL_Y"
+    name = "PedestrianVelYSpace"
     requires = {
         "pedestrian_relative_locations": PedestrianRelativeLocations,
         "pedestrian_vel_y": PedestrianRelativeVelocities,
@@ -363,7 +363,7 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
     Applications: Temporal perception, dynamic obstacle tracking, and SLAM.
     """
 
-    name = "STACKED_LASER_MAP"
+    name = "StackedLaserMapSpace"
     requires = {"front_laser": LidarRanges, "is_terminal": IsTerminal}
 
     def __init__(
@@ -501,7 +501,7 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
     Applications: Crowd density mapping, social navigation, and pedestrian avoidance.
     """
 
-    name = "PEDESTRIAN_LOCATION"
+    name = "PedestrianLocationSpace"
     requires = {
         "pedestrian_relative_locations": PedestrianRelativeLocations,
     }
@@ -576,7 +576,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
     Applications: Social behavior recognition, group interaction modeling, and crowd simulation.
     """
 
-    name = "PEDESTRIAN_SOCIAL_STATE"
+    name = "PedestrianSocialStateSpace"
     requires = {
         "pedestrian_relative_locations": PedestrianRelativeLocations,
         "pedestrian_social_states": PedestrianSocialStates,
@@ -681,7 +681,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
     Applications: Semantic crowd analysis, heterogeneous group modeling, and social navigation.
     """
 
-    name = "PEDESTRIAN_TYPE"
+    name = "PedestrianTypeSpace"
     requires = {
         "pedestrian_relative_locations": PedestrianRelativeLocations,
         "pedestrian_types": PedestrianTypeArray,

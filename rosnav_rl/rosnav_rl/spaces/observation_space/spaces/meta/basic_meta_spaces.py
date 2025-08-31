@@ -16,7 +16,7 @@ class IsFirstStepSpace(BaseObservationSpace):
     useful for resetting internal states or special first-step behaviors.
     """
 
-    name = "is_first"
+    name = "IsFirstStepSpace"
 
     def get_gym_space(self) -> spaces.Space:
         """
@@ -48,7 +48,7 @@ class IsTerminalStepSpace(BaseObservationSpace):
     which can be important for terminal state value estimation and planning.
     """
 
-    name = "is_terminal"
+    name = "IsTerminalStepSpace"
 
     def get_gym_space(self) -> spaces.Space:
         """
@@ -81,7 +81,7 @@ class EpisodeStepSpace(BaseObservationSpace):
     decision making and episode length normalization.
     """
 
-    name = "episode_step"
+    name = "EpisodeStepSpace"
 
     def __init__(self, max_episode_steps: int = 1000, *args, **kwargs):
         """

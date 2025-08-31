@@ -42,7 +42,7 @@ class MotionStateSpace(BaseObservationSpace):
     - Performance monitoring and motion quality evaluation
     """
 
-    name = "MOTION_STATE"
+    name = "MotionStateSpace"
     requires = {"last_action": RobotActionVector}
 
     def __init__(
@@ -197,7 +197,7 @@ class KinematicStateSpace(BaseObservationSpace):
     - Motion-pose coherence assessment for robust state estimation
     """
 
-    name = "ANGULAR_DYNAMICS"
+    name = "KinematicStateSpace"
 
     # Schema-based requirements: defines the data sources needed from observations.yaml
     # Each key corresponds to a data source name, each value provides rich type metadata
@@ -387,7 +387,7 @@ class TrajectoryStateSpace(BaseObservationSpace):
     - Path optimization feedback based on historical trajectory analysis
     """
 
-    name = "TRAJECTORY_STATE"
+    name = "TrajectoryStateSpace"
 
     # Schema-based requirements: defines the data sources needed from observations.yaml
     # Each key corresponds to a data source name, each value provides rich type metadata

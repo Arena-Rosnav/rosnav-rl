@@ -34,7 +34,7 @@ class LaserScanSpace(BaseObservationSpace):
     Applications: Obstacle avoidance, mapping, and raw sensor fusion.
     """
 
-    name = "LASER"
+    name = "LaserScanSpace"
     requires = {
         "front_laser": LidarRanges,  # Front-facing laser scanner range measurements
     }
@@ -122,7 +122,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
     Applications: Lightweight navigation, embedded systems, and fast obstacle avoidance.
     """
 
-    name = "REDUCED_LASER"
+    name = "ReducedLaserScanSpace"
     requires = {
         "front_laser": LidarRanges,  # Front-facing laser scanner range measurements (reduced)
     }

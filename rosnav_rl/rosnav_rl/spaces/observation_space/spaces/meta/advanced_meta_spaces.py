@@ -49,7 +49,7 @@ class MissionContextSpace(BaseObservationSpace):
     - Progress-based reward shaping for reinforcement learning optimization
     """
 
-    name = "MISSION_CONTEXT"
+    name = "MissionContextSpace"
     requires = {"dist_angle_to_goal": DistanceAngleMetrics}
 
     def __init__(
@@ -233,7 +233,7 @@ class PerformanceContextSpace(BaseObservationSpace):
     - Performance benchmarking and comparative analysis across navigation strategies
     """
 
-    name = "PERFORMANCE_CONTEXT"
+    name = "PerformanceContextSpace"
     requires = {
         "dist_angle_to_goal": DistanceAngleMetrics,
         "last_action": RobotActionVector,
@@ -435,7 +435,7 @@ class SafetyContextSpace(BaseObservationSpace):
     emergency behavior learning, and safe exploration in unknown environments.
     """
 
-    name = "SAFETY_CONTEXT"
+    name = "SafetyContextSpace"
     requires = {
         "front_laser": LidarRanges,  # LiDAR sensor data for obstacle detection and proximity analysis
         "last_action": RobotActionVector,  # Robot odometry for velocity-based risk adjustment

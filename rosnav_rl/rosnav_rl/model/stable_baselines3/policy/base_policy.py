@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Type, Dict, Any
+from typing import List, Type
 
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor

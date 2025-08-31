@@ -35,7 +35,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
     Applications: Goal-reaching, path planning, reward computation, and curriculum learning.
     """
 
-    name = "DIST_ANGLE_TO_GOAL"
+    name = "DistAngleToGoalSpace"
 
     # Schema-based requirements: defines the data sources needed from observations.yaml
     # Each key corresponds to a data source name, each value provides rich type metadata
@@ -105,7 +105,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
     Applications: Hierarchical navigation, curriculum learning, subgoal-based planning, and reward computation.
     """
 
-    name = "DIST_ANGLE_TO_SUBGOAL"
+    name = "DistAngleToSubgoalSpace"
     requires = {
         "dist_angle_to_subgoal": DistanceAngleMetrics,  # Distance and angle to navigation subgoal
     }

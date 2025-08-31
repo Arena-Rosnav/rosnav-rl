@@ -27,7 +27,7 @@ class RGBDSpace(BaseObservationSpace):
     Applications: Visual navigation, semantic segmentation, end-to-end learning.
     """
 
-    name = "RGBD"
+    name = "RGBDSpace"
     requires = {
         "color_image": ImageData,  # RGB color image
         "depth_image": ImageData,  # Depth image

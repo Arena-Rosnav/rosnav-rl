@@ -38,7 +38,7 @@ class ReliableLaserSpace(BaseObservationSpace):
     Applications: Obstacle avoidance, mapping, and robust sensor fusion.
     """
 
-    name = "RELIABLE_LASER"
+    name = "ReliableLaserSpace"
     requires = {
         "front_laser": LidarRanges,
     }
@@ -176,7 +176,7 @@ class MultiRangeLaserSpace(BaseObservationSpace):
     Applications: Near/far object detection, multi-scale perception, and robust navigation.
     """
 
-    name = "MULTI_RANGE_LASER"
+    name = "MultiRangeLaserSpace"
     requires = {
         "front_laser": LidarRanges,
     }
@@ -279,7 +279,7 @@ class MultiLaserFusionSpace(BaseObservationSpace):
     Applications: Sensor fusion, robust navigation, and multi-laser environments.
     """
 
-    name = "MULTI_LASER_FUSION"
+    name = "MultiLaserFusionSpace"
     requires = {
         "laser_fusion": LidarRanges,
     }

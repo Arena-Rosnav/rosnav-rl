@@ -172,7 +172,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         self._ped_map_size = 0
         for obs in self._observation_space:
-            if "PEDESTRIAN" in obs:
+            if "pedestrian" in obs.lower():
                 self._ped_map_size += self._observation_space[obs].shape[-1]
 
     def _setup_network(self, inplanes: int = 64):
