@@ -25,7 +25,7 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
         upper_threshold: float,
         lower_threshold: float,
         num_envs: int,
-        parameter_node_template: str = "/task_generator_node",
+        parameter_node_template: str,
         timeout: float = 5.0,
         starting_stage: int = 0,
         verbose: int = 0,
