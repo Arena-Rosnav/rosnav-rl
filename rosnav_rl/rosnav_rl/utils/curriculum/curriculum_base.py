@@ -185,6 +185,13 @@ class CurriculumBase(ABC):
                 node_name = self.parameter_node_template
             service_name = f"{node_name}/{self.parameter_service_name}"
             clients[node_name] = self.node.create_client(SetParameters, service_name)
+            if self.verbose > 0:
+                print(
+                    f"[CURRICULUM_BASE] Created parameter client for {node_name} (service: {service_name})"
+                )
+
+        if self.verbose > 0:
+            print(f"[CURRICULUM_BASE] Created {len(clients)} parameter clients total")
         return clients
 
     # ------------------------- Hooks API -------------------------
@@ -275,10 +282,16 @@ class CurriculumBase(ABC):
         """
         client = self.parameter_clients.get(node_name)
         if client is None:
+            if self.verbose > 0:
+                print(f"[CURRICULUM_BASE] No client found for node {node_name}")
             return False
 
         # Test service availability with shorter timeout first
         if not client.wait_for_service(timeout_sec=2.0):
+            if self.verbose > 0:
+                print(
+                    f"[CURRICULUM_BASE] Service not available for node {node_name} after 2.0s timeout"
+                )
             return False
 
         params: List[Parameter] = []
@@ -290,10 +303,16 @@ class CurriculumBase(ABC):
             try:
                 converted_param = self._param_to_rcl_param(pname, pval)
                 params.append(converted_param)
-            except Exception:
+            except Exception as e:
+                if self.verbose > 0:
+                    print(
+                        f"[CURRICULUM_BASE] Failed to convert parameter {pname}={pval} for node {node_name}: {e}"
+                    )
                 return False
 
         if not params:
+            if self.verbose > 0:
+                print(f"[CURRICULUM_BASE] No parameters to set for node {node_name}")
             return True  # No parameters to set is not an error
 
         request = SetParameters.Request(parameters=params)
@@ -312,15 +331,41 @@ class CurriculumBase(ABC):
                 time.sleep(0.01)
                 elapsed = time.time() - start
                 if elapsed > poll_timeout:
+                    if self.verbose > 0:
+                        print(
+                            f"[CURRICULUM_BASE] Timeout after {poll_timeout}s waiting for "
+                            f"parameter response from {node_name}"
+                        )
                     return False
 
             response = future.result()
 
             if response and all(r.successful for r in response.results):
+                if self.verbose > 0:
+                    print(
+                        f"[CURRICULUM_BASE] Successfully set {len(params)} parameters for {node_name}"
+                    )
                 return True
             else:
+                if self.verbose > 0:
+                    print(
+                        f"[CURRICULUM_BASE] Parameter setting failed for {node_name}:"
+                    )
+                    if response:
+                        for i, result in enumerate(response.results):
+                            if not result.successful:
+                                param_name = (
+                                    params[i].name if i < len(params) else "unknown"
+                                )
+                                print(f"  - Parameter '{param_name}': {result.reason}")
+                    else:
+                        print("  - No response received from service")
                 return False
-        except Exception:
+        except Exception as e:
+            if self.verbose > 0:
+                print(
+                    f"[CURRICULUM_BASE] Exception while setting parameters for {node_name}: {e}"
+                )
             return False
 
     def _set_parameters(self, param_dict: Dict[str, Any]) -> bool:
@@ -330,14 +375,26 @@ class CurriculumBase(ABC):
             return False
 
         success = True
+        failed_nodes = []
+        successful_nodes = []
+
         for node_name in list(self.parameter_clients.keys()):
             ok = self._set_parameters_batch(node_name, param_dict)
             if not ok:
                 success = False
+                failed_nodes.append(node_name)
                 if self.verbose > 0:
                     print(f"[CURRICULUM_BASE] Failed to set parameters for {node_name}")
+            else:
+                successful_nodes.append(node_name)
 
         if self.verbose > 0:
+            if successful_nodes:
+                print(
+                    f"[CURRICULUM_BASE] Successfully set parameters for: {successful_nodes}"
+                )
+            if failed_nodes:
+                print(f"[CURRICULUM_BASE] Failed to set parameters for: {failed_nodes}")
             print(f"[CURRICULUM_BASE] Parameter setting complete: {success}")
         return success
 
@@ -351,6 +408,12 @@ class CurriculumBase(ABC):
         stage = self._stages[self.curriculum_index]
         if self.verbose > 0:
             print(f"[CURRICULUM_BASE] Applying stage {self.curriculum_index}: {stage}")
+            print(
+                f"[CURRICULUM_BASE] Available parameter clients: {list(self.parameter_clients.keys())}"
+            )
+            print(
+                f"[CURRICULUM_BASE] Parameter node template: {self.parameter_node_template}"
+            )
 
         ok = self._set_parameters(stage)
         # call hooks even if setting fails (observer may want to react)
