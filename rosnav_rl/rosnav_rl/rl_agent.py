@@ -2,7 +2,7 @@ from dataclasses import asdict
 from typing import Dict, Optional, Union
 
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 
 import rosnav_rl.cfg as rosnav_rl_cfg
 

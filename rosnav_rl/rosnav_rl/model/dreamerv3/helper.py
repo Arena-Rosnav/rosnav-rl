@@ -3,7 +3,6 @@ import pathlib
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Dict, Generator, List, Tuple
 
-import gym.spaces
 import gymnasium as gym
 import numpy as np
 import torch

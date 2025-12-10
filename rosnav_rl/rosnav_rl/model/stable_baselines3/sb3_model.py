@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
-import gym
+import gymnasium as gym
 import numpy as np
 import torch as th
 from sb3_contrib import RecurrentPPO
