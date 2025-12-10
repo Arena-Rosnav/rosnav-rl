@@ -2,7 +2,7 @@ from dataclasses import asdict
 from typing import Any, Dict, List, Union
 
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 
 from ...spaces import (
     ActionSpaceManager,
