@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, TypeVar, Type
+from typing import Any, Dict, List, Optional, TypeVar, Type, Union
 
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
@@ -18,13 +18,98 @@ from .pipeline import ObservationPipeline
 T = TypeVar("T")
 
 
+def _import_observation_factory():
+    """Lazy import to avoid circular dependencies."""
+    from ..factory.factory import ObservationFactory
+
+    return ObservationFactory
+
+
 class ObservationManager:
     """
-    Manages observation collection and generation for RL agents in ROS2 using the new Collector/Generator system.
+    Central manager for observation collection and generation in ROS2-based RL agents.
 
-    - Instantiates collectors and generators from a YAML or dict config (see observations.yaml)
-    - Handles alias resolution for semantic observation names
-    - Provides unified get_observations() for downstream consumers
+    The ObservationManager orchestrates the complete observation pipeline:
+    1. **Data Collection**: Subscribes to ROS topics via Collectors
+    2. **Feature Generation**: Computes derived features via Generators
+    3. **Temporal Synchronization**: Aligns messages across topics (optional)
+    4. **Dependency Resolution**: Automatically resolves generator dependencies
+    5. **Health Monitoring**: Tracks data freshness and error rates
+
+    Architecture:
+        ```
+        ROS Topics → Collectors → [Sync] → ObservationManager
+                         ↓
+                    Generators (computed on-demand)
+                         ↓
+                    get_observations() → RL Agent
+        ```
+
+    Key Features:
+        - **Factory Pattern**: Create from YAML config via `from_config()`
+        - **Alias System**: Use semantic names (e.g., 'robot_pose') instead of specific sources
+        - **Lazy Evaluation**: Generators compute only requested observations
+        - **Buffer Management**: Efficient memory reuse in collectors and generators
+        - **Message Filters**: Optional temporal synchronization for multiple topics
+        - **Validation**: Optional dependency checking and schema validation
+
+    Attributes:
+        observation_pipeline (Type[ObservationPipeline]): Pipeline strategy class
+
+    Configuration:
+        See `from_config()` for detailed configuration documentation and examples.
+
+    Thread Safety:
+        - Collector updates use locks for thread-safe message handling
+        - Generator computations are stateless (safe for parallel access)
+        - Call `shutdown()` before destroying to clean up ROS resources
+
+    Performance:
+        - Collectors cache latest message (O(1) access)
+        - Generators use pre-allocated buffers where possible
+        - Dependency graph is resolved once at initialization
+        - Vectorized operations in numeric generators
+
+    Example:
+        ```python
+        import yaml
+        from rosnav_rl.observations.core.manager import ObservationManager
+
+        # Load configuration
+        with open('observations.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+
+        # Create manager from config
+        obs_manager = ObservationManager.from_config(
+            config=config,
+            node=ros_node,
+            ns='jackal',
+            simulation_state_container=sim_state
+        )
+
+        # Main loop
+        while running:
+            # Get all configured observations
+            obs = obs_manager.get_observations()
+
+            # Access by semantic name (from aliases)
+            robot_pose = obs['robot_pose']
+            laser_scan = obs['front_laser']
+
+            # Or by original data source name
+            ped_locations = obs['arena_pedestrian_relative_locations']
+
+            # Feed to RL agent
+            action = agent.act(obs)
+
+        # Clean up
+        obs_manager.shutdown()
+        ```
+
+    See Also:
+        - ObservationFactory: Creates data sources from configuration
+        - DependencyResolver: Resolves generator dependency graphs
+        - SubscriptionManager: Manages ROS subscriptions and synchronization
     """
 
     observation_pipeline: Type[ObservationPipeline] = ObservationPipeline
@@ -32,7 +117,7 @@ class ObservationManager:
     def __init__(
         self,
         node: Node,
-        ns: Namespace,
+        ns: Union[str, Namespace],
         data_sources: Dict[str, DataSource],
         simulation_state_container: SimulationStateContainer = None,
         wait_for_obs: bool = True,
@@ -123,6 +208,140 @@ class ObservationManager:
         # Set up ROS subscriptions for collectors
         self._setup_collectors()
 
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        node: Node,
+        ns: Union[str, Namespace],
+        simulation_state_container: SimulationStateContainer = None,
+        **manager_kwargs,
+    ) -> "ObservationManager":
+        """
+        Create an ObservationManager from a configuration dictionary.
+
+        This factory method provides a convenient way to instantiate an ObservationManager
+        from a YAML configuration file or dictionary. It automatically:
+        - Creates all collectors and generators defined in the config
+        - Resolves aliases to data source names
+        - Sets up ROS subscriptions with appropriate QoS profiles
+        - Validates generator dependencies
+        - Configures synchronization if enabled
+
+        Args:
+            config (Dict[str, Any]): Configuration dictionary with the following structure:
+                - 'aliases': Optional dict mapping semantic names to data source names
+                - 'datasources': Dict of collector and generator configurations
+                  Each datasource should have:
+                    - 'type': Class name (e.g., 'LaserScanCollector', 'RobotPoseTFGenerator')
+                    - 'params': Dict of parameters including 'topic' for collectors
+            node (Node): ROS2 node instance for creating subscriptions and logging
+            ns (Namespace): Namespace prefix for ROS topics (e.g., 'jackal', 'robot_1')
+            simulation_state_container (SimulationStateContainer, optional): Container holding
+                simulation state (robot config, environment params). If None, uses empty default.
+            **manager_kwargs: Additional keyword arguments passed to ObservationManager:
+                - wait_for_obs (bool): Wait for initial data before proceeding (default: True)
+                - qos_profile (QoSProfile): ROS2 QoS settings (default: 10)
+                - enable_synchronization (bool): Enable temporal sync (default: True)
+                - sync_tolerance_seconds (float): Timestamp tolerance in seconds (default: 0.1)
+                - buffer_size (int): Message buffer size for sync (default: 50)
+                - validate_generators (bool): Validate dependencies (default: True)
+
+        Returns:
+            ObservationManager: Fully configured and ready-to-use observation manager instance
+                with active ROS subscriptions for all collectors
+
+        Raises:
+            ValueError: If configuration is malformed or data source types are unknown
+            KeyError: If required configuration keys are missing
+
+        Example:
+            Basic usage with YAML config file:
+            ```python
+            import yaml
+            from rosnav_rl.observations.core.manager import ObservationManager
+
+            # Load configuration
+            with open('observations.yaml', 'r') as f:
+                config = yaml.safe_load(f)
+
+            # Create manager
+            obs_manager = ObservationManager.from_config(
+                config=config,
+                node=my_ros_node,
+                ns='jackal',
+                simulation_state_container=sim_state
+            )
+
+            # Get observations
+            observations = obs_manager.get_observations()
+            ```
+
+            Advanced usage with custom settings:
+            ```python
+            obs_manager = ObservationManager.from_config(
+                config=config,
+                node=my_ros_node,
+                ns='robot_1',
+                simulation_state_container=sim_state,
+                wait_for_obs=True,              # Wait for first messages
+                enable_synchronization=True,     # Enable message_filters sync
+                sync_tolerance_seconds=0.05,     # 50ms tolerance
+                buffer_size=100,                 # Larger buffer
+                validate_generators=True         # Check dependencies at init
+            )
+            ```
+
+            Minimal configuration structure:
+            ```yaml
+            aliases:
+              robot_pose: robot_pose_from_odom
+              people_data: arena_pedestrian_detections
+
+            datasources:
+              robot_pose_from_odom:
+                type: OdometryCollector
+                params:
+                  topic: "odom"
+                  up_to_date_required: true
+
+              arena_pedestrian_detections:
+                type: ArenaPedestrianCollector
+                params:
+                  topic: "/task_generator_node/arena_peds"
+                  up_to_date_required: true
+
+              arena_pedestrian_relative_locations:
+                type: ArenaPedestrianRelativeLocationGenerator
+            ```
+
+        Note:
+            - Collectors subscribe to ROS topics and cache the latest messages
+            - Generators compute derived features on-demand from collector data
+            - All topic names are automatically prefixed with the namespace
+            - Synchronization uses message_filters.ApproximateTimeSynchronizer
+            - For synchronized collectors, set 'up_to_date_required: true' in config
+        """
+        ObservationFactory = _import_observation_factory()
+        factory = ObservationFactory()
+
+        # Create data sources with common kwargs
+        common_kwargs = {
+            "node": node,
+            "ns": ns,
+            "simulation_state_container": simulation_state_container,
+        }
+
+        data_sources = factory.create_data_sources(config, **common_kwargs)
+
+        return cls(
+            node=node,
+            ns=ns,
+            data_sources=data_sources,
+            simulation_state_container=simulation_state_container,
+            **manager_kwargs,
+        )
+
     def _setup_collectors(self) -> None:
         """Set up ROS2 subscribers for collector data sources."""
 
@@ -131,6 +350,10 @@ class ObservationManager:
             try:
                 with self._subscription_manager.lock:
                     collector.update(msg)
+                    self._logger.debug(
+                        f"✓ Collector '{collector.name}' updated successfully "
+                        f"(count={collector.update_count})"
+                    )
             except Exception as e:
                 self._logger.error(f"Error updating collector '{collector.name}': {e}")
 
@@ -143,6 +366,10 @@ class ObservationManager:
                     try:
                         collector = self._collectors[collector_name]
                         collector.update(msg)
+                        self._logger.debug(
+                            f"✓ Synchronized collector '{collector.name}' updated successfully "
+                            f"(count={collector.update_count})"
+                        )
                     except Exception as e:
                         self._logger.error(
                             f"Error updating synchronized collector '{collector_name}': {e}"

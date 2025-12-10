@@ -11,6 +11,7 @@ import numpy as np
 import sensor_msgs.msg as sensor_msgs
 import nav2_msgs.msg as nav2_msgs
 import people_msgs.msg as people_msgs
+import arena_people_msgs.msg as arena_people_msgs
 
 from ..utils.pose import Pose2DType, pose3d_to_pose2d
 from .base import Collector
@@ -21,6 +22,7 @@ from ..utils.types import (
     NavigationPath,
     ImageData,
     PedestrianDetections,
+    ArenaPedestrianDetections,
     SafetyStatus,
 )
 
@@ -152,4 +154,25 @@ class PeopleCollector(Collector[people_msgs.People, PedestrianDetections]):
     """A class that collects information about people in the environment."""
 
     def _preprocess(self, msg: people_msgs.People) -> people_msgs.People:
+        return msg
+
+
+class ArenaPedestrianCollector(
+    Collector[arena_people_msgs.Pedestrians, ArenaPedestrianDetections]
+):
+    """A class that collects information about pedestrians from Arena simulator.
+
+    Processes arena_people_msgs/Pedestrians messages which include:
+    - Header with timestamp
+    - Array of Pedestrian objects with:
+      - name: Pedestrian identifier
+      - id: Unique ID
+      - pose: Full 3D pose (position + orientation)
+      - twist: Linear and angular velocities
+      - animation_state: Behavioral state (IDLE, WALKING, RUNNING, etc.)
+    """
+
+    def _preprocess(
+        self, msg: arena_people_msgs.Pedestrians
+    ) -> arena_people_msgs.Pedestrians:
         return msg

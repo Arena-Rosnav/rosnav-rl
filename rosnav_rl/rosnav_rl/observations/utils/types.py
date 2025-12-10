@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import people_msgs.msg as people_msgs
+import arena_people_msgs.msg as arena_people_msgs
 
 
 # Schema-based data requirement specification (inspired by Albumentations)
@@ -175,6 +176,16 @@ PedestrianDetections = Annotated[
     ),
 ]
 
+ArenaPedestrianDetections = Annotated[
+    arena_people_msgs.Pedestrians,
+    DataSpec(
+        description="Arena pedestrians with full state information (pose, twist, animation state)",
+        source="Arena pedestrian simulator/tracker",
+        constraints="Global coordinate frame with header",
+        example="Pedestrians(header=..., pedestrians=[Pedestrian(id=1, name='ped_1', pose=..., twist=..., animation_state=1)])",
+    ),
+]
+
 PedestrianWorldLocations = Annotated[
     np.ndarray,
     DataSpec(
@@ -219,6 +230,16 @@ PedestrianTypeMinDistances = Annotated[
     ),
 ]
 
+PedestrianDistances = Annotated[
+    Dict[Union[str, int], float],
+    DataSpec(
+        description="Minimum distances to pedestrians keyed by pedestrian ID",
+        units="meters",
+        constraints="Keys are pedestrian IDs, values are minimum distances ≥ 0",
+        example="{101: 2.5, 102: 4.1, 103: 1.8}",
+    ),
+]
+
 PedestrianTypeArray = Annotated[
     np.ndarray,
     DataSpec(
@@ -239,6 +260,15 @@ PedestrianSocialStates = Annotated[
     ),
 ]
 
+ArenaPedestrianStates = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="Array of Arena pedestrian animation/behavior states as uint8 codes",
+        shape="(N,)",
+        constraints="N = number of pedestrians, values are uint8 state codes",
+        example="[1, 0, 2, 1, 3]",
+    ),
+]
 
 # Additional encoded output types for observation spaces
 MotionStateVector = Annotated[
@@ -503,6 +533,7 @@ __all__ = [
     "SafetyStatus",
     "IsTerminal",
     "PedestrianDetections",
+    "ArenaPedestrianDetections",
     "PedestrianWorldLocations",
     "PedestrianRelativeLocations",
     "PedestrianRelativeVelocities",

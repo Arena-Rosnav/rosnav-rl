@@ -24,7 +24,7 @@
 # 4. Clean separation between logical concepts and physical sensors
 aliases:
   # Core robot state
-  robot_pose: robot_pose_from_odom    # Primary robot localization source
+  robot_pose: robot_pose_from_tf    # Primary robot localization source
   # robot_pose_tf: robot_pose_from_tf   # Alternative TF-based localization
   
   # Navigation targets
@@ -33,7 +33,8 @@ aliases:
   # nav_path: navigation_path          # Planned trajectory
   
   # Social navigation - pedestrian data
-  people_data: people_detections          # Raw pedestrian detections
+  people_data: people_detections          # Raw pedestrian detections (people_msgs)
+  arena_people_data: arena_pedestrian_detections  # Arena pedestrian detections (arena_people_msgs)
 
 datasources:
   # ---------------------------------------------------------------------------
@@ -45,15 +46,15 @@ datasources:
   # handling for laser scans, coordinate transformations for poses).
   
   # Robot localization sources
-  robot_pose_from_odom:
-    type: OdometryCollector            # Processes nav_msgs/Odometry → Pose2D
-    params:
-      topic: "odom"                    # Standard odometry topic
-      up_to_date_required: true        # Require fresh data for temporal synchronization
+  # robot_pose_from_odom:
+  #   type: OdometryCollector            # Processes nav_msgs/Odometry → Pose2D
+  #   params:
+  #     topic: "odom"                    # Standard odometry topic
+  #     up_to_date_required: true        # Require fresh data for temporal synchronization
 
-  # robot_pose_from_tf:
-  #   type: RobotPoseTFGenerator         # Listens to TF tree → Pose2D 
-  #   params: {}                         # Uses simulation_state_container for frame config
+  robot_pose_from_tf:
+    type: RobotPoseTFGenerator         # Listens to TF tree → Pose2D 
+    params: {}                         # Uses simulation_state_container for frame config
 
   # Sensor data collectors
   front_laser:
@@ -66,14 +67,14 @@ datasources:
   goal_pose:
     type: PoseStampedCollector         # Processes geometry_msgs/PoseStamped → Pose2D
     params:
-      topic: "/goal_pose"               # Navigation goal from planner
+      topic: "goal_pose"                # Navigation goal from planner (relative to namespace)
       up_to_date_required: false       # Goal updates less frequently
 
-  subgoal_pose:
-    type: PoseStampedCollector         # Processes geometry_msgs/PoseStamped → Pose2D
-    params:
-      topic: "subgoal"            # Intermediate waypoint
-      up_to_date_required: false       # Subgoal updates less frequently
+  # subgoal_pose:
+  #   type: PoseStampedCollector         # Processes geometry_msgs/PoseStamped → Pose2D
+  #   params:
+  #     topic: "subgoal"                # Intermediate waypoint
+  #     up_to_date_required: false       # Subgoal updates less frequently
 
   # Robot control and action data
   last_action:
@@ -83,11 +84,18 @@ datasources:
       # up_to_date_required: true
 
   # Social navigation - people detection
-  people_detections:
-    type: PeopleCollector              # Processes people_msgs/People → PedestrianDetections
+  # people_detections:
+  #   type: PeopleCollector              # Processes people_msgs/People → PedestrianDetections
+  #   params:
+  #     topic: "/task_generator_node/people"                  # People tracker output
+  #     up_to_date_required: true
+
+  # Arena pedestrian detection (arena_people_msgs)
+  arena_pedestrian_detections:
+    type: ArenaPedestrianCollector     # Processes arena_people_msgs/Pedestrians → ArenaPedestrianDetections
     params:
-      topic: "/task_generator_node/people"                  # People tracker output
-      up_to_date_required: false
+      topic: "/task_generator_node/arena_peds"  # Arena pedestrian simulator output
+      up_to_date_required: true
 
   collision_monitor:
     type: CollisionMonitorStateCollector  # Processes nav2_msgs/CollisionMonitorState → SafetyStatus
@@ -150,22 +158,22 @@ datasources:
   # a processing pipeline.
   
   # Coordinate frame transformations
-  goal_in_robot_frame:
-    type: GoalLocationInRobotFrameGenerator  # Transforms goal from world → robot frame
+  # goal_in_robot_frame:
+  #   type: GoalLocationInRobotFrameGenerator  # Transforms goal from world → robot frame
 
-  subgoal_in_robot_frame:
-    type: SubgoalLocationInRobotFrameGenerator  # Transforms subgoal from world → robot frame
+  # subgoal_in_robot_frame:
+  #   type: SubgoalLocationInRobotFrameGenerator  # Transforms subgoal from world → robot frame
 
   # Navigation metrics - distance and angle computations
-  dist_angle_to_goal:
-    type: DistAngleToGoalGenerator           # Computes [distance, angle] to goal
+  # dist_angle_to_goal:
+  #   type: DistAngleToGoalGenerator           # Computes [distance, angle] to goal
 
-  dist_angle_to_subgoal:
-    type: DistAngleToSubgoalGenerator        # Computes [distance, angle] to subgoal
+  # dist_angle_to_subgoal:
+  #   type: DistAngleToSubgoalGenerator        # Computes [distance, angle] to subgoal
 
   # Safety and collision detection
-  laser_safety_violation:
-    type: LaserSafeDistanceGenerator         # Checks if obstacles are within safety distance
+  # laser_safety_violation:
+  #   type: LaserSafeDistanceGenerator         # Checks if obstacles are within safety distance
 
   # ---------------------------------------------------------------------------
   # PEDESTRIAN ANALYSIS GENERATORS - Social navigation features
@@ -175,32 +183,57 @@ datasources:
   # analysis, and social state extraction for human-robot interaction.
   
   # Pedestrian position processing
-  pedestrian_relative_locations:
-    type: PedestrianRelativeLocationGenerator    # Transforms pedestrian positions to robot frame
+  # pedestrian_relative_locations:
+  #   type: PedestrianRelativeLocationGenerator    # Transforms pedestrian positions to robot frame
 
-  pedestrian_world_locations:
-    type: PedestrianLocationGenerator            # Extracts world coordinates of pedestrians
+  # pedestrian_world_locations:
+  #   type: PedestrianLocationGenerator            # Extracts world coordinates of pedestrians
 
-  # Pedestrian motion analysis
-  pedestrian_relative_velocities:
-    type: PedestrianRelativeVelGenerator         # Computes pedestrian velocities in robot frame
+  # # Pedestrian motion analysis
+  # pedestrian_relative_velocities:
+  #   type: PedestrianRelativeVelGenerator         # Computes pedestrian velocities in robot frame
 
-  pedestrian_vel_x:
-    type: PedestrianRelativeVelXGenerator        # Forward/backward velocity component
+  # pedestrian_vel_x:
+  #   type: PedestrianRelativeVelXGenerator        # Forward/backward velocity component
 
-  pedestrian_vel_y:
-    type: PedestrianRelativeVelYGenerator        # Left/right velocity component  
+  # pedestrian_vel_y:
+  #   type: PedestrianRelativeVelYGenerator        # Left/right velocity component  
 
-  # Social navigation metrics
-  pedestrian_distances:
-    type: PedestrianDistanceGenerator            # Minimum distances to each pedestrian group
+  # # Social navigation metrics
+  # pedestrian_distances:
+  #   type: PedestrianDistanceGenerator            # Minimum distances to each pedestrian group
 
-  # Pedestrian classification and social states
-  pedestrian_types:
-    type: PedestrianTypeGenerator                # Extracts pedestrian group/type classifications
+  # # Pedestrian classification and social states
+  # pedestrian_types:
+  #   type: PedestrianTypeGenerator                # Extracts pedestrian group/type classifications
 
-  pedestrian_social_states:
-    type: PedestrianSocialStateGenerator         # Extracts social behavior states
+  # pedestrian_social_states:
+  #   type: PedestrianSocialStateGenerator         # Extracts social behavior states
+
+  # ---------------------------------------------------------------------------
+  # ARENA PEDESTRIAN ANALYSIS GENERATORS - Arena-specific pedestrian features
+  # ---------------------------------------------------------------------------
+  # These generators process arena_people_msgs/Pedestrians data with full pose,
+  # twist, and animation state information from the Arena simulator.
+  
+  # Arena pedestrian position processing
+  arena_pedestrian_relative_locations:
+    type: ArenaPedestrianRelativeLocationGenerator  # Transforms Arena pedestrian positions to robot frame
+
+  arena_pedestrian_world_locations:
+    type: ArenaPedestrianLocationGenerator          # Extracts world coordinates of Arena pedestrians
+
+  # Arena pedestrian motion analysis
+  arena_pedestrian_relative_velocities:
+    type: ArenaPedestrianRelativeVelGenerator       # Computes Arena pedestrian velocities in robot frame
+
+  # Arena pedestrian metrics
+  arena_pedestrian_distances:
+    type: ArenaPedestrianDistanceGenerator          # Minimum distances to each Arena pedestrian by ID
+
+  # Arena pedestrian animation/behavior states
+  arena_pedestrian_states:
+    type: ArenaPedestrianStateGenerator    # Extracts animation states (IDLE, WALKING, RUNNING, etc.)
 
 # =============================================================================
 # CONFIGURATION EXAMPLES & USAGE PATTERNS

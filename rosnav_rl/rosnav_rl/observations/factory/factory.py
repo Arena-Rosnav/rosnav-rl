@@ -123,6 +123,10 @@ def create_observation_manager_from_config(
     """
     Convenience function to create an ObservationManager from configuration.
 
+    .. deprecated::
+        Use `ObservationManager.from_config()` instead. This function is kept
+        for backward compatibility but will be removed in a future version.
+
     Args:
         config: Configuration dictionary with observation pipeline definition
         node: ROS node
@@ -135,21 +139,10 @@ def create_observation_manager_from_config(
     """
     from ..core.manager import ObservationManager
 
-    factory = ObservationFactory()
-
-    # Create data sources with common kwargs
-    common_kwargs = {
-        "node": node,
-        "ns": ns,
-        "simulation_state_container": simulation_state_container,
-    }
-
-    data_sources = factory.create_data_sources(config, **common_kwargs)
-
-    return ObservationManager(
+    return ObservationManager.from_config(
+        config=config,
         node=node,
         ns=ns,
-        data_sources=data_sources,
         simulation_state_container=simulation_state_container,
         **manager_kwargs,
     )
