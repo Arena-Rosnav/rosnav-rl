@@ -54,7 +54,7 @@ void DRLController::configure(
   node->declare_parameter(plugin_name_ + ".lookahead_time", 1.5, lookahead_time_descriptor, true);
   node->get_parameter(plugin_name_ + ".lookahead_time", lookahead_time_);
 
-  RCLCPP_INFO(logger_, "Creating get_command client for service: %s", service_name.c_str());
+  RCLCPP_INFO(logger_, "[ROSNAV_CONTROLLER] Configuring plugin '%s' — connecting to service '%s'", plugin_name_.c_str(), service_name.c_str());
   
   // Create client with the callback group for proper execution
   client_ = node->create_client<rosnav_rl_msgs::srv::GetCommand>(
@@ -124,16 +124,19 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
   cmd_vel.header.frame_id = pose.header.frame_id;
   cmd_vel.header.stamp = clock_->now();
   
-  RCLCPP_WARN(logger_, "[ROSNAV_CONTROLLER] computeVelocityCommands called - checking service availability");
-  
+  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] computeVelocityCommands called — checking service availability");
+
   if (!client_->wait_for_service(std::chrono::seconds(1))) {
-    RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Service not available after 1s wait, stopping robot. Check if action provider node is running and is using the service name '%s'!", client_->get_service_name());
+    RCLCPP_ERROR_THROTTLE(logger_, *clock_, 5000,
+      "[ROSNAV_CONTROLLER] Service '%s' not available after 1 s — stopping robot. "
+      "Is the action-server node running with the correct service name?",
+      client_->get_service_name());
     cmd_vel.twist.linear.x = 0.0;
     cmd_vel.twist.angular.z = 0.0;
     return cmd_vel;
   }
 
-  RCLCPP_WARN(logger_, "[ROSNAV_CONTROLLER] Service available, sending request");
+  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] Service available, sending request");
   auto request = std::make_shared<rosnav_rl_msgs::srv::GetCommand::Request>();
   auto future = client_->async_send_request(request);
 
@@ -143,14 +146,15 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
   while (rclcpp::ok()) {
     if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       cmd_vel.twist = future.get()->twist;
-      RCLCPP_WARN(
+      RCLCPP_DEBUG(
         logger_,
-        "[ROSNAV_CONTROLLER] Received velocity command: linear_x=%.2f, linear_y=%.2f, angular_z=%.2f",
+        "[ROSNAV_CONTROLLER] Received command: linear_x=%.2f, linear_y=%.2f, angular_z=%.2f",
         cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
       break;
     }
     if ((node->now() - start).seconds() > 2.0) {  // Timeout less than environment timeout (10s)
-      RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Timeout waiting for get_command service, stopping robot");
+      RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Timeout waiting for '%s' response (>2 s) — stopping robot",
+        client_->get_service_name());
       cmd_vel.twist.linear.x = 0.0;
       cmd_vel.twist.angular.z = 0.0;
       break;
@@ -164,15 +168,16 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
 void DRLController::publishSubgoal()
 {
   if (global_plan_.poses.empty() || !costmap_ros_) {
-    RCLCPP_WARN(logger_, "[ROSNAV_CONTROLLER] Global plan is empty or costmap_ros is null. Cannot publish subgoal.");
+    RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] No global plan yet — skipping subgoal publish");
     return;
   }
 
   // Get robot's current pose
   geometry_msgs::msg::PoseStamped robot_pose;
   if (!costmap_ros_->getRobotPose(robot_pose)) {
-    RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Failed to get robot pose. This is likely a TF issue. Check that the transform from '%s' to '%s' is available.",
-                 costmap_ros_->getGlobalFrameID().c_str(), costmap_ros_->getBaseFrameID().c_str());
+    RCLCPP_ERROR_THROTTLE(logger_, *clock_, 5000,
+      "[ROSNAV_CONTROLLER] Failed to get robot pose — TF transform from '%s' to '%s' not available",
+      costmap_ros_->getGlobalFrameID().c_str(), costmap_ros_->getBaseFrameID().c_str());
     return;
   }
 
