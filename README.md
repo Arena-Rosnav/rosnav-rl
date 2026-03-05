@@ -42,6 +42,8 @@
 
 **Rosnav-RL** is a developer-centric framework for creating and training state-of-the-art navigation agents with deep reinforcement learning in ROS 2. It's built to accelerate your research by providing a flexible, modular, and powerful toolkit that gets out of your way.
 
+> **ROS 2 only.** All ROS 1 / `rospy` / `rospkg` dependencies have been removed. The package targets ROS 2 Humble exclusively.
+
 Forget being locked into a single RL library. Rosnav-RL's core strength is its plug-and-play architecture. Swap backends like **Stable-Baselines3** and **DreamerV3** with ease, and focus on what matters: designing, training, and deploying better navigation agents, faster.
 
 ### ✨ Key Features
@@ -108,21 +110,54 @@ For a deep dive into the architecture and development workflow, please refer to 
 
 ---
 
-## 🖥️ Usage
+## 🧪 Testing
 
-To run the trained agent, you can use the provided launch file to start the ROS action server. This will make your agent available for navigation tasks within the ROS 2 ecosystem.
+A pytest suite covering path resolution, model loading, and the `get_command` service is included:
 
 ```bash
-ros2 launch rosnav_rl rl_agent.launch.py
+cd rosnav_rl   # package root
+python3 -m pytest tests/ -v
 ```
 
-You can then send requests to the `/rosnav_rl/get_action` service to get actions from your agent.
+To create a minimal test agent (random weights, no training required):
+
+```bash
+python3 scripts/create_test_agent.py --agent-name test_agent
+```
+
+This writes `training_config.yaml` and `best_model.zip` to `Arena/arena_training/agents/test_agent/`.
 
 ---
 
-## 🤝 Contributing
+## 🖥️ Usage
 
-Contributions are welcome! Please read the contributing guidelines before submitting a pull request.
+**Standalone — start the action server with a trained agent:**
+
+```bash
+ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=<your_agent>
+```
+
+Or via the provided launch file:
+
+```bash
+ros2 launch rosnav_rl action_server.launch.py agent_name:=<your_agent>
+```
+
+The server exposes a `get_command` service (`rosnav_rl_msgs/srv/GetCommand`) under the robot's namespace. It reads sensor data from its configured ROS 2 topics and returns a `geometry_msgs/Twist`. On inference errors it logs a warning and returns zero velocity instead of crashing.
+
+```bash
+# Call the service manually
+ros2 service call /get_command rosnav_rl_msgs/srv/GetCommand {}
+```
+
+**Arena integration** — when using [Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav), the action server is started automatically:
+
+```bash
+arena launch local_planner:=rosnav_rl agent_name:=<your_agent>
+```
+
+Agent folders live in `Arena/arena_training/agents/<agent_name>/` and must contain `training_config.yaml` + `best_model.zip`.
+
 
 ---
 
