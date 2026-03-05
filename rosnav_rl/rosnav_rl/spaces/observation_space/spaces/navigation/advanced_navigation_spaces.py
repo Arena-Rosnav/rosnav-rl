@@ -68,6 +68,10 @@ class RobustGoalSpace(BaseObservationSpace):
 
         super().__init__(*args, **kwargs)
 
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.last_distance = None
+
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for goal representation."""
         dims = 3 if self.include_progress else 2  # [distance, angle, progress]

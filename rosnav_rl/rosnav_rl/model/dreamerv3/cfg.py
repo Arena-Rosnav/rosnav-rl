@@ -1,14 +1,11 @@
 from pathlib import Path
 from typing import ClassVar, List, Optional, Union
 
-import rospkg
 from pydantic import BaseModel
 from typing_extensions import Literal
 
 from rosnav_rl.cfg.framework import FrameworkCfg
 from rosnav_rl.utils.type_aliases.rl_frameworks import SupportedRLFrameworks
-
-rp = rospkg.RosPack()
 
 
 class GeneralCfg(BaseModel):

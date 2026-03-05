@@ -77,6 +77,15 @@ class UpdatedStackedObservations(StackedObservations):
         dones: np.ndarray,
         infos: List[Dict[str, Any]],
     ) -> Tuple[TObs, List[Dict[str, Any]]]:
+        # Also expand time dimension on terminal_observation in infos,
+        # otherwise SB3's np.concatenate(previous_stack_2D, terminal_obs_1D)
+        # fails with a dimension mismatch.
+        if self._enforce_time_dimension:
+            for info in infos:
+                if "terminal_observation" in info:
+                    info["terminal_observation"] = np.expand_dims(
+                        info["terminal_observation"], 0
+                    )
         return super().update(self.add_time_dimension(observations), dones, infos)
 
     def reset(self, observation: TObs) -> TObs:

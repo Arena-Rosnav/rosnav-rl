@@ -9,7 +9,6 @@ from __future__ import annotations
 import time
 from typing import List
 
-from rclpy.duration import Duration
 from rclpy.node import Node
 
 from ..data_sources.base import Collector
@@ -91,18 +90,27 @@ class WaitingStrategy:
         self, collector: Collector, timeout: float
     ) -> None:
         """
-        Efficiently poll for a collector update with timeout using ROS simulation time.
+        Poll for a collector update using wall-clock time for both sleeping and
+        timeout tracking.
+
+        Using wall-clock time (time.monotonic) consistently avoids the mismatch
+        that occurred when time.sleep() advanced wall-clock time but the timeout
+        was measured against ROS simulation time — which can be paused, slow, or
+        ahead of real time. Wall-clock is the correct measure here because we are
+        waiting for a real network message to arrive.
+
+        This method must not be called from inside a ROS executor callback because
+        time.sleep() will block the executor thread. Call it only from the
+        training-loop / step thread.
 
         Args:
             collector: The collector to poll for updates
-            timeout: Maximum time to wait in seconds
+            timeout: Maximum wall-clock seconds to wait
 
         Raises:
             TimeoutError: If the timeout is exceeded
         """
-        # Use ROS node's clock to respect simulation time
-        start_time = self._node.get_clock().now()
-        timeout_duration = Duration(seconds=timeout)
+        start = time.monotonic()
 
         # Adaptive polling intervals - start fast, slow down over time
         sleep_interval = 0.001  # Start with 1ms
@@ -110,15 +118,14 @@ class WaitingStrategy:
         sleep_increase_factor = 1.5
 
         while collector.stale:
-            current_time = self._node.get_clock().now()
-            elapsed = current_time - start_time
+            elapsed = time.monotonic() - start
 
-            if elapsed >= timeout_duration:
+            if elapsed >= timeout:
                 raise TimeoutError(
                     f"Timeout after {timeout}s waiting for collector update"
                 )
 
-            # Adaptive sleep - start aggressive, become more conservative
+            # Yield briefly so the OS can deliver incoming messages
             time.sleep(sleep_interval)
             sleep_interval = min(
                 sleep_interval * sleep_increase_factor, max_sleep_interval

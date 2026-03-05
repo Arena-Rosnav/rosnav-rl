@@ -135,14 +135,28 @@ class StableBaselinesEnv:
         return self._norm_wrapper.normalize_obs(observation)
 
     def stack(self, observation: np.ndarray) -> np.ndarray:
-        return self._stack_wrapper.stacked_obs.update(
-            observations=observation,
+        # encode_observation returns unbatched obs; VecFrameStack expects (n_envs, ...)
+        if isinstance(observation, dict):
+            batched = {k: np.asarray(v)[np.newaxis] for k, v in observation.items()}
+        else:
+            batched = np.asarray(observation)[np.newaxis]
+
+        stacked, infos = self._stack_wrapper.stacked_obs.update(
+            observations=batched,
             dones=np.array([False] * self._env.num_envs),
             infos=[{}] * self._env.num_envs,
         )
+        # Remove batch dim: _predict_non_recurrent expects (stack_size, obs_dim) not (1, stack_size, obs_dim)
+        if isinstance(stacked, dict):
+            return {k: v[0] for k, v in stacked.items()}, infos
+        return stacked[0], infos
 
     def reset(self, observation: np.ndarray) -> np.ndarray:
-        return self._stack_wrapper.stacked_obs.reset(observation=observation)
+        if isinstance(observation, dict):
+            batched = {k: np.asarray(v)[np.newaxis] for k, v in observation.items()}
+        else:
+            batched = np.asarray(observation)[np.newaxis]
+        return self._stack_wrapper.stacked_obs.reset(observation=batched)
 
     @property
     def has_norm_wrapper(self) -> bool:
@@ -313,12 +327,16 @@ class StableBaselinesModel(RL_Model):
             self.reset()
 
         observation = self._rl_agent.space_manager.encode_observation(
-            observation, done=is_first_observation
+            observation
         )
 
         if self.__env is None:
             self.__env = StableBaselinesEnv(
-                make_mock_env(ns="", space_manager=self._rl_agent.space_manager)
+                make_mock_env(
+                    ns="",
+                    space_manager=self._rl_agent.space_manager,
+                    stack_size=self._policy_description.stack_size,
+                )
             )
 
         if self.__env.has_stack_wrapper:
@@ -626,7 +644,7 @@ class StableBaselinesModel(RL_Model):
         last observation available in the state, it also resets the environment with the last observation.
         """
         self.__state.reset()
-        if self.__env.has_stack_wrapper and self.__state.last_observation:
+        if self.__env is not None and self.__env.has_stack_wrapper and self.__state.last_observation:
             self.__env.reset(self.__state.last_observation)
 
     @property

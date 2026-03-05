@@ -148,7 +148,8 @@ class RosnavEvalCallback(EvalCallback):
                     continue_training = self.callback_on_new_best.on_step()
 
             if self.callback_on_eval_end is not None:
-                self.callback_on_eval_end._on_step(self)
+                self.callback_on_eval_end.parent = self
+                self.callback_on_eval_end._on_step()
 
             # Trigger callback after every evaluation, if needed
             if self.callback is not None:

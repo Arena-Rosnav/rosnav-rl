@@ -4,6 +4,7 @@ from typing import Protocol
 import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rosnav_rl_msgs.srv import GetCommand
 from std_msgs.msg import Int16
 
@@ -17,7 +18,7 @@ class ObservationCollector(Protocol):
 
 
 class ActionServer(ABC):
-    """ActionServer is an abstract base class for a ROS action server that interacts with a reinforcement learning agent.
+    """ActionServer is an abstract base class for a ROS2 action server that interacts with a reinforcement learning agent.
 
     Attributes:
         agent (RL_Agent): The reinforcement learning agent.
@@ -32,8 +33,9 @@ class ActionServer(ABC):
         Initializes the BaseServer.
 
         Args:
-            model_path (str): The path to the model file.
+            agent_name (str): The name of the trained agent to load.
             namespace (str, optional): The namespace for the server. Defaults to an empty string.
+            node (Node, optional): An existing ROS2 node. If None, a new one is created.
         """
         self.agent_name = agent_name
         self.namespace = Namespace(namespace)
@@ -41,7 +43,7 @@ class ActionServer(ABC):
             node
             if node is not None
             else rclpy.create_node(
-                "rosnav_rl/action_server",
+                "rosnav_action_server",
                 namespace=str(self.namespace),
             )
         )
@@ -55,24 +57,23 @@ class ActionServer(ABC):
 
     def _initialize_ros(self):
         """
-        Initializes ROS services and subscribers for the action server.
+        Initializes ROS2 services and subscribers for the action server.
 
-        This method sets up the following ROS components:
-        - A service to get the next action, which is handled by `__handle_next_action_srv`.
-        - A subscriber to reset the stacked observations, which listens to the "/scenario_reset" topic and calls `__on_scene_reset`.
-
-        Returns:
-            None
+        Sets up:
+        - A service to get the next action (GetCommand).
+        - A subscriber to reset stacked observations on scenario reset.
         """
         self._get_next_action_srv = self.node.create_service(
             GetCommand,
             "get_command",
             self.__handle_next_action_srv,
         )
+        #TODO: Adjust episode reset trigger
         self._sub_reset_stacked_obs = self.node.create_subscription(
             Int16,
             "/scenario_reset",
             self.__on_scene_reset,
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE),
         )
 
     def __handle_next_action_srv(
@@ -95,9 +96,21 @@ class ActionServer(ABC):
             response.twist = cmd_vel
             return response
 
-        action = self.agent.get_action(self.observation_collector.get_observations())
+        try:
+            action = self.agent.get_action(
+                self.observation_collector.get_observations()
+            )
+        except Exception as exc:
+            # Gracefully handle transient observation failures (e.g. missing
+            # topic data at startup) instead of crashing the whole node.
+            self.logger.warn(
+                f"[Rosnav-RL] get_action failed — returning zero velocity. "
+                f"Reason: {type(exc).__name__}: {exc}"
+            )
+            response.twist = cmd_vel
+            return response
 
-        # Assuming the action is a numpy array with [linear.x, linear.y,angular.z]
+        # Action is a numpy array with [linear.x, linear.y, angular.z]
         cmd_vel.linear.x = float(action[0])
         cmd_vel.linear.y = float(action[1])
         cmd_vel.angular.z = float(action[2])
@@ -106,15 +119,12 @@ class ActionServer(ABC):
 
         return response
 
-    def __on_scene_reset(self, request: Int16):
+    def __on_scene_reset(self, msg: Int16):
         """
-        Resets the last action and stacked observations.
+        Resets the last action and stacked observations on scenario reset.
 
         Args:
-            request (Int16): The reset request.
-
-        Returns:
-            None
+            msg (Int16): The reset message.
         """
         if self.agent is None:
             self.logger.info("Agent not initialized yet.")
@@ -123,13 +133,13 @@ class ActionServer(ABC):
 
     def start(self):
         """
-        Starts the ROS node and initializes the agent and observation collector.
+        Starts the ROS2 node and initializes the agent and observation collector.
 
         This method performs the following steps:
         1. Initializes ROS-related components.
         2. Initializes the agent.
         3. Initializes the observation collector.
-        4. Enters a loop that keeps the node running until ROS is shut down.
+        4. Spins the node until shutdown.
         """
         self._initialize_ros()
         self.logger.info("[Rosnav-RL | Action Server] ROS services initialized.")
@@ -141,5 +151,4 @@ class ActionServer(ABC):
         )
 
         self.logger.info("[Rosnav-RL | Action Server] Spinning...")
-        while not rclpy.ok():
-            rclpy.spin_once(self.node)
+        rclpy.spin(self.node)

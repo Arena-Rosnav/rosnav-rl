@@ -65,15 +65,16 @@ class LaserScanSpace(BaseObservationSpace):
         """
         Applies a limit to the laser beams, setting values greater than max_range to max_range.
 
+        Returns a new array to avoid mutating the shared collector buffer.
+
         Args
             laserbeams (np.ndarray): The array of laser beams.
             max_range (float): The maximum range value to apply.
 
         Returns:
-            np.ndarray: The modified laser beams with values capped at max_range.
+            np.ndarray: A new array with values capped at max_range.
         """
-        laserbeams[laserbeams > max_range] = max_range
-        return laserbeams
+        return np.minimum(laserbeams, max_range)
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
@@ -138,6 +139,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         self._num_beams = laser_num_beams
         self._max_range = laser_max_range
         self._reduced_num_beams = reduced_num_beams
+        self._cached_indices = None  # Lazily cached
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:
@@ -157,10 +159,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
     def get_indices(self) -> np.ndarray:
         """
         Calculates the indices for selecting laser beams for reduction.
-
-        This method determines which indices from the original laser scan
-        should be used to create the reduced representation. The indices
-        are evenly distributed across the full range of laser beams.
+        Results are cached after first computation.
 
         Returns:
             np.ndarray: Array of indices to select from the original laser scan.
@@ -168,6 +167,9 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         Raises:
             ValueError: If reduced_num_beams is greater than the original num_beams.
         """
+        if self._cached_indices is not None:
+            return self._cached_indices
+
         if self._reduced_num_beams > self._num_beams:
             raise ValueError(
                 f"Cannot reduce {self._num_beams} beams to {self._reduced_num_beams} beams"
@@ -180,6 +182,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         # Ensure we don't exceed array bounds
         indices = np.clip(indices, 0, self._num_beams - 1)
 
+        self._cached_indices = indices
         return indices
 
     @BaseObservationSpace.apply_normalization

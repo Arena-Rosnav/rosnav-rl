@@ -26,13 +26,20 @@ class Normalizer(ABC):
 class MaxAbsScaler(Normalizer):
     """Max absolute scaling normalizer: scales to [-1, 1] range."""
 
+    def __init__(self, **kwargs):
+        self._cached_denom = None
+        self._cached_low = None
+
     def normalize(
         self, observation: np.ndarray, low: np.ndarray, high: np.ndarray
     ) -> np.ndarray:
         """Scale observation to [-1, 1] range."""
-        denominator = high - low
-        denominator = np.where(denominator == 0, 1e-8, denominator)
-        return (2 * (observation - low)) / denominator - 1
+        # Cache denominator since low/high are fixed per space instance
+        if self._cached_denom is None or self._cached_low is not low:
+            denominator = high - low
+            self._cached_denom = np.where(denominator == 0, 1e-8, denominator)
+            self._cached_low = low
+        return (2 * (observation - low)) / self._cached_denom - 1
 
     def denormalize(
         self, normalized_obs: np.ndarray, low: np.ndarray, high: np.ndarray
@@ -44,13 +51,19 @@ class MaxAbsScaler(Normalizer):
 class MinMaxScaler(Normalizer):
     """Min-max scaling normalizer: scales to [0, 1] range."""
 
+    def __init__(self, **kwargs):
+        self._cached_denom = None
+        self._cached_low = None
+
     def normalize(
         self, observation: np.ndarray, low: np.ndarray, high: np.ndarray
     ) -> np.ndarray:
         """Scale observation to [0, 1] range."""
-        denominator = high - low
-        denominator = np.where(denominator == 0, 1e-8, denominator)
-        return (observation - low) / denominator
+        if self._cached_denom is None or self._cached_low is not low:
+            denominator = high - low
+            self._cached_denom = np.where(denominator == 0, 1e-8, denominator)
+            self._cached_low = low
+        return (observation - low) / self._cached_denom
 
     def denormalize(
         self, normalized_obs: np.ndarray, low: np.ndarray, high: np.ndarray
@@ -62,18 +75,22 @@ class MinMaxScaler(Normalizer):
 class StandardScaler(Normalizer):
     """Standard scaling normalizer: zero mean, unit variance."""
 
-    def __init__(self, epsilon: float = 1e-8):
+    def __init__(self, epsilon: float = 1e-8, **kwargs):
         self.epsilon = epsilon
+        self._cached_mean = None
+        self._cached_std = None
+        self._cached_low = None
 
     def normalize(
         self, observation: np.ndarray, low: np.ndarray, high: np.ndarray
     ) -> np.ndarray:
         """Standardize using bounds as rough mean/std estimates."""
-        # Use bounds to estimate mean and std
-        mean = (low + high) / 2
-        std = (high - low) / 4  # Rough estimate assuming ~95% of data in bounds
-        std = np.where(std == 0, self.epsilon, std)
-        return (observation - mean) / std
+        if self._cached_mean is None or self._cached_low is not low:
+            self._cached_mean = (low + high) / 2
+            std = (high - low) / 4
+            self._cached_std = np.where(std == 0, self.epsilon, std)
+            self._cached_low = low
+        return (observation - self._cached_mean) / self._cached_std
 
     def denormalize(
         self, normalized_obs: np.ndarray, low: np.ndarray, high: np.ndarray
@@ -101,10 +118,11 @@ class IdentityNormalizer(Normalizer):
         return normalized_obs
 
 
-# Registry of available normalizers
+# Registry of available normalizers — use callables so each space gets a fresh instance
+# that can cache its own bounds.
 NORMALIZERS: Dict[str, Union[Normalizer, Callable[[], Normalizer]]] = {
-    "max_abs": MaxAbsScaler(),
-    "min_max": MinMaxScaler(),
+    "max_abs": MaxAbsScaler,
+    "min_max": MinMaxScaler,
     "standard": StandardScaler,  # Callable to allow epsilon configuration
     "identity": IdentityNormalizer(),
     "none": IdentityNormalizer(),

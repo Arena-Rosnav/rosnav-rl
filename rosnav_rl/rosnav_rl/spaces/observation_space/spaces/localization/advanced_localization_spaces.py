@@ -85,6 +85,12 @@ class RobustOdometrySpace(BaseObservationSpace):
 
         super().__init__(*args, **kwargs)
 
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.filtered_linear_vel = None
+        self.filtered_angular_vel = None
+        self.last_velocities = None
+
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for odometry."""
         dims = (
@@ -267,6 +273,10 @@ class PoseStabilizedSpace(BaseObservationSpace):
         self.reference_pose = None
 
         super().__init__(*args, **kwargs)
+
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.reference_pose = None
 
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for stabilized pose."""

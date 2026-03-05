@@ -38,6 +38,8 @@ While initially developed for the [Arena-Rosnav](https://github.com/Arena-Rosnav
 - **PyTorch**: The primary deep learning library, offering flexibility and performance for building custom neural networks.
 - **Stable-Baselines3 & DreamerV3**: Integrated, state-of-the-art RL frameworks that serve as powerful, interchangeable backends for training agents.
 
+> **ROS 2 only.** All ROS 1 / `rospy` / `rospkg` dependencies have been removed. The package targets ROS 2 Humble exclusively.
+
 ### ✨ Key Features
 - **Framework-Agnostic RL Backend**: Don't get locked into one library. A common interface allows you to seamlessly switch between different RL frameworks like Stable-Baselines3 and DreamerV3 to find the best algorithm for your task.
 - **Deeply Modular & Extensible**: Build custom agents with ease. Every component—from observation spaces and reward functions to network layers—is a plug-and-play module. This design encourages rapid prototyping and experimentation.
@@ -142,6 +144,24 @@ For development, it's recommended to clone the repository into your ROS 2 worksp
     ```bash
     source install/setup.bash
     ```
+
+### Running the tests
+
+A pytest suite covering path resolution, model loading, and the GetCommand service is included:
+
+```bash
+cd rosnav_rl   # package root
+python3 -m pytest tests/ -v
+```
+
+To create a minimal test agent for local smoke-testing (no training required):
+
+```bash
+python3 scripts/create_test_agent.py --agent-name test_agent
+```
+
+This writes `training_config.yaml` and `best_model.zip` (random weights) to `Arena/arena_training/agents/test_agent/`.
+
 ---
 
 ## 📂 4. Code Organization
@@ -226,39 +246,39 @@ The typical workflow for training an agent involves creating a custom `gym.Env` 
 ### Deployment
 Once an agent is trained, it can be deployed using the ROS 2 Action Server.
 
--   A launch file is provided to start the server with your trained agent's model.
--   The server listens for requests on the `/rosnav_rl/get_action` service.
--   An external node can request an action by calling this service, providing the necessary observation data if required by the agent's configuration. The server then returns the computed action.
+**Starting the server standalone:**
+```bash
+ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=<your_agent>
+```
 
+**Via `robot.launch.py` (Arena integration):**  
+The server is started automatically when `local_planner:=rosnav_rl` *and* `train_mode:=false`. No manual launch required:
+```bash
+arena launch local_planner:=rosnav_rl agent_name:=<your_agent>
+```
+
+The server exposes a single service `get_command` (type `rosnav_rl_msgs/srv/GetCommand`) under the robot's namespace. The agent reads sensor data from its configured ROS 2 topics and returns a `geometry_msgs/Twist`. On inference errors (e.g., missing sensor data at startup) it logs a warning and returns zero velocity instead of crashing.
+
+**Calling the service manually:**
+```bash
+# Empty request — agent polls its own ROS topics
+ros2 service call /get_command rosnav_rl_msgs/srv/GetCommand {}
+```
+
+**From a ROS 2 node:**
 ```python
-# Example of a ROS 2 node calling the action service
 import rclpy
-from rosnav_rl_msgs.srv import GetAction
+from rosnav_rl_msgs.srv import GetCommand
 
-# Initialize rclpy and create a node
 rclpy.init()
-node = rclpy.create_node('action_requester')
+node = rclpy.create_node('planner')
+client = node.create_client(GetCommand, 'get_command')  # namespaced per robot
+client.wait_for_service()
 
-# Create a client for the service
-# Replace 'sim_1' with the appropriate namespace if used
-client = node.create_client(GetAction, "/sim_1/rosnav_rl/get_action")
-
-# Wait for the service to be available
-while not client.wait_for_service(timeout_sec=1.0):
-    node.get_logger().info('Service not available, waiting again...')
-
-# Create a request and call the service
-request = GetAction.Request()
-future = client.call_async(request)
+future = client.call_async(GetCommand.Request())
 rclpy.spin_until_future_complete(node, future)
+twist = future.result().twist  # geometry_msgs/Twist
 
-if future.result() is not None:
-    action = future.result().action
-    node.get_logger().info(f'Received action: {action}')
-else:
-    node.get_logger().error('Exception while calling service: %r' % future.exception())
-
-# Clean up
 node.destroy_node()
 rclpy.shutdown()
 ```

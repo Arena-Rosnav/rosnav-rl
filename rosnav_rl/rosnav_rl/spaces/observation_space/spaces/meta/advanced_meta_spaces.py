@@ -81,6 +81,13 @@ class MissionContextSpace(BaseObservationSpace):
 
         super().__init__(*args, **kwargs)
 
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.mission_start_time = None
+        self.initial_distance = None
+        self.smoothed_progress = 0.0
+        self.step_count = 0
+
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for mission context."""
         # [progress, time_normalized, mission_phase, urgency]
@@ -260,6 +267,13 @@ class PerformanceContextSpace(BaseObservationSpace):
         self.last_position = None
 
         super().__init__(*args, **kwargs)
+
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.distance_history = []
+        self.velocity_history = []
+        self.cumulative_distance_traveled = 0.0
+        self.last_position = None
 
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for performance context."""
@@ -469,6 +483,12 @@ class SafetyContextSpace(BaseObservationSpace):
 
         super().__init__(*args, **kwargs)
 
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.risk_history = []
+        self.violation_count = 0
+        self.total_steps = 0
+
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for safety context."""
         # [current_risk, avg_risk, violation_rate, safety_margin]
@@ -584,7 +604,7 @@ class SafetyContextSpace(BaseObservationSpace):
                 - Risk Computation: velocity-adjusted distance assessment with critical thresholds
                 - Example: [0.2, 0.15, 0.05, 0.85] (low current risk, good safety history)
         """
-        velocity = (float(last_action[0]), float(last_action[1]))
+        velocity = (float(last_action[0]), float(last_action[-1]))
 
         # Compute current collision risk
         current_risk = self._compute_collision_risk(front_laser, velocity)

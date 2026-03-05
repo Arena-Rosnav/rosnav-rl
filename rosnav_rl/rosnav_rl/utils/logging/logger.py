@@ -367,12 +367,6 @@ class LoggerFactory:
             except (ImportError, ValueError):
                 pass
 
-        # Try ROS1 (rospy)
-        try:
-            return ROS1Logger(name, **kwargs)
-        except ImportError:
-            pass
-
         # Fall back to Python logging
         try:
             return PythonLogger(name, **kwargs)

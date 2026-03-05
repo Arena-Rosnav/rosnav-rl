@@ -449,6 +449,7 @@ class RewardApproachGoal(RewardUnit):
 
         self.last_robot_pose = None
         self.last_goal_distance = None
+        self._last_goal_world: np.ndarray = None  # world-frame target for jump detection
 
     def check_parameters(self, *args, **kwargs):
         if self._pos_factor < 0 or self._neg_factor < 0:
@@ -508,8 +509,28 @@ class RewardApproachGoal(RewardUnit):
         # Calculate current distance to target
         current_distance = np.sqrt(target_relative[0] ** 2 + target_relative[1] ** 2)
 
-        # Apply reward if we have previous distance measurement
-        if self.last_goal_distance is not None:
+        # Reconstruct target position in world frame for goal-jump detection.
+        # robot_pose is a structured array with fields "x", "y", "yaw".
+        yaw = float(robot_pose["yaw"])
+        cos_yaw = np.cos(yaw)
+        sin_yaw = np.sin(yaw)
+        current_goal_world = np.array([
+            float(robot_pose["x"]) + cos_yaw * target_relative[0] - sin_yaw * target_relative[1],
+            float(robot_pose["y"]) + sin_yaw * target_relative[0] + cos_yaw * target_relative[1],
+        ], dtype=np.float64)
+
+        # Detect goal/subgoal reassignment: if the target jumped further than the
+        # threshold in world space, the generator updated it → skip this step's
+        # reward to avoid a spurious bonus/penalty from the discontinuity.
+        goal_jumped = (
+            self._last_goal_world is not None
+            and np.sum((current_goal_world - self._last_goal_world) ** 2)
+            > self._goal_update_threshold_sq
+        )
+
+        # Apply reward only when we have a valid previous distance and the goal
+        # has NOT just been reassigned.
+        if self.last_goal_distance is not None and not goal_jumped:
             distance_change = self.last_goal_distance - current_distance
             factor = self._pos_factor if distance_change > 0 else self._neg_factor
             self.add_reward(factor * distance_change)
@@ -517,11 +538,13 @@ class RewardApproachGoal(RewardUnit):
         # Update tracking variables
         self.last_robot_pose = robot_pose.copy()
         self.last_goal_distance = current_distance
+        self._last_goal_world = current_goal_world
 
     def reset(self):
         """Reset internal state for new episode."""
         self.last_robot_pose = None
         self.last_goal_distance = None
+        self._last_goal_world = None
 
 
 @RewardUnitFactory.register("collision")
@@ -579,6 +602,10 @@ class RewardCollision(RewardUnit):
         super().__init__(reward_function, True, *args, **kwargs)
         self._reward = reward
         self._bumper_zone = bumper_zone
+        # Latch: once a collision is detected it stays True until reset() so a
+        # brief collision_monitor_state pulse (True→False within one step) is
+        # never silently missed.
+        self._collision_latched: bool = False
 
     def check_parameters(self, *args, **kwargs):
         if self._reward > 0.0:
@@ -623,7 +650,7 @@ class RewardCollision(RewardUnit):
                 - Source: simulation environment
                 - Used for: collision zone configuration and episode termination
         """
-        # If no collision monitor detection, check laser-based collision
+        # If no collision monitor signal yet, fallback to laser-based collision check
         if not collision_monitor:
             robot_radius = simulation_state_container.robot.radius
             collision_threshold = robot_radius + self._bumper_zone
@@ -632,10 +659,20 @@ class RewardCollision(RewardUnit):
             min_laser_distance = np.min(front_laser)
             collision_monitor = min_laser_distance <= collision_threshold
 
-        # Apply penalty and terminate episode if collision detected from either source
+        # Latch on the first detected collision; stays True until reset() is called.
+        # This prevents the common race condition where collision_monitor_state fires
+        # and clears (True→False) faster than one training step is evaluated.
         if collision_monitor:
+            self._collision_latched = True
+
+        # Apply penalty and terminate episode whenever the latch is set
+        if self._collision_latched:
             self.add_reward(self._reward)
             self.add_info(self.DONE_INFO)
+
+    def reset(self) -> None:
+        """Clear the collision latch at the start of each new episode."""
+        self._collision_latched = False
 
 
 @RewardUnitFactory.register("distance_travelled")
@@ -715,9 +752,9 @@ class RewardDistanceTravelled(RewardUnit):
         linear_velocity = last_action[0]  # Forward/backward velocity
         angular_velocity = last_action[-1]  # Rotational velocity
 
-        # Calculate scaled energy consumption
-        linear_energy = linear_velocity * self._lin_vel_scalar
-        angular_energy = angular_velocity * self._ang_vel_scalar
+        # Calculate scaled energy consumption (use abs to avoid rewarding reverse/CW spin)
+        linear_energy = abs(linear_velocity) * self._lin_vel_scalar
+        angular_energy = abs(angular_velocity) * self._ang_vel_scalar
 
         # Apply negative consumption factor (encouraging efficient movement)
         total_energy_reward = -(linear_energy + angular_energy) * self._factor
@@ -897,8 +934,9 @@ class RewardFactoredReverseDrive(RewardUnit):
         linear_velocity = last_action[0]
 
         # Apply velocity-proportional penalty for reverse movement
+        # Use abs so that factor=-0.1 * abs(velocity) is always negative (a penalty)
         if linear_velocity < 0 and linear_velocity < self._threshold:
-            self.add_reward(self._factor * linear_velocity)
+            self.add_reward(self._factor * abs(linear_velocity))
 
 
 @RewardUnitFactory.register("abrupt_velocity_change")
@@ -1079,8 +1117,8 @@ class RewardRootVelocityDifference(RewardUnit):
                 - Example: [0.4, 0.0, 0.3] (evaluated for L2 norm consistency)
         """
         if self.last_action is not None:
-            # Calculate L2 norm of squared velocity differences
-            vel_diff = np.linalg.norm((last_action - self.last_action) ** 2)
+            # Calculate L2 norm of velocity differences
+            vel_diff = np.linalg.norm(last_action - self.last_action)
 
             # Provide positive reward for consistent motion under threshold
             if vel_diff < self._k:
@@ -1092,7 +1130,6 @@ class RewardRootVelocityDifference(RewardUnit):
 
     def reset(self):
         """Reset internal state for new episode."""
-        self.last_action = None
         self.last_action = None
 
 
@@ -1264,7 +1301,7 @@ class RewardActiveHeadingDirection(RewardUnit):
         simulation_state_container: SimulationStateContainer,
         *args,
         **kwargs,
-    ) -> float:
+    ) -> None:
         """Calculate reward based on active heading direction with velocity obstacle avoidance.
 
         Computes optimal heading direction considering goal orientation and pedestrian velocity
@@ -1316,7 +1353,7 @@ class RewardActiveHeadingDirection(RewardUnit):
             or pedestrian_relative_velocities is None
             or last_action is None
         ):
-            return 0.0
+            return
 
         # Extract goal direction and robot forward velocity
         theta_pre = dist_angle_to_target[1]
@@ -1376,7 +1413,7 @@ class RewardActiveHeadingDirection(RewardUnit):
             # No obstacles: use direct goal direction
             d_theta = theta_pre
 
-        return self._r_angle * (self._theta_m - abs(d_theta))
+        self.add_reward(self._r_angle * (self._theta_m - abs(d_theta)))
 
     def reset(self):
         """Reset internal state for new episode."""
@@ -1874,7 +1911,7 @@ class RewardAngularVelocityConstraint(RewardUnit):
         angular = abs(last_action[-1])
 
         # Apply penalty only if threshold is set and angular velocity exceeds it
-        if self._threshold and angular > self._threshold:
+        if self._threshold is not None and angular > self._threshold:
             self.add_reward(self._penalty_factor * angular)
 
     def reset(self):
@@ -1990,7 +2027,7 @@ class RewardLinearVelBoost(RewardUnit):
     def __init__(
         self,
         reward_function: RewardFunction,
-        reward_factor: float = -0.05,
+        reward_factor: float = 0.05,
         threshold: float = None,
         _on_safe_dist_violation: bool = True,
         *args,
@@ -2035,7 +2072,7 @@ class RewardLinearVelBoost(RewardUnit):
         linear = last_action[0]
 
         # Apply reward only if threshold is set and linear velocity exceeds it
-        if self._threshold and linear > self._threshold:
+        if self._threshold is not None and linear > self._threshold:
             self.add_reward(self._reward_factor * linear)
 
     def reset(self):

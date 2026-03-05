@@ -100,6 +100,9 @@ class RewardFunction(ErrorReportingMixin):
         self._validate_units = enable_validation
         self._lock = threading.Lock() if parallel else None
 
+        # Reusable kwargs dict to avoid per-step allocation
+        self._execution_kwargs: Dict[str, Any] = {}
+
         # Reward units
         self._reward_units: List["RewardUnit"] = []
         self._safe_dist_sensitive_units: List["RewardUnit"] = []
@@ -160,7 +163,7 @@ class RewardFunction(ErrorReportingMixin):
             **kwargs: Additional arguments passed to reward units.
         """
         self._validate_if_enabled(obs_dict)
-        eligible_units = self._get_eligible_units()
+        eligible_units = self._get_eligible_units(obs_dict)
 
         if not eligible_units:
             return
@@ -171,17 +174,28 @@ class RewardFunction(ErrorReportingMixin):
         self._execute_reward_units(eligible_units, execution_kwargs)
 
     def _validate_if_enabled(self, obs_dict: ObservationDict) -> None:
-        """Validate reward unit requirements if validation is enabled."""
+        """Validate reward unit requirements if validation is enabled.
+
+        After the first successful validation, automatically disables further
+        checks for performance since the key set is static at runtime.
+        """
         if self._validate_units:
             with self._error_context("validating reward unit requirements"):
                 validate_reward_units(
                     obs_dict,
                     {unit.__class__.__name__: unit for unit in self._reward_units},
                 )
+                # Disable after first successful validation — keys don't change at runtime
+                self._validate_units = False
 
-    def _get_eligible_units(self) -> List["RewardUnit"]:
-        """Get eligible reward units based on safety state."""
-        safe_dist_violation = self.state.info.get("safe_dist_violation", False)
+    def _get_eligible_units(self, obs_dict: ObservationDict) -> List["RewardUnit"]:
+        """Get eligible reward units based on current safety state from observations.
+
+        Reads ``laser_safety_violation`` directly from the live observation
+        dictionary so the check reflects the *current* step rather than the
+        (already-cleared) reward state, which was always False before this fix.
+        """
+        safe_dist_violation = bool(obs_dict.get("laser_safety_violation", False))
         return (
             self._safe_dist_sensitive_units
             if safe_dist_violation
@@ -194,9 +208,18 @@ class RewardFunction(ErrorReportingMixin):
         simulation_state_container: SimulationStateContainer,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Prepare arguments for reward unit execution."""
-        obs_dict["simulation_state_container"] = simulation_state_container
-        return obs_dict
+        """Prepare arguments for reward unit execution.
+
+        Reuses a single mutable dict to avoid per-step allocation.
+        The dict is cleared and repopulated each call.
+        """
+        ek = self._execution_kwargs
+        ek.clear()
+        ek.update(obs_dict)
+        ek["simulation_state_container"] = simulation_state_container
+        if kwargs:
+            ek.update(kwargs)
+        return ek
 
     def _execute_reward_units(
         self, units: List["RewardUnit"], kwargs: Dict[str, Any]
@@ -288,7 +311,6 @@ class RewardFunction(ErrorReportingMixin):
         for unit_name, exception in failed_units:
             if self.verbose and exception:
                 self._report_error(
-                    component_type=ComponentType.REWARD_UNIT,
                     component_name=unit_name,
                     severity=ErrorSeverity.WARNING,
                     message=str(exception),

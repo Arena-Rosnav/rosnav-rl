@@ -96,19 +96,16 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         return grid_x, grid_y
 
     def _create_feature_map(self) -> np.ndarray:
-        """Create an empty feature map with background values."""
-        if self._flatten:
-            return np.full(
-                (self._feature_map_size * self._feature_map_size,),
-                self.background_value,
-                dtype=np.float32,
-            )
-        else:
-            return np.full(
-                (self._feature_map_size, self._feature_map_size),
-                self.background_value,
-                dtype=np.float32,
-            )
+        """Create an empty feature map with background values.
+
+        Always returns a 2D array for consistent indexing in encode_observation.
+        Flattening is handled at the end of encode_observation, not here.
+        """
+        return np.full(
+            (self._feature_map_size, self._feature_map_size),
+            self.background_value,
+            dtype=np.float32,
+        )
 
     def _get_feature_map_shape(self) -> tuple:
         """Get the shape for the feature map."""
@@ -408,25 +405,38 @@ class StackedLaserMapSpace(BaseFeatureMapSpace):
         self._laser_queue = deque([np.zeros_like(laser_scan)] * self._laser_stack_size)
 
     def _build_laser_map(self, laser_queue: deque) -> np.ndarray:
-        """Builds a laser map from a queue of laser scans."""
-        # The reference implementation expects a fixed structure.
-        # We assume laser_stack_size=10, feature_map_size=80, and laser scan length = 720
-        # to match the logic.
+        """Builds a laser map from a queue of laser scans.
+
+        Dynamically computes dimensions from the configured parameters
+        instead of assuming fixed laser_stack_size=10, feature_map_size=80,
+        and 720-beam laser.
+        """
         temp = np.array(laser_queue, dtype=np.float32).flatten()
 
-        # Single reshape for all operations
-        reshaped = temp.reshape(10, 80, 9)
+        n_beams_per_scan = len(laser_queue[0])
+        beams_per_col = n_beams_per_scan // self._feature_map_size
 
-        # Pre-allocate output with matching dtype
-        scan_avg = np.zeros((20, 80), dtype=np.float32)
+        if beams_per_col < 1:
+            beams_per_col = 1
 
-        # Vectorized calculations using axis reduction
-        scan_avg[::2] = reshaped.min(axis=2)  # Even rows: minima
-        scan_avg[1::2] = reshaped.mean(axis=2)  # Odd rows: averages
+        # Reshape: (stack_size, feature_map_size, beams_per_col)
+        usable_beams = self._feature_map_size * beams_per_col
+        reshaped = temp[: self._laser_stack_size * usable_beams].reshape(
+            self._laser_stack_size, self._feature_map_size, beams_per_col
+        )
 
-        # Final transformations
-        scan_avg = scan_avg.reshape(1600)
-        scan_avg_map = np.tile(scan_avg, (4, 1)).reshape(1, 80, 80)
+        # Build summary: 2 rows per stack entry (min, mean)
+        summary_rows = self._laser_stack_size * 2
+        scan_avg = np.zeros((summary_rows, self._feature_map_size), dtype=np.float32)
+        scan_avg[::2] = reshaped.min(axis=2)   # Even rows: minima
+        scan_avg[1::2] = reshaped.mean(axis=2) # Odd rows: averages
+
+        # Tile to fill the feature map height
+        flat = scan_avg.reshape(-1)
+        target_size = self._feature_map_size * self._feature_map_size
+        repeats = max(1, target_size // max(len(flat), 1))
+        tiled = np.tile(flat, repeats + 1)[:target_size]
+        scan_avg_map = tiled.reshape(1, self._feature_map_size, self._feature_map_size)
 
         return scan_avg_map
 

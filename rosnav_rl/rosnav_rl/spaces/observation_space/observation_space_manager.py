@@ -127,9 +127,10 @@ class ObservationSpaceManager:
         if not self.spaces:
             return {}
 
-        # Optional validation - can be disabled for performance
+        # Validate once then disable for performance — keys are static at runtime
         if self.validate_observations:
             validate_observation_spaces(observations, self.spaces)
+            self.validate_observations = False
 
         if self.parallel_encoding and len(self.spaces) > 1:
             return self._encode_parallel(observations)
@@ -229,6 +230,11 @@ class ObservationSpaceManager:
     def space_list(self) -> List[BaseObservationSpace]:
         """Return the list of observation spaces."""
         return list(self.spaces.values())
+
+    def reset_spaces(self) -> None:
+        """Reset internal state of all observation spaces for a new episode."""
+        for space in self.spaces.values():
+            space.reset()
 
     @property
     def observation_space(self) -> spaces.Space:

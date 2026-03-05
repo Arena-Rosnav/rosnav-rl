@@ -72,6 +72,11 @@ class MotionStateSpace(BaseObservationSpace):
 
         super().__init__(*args, **kwargs)
 
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.velocity_history = []
+        self.last_velocity = None
+
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for motion state."""
         # [velocity_magnitude, velocity_direction, stability, acceleration?]
@@ -243,6 +248,9 @@ class KinematicStateSpace(BaseObservationSpace):
     ) -> float:
         """Compute alignment between motion and orientation.
 
+        Measures how well the robot's velocity vector aligns with its heading.
+        +1 = pure forward motion, -1 = pure backward, 0 = pure rotation.
+
         Args:
             yaw: Current orientation
             linear_vel: Linear velocity
@@ -251,22 +259,16 @@ class KinematicStateSpace(BaseObservationSpace):
         Returns:
             Motion alignment metric [-1, 1]
         """
-        if abs(linear_vel) < 1e-6:
-            return 0.0  # No linear motion
+        speed = np.sqrt(linear_vel**2 + angular_vel**2)
+        if speed < 1e-6:
+            return 0.0  # No motion
 
-        # Motion direction based on velocities
-        if linear_vel > 0:
-            motion_direction = yaw  # Forward motion
-        else:
-            motion_direction = yaw + np.pi  # Backward motion
+        # Velocity vector direction in robot frame
+        velocity_direction = np.arctan2(angular_vel, linear_vel)
 
-        # Normalize motion direction
-        motion_direction = np.arctan2(
-            np.sin(motion_direction), np.cos(motion_direction)
-        )
-
-        # Compute alignment (cosine of angle difference)
-        alignment = np.cos(motion_direction - yaw)
+        # Alignment: cos(0)=1 when velocity is purely forward,
+        # cos(pi)=-1 when purely backward
+        alignment = np.cos(velocity_direction)
 
         return alignment
 
@@ -422,6 +424,11 @@ class TrajectoryStateSpace(BaseObservationSpace):
         self.velocity_history = []
 
         super().__init__(*args, **kwargs)
+
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.pose_history = []
+        self.velocity_history = []
 
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for trajectory state."""

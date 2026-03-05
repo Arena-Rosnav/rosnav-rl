@@ -59,15 +59,25 @@ class Namespace:
 
     @property
     def simulation_ns(self) -> Namespace:
-        return Namespace(self.name[0] if self.name else "")
+        return Namespace(self.name[1] if self.name else "")
 
     @property
     def robot_ns(self) -> Namespace:
-        return Namespace(self.name[1] if len(self.name) > 1 else "")
+        return Namespace(self.name[2] if len(self.name) > 1 else "")
 
     def to_string(self) -> str:
         """Returns the string representation of the namespace."""
         return str(self)
+
+    def without_slashes(self) -> str:
+        """Returns the string representation of the namespace without slashes."""
+        return "".join(self.name)
+    
+    def __getitem__(self, index: int) -> Namespace:
+        if index < 0 or index >= len(self.name):
+            raise IndexError(f"Namespace index {index} out of range")
+        return Namespace(self.name[index])
+
 
 
 class Topic:

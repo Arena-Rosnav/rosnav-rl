@@ -1,7 +1,5 @@
 from typing import Optional, Union
 
-# import rospy
-# TODO: Retrieve robot model from ROS params
 from pydantic import BaseModel, Discriminator, Field, model_validator
 from typing_extensions import Annotated
 

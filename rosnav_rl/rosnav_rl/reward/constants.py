@@ -7,9 +7,9 @@ class REWARD_CONSTANTS:
 
 
 class DONE_REASONS(enum.Enum):
-    STEP_LIMIT = 0
-    COLLISION = 1
-    SUCCESS = 2
+    STEP_LIMIT = enum.auto()
+    COLLISION = enum.auto()
+    SUCCESS = enum.auto()
 
 
 class DEFAULTS:

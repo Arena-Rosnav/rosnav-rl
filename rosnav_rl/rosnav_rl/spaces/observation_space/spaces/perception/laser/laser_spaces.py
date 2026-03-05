@@ -329,6 +329,11 @@ class MultiLaserFusionSpace(BaseObservationSpace):
 
         super().__init__(*args, **kwargs)
 
+    def reset(self) -> None:
+        """Reset episode-local state."""
+        self.sensor_health = {cfg["topic"]: 1.0 for cfg in self.laser_configs}
+        self.last_update_times = {cfg["topic"]: 0.0 for cfg in self.laser_configs}
+
     def get_gym_space(self) -> spaces.Space:
         """Get gym space for fused laser data."""
         return spaces.Box(

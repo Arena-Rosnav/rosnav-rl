@@ -308,7 +308,9 @@ class SpatialAwarenessSpace(BaseObservationSpace):
 
             corridor_width = left_distance + right_distance
 
-            if corridor_width > self.corridor_width_threshold:
+            # Must be wider than threshold but not so wide it's just open space
+            max_corridor_width = self.corridor_width_threshold * 4.0
+            if self.corridor_width_threshold < corridor_width <= max_corridor_width:
                 # Determine corridor direction based on which side is farther
                 if left_distance > right_distance:
                     corridor_direction = 0.75  # Left-leaning corridor

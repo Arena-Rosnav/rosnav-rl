@@ -1,5 +1,9 @@
 import numpy as np
 
+# Pre-allocated 3x3 buffer to avoid per-call allocation in get_relative_pos_to_robot
+_TRANSFORM_BUFFER = np.empty((3, 3), dtype=np.float64)
+_TRANSFORM_BUFFER[2, :] = [0, 0, 1]  # last row is constant
+
 
 def get_relative_pos_to_robot(
     robot_pose: np.ndarray, distant_poses: np.ndarray, output_buffer: np.ndarray = None
@@ -31,26 +35,17 @@ def get_relative_pos_to_robot(
     cos_yaw = np.cos(yaw)
     sin_yaw = np.sin(yaw)
 
-    # Calculate the inverse transformation matrix robot_T_map directly
-    robot_T_map = np.array(
-        [
-            [
-                cos_yaw,
-                sin_yaw,
-                -x * cos_yaw - y * sin_yaw,
-            ],
-            [
-                -sin_yaw,
-                cos_yaw,
-                x * sin_yaw - y * cos_yaw,
-            ],
-            [0, 0, 1],
-        ]
-    )
+    # Fill the pre-allocated inverse transformation matrix robot_T_map
+    _TRANSFORM_BUFFER[0, 0] = cos_yaw
+    _TRANSFORM_BUFFER[0, 1] = sin_yaw
+    _TRANSFORM_BUFFER[0, 2] = -x * cos_yaw - y * sin_yaw
+    _TRANSFORM_BUFFER[1, 0] = -sin_yaw
+    _TRANSFORM_BUFFER[1, 1] = cos_yaw
+    _TRANSFORM_BUFFER[1, 2] = x * sin_yaw - y * cos_yaw
 
     # Apply the transformation to the distant poses using einsum.
     # Return the transformed poses, excluding the homogeneous component.
-    result = np.einsum("ij,kj->ki", robot_T_map, distant_poses)[:, :2]
+    result = np.einsum("ij,kj->ki", _TRANSFORM_BUFFER, distant_poses)[:, :2]
     if output_buffer is not None:
         output_buffer[: result.shape[0], :2] = result
         return output_buffer[: result.shape[0], :2]
@@ -80,20 +75,18 @@ def get_relative_vel_to_robot(
                     empty array with shape (0, 2) if the input pedestrian_vel_vector
                     is empty.
     """
-    # Create the rotation matrix to transform from map frame to robot frame
-    map_r_robot = np.array(
-        [
-            [np.cos(robot_pose["yaw"]), -np.sin(robot_pose["yaw"])],
-            [np.sin(robot_pose["yaw"]), np.cos(robot_pose["yaw"])],
-        ]
-    )
+    if len(pedestrian_vel_vector) == 0:
+        return np.empty((0, 2))
 
-    # Use the transpose for transformation
-    robot_r_map = map_r_robot.T
+    yaw = robot_pose["yaw"]
+    cos_yaw = np.cos(yaw)
+    sin_yaw = np.sin(yaw)
 
-    if len(pedestrian_vel_vector) > 0:
-        # Transform pedestrian velocities to the robot's coordinate frame
-        rel_vel = np.matmul(robot_r_map, pedestrian_vel_vector.T).T
-        return rel_vel
+    # robot_r_map = map_r_robot.T = [[cos, sin], [-sin, cos]]
+    # Apply as matmul: (2x2) @ (2xN) -> (2xN) -> transpose to (Nx2)
+    vx = pedestrian_vel_vector[:, 0]
+    vy = pedestrian_vel_vector[:, 1]
+    rel_vx = cos_yaw * vx + sin_yaw * vy
+    rel_vy = -sin_yaw * vx + cos_yaw * vy
 
-    return np.empty((0, 2))
+    return np.column_stack((rel_vx, rel_vy))

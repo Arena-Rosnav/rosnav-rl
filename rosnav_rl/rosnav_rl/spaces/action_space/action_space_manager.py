@@ -137,13 +137,12 @@ class ActionSpaceManager:
         Returns:
             np.ndarray: The decoded action.
         """
-        if type(action) == int:
-            action = [action]
-
-        # if self._stacked:
-        #     action = action[0] if action.ndim == 2 else action
-
         if self._discrete:
+            # Ensure action is a scalar int for discrete indexing
+            if hasattr(action, '__len__'):
+                action = int(action[0])
+            else:
+                action = int(action)
             return self._extend_action_array(self._translate_disc_action(action))
 
         return self._extend_action_array(action)

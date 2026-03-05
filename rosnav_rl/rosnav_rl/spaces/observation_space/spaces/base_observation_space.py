@@ -60,6 +60,19 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         self._normalize = normalize
         self._normalizer = self._setup_normalizer(normalize, normalizer, **kwargs)
 
+        # Pre-cache normalization bounds to avoid hasattr() on every step
+        self._can_normalize = (
+            self._normalize
+            and hasattr(self._space, "low")
+            and hasattr(self._space, "high")
+        )
+        if self._can_normalize:
+            self._norm_low = self._space.low
+            self._norm_high = self._space.high
+        else:
+            self._norm_low = None
+            self._norm_high = None
+
         # Store configuration for debugging and serialization
         self._config = {
             "normalize": normalize,
@@ -123,6 +136,15 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
     # ==========================================
     # Public API Methods
     # ==========================================
+
+    def reset(self) -> None:
+        """Reset any internal state for a new episode.
+
+        Override in subclasses that maintain episode-local state (e.g. velocity
+        histories, progress trackers, reference poses).  The default
+        implementation is a no-op so stateless spaces need not override.
+        """
+        pass
 
     def safe_encode_observation(self, *args, **kwargs) -> np.ndarray:
         """Safely encode observations with error handling and null fallback.
@@ -216,13 +238,9 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Returns:
             np.ndarray: Normalized array if normalization is enabled, otherwise unchanged.
         """
-        if (
-            self._normalize
-            and hasattr(self._space, "low")
-            and hasattr(self._space, "high")
-        ):
+        if self._can_normalize:
             return self._normalizer.normalize(
-                observation_arr, self._space.low, self._space.high
+                observation_arr, self._norm_low, self._norm_high
             )
         return observation_arr
 

@@ -8,13 +8,14 @@ calculations on data from other `DataSource`s.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import List
+from typing import List, Union
 from warnings import warn
 
 import arena_people_msgs.msg as arena_people_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
 import rclpy
+from rosnav_rl.utils.rostopic import Namespace
 import tf2_ros
 from tf_transformations import euler_from_quaternion
 
@@ -62,7 +63,13 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
     # This generator doesn't depend on other data sources - it gets data from TF
     requires = {}
 
-    def __init__(self, name: str, node: rclpy.Node = None, **kwargs):
+    def __init__(
+        self,
+        name: str,
+        node: rclpy.Node | None = None,
+        ns: Union[str, Namespace] | None = None,
+        **kwargs,
+    ):
         super().__init__(name, **kwargs)
         self._node = node
         if not self._node:
@@ -70,16 +77,19 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
 
         self._tf_buffer = tf2_ros.Buffer(node=self._node)
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self._node)
-        self._last_pose = np.zeros(3, dtype=Pose2DType)
+        self._last_pose = np.array((0.0, 0.0, 0.0), dtype=Pose2DType)
         self._is_initialized = False
+        self._namespace = Namespace(ns) if ns else None
 
         # Set default frame names, will be updated when simulation_state_container is available
         self.TARGET_FRAME: str = "map"  # Reference/parent frame
-        self.SOURCE_FRAME: str = "jackal/base_link"  # Robot frame
+        self.SOURCE_FRAME: str = (
+            f"{self._namespace.simulation_ns.without_slashes()}_{self._namespace.robot_ns.without_slashes()}/base_link"
+            if self._namespace
+            else "jackal/base_link"  # Robot frame
+        )
 
-    def _generate(
-        self, simulation_state_container: SimulationStateContainer, **kwargs
-    ) -> Pose2D:
+    def _generate(self, simulation_state_container: SimulationStateContainer, **kwargs) -> Pose2D:
         """Generates the robot's 2D pose (x, y, theta) from the TF tree.
 
         Args:
@@ -127,7 +137,7 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
             transform_stamped = self._tf_buffer.lookup_transform(
                 self.TARGET_FRAME,
                 self.SOURCE_FRAME,
-                self._node.get_clock().now(),
+                rclpy.time.Time(),
                 timeout=rclpy.duration.Duration(seconds=0.1),
             )
             trans = transform_stamped.transform.translation
@@ -186,9 +196,7 @@ class GoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
         Example:
             [2.5, -1.0]
         """
-        return get_relative_pos_to_robot(
-            robot_pose, np.array([[goal_pose["x"], goal_pose["y"], 1]])
-        ).squeeze(0)
+        return get_relative_pos_to_robot(robot_pose, np.array([[goal_pose["x"], goal_pose["y"], 1]])).squeeze(0)
 
 
 class SubgoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
@@ -233,9 +241,7 @@ class SubgoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
         Example:
             [1.0, 3.2]
         """
-        return get_relative_pos_to_robot(
-            robot_pose, np.array([[subgoal_pose["x"], subgoal_pose["y"], 1]])
-        ).squeeze(0)
+        return get_relative_pos_to_robot(robot_pose, np.array([[subgoal_pose["x"], subgoal_pose["y"], 1]])).squeeze(0)
 
 
 class DistAngleToGoalGenerator(Generator[DistanceAngleMetrics]):
@@ -783,27 +789,17 @@ class PedestrianTypeGenerator(Generator[PedestrianTypeArray]):
             return self._ped_types_buffer
 
         num_peds = len(people_data.people)
-        if (
-            self._ped_types_buffer is None
-            or self._last_num_peds != num_peds
-            or current_ped_ids != self._ped_ids
-        ):
+        if self._ped_types_buffer is None or self._last_num_peds != num_peds or current_ped_ids != self._ped_ids:
             try:
                 self._ped_types_buffer = np.empty(num_peds, dtype=int)
                 for i, data in enumerate(people_data.people):
                     self._ped_types_buffer[i] = int(data.tags[group_id_idx])
             except (ValueError, AttributeError, IndexError):
-                warn(
-                    "Pedestrian group ID not found in the data. Returning empty array."
-                )
+                warn("Pedestrian group ID not found in the data. Returning empty array.")
                 self._ped_types_buffer = np.array([])
             self._ped_ids = current_ped_ids
             self._last_num_peds = num_peds
-        return (
-            self._ped_types_buffer[:num_peds]
-            if self._ped_types_buffer is not None
-            else np.array([])
-        )
+        return self._ped_types_buffer[:num_peds] if self._ped_types_buffer is not None else np.array([])
 
 
 class PedestrianSocialStateGenerator(Generator[PedestrianSocialStates]):
@@ -870,17 +866,11 @@ class PedestrianSocialStateGenerator(Generator[PedestrianSocialStates]):
                 for i, data in enumerate(people_data.people):
                     self._ped_social_states_buffer[i] = int(data.tags[behavior_idx])
             except (ValueError, AttributeError, IndexError):
-                warn(
-                    "Pedestrian social state not found in the data. Returning empty array."
-                )
+                warn("Pedestrian social state not found in the data. Returning empty array.")
                 self._ped_social_states_buffer = np.array([])
             self._ped_ids = current_ped_ids
             self._last_num_peds = num_peds
-        return (
-            self._ped_social_states_buffer[:num_peds]
-            if self._ped_social_states_buffer is not None
-            else np.array([])
-        )
+        return self._ped_social_states_buffer[:num_peds] if self._ped_social_states_buffer is not None else np.array([])
 
 
 # =============================================================================
@@ -1067,7 +1057,7 @@ class ArenaPedestrianRelativeVelGenerator(Generator[PedestrianRelativeVelocities
         for i, p in enumerate(arena_people_data.pedestrians):
             self._vel_buffer[i, 0] = p.twist.linear.x
             self._vel_buffer[i, 1] = p.twist.linear.y
-            
+
         return get_relative_vel_to_robot(
             robot_pose=robot_pose,
             pedestrian_vel_vector=self._vel_buffer,
@@ -1111,16 +1101,12 @@ class ArenaPedestrianDistanceGenerator(Generator[PedestrianDistances]):
         Returns:
             PedestrianDistances: Dict mapping pedestrian ID to distance
         """
-        if (
-            not arena_people_data
-            or not arena_people_data.pedestrians
-            or len(arena_pedestrian_relative_locations) == 0
-        ):
+        if not arena_people_data or not arena_people_data.pedestrians or len(arena_pedestrian_relative_locations) == 0:
             return {}
 
         # Vectorized distance computation (much faster)
         distances_array = np.linalg.norm(arena_pedestrian_relative_locations, axis=1)
-        
+
         # Build result dict efficiently
         result = {}
         for i, ped in enumerate(arena_people_data.pedestrians):

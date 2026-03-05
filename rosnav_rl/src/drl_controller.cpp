@@ -124,16 +124,16 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
   cmd_vel.header.frame_id = pose.header.frame_id;
   cmd_vel.header.stamp = clock_->now();
   
-  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] computeVelocityCommands called - checking service availability");
+  RCLCPP_WARN(logger_, "[ROSNAV_CONTROLLER] computeVelocityCommands called - checking service availability");
   
   if (!client_->wait_for_service(std::chrono::seconds(1))) {
-    RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Service not available, stopping robot");
+    RCLCPP_ERROR(logger_, "[ROSNAV_CONTROLLER] Service not available after 1s wait, stopping robot. Check if action provider node is running and is using the service name '%s'!", client_->get_service_name());
     cmd_vel.twist.linear.x = 0.0;
     cmd_vel.twist.angular.z = 0.0;
     return cmd_vel;
   }
 
-  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] Service available, sending request");
+  RCLCPP_WARN(logger_, "[ROSNAV_CONTROLLER] Service available, sending request");
   auto request = std::make_shared<rosnav_rl_msgs::srv::GetCommand::Request>();
   auto future = client_->async_send_request(request);
 
@@ -143,7 +143,7 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
   while (rclcpp::ok()) {
     if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       cmd_vel.twist = future.get()->twist;
-      RCLCPP_INFO(
+      RCLCPP_WARN(
         logger_,
         "[ROSNAV_CONTROLLER] Received velocity command: linear_x=%.2f, linear_y=%.2f, angular_z=%.2f",
         cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
@@ -164,7 +164,7 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
 void DRLController::publishSubgoal()
 {
   if (global_plan_.poses.empty() || !costmap_ros_) {
-    RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] Global plan is empty or costmap_ros is null. Cannot publish subgoal.");
+    RCLCPP_WARN(logger_, "[ROSNAV_CONTROLLER] Global plan is empty or costmap_ros is null. Cannot publish subgoal.");
     return;
   }
 
@@ -180,35 +180,53 @@ void DRLController::publishSubgoal()
   double lookahead_dist = current_velocity_.linear.x * lookahead_time_;
   lookahead_dist = std::clamp(lookahead_dist, min_lookahead_dist_, max_lookahead_dist_);
 
-  // Find the point on the global plan that is 'lookahead_dist' away from the robot
-  for (const auto & plan_pose : global_plan_.poses) {
+  // Step 1: Find the closest point on the path to the robot
+  size_t closest_idx = 0;
+  double min_dist = std::numeric_limits<double>::max();
+  
+  for (size_t i = 0; i < global_plan_.poses.size(); ++i) {
     double dist = std::hypot(
-      plan_pose.pose.position.x - robot_pose.pose.position.x,
-      plan_pose.pose.position.y - robot_pose.pose.position.y);
-
-    if (dist >= lookahead_dist) {
-      geometry_msgs::msg::PoseStamped subgoal = plan_pose;
-      subgoal.header.stamp = clock_->now();
-      subgoal_pub_->publish(subgoal);
-      RCLCPP_DEBUG(
-        logger_, "[ROSNAV_CONTROLLER] Published subgoal (lookahead): x=%.2f, y=%.2f",
-        subgoal.pose.position.x, subgoal.pose.position.y);
-      return;
+      global_plan_.poses[i].pose.position.x - robot_pose.pose.position.x,
+      global_plan_.poses[i].pose.position.y - robot_pose.pose.position.y);
+    
+    if (dist < min_dist) {
+      min_dist = dist;
+      closest_idx = i;
     }
   }
 
-  // If no point is far enough, use the last point of the plan (the goal)
-  if (!global_plan_.poses.empty()) {
-    geometry_msgs::msg::PoseStamped subgoal = global_plan_.poses.back();
-    subgoal.header.stamp = clock_->now();
-    subgoal_pub_->publish(subgoal);
-    RCLCPP_DEBUG(
-      logger_, "[ROSNAV_CONTROLLER] Published subgoal (end of plan): x=%.2f, y=%.2f",
-      subgoal.pose.position.x, subgoal.pose.position.y);
-    return;
+  // Step 2: Traverse forward along the path, accumulating arc length
+  double accumulated_dist = 0.0;
+  size_t subgoal_idx = closest_idx;
+  
+  for (size_t i = closest_idx; i < global_plan_.poses.size() - 1; ++i) {
+    double segment_length = std::hypot(
+      global_plan_.poses[i + 1].pose.position.x - global_plan_.poses[i].pose.position.x,
+      global_plan_.poses[i + 1].pose.position.y - global_plan_.poses[i].pose.position.y);
+    
+    accumulated_dist += segment_length;
+    
+    if (accumulated_dist >= lookahead_dist) {
+      subgoal_idx = i + 1;
+      break;
+    }
+    subgoal_idx = i + 1;
   }
 
-  RCLCPP_DEBUG(logger_, "[ROSNAV_CONTROLLER] No valid subgoal found.");
+  // Step 3: Publish the selected subgoal
+  geometry_msgs::msg::PoseStamped subgoal = global_plan_.poses[subgoal_idx];
+  subgoal.header.stamp = clock_->now();
+  subgoal_pub_->publish(subgoal);
+  
+  if (subgoal_idx == global_plan_.poses.size() - 1) {
+    RCLCPP_DEBUG(
+      logger_, "[ROSNAV_CONTROLLER] Published subgoal (end of plan): x=%.2f, y=%.2f, arc_dist=%.2f",
+      subgoal.pose.position.x, subgoal.pose.position.y, accumulated_dist);
+  } else {
+    RCLCPP_DEBUG(
+      logger_, "[ROSNAV_CONTROLLER] Published subgoal (lookahead): x=%.2f, y=%.2f, arc_dist=%.2f (target: %.2f)",
+      subgoal.pose.position.x, subgoal.pose.position.y, accumulated_dist, lookahead_dist);
+  }
 }
 
 void DRLController::setPlan(const nav_msgs::msg::Path & path)
