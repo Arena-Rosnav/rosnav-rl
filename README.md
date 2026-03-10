@@ -27,7 +27,7 @@
     <a href="https://stable-baselines3.readthedocs.io/en/master/">
     <img src="https://img.shields.io/badge/Stable--Baselines3-blue" alt="Stable-Baselines3">
     </a>
-    <a href="https://github.com/danijar/dreamerv3">
+    <a href="https://github.com/NM512/dreamerv3-torch">
     <img src="https://img.shields.io/badge/DreamerV3-blue.svg" alt="DreamerV3">
     </a>
 </p>
