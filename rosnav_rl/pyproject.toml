@@ -1,40 +1,45 @@
-[tool.poetry]
+[project]
 name = "rosnav-rl"
 version = "0.1.0"
 description = "Python Framework for Reinforcement Learning in Robotic Navigation based on ROS"
-authors = ["tuananhroman <anh.maxiking@hotmail.de>"]
+authors = [{ name = "tuananhroman", email = "anh.maxiking@hotmail.de" }]
 readme = "README.md"
-[tool.poetry.dependencies]
-python = "^3.8"
-docutils = "0.20"
-torch = "^2.0.0"
-wandb = "^0.13.9"
-tensorboard = "^2.12.2"
-torchdiffeq = "^0.2.3"
-diffcp = "^1.0.21"
-mpi4py = "^3.1.4"
-gputil = "^1.4.0"
-tensorboardx = "^2.6"
-opencv-python-headless = "^4.8"
-sb3-contrib = "^2.1.0"
-shimmy = "^1.3.0"
-pygments = "^2.18.0"
-stable-baselines3 = "^2.1.0"
-gymnasium = "^1.0.0"
-ruamel-yaml = "^0.17"
-pydantic = "^2.10.6"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "docutils==0.20",
+    "torch>=2.0.0",
+    "wandb>=0.13.9",
+    "tensorboard>=2.12.2",
+    "torchdiffeq>=0.2.3",
+    "diffcp>=1.0.21",
+    "mpi4py>=3.1.4",
+    "gputil>=1.4.0",
+    "tensorboardx>=2.6",
+    "opencv-python-headless>=4.8",
+    "sb3-contrib>=2.1.0",
+    "shimmy>=1.3.0",
+    "pygments>=2.18.0",
+    "stable-baselines3>=2.1.0",
+    "gymnasium>=1.0.0",
+    "ruamel-yaml>=0.17",
+    "pydantic>=2.10.6",
+]
 
-[tool.colcon-poetry-ros]
-package-mode = true  # Critical for ROS integration
-
-[tool.poetry.group.dev.dependencies]
-matplotlib = "^3.0.0"
-einops = "^0.3.0"
-pyinstrument = "^5.0.3"
+[dependency-groups]
+dev = [
+    "matplotlib>=3.0.0",
+    "einops>=0.3.0",
+    "pyinstrument>=5.0.3",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+# Enable uv to treat this directory as an installable package
+package = true
 
 [tool.ruff]
 line-length = 120
