@@ -13,8 +13,8 @@
   <a href="https://docs.ros.org/en/humble/index.html">
     <img src="https://img.shields.io/badge/ROS-Humble-blue" alt="ROS Humble">
   </a>
-  <a href="https://www.python.org/downloads/release/python-380/">
-    <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python 3.8+">
+  <a href="https://www.python.org/downloads/release/python-3100/">
+    <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python 3.10+">
   </a>
   <a href="https://pytorch.org/">
     <img src="https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=flat&logo=PyTorch&logoColor=white" alt="PyTorch">
@@ -48,11 +48,13 @@ Forget being locked into a single RL library. Rosnav-RL's core strength is its p
 
 ### ✨ Key Features
 
-*   **Experiment with Multiple RL Frameworks**: Don't get locked in. Our framework-agnostic design lets you leverage the best of different libraries like Stable-Baselines3 and DreamerV3 in the same project.
-*   **Build Custom Agents in Minutes**: A deeply modular architecture with plug-and-play components for rewards, observations, and network layers means you can prototype new agent designs rapidly.
-*   **Standardize Your Experiments**: Tame the complexity of multiple robot setups and tasks with a unified system for managing observation and action spaces.
-*   **Configure with Confidence**: Pydantic-based configuration provides type-safety, auto-validation, and self-documenting schemas, eliminating frustrating runtime errors.
-*   **Deploy Seamlessly in ROS 2**: Move from training to deployment effortlessly. A built-in ROS action server ensures your agent integrates perfectly into your robotics ecosystem.
+*   **9 Algorithms Out of the Box**: PPO, A2C, TRPO, RecurrentPPO, SAC, TD3, DDPG, TQC, CrossQ. Add a new one with a single config file.
+*   **Framework-Agnostic**: Common `RL_Model` interface — swap SB3 ↔ DreamerV3 without touching training code.
+*   **Composable Observation Spaces**: Mix laser, goal, velocity, and custom spaces via a registry. Parallel encoding, auto-normalization.
+*   **Modular Reward System**: Stack reward units declaratively in YAML. Parallel evaluation, safety categorization.
+*   **YAML-Driven Observation Pipeline**: Collectors → Generators with automatic dependency resolution via topological sort.
+*   **Type-Safe Configuration**: Pydantic v2 with discriminated unions, auto-validation, full YAML round-trip.
+*   **One-Command Deployment**: `ros2 run rosnav_rl action_server.py` wraps any trained agent in a `GetCommand` service.
 
 ---
 
@@ -65,7 +67,11 @@ This repository contains the following packages:
 | **`rosnav_rl`** | The core package containing the reinforcement learning framework, agent definitions, and training pipelines. |
 | **`rosnav_rl_msgs`** | Contains the ROS message and service definitions used by `rosnav_rl` for communication. |
 
-For a deep dive into the architecture and development workflow, please refer to the **[RosNav-RL Developer Guide](rosnav_rl/README.md)**.
+| Document | Description |
+| --- | --- |
+| **[README](rosnav_rl/README.md)** | Package overview, quick start, architecture at a glance |
+| **[Developer Guide](rosnav_rl/GUIDE.md)** | Full architecture deep-dive, design patterns, code organization, core concepts |
+| **[Tutorials](rosnav_rl/TUTORIALS.md)** | Step-by-step guides: training, deploying, adding algorithms, spaces, rewards |
 
 ---
 
@@ -74,7 +80,7 @@ For a deep dive into the architecture and development workflow, please refer to 
 ### Prerequisites
 
 *   ROS 2 Humble installation
-*   Python 3.8+
+*   Python 3.10+
 *   Poetry
 
 ### 🛠️ Installation
