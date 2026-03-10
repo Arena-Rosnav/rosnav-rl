@@ -1,54 +1,40 @@
-from typing import List, Type, Union, Literal, Dict
+from typing import Dict, List, Literal, Type, Union
 
-from sb3_contrib import RecurrentPPO
-from stable_baselines3 import PPO
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from sb3_contrib import CrossQ, RecurrentPPO, TQC, TRPO
+from stable_baselines3 import A2C, DDPG, PPO, SAC, TD3
 from stable_baselines3.common.base_class import BaseAlgorithm
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
 POLICY_TYPE: Dict[
-    BaseAlgorithm, Literal["MultiInputPolicy", "MultiInputLstmPolicy"]
+    Type[BaseAlgorithm], Literal["MultiInputPolicy", "MultiInputLstmPolicy"]
 ] = {
+    # On-policy
     PPO: "MultiInputPolicy",
+    A2C: "MultiInputPolicy",
+    TRPO: "MultiInputPolicy",
     RecurrentPPO: "MultiInputLstmPolicy",
+    # Off-policy
+    SAC: "MultiInputPolicy",
+    TD3: "MultiInputPolicy",
+    DDPG: "MultiInputPolicy",
+    TQC: "MultiInputPolicy",
+    CrossQ: "MultiInputPolicy",
 }
 
-# Parsed as ppo_kwargs to sb3 ppo class
+# Parsed as policy_kwargs to the SB3 algorithm class.
+# Keys present in this dict are extracted from StableBaselinesPolicyDescription
+# instances and forwarded to the SB3 Policy constructor.
 BASE_AGENT_ATTR = {
+    # Common policy kwargs
     "features_extractor_class": Union[Type[BaseFeaturesExtractor], None],
     "features_extractor_kwargs": Union[dict, None],
     "net_arch": Union[List[Union[int, dict]], None],
     "activation_fn": Union[Type[Module], None],
-    # LSTM
-    # Number of LSTM layers
+    # LSTM-specific (RecurrentPPO only — silently ignored for non-recurrent algos)
     "n_lstm_layers": int,
-    # Number of hidden units for each LSTM layer
     "lstm_hidden_size": int,
-    #  Whether the LSTM is shared between the actor and the critic
-    # (in that case, only the actor gradient is used)
-    # By default, the actor and the critic have two separate LSTM.
     "shared_lstm": bool,
-    # Use a seperate LSTM for the critic
     "enable_critic_lstm": bool,
     "lstm_kwargs": Union[dict, None],
 }
-
-"""
-n_lstm_layers: 
-This parameter determines the number of LSTM layers in the model. Each LSTM layer processes the input sequence and generates a hidden state 
-that is passed to the next layer. Increasing the number of LSTM layers can help the model learn more complex patterns in the input sequence, 
-but it can also increase the risk of overfitting.
-
-lstm_hidden_size: 
-This parameter determines the number of hidden units for each LSTM layer. Increasing this parameter can help the model learn more complex patterns 
-in the input sequence, but it can also increase the risk of overfitting.
-
-shared_lstm: 
-This parameter determines whether the LSTM is shared between the actor and the critic. If this parameter is set to True, 
-then only the actor gradient is used. By default, the actor and the critic have two separate LSTMs.
-
-enable_critic_lstm: 
-This parameter determines whether a separate LSTM is used for the critic. 
-If this parameter is set to True, then a separate LSTM is used for the critic. This can help improve performance by allowing the critic to learn a 
-separate representation of the input sequence.
-"""

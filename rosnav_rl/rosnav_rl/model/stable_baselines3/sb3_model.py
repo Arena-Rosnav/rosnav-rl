@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 import gymnasium as gym
 import numpy as np
 import torch as th
-from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import (
     VecEnv,
@@ -218,6 +217,19 @@ class StableBaselinesModel(RL_Model):
         """
         super().__init__(rl_agent, algorithm_cfg)
         self.__setup_agent_factory_and_policy_description()
+
+    @classmethod
+    def from_framework_cfg(cls, rl_agent, framework_cfg, *args, **kwargs):
+        """Create a :class:`StableBaselinesModel` from a framework config.
+
+        Extracts the ``algorithm`` sub-config from the SB3 framework envelope.
+        """
+        return cls(
+            rl_agent=rl_agent,
+            algorithm_cfg=framework_cfg.algorithm,
+            *args,
+            **kwargs,
+        )
 
     def __setup_agent_factory_and_policy_description(self):
         """
@@ -475,14 +487,25 @@ class StableBaselinesModel(RL_Model):
         Returns:
             Dict[str, Any]: A dictionary containing the arguments for the SB3 algorithm.
         """
-        check_batch_size(
-            n_envs=env.num_envs,
-            batch_size=parameters.total_batch_size,
-            mn_batch_size=parameters.batch_size,
-        )
+        from rosnav_rl.model.stable_baselines3.cfg.base import OnPolicyParameters
 
-        parameters.n_steps = parameters.total_batch_size // env.num_envs
         parameters.learning_rate = load_lr_schedule(parameters.learning_rate)
+
+        # On-policy algorithms derive n_steps from total_batch_size
+        dump_exclude = {
+            "tensorboard_log",
+            "total_timesteps",
+            "show_progress_bar",
+        }
+
+        if isinstance(parameters, OnPolicyParameters):
+            check_batch_size(
+                n_envs=env.num_envs,
+                batch_size=parameters.total_batch_size,
+                mn_batch_size=parameters.batch_size,
+            )
+            parameters.n_steps = parameters.total_batch_size // env.num_envs
+            dump_exclude.add("total_batch_size")
 
         return {
             "env": env,
@@ -490,14 +513,7 @@ class StableBaselinesModel(RL_Model):
             "policy_kwargs": self._policy_description.get_kwargs(),
             "tensorboard_log": tensorboard_log_path or parameters.tensorboard_log,
             "device": DEVICE_CPU if no_gpu else DEVICE_AUTO,
-            **parameters.model_dump(
-                exclude=[
-                    "total_batch_size",
-                    "tensorboard_log",
-                    "total_timesteps",
-                    "show_progress_bar",
-                ]
-            ),
+            **parameters.model_dump(exclude=dump_exclude),
         }
 
     def _initialize_model(self, algorithm_parameters: Dict[str, Any]) -> None:
@@ -539,6 +555,19 @@ class StableBaselinesModel(RL_Model):
             path, env=env, custom_objects=algorithm_args
         )
 
+    @property
+    def _is_recurrent(self) -> bool:
+        """Check whether the current model uses a recurrent policy.
+
+        The check is structural (``lstm_actor`` attribute on the policy)
+        rather than based on ``isinstance`` so it remains valid for any
+        future recurrent algorithm without code changes.
+        """
+        return (
+            self._model is not None
+            and hasattr(self._model.policy, "lstm_actor")
+        )
+
     def _predict(
         self,
         observation: Union[np.ndarray, Dict[str, np.ndarray]],
@@ -546,19 +575,21 @@ class StableBaselinesModel(RL_Model):
         episode_start: Optional[np.ndarray] = None,
         deterministic: bool = True,
     ):
-        """
-        Predict the action to take given an observation.
+        """Predict the action to take given an observation.
+
+        Dispatches to the recurrent or non-recurrent prediction path based
+        on whether the loaded policy carries LSTM layers.
 
         Args:
-            observation (Union[np.ndarray, Dict[str, np.ndarray]]): The observation input to the model.
-            state (Optional[Tuple[np.ndarray, ...]], optional): The state of the model if using a recurrent policy. Defaults to None.
-            episode_start (Optional[np.ndarray], optional): Indicator if the episode is starting. Defaults to None.
-            deterministic (bool, optional): Whether to use a deterministic policy. Defaults to True.
+            observation: The observation input to the model.
+            state: Hidden state for recurrent policies.
+            episode_start: Boolean indicator for the start of an episode.
+            deterministic: Use the mean action (greedy) instead of sampling.
 
         Returns:
-            The predicted action and the next state if using a recurrent policy.
+            Tuple of ``(action, next_state)``.
         """
-        if isinstance(self.model, RecurrentPPO):
+        if self._is_recurrent:
             return self._predict_recurrent(
                 observation, state, episode_start, deterministic
             )
@@ -573,23 +604,17 @@ class StableBaselinesModel(RL_Model):
         episode_start: Optional[np.ndarray] = None,
         deterministic: Optional[bool] = True,
     ):
-        """
-        Predict the next action using a recurrent policy.
+        """Predict the next action using a recurrent policy.
 
         Args:
-            observation (np.ndarray): The current observation.
-            state (Tuple[np.ndarray, ...]): The current state of the recurrent policy.
-            episode_start (Optional[np.ndarray], optional): Indicator for the start of an episode. Defaults to None.
-            deterministic (Optional[bool], optional): Whether to use deterministic or stochastic actions. Defaults to True.
+            observation: The current observation.
+            state: The current hidden state of the recurrent policy.
+            episode_start: Indicator for the start of an episode.
+            deterministic: Use the mean action instead of sampling.
 
         Returns:
-            Tuple[np.ndarray, Tuple[np.ndarray, ...]]: The predicted action and the next state.
-
-        Raises:
-            ValueError: If the model is not an instance of RecurrentPPO.
+            ``(action, next_state)`` tuple.
         """
-        if not isinstance(self.model, RecurrentPPO):
-            raise ValueError("Model is not a RecurrentPPO instance.")
         return self.model.policy.predict(
             observation, state, episode_start, deterministic
         )

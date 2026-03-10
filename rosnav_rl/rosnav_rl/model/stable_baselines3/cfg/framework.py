@@ -3,25 +3,40 @@ from typing import Literal, Union
 from rosnav_rl.cfg.framework import FrameworkCfg
 from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
 
+from .a2c import A2C_Cfg
 from .base import SBAlgorithmCfg
+from .crossq import CrossQ_Cfg
 from .ppo import PPO_Cfg
+from .sac import SAC_Cfg
+from .td3 import TD3_Cfg
+from .tqc import TQC_Cfg
+from .trpo import TRPO_Cfg
 
 
 class StableBaselinesCfg(FrameworkCfg):
-    """
-    Configuration class for the Stable Baselines 3 framework.
+    """Configuration for the Stable Baselines 3 framework.
 
-    This class extends FrameworkCfg to provide specific configuration options
-    for the Stable Baselines 3 reinforcement learning framework.
+    ``algorithm`` accepts any of the supported algorithm-specific config
+    classes.  When parsing from a plain dict the correct sub-class is
+    selected automatically because each ``parameters`` model carries an
+    ``algorithm_name`` class variable that acts as a discriminator.
 
     Attributes:
-        __name__ (Literal[SupportedRLFrameworks.STABLE_BASELINES3]): The name of the framework,
-                 fixed to SupportedRLFrameworks.STABLE_BASELINES3.
-        algorithm (Union[SBAlgorithmCfg, PPO_Cfg]): The reinforcement learning algorithm to use.
-                 Can be either a general SB algorithm configuration or specifically a PPO configuration.
+        name: Framework identifier (always ``stable_baselines3``).
+        algorithm: Algorithm envelope containing architecture name,
+            checkpoint info, and algorithm-specific hyper-parameters.
     """
 
     name: Literal[SupportedRLFrameworks.STABLE_BASELINES3] = (
         SupportedRLFrameworks.STABLE_BASELINES3
     )
-    algorithm: Union[SBAlgorithmCfg, PPO_Cfg]
+    algorithm: Union[
+        PPO_Cfg,
+        A2C_Cfg,
+        TRPO_Cfg,
+        SAC_Cfg,
+        TD3_Cfg,
+        TQC_Cfg,
+        CrossQ_Cfg,
+        SBAlgorithmCfg,
+    ]
