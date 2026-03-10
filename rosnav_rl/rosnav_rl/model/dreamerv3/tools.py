@@ -17,7 +17,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.tensorboard import SummaryWriter
 
-to_np = lambda x: x.detach().cpu().numpy()
+to_np = lambda x: x.detach().cpu().float().numpy()
 
 
 def symlog(x):
@@ -127,7 +127,35 @@ class Logger:
         scalars = list(self._scalars.items())
         if fps:
             scalars.append(("fps", self._compute_fps(step)))
-        print(f"[{step}]", " / ".join(f"{k} {v:.1f}" for k, v in scalars))
+        # Pretty-print: group metrics by category, one group per line
+        _GROUPS = [
+            ("Episode ", lambda k: k in ("dataset_size", "train_return", "train_length",
+                                         "train_episodes", "eval_return", "eval_length",
+                                         "eval_episodes", "fps", "update_count")),
+            ("World   ", lambda k: k in ("model_loss", "model_grad_norm", "kl", "kl_free",
+                                         "dyn_loss", "rep_loss", "dyn_scale", "rep_scale",
+                                         "prior_ent", "post_ent")),
+            ("Heads   ", lambda k: k.endswith("_loss") and k not in ("model_loss",
+                                         "actor_loss", "value_loss", "dyn_loss", "rep_loss")),
+            ("Actor   ", lambda k: k.startswith("actor") or k.startswith("imag")
+                                   or k.startswith("normed") or k.startswith("EMA")
+                                   or k in ("value_mean", "value_std", "value_min", "value_max",
+                                            "target_mean", "target_std", "target_min", "target_max")),
+            ("Critic  ", lambda k: k.startswith("value_loss") or k == "value_grad_norm"),
+        ]
+        used = set()
+        lines = []
+        for label, matcher in _GROUPS:
+            items = [(k, v) for k, v in scalars if matcher(k) and k not in used]
+            if items:
+                used.update(k for k, _ in items)
+                lines.append(f"  {label}| " + "  ".join(f"{k} {v:.3g}" for k, v in items))
+        # Any remaining metrics go in a catch-all line
+        rest = [(k, v) for k, v in scalars if k not in used]
+        if rest:
+            lines.append("  Other   | " + "  ".join(f"{k} {v:.3g}" for k, v in rest))
+        print(f"[{step}]")
+        print("\n".join(lines))
         with (self._logdir / "metrics.jsonl").open("a") as f:
             f.write(json.dumps({"step": step, **dict(scalars)}) + "\n")
         for name, value in scalars:
@@ -206,7 +234,6 @@ def simulate(
         state (tuple, optional): Previous simulation state (step, episode, done, length, obs, agent_state, reward).
             Defaults to None.
         no_image_key (bool, optional): Whether to ignore image logging. Defaults to False.
-
     Returns:
         tuple: A 7-element tuple containing:
             - remaining_steps (int): Steps left to simulate
@@ -226,7 +253,13 @@ def simulate(
         results = [r() for r in results]
     
     first_iter = True
-    
+    # Resolve pause callable once — Parallel.__getattr__ re-raises remote
+    # AttributeError as a plain Exception, so getattr(..., None) is not enough.
+    try:
+        _pause = envs[0].pause
+    except Exception:
+        _pause = None
+
     # initialize or unpack simulation state
     if state is None:
         step, episode = 0, 0
@@ -258,7 +291,11 @@ def simulate(
                 obs[index] = result
         # step agents
         obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
+        if _pause is not None:
+            _pause(True)
         action, agent_state = agent(obs, done, agent_state)
+        if _pause is not None:
+            _pause(False)
         if isinstance(action, dict):
             action = [
                 {k: np.array(action[k][i].detach().cpu()) for k in action}
@@ -293,29 +330,31 @@ def simulate(
 
         if done.any():
             indices = [index for index, d in enumerate(done) if d]
-            # logging for done episode
-            for i in indices:
-                save_episodes(directory, {envs[i].id: cache[envs[i].id]})
-                length = len(cache[envs[i].id]["reward"]) - 1
-                score = float(np.array(cache[envs[i].id]["reward"]).sum())
+            # Snapshot ids NOW so they don't change if a reset is triggered later
+            done_ids = [envs[i].id for i in indices]
+            # Save all done episodes BEFORE erasing any of them from cache.
+            # Calling erase_over_episodes inside the loop can delete a later
+            # done-env's episode before it is saved, causing a KeyError.
+            for i, eid in zip(indices, done_ids):
+                save_episodes(directory, {eid: cache[eid]})
+
+            for i, eid in zip(indices, done_ids):
+                length = len(cache[eid]["reward"]) - 1
+                score = float(np.array(cache[eid]["reward"]).sum())
                 if not no_image_key:
-                    video = cache[envs[i].id]["image"]
+                    video = cache[eid]["image"]
                 # record logs given from environments
-                for key in list(cache[envs[i].id].keys()):
+                for key in list(cache[eid].keys()):
                     if "log_" in key:
                         logger.scalar(
-                            key, float(np.array(cache[envs[i].id][key]).sum())
+                            key, float(np.array(cache[eid][key]).sum())
                         )
                         # log items won't be used later
-                        cache[envs[i].id].pop(key)
+                        cache[eid].pop(key)
 
                 if not is_eval:
-                    step_in_dataset = erase_over_episodes(cache, limit)
-                    logger.scalar(f"dataset_size", step_in_dataset)
                     logger.scalar(f"train_return", score)
                     logger.scalar(f"train_length", length)
-                    logger.scalar(f"train_episodes", len(cache))
-                    logger.write(step=logger.step)
                 else:
                     if not "eval_lengths" in locals():
                         eval_lengths = []
@@ -336,6 +375,13 @@ def simulate(
                         logger.scalar(f"eval_episodes", len(eval_scores))
                         logger.write(step=logger.step)
                         eval_done = True
+
+            if not is_eval:
+                # Erase once after all done episodes are saved
+                step_in_dataset = erase_over_episodes(cache, limit)
+                logger.scalar(f"dataset_size", step_in_dataset)
+                logger.scalar(f"train_episodes", len(cache))
+                logger.write(step=logger.step)
     if is_eval:
         # keep only last item for saving memory. this cache is used for video_pred later
         while len(cache) > 1:

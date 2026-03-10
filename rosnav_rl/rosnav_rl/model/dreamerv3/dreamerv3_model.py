@@ -86,6 +86,8 @@ class DreamerV3Model(RL_Model):
         """
         super().__init__(rl_agent, algorithm_cfg, *args, **kwargs)
 
+        if algorithm_cfg.general.logdir is None:
+            algorithm_cfg.general.logdir = Path.cwd() / "agents"
         algorithm_cfg.general.logdir = (
             Path(algorithm_cfg.general.logdir) / rl_agent.name
         )
@@ -123,6 +125,7 @@ class DreamerV3Model(RL_Model):
         train_envs: DreamerEnvWrapper,
         eval_envs: DreamerEnvWrapper,
         *args,
+        after_eval_fn=None,
         **kwargs,
     ):
         """
@@ -191,6 +194,7 @@ class DreamerV3Model(RL_Model):
             is_image_available=observation_space.get("image", None) is not None,
             state=state,
             log_wandb=True,
+            after_eval_fn=after_eval_fn,
         )
 
     def save(self, file_name: str, *args, **kwargs):
