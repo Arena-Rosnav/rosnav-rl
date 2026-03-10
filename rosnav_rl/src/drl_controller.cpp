@@ -128,8 +128,7 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
 
   if (!client_->wait_for_service(std::chrono::seconds(1))) {
     RCLCPP_ERROR_THROTTLE(logger_, *clock_, 5000,
-      "[ROSNAV_CONTROLLER] Service '%s' not available after 1 s — stopping robot. "
-      "Is the action-server node running with the correct service name?",
+      "[ROSNAV_CONTROLLER] Service '%s' not available after 1 s - stopping robot. ",
       client_->get_service_name());
     cmd_vel.twist.linear.x = 0.0;
     cmd_vel.twist.angular.z = 0.0;
