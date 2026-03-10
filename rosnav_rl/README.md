@@ -36,8 +36,8 @@
 cd ~/colcon_ws/src
 git clone https://github.com/Arena-Rosnav/rosnav-rl.git
 
-# 2. Install Python dependencies
-cd rosnav-rl/rosnav_rl && poetry install
+# 2. Install Python dependencies (uv creates the venv and installs everything)
+cd rosnav-rl/rosnav_rl && uv sync
 
 # 3. Build
 cd ~/colcon_ws

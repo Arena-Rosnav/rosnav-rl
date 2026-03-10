@@ -123,7 +123,7 @@ The core principle is **modularity and separation of concerns**:
 
 - ROS 2 Humble
 - Python 3.10+
-- Poetry
+- [uv](https://docs.astral.sh/uv/) (`pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
 ### Installation
 
@@ -132,9 +132,9 @@ The core principle is **modularity and separation of concerns**:
 cd ~/colcon_ws/src
 git clone https://github.com/Arena-Rosnav/rosnav-rl.git
 
-# Python dependencies
+# Python dependencies (uv creates a .venv and installs all deps)
 cd rosnav-rl/rosnav_rl
-poetry install
+uv sync
 
 # Build ROS packages
 cd ~/colcon_ws

@@ -81,7 +81,7 @@ This repository contains the following packages:
 
 *   ROS 2 Humble installation
 *   Python 3.10+
-*   Poetry
+*   [uv](https://docs.astral.sh/uv/) (`pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
 ### 🛠️ Installation
 
@@ -92,12 +92,15 @@ This repository contains the following packages:
     git clone https://github.com/Arena-Rosnav/rosnav-rl.git
     ```
 
-2.  **Install dependencies using Poetry:**
+2.  **Install dependencies using uv:**
 
-    Navigate to the `rosnav_rl` package directory and run `poetry install`. This will install the necessary Python packages in a virtual environment.
+    Navigate to the `rosnav_rl` package directory and run `uv sync`. uv will create a
+    `.venv` virtual environment and install all required packages automatically.
     ```bash
     cd rosnav-rl/rosnav_rl
-    poetry install
+    uv sync
+    # activate the venv (or prefix commands with `uv run`)
+    source .venv/bin/activate
     ```
 
 3.  **Build your workspace:**
