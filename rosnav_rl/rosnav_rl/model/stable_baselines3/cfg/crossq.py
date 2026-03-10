@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from sb3_contrib.crossq import CrossQ
 
@@ -40,7 +40,9 @@ class CrossQ_Cfg(SBAlgorithmCfg):
     """Top-level CrossQ configuration (architecture + hyper-parameters).
 
     Attributes:
+        type: Discriminator tag, always ``"CrossQ"``.
         parameters: CrossQ-specific algorithm parameters.
     """
 
+    type: Literal["CrossQ"] = "CrossQ"
     parameters: CrossQ_Algorithm_Cfg

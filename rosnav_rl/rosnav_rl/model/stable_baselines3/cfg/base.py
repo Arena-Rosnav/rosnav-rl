@@ -1,4 +1,4 @@
-from typing import ClassVar, Optional, Union
+from typing import ClassVar, Literal, Optional, Union
 
 from abc import ABC
 
@@ -137,6 +137,12 @@ class SBAlgorithmCfg(BaseModel):
     """Top-level configuration envelope for any SB3 algorithm.
 
     Attributes:
+        type: Discriminator tag used by Pydantic's tagged union in
+            :class:`StableBaselinesCfg`.  Concrete subclasses override this
+            with a ``Literal["PPO"]`` / ``Literal["SAC"]`` etc. value so that
+            the correct sub-class is selected automatically when parsing from a
+            plain dict (e.g. from a YAML config file).  The generic fallback is
+            ``"generic"``; prefer using a specific typed sub-class instead.
         architecture_name: Registry key for the neural-network architecture /
             policy description (see :class:`AgentFactory`).
         checkpoint: Checkpoint file to load (without extension).
@@ -147,6 +153,7 @@ class SBAlgorithmCfg(BaseModel):
         callbacks: Training callback configuration.
     """
 
+    type: Literal["generic"] = "generic"
     architecture_name: str
     checkpoint: Optional[str] = "last_model"
     transfer_weights: Optional[TransferWeightsCfg] = None

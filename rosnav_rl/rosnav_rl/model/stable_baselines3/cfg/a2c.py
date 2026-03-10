@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from stable_baselines3.a2c import A2C
 
@@ -32,7 +32,9 @@ class A2C_Cfg(SBAlgorithmCfg):
     """Top-level A2C configuration (architecture + hyper-parameters).
 
     Attributes:
+        type: Discriminator tag, always ``"A2C"``.
         parameters: A2C-specific algorithm parameters.
     """
 
+    type: Literal["A2C"] = "A2C"
     parameters: A2C_Algorithm_Cfg

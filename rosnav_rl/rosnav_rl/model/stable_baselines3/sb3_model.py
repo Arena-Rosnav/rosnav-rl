@@ -478,6 +478,14 @@ class StableBaselinesModel(RL_Model):
         """
         Set up the arguments required for initializing the Stable Baselines 3 algorithm.
 
+        Parameters from the config are filtered against the algorithm class's
+        ``__init__`` signature so that fields which exist in the broad Pydantic
+        base classes but are not accepted by a specific algorithm (e.g.
+        ``batch_size`` for A2C, ``use_sde`` for TD3) are silently dropped.
+        Fields whose value is ``None`` are also excluded so that SB3's own
+        defaults are used instead of an explicit ``None`` override (e.g.
+        ``n_steps=None`` for off-policy algorithms).
+
         Args:
             parameters (sb3_cfg.SBAlgorithmParameters): The parameters for the SB3 algorithm.
             env (Union[VecEnv, gym.Env]): The environment in which the algorithm will be trained.
@@ -487,6 +495,8 @@ class StableBaselinesModel(RL_Model):
         Returns:
             Dict[str, Any]: A dictionary containing the arguments for the SB3 algorithm.
         """
+        import inspect
+
         from rosnav_rl.model.stable_baselines3.cfg.base import OnPolicyParameters
 
         parameters.learning_rate = load_lr_schedule(parameters.learning_rate)
@@ -507,14 +517,32 @@ class StableBaselinesModel(RL_Model):
             parameters.n_steps = parameters.total_batch_size // env.num_envs
             dump_exclude.add("total_batch_size")
 
-        return {
+        # Determine which kwargs the algorithm constructor actually accepts so
+        # we never pass an unsupported parameter (e.g. `batch_size` to A2C or
+        # `use_sde` to TD3).
+        algo_cls = self._policy_description.algorithm_class
+        algo_init_params = set(inspect.signature(algo_cls.__init__).parameters) - {"self"}
+
+        # Always include these non-config kwargs that come from other sources.
+        base_kwargs = {
             "env": env,
-            "policy": POLICY_TYPE[self._policy_description.algorithm_class],
+            "policy": POLICY_TYPE[algo_cls],
             "policy_kwargs": self._policy_description.get_kwargs(),
             "tensorboard_log": tensorboard_log_path or parameters.tensorboard_log,
             "device": DEVICE_CPU if no_gpu else DEVICE_AUTO,
-            **parameters.model_dump(exclude=dump_exclude),
         }
+
+        # Dump config parameters, then filter to valid constructor kwargs and
+        # drop any None values (so SB3 defaults are used for omitted params).
+        config_dump = parameters.model_dump(exclude=dump_exclude)
+        filtered_config = {
+            k: v
+            for k, v in config_dump.items()
+            if k in algo_init_params and v is not None
+        }
+
+        return {**base_kwargs, **filtered_config}
+
 
     def _initialize_model(self, algorithm_parameters: Dict[str, Any]) -> None:
         """

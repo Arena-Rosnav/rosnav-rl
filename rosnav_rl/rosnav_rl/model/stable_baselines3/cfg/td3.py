@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from stable_baselines3.td3 import TD3
 
@@ -39,7 +39,9 @@ class TD3_Cfg(SBAlgorithmCfg):
     """Top-level TD3 configuration (architecture + hyper-parameters).
 
     Attributes:
+        type: Discriminator tag, always ``"TD3"``.
         parameters: TD3-specific algorithm parameters.
     """
 
+    type: Literal["TD3"] = "TD3"
     parameters: TD3_Algorithm_Cfg

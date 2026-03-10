@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from stable_baselines3.ppo import PPO
 
@@ -28,7 +28,9 @@ class PPO_Cfg(SBAlgorithmCfg):
     """Top-level PPO configuration (architecture + hyper-parameters).
 
     Attributes:
+        type: Discriminator tag, always ``"PPO"``.
         parameters: PPO-specific algorithm parameters.
     """
 
+    type: Literal["PPO"] = "PPO"
     parameters: PPO_Algorithm_Cfg

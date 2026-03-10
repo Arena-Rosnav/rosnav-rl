@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from sb3_contrib.tqc import TQC
 
@@ -42,7 +42,9 @@ class TQC_Cfg(SBAlgorithmCfg):
     """Top-level TQC configuration (architecture + hyper-parameters).
 
     Attributes:
+        type: Discriminator tag, always ``"TQC"``.
         parameters: TQC-specific algorithm parameters.
     """
 
+    type: Literal["TQC"] = "TQC"
     parameters: TQC_Algorithm_Cfg

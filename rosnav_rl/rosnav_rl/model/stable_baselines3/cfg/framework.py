@@ -1,5 +1,8 @@
 from typing import Literal, Union
 
+from pydantic import Field
+from typing_extensions import Annotated
+
 from rosnav_rl.cfg.framework import FrameworkCfg
 from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
 
@@ -30,13 +33,16 @@ class StableBaselinesCfg(FrameworkCfg):
     name: Literal[SupportedRLFrameworks.STABLE_BASELINES3] = (
         SupportedRLFrameworks.STABLE_BASELINES3
     )
-    algorithm: Union[
-        PPO_Cfg,
-        A2C_Cfg,
-        TRPO_Cfg,
-        SAC_Cfg,
-        TD3_Cfg,
-        TQC_Cfg,
-        CrossQ_Cfg,
-        SBAlgorithmCfg,
+    algorithm: Annotated[
+        Union[
+            PPO_Cfg,
+            A2C_Cfg,
+            TRPO_Cfg,
+            SAC_Cfg,
+            TD3_Cfg,
+            TQC_Cfg,
+            CrossQ_Cfg,
+            SBAlgorithmCfg,
+        ],
+        Field(discriminator="type"),
     ]

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from sb3_contrib.trpo import TRPO
 
@@ -42,7 +42,9 @@ class TRPO_Cfg(SBAlgorithmCfg):
     """Top-level TRPO configuration (architecture + hyper-parameters).
 
     Attributes:
+        type: Discriminator tag, always ``"TRPO"``.
         parameters: TRPO-specific algorithm parameters.
     """
 
+    type: Literal["TRPO"] = "TRPO"
     parameters: TRPO_Algorithm_Cfg

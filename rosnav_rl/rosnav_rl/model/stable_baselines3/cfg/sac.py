@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from stable_baselines3.sac import SAC
 
@@ -40,7 +40,9 @@ class SAC_Cfg(SBAlgorithmCfg):
     """Top-level SAC configuration (architecture + hyper-parameters).
 
     Attributes:
+        type: Discriminator tag, always ``"SAC"``.
         parameters: SAC-specific algorithm parameters.
     """
 
+    type: Literal["SAC"] = "SAC"
     parameters: SAC_Algorithm_Cfg
