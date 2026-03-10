@@ -8,7 +8,7 @@ from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
 )
 
 
-@SpaceFactory.register("is_first", SpaceCategory.META)
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.META)
 class IsFirstStepSpace(BaseObservationSpace):
     """Original observation space indicating if this is the first step of an episode.
 
