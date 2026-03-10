@@ -93,7 +93,7 @@ class RewardGoalReached(RewardUnit):
                 f"Negative rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,
@@ -175,7 +175,7 @@ class RewardSafeDistance(RewardUnit):
                 f"Positive rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,
@@ -256,7 +256,7 @@ class RewardFactoredSafeDistance(RewardUnit):
                 f"Positive factor may lead to unfavorable behaviors. "
                 f"Current value: {self._factor}"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,
@@ -360,7 +360,7 @@ class RewardNoMovement(RewardUnit):
                 f"Positive rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,
@@ -458,7 +458,7 @@ class RewardApproachGoal(RewardUnit):
                 f"Current values: [pos_factor={self._pos_factor}], "
                 f"[neg_factor={self._neg_factor}]"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
         if self._pos_factor >= self._neg_factor:
             warn_msg = (
                 "'pos_factor' should be smaller than 'neg_factor' otherwise "
@@ -466,7 +466,7 @@ class RewardApproachGoal(RewardUnit):
                 f"Current values: [pos_factor={self._pos_factor}], "
                 f"[neg_factor={self._neg_factor}]"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,
@@ -614,7 +614,7 @@ class RewardCollision(RewardUnit):
                 f"Positive rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,
@@ -822,7 +822,7 @@ class RewardReverseDrive(RewardUnit):
                 f"Positive rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,
@@ -910,7 +910,7 @@ class RewardFactoredReverseDrive(RewardUnit):
                 f"Positive factors may lead to unfavorable behaviors. "
                 f"Current value: {self._factor}"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,
@@ -1970,7 +1970,7 @@ class RewardMaxStepsExceeded(RewardUnit):
                 f"The penalty should be a positive value as it is going to be subtracted from the total reward."
                 f"Current value: {self._penalty}"
             )
-            warn(warn_msg)
+            self._report_warning(warn_msg)
 
     def __call__(
         self,

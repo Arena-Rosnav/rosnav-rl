@@ -4,7 +4,21 @@ import numpy as np
 import uuid
 
 
-class TimeLimit(gym.Wrapper):
+class _GymDelegatingWrapper(gym.Wrapper):
+    """Base wrapper that delegates attribute access to the wrapped env.
+
+    gymnasium >= 1.0 removed Wrapper.__getattr__, so we re-add it here so
+    that attributes like `id` (set by UUID) are visible on all outer wrappers.
+    """
+
+    def __getattr__(self, name: str):
+        # Avoid infinite recursion if self.env is not yet set
+        if name == "env":
+            raise AttributeError("env not set")
+        return getattr(self.env, name)
+
+
+class TimeLimit(_GymDelegatingWrapper):
     """A wrapper for OpenAI Gym environments that imposes a time limit on episodes.
 
     This wrapper terminates episodes after a specified number of steps, regardless of
@@ -41,12 +55,12 @@ class TimeLimit(gym.Wrapper):
             self._step = None
         return obs, reward, done, info
 
-    def reset(self):
+    def reset(self, **kwargs):
         self._step = 0
-        return self.env.reset()
+        return self.env.reset(**kwargs)
 
 
-class NormalizeActions(gym.Wrapper):
+class NormalizeActions(_GymDelegatingWrapper):
     """A wrapper for OpenAI Gym environments that normalizes the action space to [-1, 1].
 
     This wrapper scales the action space of the environment to be within the range [-1, 1].
@@ -84,7 +98,7 @@ class NormalizeActions(gym.Wrapper):
         return self.env.step(original)
 
 
-class OneHotAction(gym.Wrapper):
+class OneHotAction(_GymDelegatingWrapper):
     """A wrapper that converts a discrete action space to a one-hot encoded continuous action space.
 
     This wrapper transforms the environment's discrete action space into a continuous space
@@ -125,8 +139,8 @@ class OneHotAction(gym.Wrapper):
             raise ValueError(f"Invalid one-hot action:\n{action}")
         return self.env.step(index)
 
-    def reset(self):
-        return self.env.reset()
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
 
     def _sample_action(self):
         actions = self.env.action_space.n
@@ -136,7 +150,7 @@ class OneHotAction(gym.Wrapper):
         return reference
 
 
-class RewardObs(gym.Wrapper):
+class RewardObs(_GymDelegatingWrapper):
     """A wrapper that adds reward to observation space.
 
     This wrapper adds reward value from the environment step into the
@@ -167,14 +181,14 @@ class RewardObs(gym.Wrapper):
             obs["obs_reward"] = np.array([reward], dtype=np.float32)
         return obs, reward, done, info
 
-    def reset(self):
-        obs = self.env.reset()
+    def reset(self, **kwargs):
+        obs = self.env.reset(**kwargs)
         if "obs_reward" not in obs:
             obs["obs_reward"] = np.array([0.0], dtype=np.float32)
         return obs
 
 
-class SelectAction(gym.Wrapper):
+class SelectAction(_GymDelegatingWrapper):
     """A wrapper for gym environments that selects a specific component of the action.
 
     This wrapper is useful when dealing with multi-component action spaces where only
@@ -201,7 +215,7 @@ class SelectAction(gym.Wrapper):
         return self.env.step(action[self._key])
 
 
-class UUID(gym.Wrapper):
+class UUID(_GymDelegatingWrapper):
     """A wrapper that assigns a unique identifier to each environment instance.
 
     This wrapper generates a unique ID for the environment by combining a timestamp
@@ -220,13 +234,13 @@ class UUID(gym.Wrapper):
         timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
         self.id = f"{timestamp}-{str(uuid.uuid4().hex)}"
 
-    def reset(self):
+    def reset(self, **kwargs):
         timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
         self.id = f"{timestamp}-{str(uuid.uuid4().hex)}"
-        return self.env.reset()
+        return self.env.reset(**kwargs)
 
 
-class ResetWoInfo(gym.Wrapper):
+class ResetWoInfo(_GymDelegatingWrapper):
     """A wrapper that resets the environment without returning info.
 
     This wrapper is useful when the info returned by the environment is not needed
@@ -244,33 +258,78 @@ class ResetWoInfo(gym.Wrapper):
         obs = env.reset()  # Returns only the observation
     """
 
-    def reset(self):
-        return self.env.reset()[0]
-
-
-class ChannelFirsttoLast(gym.Wrapper):
-    def step(self, action):
-        obs, reward, done, info = self.env.step(action)
-        updated_obs = {
-            k: np.moveaxis(v, 0, -1)
-            for k, v in obs.items()
-            if isinstance(v, np.ndarray) and v.ndim == 3
-        }
-        obs.update(updated_obs)
-        return obs, reward, done, info
-
     def reset(self, **kwargs):
-        obs: dict = self.env.reset()
-        updated_obs = {
-            k: np.moveaxis(v, 0, -1)
-            for k, v in obs.items()
-            if isinstance(v, np.ndarray) and v.ndim == 3
-        }
-        obs.update(updated_obs)
+        return self.env.reset(**kwargs)[0]
+
+
+class ChannelFirsttoLast(_GymDelegatingWrapper):
+    """Convert channels-first (C, H, W) tensors to channels-last (H, W, C).
+
+    Also ensures all 2-D spatial observations (H, W) get a trailing channel
+    dimension (H, W, 1) so all CNN inputs have consistent rank when the
+    DreamerV3 encoder concatenates them along the last axis.
+    """
+
+    @staticmethod
+    def _transform(obs: dict) -> dict:
+        updated = {}
+        for k, v in obs.items():
+            if not isinstance(v, np.ndarray):
+                continue
+            if v.ndim == 3:
+                # (C, H, W) → (H, W, C)
+                updated[k] = np.moveaxis(v, 0, -1)
+            elif v.ndim == 2:
+                # (H, W) → (H, W, 1)  – add channel dim for CNN consistency
+                updated[k] = v[:, :, np.newaxis]
+        obs.update(updated)
         return obs
 
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        return self._transform(obs), reward, done, info
 
-class WoTruncatedFlag(gym.Wrapper):
+    def reset(self, **kwargs):
+        obs: dict = self.env.reset(**kwargs)
+        return self._transform(obs)
+
+
+class WoTruncatedFlag(_GymDelegatingWrapper):
     def step(self, action):
         obs, reward, done, _, info = self.env.step(action)
         return obs, reward, done, info
+
+
+# Keys that the DreamerV3 world model expects with specific lowercase names.
+# The observation space manager emits them with PascalCase class names.
+_DREAMER_KEY_REMAP = {
+    "IsFirstStepSpace": "is_first",
+    "IsTerminalStepSpace": "is_terminal",
+}
+
+
+class RenameObsForDreamer(_GymDelegatingWrapper):
+    """Renames observation keys to the names DreamerV3 internals expect.
+
+    The observation space manager stores entries under their class name
+    (e.g. ``"IsFirstStepSpace"``), but ``WorldModel.preprocess()``
+    asserts the presence of ``"is_first"`` and ``"is_terminal"``.
+    This wrapper applies ``_DREAMER_KEY_REMAP`` to both ``reset()``
+    and ``step()`` outputs so the rest of the dreamer pipeline is
+    unaware of the convention mismatch.
+    """
+
+    @staticmethod
+    def _remap(obs: dict) -> dict:
+        for old, new in _DREAMER_KEY_REMAP.items():
+            if old in obs:
+                obs[new] = obs.pop(old)
+        return obs
+
+    def reset(self, **kwargs):
+        obs = self.env.reset(**kwargs)
+        return self._remap(obs)
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        return self._remap(obs), reward, done, info

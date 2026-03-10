@@ -1,4 +1,5 @@
 import concurrent.futures
+import logging
 import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
@@ -12,6 +13,8 @@ from rosnav_rl.utils.logging import (
 )
 from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.utils.validation import validate_reward_units
+
+_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .reward_units.base_reward_units import RewardUnit
@@ -425,7 +428,7 @@ class RewardFunction(ErrorReportingMixin):
         ]
 
         for message in log_messages:
-            print(message)
+            _logger.debug(message)
 
     @property
     def reward_units(self) -> List["RewardUnit"]:

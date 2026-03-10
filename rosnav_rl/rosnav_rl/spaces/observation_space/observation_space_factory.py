@@ -1,4 +1,7 @@
 from typing import TYPE_CHECKING, Any, Callable, Dict, Union
+import logging
+
+_logger = logging.getLogger(__name__)
 
 from .space_categories import SpaceCategory
 
@@ -176,11 +179,12 @@ def _auto_load_spacefactory():
             perception,
         )
 
-        print(
-            f"[ROSNAV-RL] Auto-loaded {len(SpaceFactory.registry)} observation spaces"
+        _logger.info(
+            "[ROSNAV-RL] Auto-loaded %d observation spaces",
+            len(SpaceFactory.registry),
         )
     except ImportError as e:
-        print(f"Warning: Could not auto-load all spaces: {e}")
+        _logger.warning("Could not auto-load all spaces: %s", e)
 
 
 _auto_load_spacefactory()

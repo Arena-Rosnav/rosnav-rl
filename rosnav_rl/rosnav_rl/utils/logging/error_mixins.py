@@ -66,6 +66,10 @@ class ErrorReportingMixin:
         """Report an info message."""
         self._report_error(message, severity=ErrorSeverity.INFO)
 
+    def _report_debug(self, message: str) -> None:
+        """Report a debug message (only collected when verbose=2 / DEBUG level)."""
+        self._report_error(message, severity=ErrorSeverity.DEBUG)
+
     def _report_critical(self, message: str, error_type: Optional[str] = None) -> None:
         """Report a critical error."""
         self._report_error(

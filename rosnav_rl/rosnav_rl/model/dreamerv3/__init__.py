@@ -3,6 +3,7 @@ from .dreamerv3_model import DreamerV3Model
 from .envs.wrappers import (
     UUID,
     ChannelFirsttoLast,
+    RenameObsForDreamer,
     ResetWoInfo,
     SelectAction,
     TimeLimit,

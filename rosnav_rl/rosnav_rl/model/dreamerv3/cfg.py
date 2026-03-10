@@ -26,14 +26,12 @@ class GeneralCfg(BaseModel):
         log_every (float): Frequency of logging in steps. Defaults to 1e4.
         device (str): Computing device to use ('cpu' or 'cuda'). Defaults to "cpu".
         compile (bool): Whether to compile the model. Defaults to True.
-        precision (int): Numerical precision in bits. Defaults to 32.
+        precision (int): Numerical precision in bits. Defaults to 32. Use 16 to enable bfloat16 AMP (recommended over float16 to avoid overflow in RSSM logits).
         debug (bool): Whether to enable debug mode. Defaults to False.
         video_pred_log (bool): Whether to log video predictions. Defaults to True.
     """
 
-    logdir: Optional[Union[str, Path]] = (
-        "/home/le/arena4_ws/src/planners/rosnav_rl/rosnav_rl" + "/agents"
-    )  # TODO: get the path from the config rp.get_path("rosnav_rl")
+    logdir: Optional[Union[str, Path]] = None  # Set by trainer; override for custom path
     traindir: Optional[Union[str, Path]] = None
     evaldir: Optional[Union[str, Path]] = None
     offline_traindir: Union[str, Path] = ""

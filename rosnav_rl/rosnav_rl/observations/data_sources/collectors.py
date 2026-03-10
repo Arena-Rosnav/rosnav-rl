@@ -37,6 +37,7 @@ class LaserScanCollector(Collector[sensor_msgs.LaserScan, LidarRanges]):
             return np.array([])
         laser = np.array(msg.ranges, np.float32)
         laser[np.isnan(laser)] = msg.range_max
+        laser[np.isinf(laser)] = msg.range_max
         return laser
 
 

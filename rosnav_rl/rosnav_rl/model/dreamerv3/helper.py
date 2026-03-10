@@ -1,4 +1,5 @@
 import functools
+import logging
 import pathlib
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Dict, Generator, List, Tuple
@@ -17,6 +18,8 @@ from rosnav_rl.model.dreamerv3.parallel import Parallel
 if TYPE_CHECKING:
     from rosnav_rl.model.dreamerv3.cfg import DreamerV3Cfg
 
+
+_log = logging.getLogger(__name__)
 
 to_np = lambda x: x.detach().cpu().numpy()
 
@@ -83,7 +86,7 @@ def prepare_directories(config: "DreamerV3Cfg", logdir: pathlib.Path):
         This function creates directories with the parents parameter set to True,
         which means it will create any necessary parent directories.
     """
-    print("Logdir", logdir)
+    _log.info("Logdir: %s", logdir)
 
     logdir.mkdir(parents=True, exist_ok=True)
     logdir.mkdir(parents=True, exist_ok=True)
@@ -173,8 +176,11 @@ def prefill_dataset(
         - For continuous action spaces, a uniform distribution between low and high bounds is used.
         - The function simulates the random agent in the environment until enough steps are collected.
     """
-    print("Action Space", action_space)
-    print("Observation Space", observation_space)
+    _log.info(
+        "Action Space: %s  |  Observation Space keys: %s",
+        action_space,
+        list(observation_space.keys()),
+    )
 
     _num_actions = (
         action_space.n if hasattr(action_space, "n") else action_space.shape[0]
@@ -188,7 +194,7 @@ def prefill_dataset(
             config.training.prefill_steps
             - data_tools.count_steps(config.general.traindir),
         )
-        print(f"Prefill dataset ({prefill} steps).")
+        _log.info("Prefilling dataset (%d steps).", prefill)
         if hasattr(action_space, "discrete"):
             random_actor = tools.OneHotDist(
                 torch.zeros(_num_actions).repeat(len(train_envs), 1)
@@ -218,7 +224,7 @@ def prefill_dataset(
             no_image_key=not _image_available,
         )
         logger.step += prefill * config.environment.action_repeat
-        print(f"Logger: ({logger.step} steps).")
+        _log.debug("Logger step after prefill: %d", logger.step)
         return state
 
 
@@ -305,6 +311,7 @@ def train(
     is_image_available: bool,
     state: tools._State = None,
     log_wandb: bool = False,
+    after_eval_fn=None,
 ):
     """
     Train and evaluate a Dreamer agent using the specified configuration.
@@ -334,8 +341,13 @@ def train(
         while agent._step < config.training.steps + config.training.eval_every:
             logger.write()
 
-            # Run evaluation phase if configured
-            if config.training.eval_episode_num > 0:
+            # Run evaluation phase if configured (skip until model has been trained at least once)
+            if config.training.eval_episode_num > 0 and agent._update_count > 0:
+                _log.info(
+                    "\n" + "=" * 60 + "\n"
+                    "  EVALUATION  |  step=%d / %d  |  updates=%d\n" + "=" * 60,
+                    agent._step, config.training.steps, agent._update_count,
+                )
                 _run_evaluation(
                     agent=agent,
                     eval_envs=eval_envs,
@@ -345,9 +357,17 @@ def train(
                     logger=logger,
                     is_image_available=is_image_available,
                 )
+                if after_eval_fn is not None:
+                    after_eval_fn(
+                        logger._scalars.get("eval_return", float("-inf"))
+                    )
 
             # Run training phase
-            print("Start training.")
+            _log.info(
+                "\n" + "-" * 60 + "\n"
+                "  TRAINING    |  step=%d / %d  |  eval_every=%d\n" + "-" * 60,
+                agent._step, config.training.steps, config.training.eval_every,
+            )
             state = _run_training(
                 agent=agent,
                 train_envs=train_envs,
@@ -379,7 +399,7 @@ def _run_evaluation(
     is_image_available: bool,
 ):
     """Run the evaluation phase of training."""
-    print("Start evaluation.")
+    _log.info("Running evaluation (%d episode(s)).", config.training.eval_episode_num)
     eval_policy = functools.partial(agent, training=False)
     tools.simulate(
         eval_policy,
@@ -440,7 +460,9 @@ def _close_environments(envs: List[Parallel]):
 
 
 def _log_to_wandb(metrics: Dict):
-    """Log metrics to Weights & Biases."""
+    """Log metrics to Weights & Biases (no-op if wandb is not active)."""
+    if wandb.run is None:
+        return
     for key, value in metrics.items():
         wandb.log({key: wandb_format_value(value)})
 
