@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Union
 
 from pydantic import BaseModel
 
@@ -13,8 +13,6 @@ if TYPE_CHECKING:
     from ..spaces.observation_space.spaces.base_observation_space import (
         BaseObservationSpace,
     )
-    from .dreamerv3.cfg import DreamerV3Cfg
-    from .stable_baselines3.cfg.base import SBAlgorithmCfg
 
 
 class RL_Model(ABC):
@@ -26,7 +24,7 @@ class RL_Model(ABC):
     Attributes:
         _model: The actual machine learning model instance.
         _algorithm_cfg (BaseModel): Configuration parameters for the RL algorithm.
-        _rl_agent (RL_Agent): Reference to the RL agent controlling this model.ddddddd
+        _rl_agent (RL_Agent): Reference to the RL agent controlling this model.
 
     Methods:
         setup_model: Initialize and configure the model.
@@ -54,6 +52,19 @@ class RL_Model(ABC):
     ) -> None:
         self._rl_agent = rl_agent
         self._algorithm_cfg = algorithm_cfg
+
+    @classmethod
+    def from_framework_cfg(
+        cls, rl_agent: "RL_Agent", framework_cfg, *args, **kwargs
+    ) -> "RL_Model":
+        """Construct a model from a :class:`FrameworkCfg` envelope.
+
+        Subclasses may override this to extract the relevant portion of the
+        config (e.g. ``framework_cfg.algorithm`` for SB3).  The default
+        implementation passes the entire ``framework_cfg`` as the algorithm
+        config.
+        """
+        return cls(rl_agent=rl_agent, algorithm_cfg=framework_cfg, *args, **kwargs)
 
     @abstractmethod
     def setup_model(self, *args, **kwargs):
@@ -93,7 +104,7 @@ class RL_Model(ABC):
         self._model = model
 
     @property
-    def algorithm_cfg(self) -> Union["SBAlgorithmCfg", "DreamerV3Cfg"]:
+    def algorithm_cfg(self) -> BaseModel:
         return self._algorithm_cfg
 
     @property

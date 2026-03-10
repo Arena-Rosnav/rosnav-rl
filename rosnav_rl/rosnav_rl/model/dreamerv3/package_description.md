@@ -297,3 +297,6 @@ logdir/
   └── metrics.jsonl   # Training metrics
 ```
 
+### Credits
+
+https://github.com/NM512/dreamerv3-torch

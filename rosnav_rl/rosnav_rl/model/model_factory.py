@@ -65,6 +65,10 @@ class ModelFactory:
     ) -> "RL_Model":
         """Create an RL model instance based on the framework configuration.
 
+        Each registered model class is responsible for accepting a uniform
+        ``(rl_agent, algorithm_cfg)`` signature.  The factory simply looks
+        up the right class and delegates — no framework-specific branching.
+
         Args:
             framework_cfg: Configuration object containing framework settings
             rl_agent: The RL agent instance
@@ -84,18 +88,10 @@ class ModelFactory:
             )
 
         model_class = cls._model_registry[framework_name]
-
-        # Create model with appropriate parameters based on framework type
-        if framework_name == SupportedRLFrameworks.STABLE_BASELINES3:
-            return model_class(
-                rl_agent=rl_agent,
-                algorithm_cfg=framework_cfg.algorithm,
-            )
-        elif framework_name == SupportedRLFrameworks.DREAMER_V3:
-            return model_class(rl_agent=rl_agent, algorithm_cfg=framework_cfg)
-        else:
-            # Fallback for future frameworks - assume they follow the DreamerV3 pattern
-            return model_class(rl_agent=rl_agent, algorithm_cfg=framework_cfg)
+        return model_class.from_framework_cfg(
+            rl_agent=rl_agent,
+            framework_cfg=framework_cfg,
+        )
 
     @classmethod
     def get_supported_frameworks(cls) -> list[SupportedRLFrameworks]:
