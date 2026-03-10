@@ -9,6 +9,9 @@ generators, reward units) and logging them in an organized way once per iteratio
 from typing import Dict, Optional
 from dataclasses import dataclass
 from enum import Enum
+import json
+import logging
+import os
 import threading
 from collections import defaultdict
 
@@ -16,8 +19,9 @@ from .logger import get_logger, LogLevel
 
 
 class ErrorSeverity(Enum):
-    """Severity levels for errors."""
+    """Severity levels for errors, ordered from least to most severe."""
 
+    DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
     ERROR = "ERROR"
@@ -62,12 +66,44 @@ class ErrorMessage:
 
 
 class ErrorCollector:
-    """Thread-safe error collector for unified logging."""
+    """Thread-safe error collector for unified logging.
+
+    Errors below ``min_severity`` are silently dropped in ``add_error()``,
+    keeping the collect-then-dump paradigm intact while letting callers
+    control verbosity from the outside via ``set_min_severity()``.
+    """
+
+    # Order used for threshold comparisons (lower value = less severe)
+    _SEVERITY_ORDER = {
+        ErrorSeverity.DEBUG: 0,
+        ErrorSeverity.INFO: 1,
+        ErrorSeverity.WARNING: 2,
+        ErrorSeverity.ERROR: 3,
+        ErrorSeverity.CRITICAL: 4,
+    }
 
     def __init__(self):
         self._errors: Dict[ErrorMessage, int] = {}
         self._lock = threading.Lock()
         self._enabled = True
+        self._min_severity: ErrorSeverity = ErrorSeverity.INFO
+
+    def set_min_severity(self, severity: ErrorSeverity) -> None:
+        """Set the minimum severity level that will be collected.
+
+        Messages below this level are silently dropped.  The mapping from
+        Python ``logging`` levels is::
+
+            DEBUG    →  ErrorSeverity.DEBUG    (collect everything incl. debug)
+            INFO     →  ErrorSeverity.INFO     (suppress DEBUG)
+            WARNING  →  ErrorSeverity.WARNING  (suppress DEBUG + INFO)
+            ERROR    →  ErrorSeverity.ERROR    (suppress DEBUG + INFO + WARNING)
+            CRITICAL →  ErrorSeverity.CRITICAL (only critical)
+
+        Args:
+            severity: Minimum ``ErrorSeverity`` to collect.
+        """
+        self._min_severity = severity
 
     def add_error(
         self,
@@ -79,6 +115,8 @@ class ErrorCollector:
     ) -> None:
         """Add an error to the collector.
 
+        Silently drops the message if *severity* is below ``min_severity``.
+
         Args:
             component_type: Type of component reporting the error
             component_name: Name of the specific component
@@ -87,6 +125,10 @@ class ErrorCollector:
             error_type: Type of exception (if applicable)
         """
         if not self._enabled:
+            return
+
+        # Threshold check — drop below min_severity
+        if self._SEVERITY_ORDER[severity] < self._SEVERITY_ORDER[self._min_severity]:
             return
 
         error_msg = ErrorMessage(
@@ -105,6 +147,7 @@ class ErrorCollector:
 
     def flush_and_log(self) -> None:
         """Flush all collected errors and log them in an organized way."""
+        _apply_env_log_config()  # no-op after first call; bootstraps worker processes
         if not self._enabled:
             return
 
@@ -212,16 +255,28 @@ class ErrorCollector:
         }.get(severity, "❓")
 
     def _output_log(self, message: str, severity: ErrorSeverity) -> None:
-        """Output the log message using the flexible logger system."""
-        logger = get_logger()
+        """Output the batched error report via the stdlib logging hierarchy.
 
-        # Map our error severity to logger levels
-        if severity in [ErrorSeverity.CRITICAL, ErrorSeverity.ERROR]:
-            logger.error(message)
+        Using ``logging.getLogger('rosnav_rl.errors')`` means:
+        - The report respects the ``rosnav_rl`` root level set by
+          ``configure_rosnav_rl_logging()``.
+        - It integrates with whatever handler (ROS2, file, console) the
+          application has configured — no duplicate output.
+        """
+        _log = logging.getLogger("rosnav_rl.errors")
+        if severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR):
+            _log.error(message)
         elif severity == ErrorSeverity.WARNING:
-            logger.warning(message)
-        else:
-            logger.info(message)
+            _log.warning(message)
+        elif severity == ErrorSeverity.INFO:
+            _log.info(message)
+        else:  # DEBUG
+            _log.debug(message)
+
+    @property
+    def min_severity(self) -> ErrorSeverity:
+        """Currently active minimum severity threshold."""
+        return self._min_severity
 
     def enable(self) -> None:
         """Enable error collection."""
@@ -251,6 +306,62 @@ class ErrorCollector:
 
 # Global error collector instance
 _global_error_collector = ErrorCollector()
+
+# ── Env-var driven logging bootstrap for subprocess workers ─────────────────
+# When dreamerv3.Parallel (or any other multiprocessing backend) spawns a
+# worker, it gets a fresh Python interpreter.  configure_rosnav_rl_logging()
+# was never called there, so rosnav_rl.* loggers default to root-WARNING and
+# every flush_and_log call emits visible WARNING output.
+#
+# configure_rosnav_rl_logging() writes the desired levels into env vars;
+# _apply_env_log_config() reads them back on the *first* flush_and_log call
+# inside the worker so the loggers are silenced before any output.
+
+_ENV_KEY_LEVEL = "ROSNAV_RL_LOG_LEVEL"
+_ENV_KEY_OVERRIDES = "ROSNAV_RL_LOG_OVERRIDES"
+_env_log_applied = False
+_env_log_lock = threading.Lock()
+
+
+def _apply_env_log_config() -> None:
+    """Lazily apply rosnav_rl log levels from env vars (once per process).
+
+    Called once at the top of every ``flush_and_log()`` invocation.
+    The actual work only runs the first time (guarded by ``_env_log_applied``).
+    Sets both the Python logging levels and the ErrorCollector min_severity.
+    """
+    global _env_log_applied
+    if _env_log_applied:
+        return
+    with _env_log_lock:
+        if _env_log_applied:
+            return
+        level_str = os.environ.get(_ENV_KEY_LEVEL)
+        if level_str:
+            root_level = getattr(logging, level_str, logging.WARNING)
+            logging.getLogger("rosnav_rl").setLevel(root_level)
+            # Also sync ErrorCollector threshold so below-threshold errors
+            # are not even collected in worker processes.
+            _severity_map = {
+                "DEBUG": ErrorSeverity.DEBUG,
+                "INFO": ErrorSeverity.INFO,
+                "WARNING": ErrorSeverity.WARNING,
+                "ERROR": ErrorSeverity.ERROR,
+                "CRITICAL": ErrorSeverity.CRITICAL,
+            }
+            severity = _severity_map.get(level_str, ErrorSeverity.WARNING)
+            _global_error_collector.set_min_severity(severity)
+        overrides_json = os.environ.get(_ENV_KEY_OVERRIDES)
+        if overrides_json:
+            try:
+                overrides = json.loads(overrides_json)
+                for ns, lvl in overrides.items():
+                    logging.getLogger(ns).setLevel(
+                        getattr(logging, lvl, logging.WARNING)
+                    )
+            except Exception:
+                pass
+        _env_log_applied = True
 
 
 def get_error_collector() -> ErrorCollector:

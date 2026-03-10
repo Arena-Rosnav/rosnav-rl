@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional, TypeVar, Type, Union
 
 from rclpy.node import Node
@@ -146,7 +147,7 @@ class ObservationManager:
         """
         if simulation_state_container is None:
             simulation_state_container = SimulationStateContainer()
-            print(
+            logging.getLogger(__name__).warning(
                 "No simulation state container provided. Using default empty container. "
                 "Not recommended for production use."
             )

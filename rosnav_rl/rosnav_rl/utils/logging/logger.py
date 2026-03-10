@@ -181,56 +181,55 @@ class ROS1Logger(BaseLogger):
 
 
 class PythonLogger(BaseLogger):
-    """Standard Python logging-based logger implementation."""
+    """Thin stdlib-logging adapter.
+
+    Delegates every call to ``logging.getLogger(name)``, which means it
+    participates fully in the Python ``logging`` hierarchy: level filtering,
+    propagation to the root handler, and external ``setLevel()`` calls all
+    work as expected.
+
+    **No handler is installed here.** The stdlib root / application handler
+    configuration is responsible for output.  This prevents duplicate log
+    lines and allows the ``rosnav_rl.*`` namespace levels set by
+    ``configure_rosnav_rl_logging()`` to take effect naturally.
+    """
 
     def __init__(self, name: str = "rosnav_rl", level: str = "INFO", **kwargs):
-        """Initialize Python logger.
+        """Initialize Python logger adapter.
 
         Args:
-            name: Logger name
-            level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+            name:  Logger name — should be a dotted namespace like
+                   ``'rosnav_rl'`` or ``'rosnav_rl.errors'`` so it sits
+                   correctly in the stdlib hierarchy.
+            level: Initial log level string (DEBUG/INFO/WARNING/ERROR/CRITICAL).
+                   Prefer controlling this from outside via
+                   ``logging.getLogger(name).setLevel(...)``.
         """
         super().__init__(name, **kwargs)
+        import logging as _stdlib_logging
 
-        import logging
-
-        self.logger = logging.getLogger(name)
-
-        # Set logging level
-        numeric_level = getattr(logging, level.upper(), logging.INFO)
+        self.logger = _stdlib_logging.getLogger(name)
+        numeric_level = getattr(_stdlib_logging, level.upper(), _stdlib_logging.INFO)
         self.logger.setLevel(numeric_level)
-
-        # Add console handler if none exists
-        if not self.logger.handlers:
-            handler = logging.StreamHandler(sys.stdout)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
+        # No handler installed — let the application's logging configuration handle output.
 
     def debug(self, message: str, **kwargs) -> None:
-        """Log a debug message using Python logging."""
         if self.enabled:
             self.logger.debug(message)
 
     def info(self, message: str, **kwargs) -> None:
-        """Log an info message using Python logging."""
         if self.enabled:
             self.logger.info(message)
 
     def warning(self, message: str, **kwargs) -> None:
-        """Log a warning message using Python logging."""
         if self.enabled:
             self.logger.warning(message)
 
     def error(self, message: str, **kwargs) -> None:
-        """Log an error message using Python logging."""
         if self.enabled:
             self.logger.error(message)
 
     def critical(self, message: str, **kwargs) -> None:
-        """Log a critical message using Python logging."""
         if self.enabled:
             self.logger.critical(message)
 
