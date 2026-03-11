@@ -11,7 +11,7 @@
 
 | | |
 | --- | --- |
-| **ROS** | Humble (ROS 2 only — no rospy/rospkg) |
+| **ROS** | Humble (ROS 2 only - no rospy/rospkg) |
 | **Python** | 3.10+ |
 | **RL Backends** | Stable-Baselines3, sb3-contrib, DreamerV3 |
 | **Config** | Pydantic v2 (type-safe, auto-validated, YAML round-trip) |
@@ -20,12 +20,11 @@
 
 ## Key Features
 
-- **9 algorithms out of the box** — PPO, A2C, TRPO, RecurrentPPO, SAC, TD3, DDPG, TQC, CrossQ. Add a new one with a single config file.
-- **Framework-agnostic** — common `RL_Model` interface lets you swap SB3 ↔ DreamerV3 without touching training code.
-- **Composable observation spaces** — mix laser, goal, velocity, pedestrian, and custom spaces via a registry. Parallel encoding, auto-normalization.
-- **Modular reward system** — stack reward units declaratively in YAML. Parallel evaluation, safety categorization, schema-based dependency validation.
-- **YAML-driven observation pipeline** — collectors → generators → agents. Dependency resolution via topological sort.
-- **One-command deployment** — `ros2 run rosnav_rl action_server.py` wraps any trained agent in a `GetCommand` service.
+- **Framework-agnostic** - common `RL_Model` interface lets you swap SB3 ↔ DreamerV3 without touching training code.
+- **Composable observation spaces** - mix laser, goal, velocity, pedestrian, and custom spaces via a registry. Parallel encoding, auto-normalization.
+- **Modular reward system** - stack reward units declaratively in YAML. Parallel evaluation, safety categorization, schema-based dependency validation.
+- **Observation pipeline** - collectors → generators → agents. Dependency resolution via topological sort. Observation synchronization.
+- **One-command deployment** - `ros2 run rosnav_rl action_server.py` wraps any trained agent in a `GetCommand` service.
 
 ---
 
@@ -111,10 +110,10 @@ Sensors ──▶ ObservationManager ──▶ ObservationSpaceManager ──▶
 | Module | Role |
 | --- | --- |
 | **Observations** | ROS 2 topic → typed data via Collectors & Generators |
-| **Spaces** | Encode observations, decode actions — registry-based, parallel |
+| **Spaces** | Encode observations, decode actions - registry-based, parallel |
 | **Model** | Algorithm-agnostic training & inference (`RL_Model` ABC) |
 | **Reward** | Composable reward units with safety categorization |
-| **Config** | Pydantic v2 discriminated unions — YAML in, validated config out |
+| **Config** | Pydantic v2 discriminated unions - YAML in, validated config out |
 | **Action Server** | `GetCommand` ROS 2 service for real-time deployment |
 | **States** | Typed dataclass containers for simulation & agent state |
 
@@ -131,12 +130,12 @@ Sensors ──▶ ObservationManager ──▶ ObservationSpaceManager ──▶
 
 | Package | README |
 | --- | --- |
-| Model | [model/README.md](rosnav_rl/model/README.md) — RL_Model ABC, SB3 config hierarchy, ModelFactory |
-| Observations | [observations/README.md](rosnav_rl/observations/README.md) — Collectors, Generators, YAML pipeline, DependencyResolver |
-| Reward | [reward/README.md](rosnav_rl/reward/README.md) — RewardFunction, RewardUnit, safety categorization |
-| Spaces | [spaces/README.md](rosnav_rl/spaces/README.md) — SpaceFactory, encoding pipeline, ActionSpaceManager |
-| Config | [cfg/README.md](rosnav_rl/cfg/README.md) — AgentCfg, discriminated unions, serialization |
-| Action Server | [action_server/README.md](rosnav_rl/action_server/README.md) — ROS 2 deployment, GetCommand service |
+| Model | [model/README.md](rosnav_rl/model/README.md) - RL_Model ABC, SB3 config hierarchy, ModelFactory |
+| Observations | [observations/README.md](rosnav_rl/observations/README.md) - Collectors, Generators, YAML pipeline, DependencyResolver |
+| Reward | [reward/README.md](rosnav_rl/reward/README.md) - RewardFunction, RewardUnit, safety categorization |
+| Spaces | [spaces/README.md](rosnav_rl/spaces/README.md) - SpaceFactory, encoding pipeline, ActionSpaceManager |
+| Config | [cfg/README.md](rosnav_rl/cfg/README.md) - AgentCfg, discriminated unions, serialization |
+| Action Server | [action_server/README.md](rosnav_rl/action_server/README.md) - ROS 2 deployment, GetCommand service |
 
 ---
 
@@ -153,7 +152,7 @@ python3 -m pytest tests/ -v
 
 ```
 rosnav_rl/
-├── rl_agent.py           # RL_Agent — top-level orchestrator
+├── rl_agent.py           # RL_Agent - top-level orchestrator
 ├── cfg/                  # Pydantic v2 configuration (AgentCfg, RewardCfg, …)
 ├── model/                # RL_Model ABC + SB3 & DreamerV3 implementations
 ├── observations/         # Collector/Generator pipeline, YAML-driven
@@ -169,4 +168,4 @@ rosnav_rl/
 
 ## License
 
-MIT — see [LICENSE.md](LICENSE.md).
+MIT - see [LICENSE.md](LICENSE.md).
