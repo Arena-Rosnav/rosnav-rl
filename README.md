@@ -49,7 +49,7 @@ Forget being locked into a single RL library. Rosnav-RL's core strength is its p
 ### ✨ Key Features
 
 *   **9 Algorithms Out of the Box**: PPO, A2C, TRPO, RecurrentPPO, SAC, TD3, DDPG, TQC, CrossQ. Add a new one with a single config file.
-*   **Framework-Agnostic**: Common `RL_Model` interface — swap SB3 ↔ DreamerV3 without touching training code.
+*   **Framework-Agnostic**: Common `RL_Model` interface - swap SB3 ↔ DreamerV3 without touching training code.
 *   **Composable Observation Spaces**: Mix laser, goal, velocity, and custom spaces via a registry. Parallel encoding, auto-normalization.
 *   **Modular Reward System**: Stack reward units declaratively in YAML. Parallel evaluation, safety categorization.
 *   **YAML-Driven Observation Pipeline**: Collectors → Generators with automatic dependency resolution via topological sort.
@@ -140,7 +140,7 @@ This writes `training_config.yaml` and `best_model.zip` to `Arena/arena_training
 
 ## 🖥️ Usage
 
-**Standalone — start the action server with a trained agent:**
+**Standalone - start the action server with a trained agent:**
 
 ```bash
 ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=<your_agent>
@@ -159,7 +159,7 @@ The server exposes a `get_command` service (`rosnav_rl_msgs/srv/GetCommand`) und
 ros2 service call /get_command rosnav_rl_msgs/srv/GetCommand {}
 ```
 
-**Arena integration** — when using [Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav), the action server is started automatically:
+**Arena integration** - when using [Arena-Rosnav](https://github.com/Arena-Rosnav/arena-rosnav), the action server is started automatically:
 
 ```bash
 arena launch local_planner:=rosnav_rl agent_name:=<your_agent>
