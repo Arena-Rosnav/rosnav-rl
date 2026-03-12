@@ -30,7 +30,7 @@
 
 ## Quick Start
 
-> **Arena users:** run `arena feature training install` — it handles everything below. Come back here for the API reference.
+> **Arena users:** run `arena feature training install` - it handles everything below. Come back here for the API reference.
 
 ```bash
 # 1. Clone into your colcon workspace
@@ -48,13 +48,39 @@ source install/setup.bash
 
 ### Deploy a pre-trained agent
 
+The action server needs two things: a trained agent and an **observations config** that maps your robot's sensor topics to collector types.
+
 ```bash
 # Create a test agent with random weights (no training run needed)
 python3 scripts/create_test_agent.py --agent-name test_agent
 
-# Start the action server — exposes a GetCommand ROS 2 service
-ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=test_agent
+# Start the action server
+ros2 run rosnav_rl action_server.py --ros-args \
+  -p agent_name:=test_agent \
+  -p observations_config:=/path/to/observations.yaml
 ```
+
+The observations config tells the server which ROS topics to subscribe to. A minimal example:
+
+```yaml
+# observations.yaml
+datasources:
+  front_laser:
+    type: LaserScanCollector
+    params:
+      topic: "scan"              # your lidar topic
+      up_to_date_required: true
+  goal_pose:
+    type: PoseStampedCollector
+    params:
+      topic: "goal_pose"
+      up_to_date_required: false
+  robot_pose_from_tf:
+    type: RobotPoseTFGenerator
+    params: {}
+```
+
+A full annotated config with all available collectors and generators is at [`observations/observations.yaml`](rosnav_rl/observations/observations.yaml).
 
 ### Train an agent (minimal Python example)
 
