@@ -30,28 +30,33 @@
 
 ## Quick Start
 
+> **Arena users:** run `arena feature training install` — it handles everything below. Come back here for the API reference.
+
 ```bash
 # 1. Clone into your colcon workspace
 cd ~/colcon_ws/src
-git clone https://github.com/Arena-Rosnav/rosnav-rl.git
+git clone --depth 1 https://github.com/Arena-Rosnav/rosnav-rl.git
 
-# 2. Install Python dependencies (uv creates the venv and installs everything)
+# 2. Install Python dependencies
 cd rosnav-rl/rosnav_rl && uv sync
 
-# 3. Build
+# 3. Build ROS 2 packages
 cd ~/colcon_ws
 colcon build --packages-select rosnav_rl rosnav_rl_msgs
 source install/setup.bash
+```
 
-# 4. Create a test agent (random weights, no training needed)
-cd src/rosnav-rl/rosnav_rl
+### Deploy a pre-trained agent
+
+```bash
+# Create a test agent with random weights (no training run needed)
 python3 scripts/create_test_agent.py --agent-name test_agent
 
-# 5. Run the action server
+# Start the action server — exposes a GetCommand ROS 2 service
 ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=test_agent
 ```
 
-### Minimal training script
+### Train an agent (minimal Python example)
 
 ```python
 import rosnav_rl
@@ -59,7 +64,6 @@ from rosnav_rl.model.stable_baselines3.cfg import (
     StableBaselinesCfg, PPO_Cfg, PPO_Algorithm_Cfg,
 )
 
-# Configure
 agent_cfg = rosnav_rl.AgentCfg(
     robot="jackal",
     framework=StableBaselinesCfg(
@@ -81,17 +85,16 @@ agent_cfg = rosnav_rl.AgentCfg(
     ),
 )
 
-# Build agent
 sim_state = rosnav_rl.SimulationStateContainer(...)
 agent = rosnav_rl.RL_Agent(
     agent_cfg=agent_cfg,
     agent_state_container=sim_state.to_agent_state_container(),
 )
 agent.initialize_model()
-
-# Train
 agent.train(train_envs=train_envs, eval_envs=eval_envs)
 ```
+
+For full training with a simulator see [`arena_training`](https://github.com/Arena-Rosnav/Arena-Training) and its [config reference](https://github.com/Arena-Rosnav/Arena-Training/tree/main/configs).
 
 ---
 
