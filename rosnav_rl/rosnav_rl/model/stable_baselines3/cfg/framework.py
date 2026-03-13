@@ -1,6 +1,6 @@
-from typing import Literal, Union
+from typing import Any, Dict, Literal, Union
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing_extensions import Annotated
 
 from rosnav_rl.cfg.framework import FrameworkCfg
@@ -33,6 +33,19 @@ class StableBaselinesCfg(FrameworkCfg):
     name: Literal[SupportedRLFrameworks.STABLE_BASELINES3] = (
         SupportedRLFrameworks.STABLE_BASELINES3
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inject_algorithm_type(cls, data: Any) -> Any:
+        """If ``algorithm`` dict is missing the ``type`` discriminator,
+        default it to ``"generic"`` so the fallback class is selected
+        rather than raising ``union_tag_not_found``."""
+        if isinstance(data, dict):
+            algo = data.get("algorithm")
+            if isinstance(algo, dict) and "type" not in algo:
+                data = {**data, "algorithm": {**algo, "type": "generic"}}
+        return data
+
     algorithm: Annotated[
         Union[
             PPO_Cfg,
