@@ -15,6 +15,8 @@
 6. [Adding a New Observation Data Source](#6-adding-a-new-observation-data-source)
 7. [Adding a New Reward Unit](#7-adding-a-new-reward-unit)
 8. [Adding a New Model Architecture](#8-adding-a-new-model-architecture)
+9. [Hyperparameter Tuning](#9-hyperparameter-tuning)
+10. [Configuring the Agent Directory](#10-configuring-the-agent-directory)
 
 ---
 
@@ -701,6 +703,312 @@ For advanced customization (custom policy classes, feature extractors), see
 
 ---
 
+## 9. Hyperparameter Tuning
+
+The `rosnav_rl.tuning` module provides **Optuna-based** hyperparameter
+optimisation that integrates seamlessly with the Pydantic config system.
+Any field in a `TrainingCfg` can be tuned using **dot-notation paths** —
+no code changes required.
+
+### Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  tuning_config.yaml                                     │
+│  ├─ base_config: sb_training_config.yaml                │
+│  ├─ study_name / n_trials / direction / metric          │
+│  └─ search_space:                                       │
+│       agent_cfg.framework.algorithm.parameters.lr: ...  │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+              ┌────────▼────────┐
+              │  tune_agent.py  │
+              └────────┬────────┘
+                       │  for each trial:
+              ┌────────▼────────────────┐
+              │ 1. suggest_params()     │  ← Optuna draws values
+              │ 2. apply_params()       │  ← Override base config
+              │ 3. TrainingCfg.validate │  ← Pydantic validation
+              │ 4. trainer.train()      │  ← Full training run
+              │ 5. report metric        │  → Optuna records result
+              └─────────────────────────┘
+```
+
+### Step 1 — Install Dependencies
+
+```bash
+# From the rosnav_rl directory:
+uv sync --group tuning
+
+# Or from the Arena root:
+uv sync --group tuning
+```
+
+### Step 2 — Create a Tuning Config
+
+Create `tuning_config.yaml`:
+
+```yaml
+# Path to the base training config (relative or absolute)
+base_config: sb_training_config.yaml
+
+# Optuna study settings
+study_name: ppo_lr_gamma_search
+n_trials: 50
+direction: maximize        # maximize or minimize
+metric: mean_reward        # metric key to optimize
+
+# Reduce training length per trial for faster exploration
+trial_timesteps: 500000
+
+# Persist results to a SQLite database (optional)
+storage: "sqlite:///tuning_results.db"
+
+# Pruner: stop unpromising trials early
+pruner:
+  type: median             # median | hyperband | percentile | none
+  n_startup_trials: 5      # complete this many trials before pruning
+  n_warmup_steps: 10       # report steps before pruner activates
+
+# Where to save trial agent artifacts (optional)
+agents_dir: /tmp/tuning_agents
+
+# Search space — dot-notation paths into the TrainingCfg
+search_space:
+  agent_cfg.framework.algorithm.parameters.learning_rate:
+    type: float
+    low: 1.0e-5
+    high: 1.0e-3
+    log: true
+
+  agent_cfg.framework.algorithm.parameters.gamma:
+    type: float
+    low: 0.9
+    high: 0.9999
+
+  agent_cfg.framework.algorithm.parameters.n_steps:
+    type: int
+    low: 128
+    high: 4096
+    step: 128
+
+  agent_cfg.framework.algorithm.parameters.n_epochs:
+    type: int
+    low: 1
+    high: 20
+
+  agent_cfg.framework.algorithm.parameters.clip_range:
+    type: float
+    low: 0.1
+    high: 0.4
+```
+
+### Step 3 — Run the Tuning
+
+```bash
+python3 scripts/tune_agent.py --config tuning_config.yaml
+
+# Override the number of trials:
+python3 scripts/tune_agent.py --config tuning_config.yaml --n-trials 10
+```
+
+The script:
+1. Loads your base `TrainingCfg` and the search space.
+2. Creates an Optuna study (or resumes from the SQLite DB).
+3. For each trial, samples hyperparameters from the search space.
+4. Modifies the config, validates it with Pydantic, and runs training.
+5. Reports the metric and optionally prunes unpromising trials.
+6. Saves `<study_name>_best_params.yaml` with the winning configuration.
+
+### Step 4 — Analyse Results
+
+```python
+import optuna
+
+# Load the persisted study
+study = optuna.load_study(
+    study_name="ppo_lr_gamma_search",
+    storage="sqlite:///tuning_results.db",
+)
+
+# Best parameters
+print(study.best_trial.params)
+# {'agent_cfg.framework.algorithm.parameters.learning_rate': 0.000342, ...}
+
+# Visualization (requires matplotlib)
+from optuna.visualization.matplotlib import (
+    plot_optimization_history,
+    plot_param_importances,
+    plot_parallel_coordinate,
+)
+
+plot_optimization_history(study)
+plot_param_importances(study)
+plot_parallel_coordinate(study)
+```
+
+### Search Space Parameter Types
+
+| Type | YAML | Optuna method |
+| --- | --- | --- |
+| `float` | `type: float`, `low`, `high`, `log`, `step` | `suggest_float` |
+| `int` | `type: int`, `low`, `high`, `log`, `step` | `suggest_int` |
+| `categorical` | `type: categorical`, `choices: [...]` | `suggest_categorical` |
+
+### Example: Tuning SAC
+
+```yaml
+base_config: sac_training_config.yaml
+study_name: sac_tuning
+n_trials: 30
+direction: maximize
+metric: mean_reward
+trial_timesteps: 300000
+
+search_space:
+  agent_cfg.framework.algorithm.parameters.learning_rate:
+    type: float
+    low: 1.0e-5
+    high: 3.0e-3
+    log: true
+
+  agent_cfg.framework.algorithm.parameters.tau:
+    type: float
+    low: 0.001
+    high: 0.1
+    log: true
+
+  agent_cfg.framework.algorithm.parameters.batch_size:
+    type: categorical
+    choices: [64, 128, 256, 512, 1024]
+
+  agent_cfg.framework.algorithm.parameters.train_freq:
+    type: int
+    low: 1
+    high: 16
+```
+
+### Example: Tuning Reward Weights
+
+You can tune **any** config field, not just algorithm parameters:
+
+```yaml
+search_space:
+  agent_cfg.reward.reward_function_dict.approach_goal.pos_factor:
+    type: float
+    low: 0.1
+    high: 1.0
+
+  agent_cfg.reward.reward_function_dict.safe_distance.reward:
+    type: float
+    low: -0.5
+    high: -0.01
+```
+
+### Programmatic Usage
+
+```python
+import optuna
+from rosnav_rl.tuning import TuningCfg, suggest_params, apply_params
+
+# Define search space in Python
+from rosnav_rl.tuning import FloatParam, IntParam
+
+search_space = {
+    "agent_cfg.framework.algorithm.parameters.learning_rate":
+        FloatParam(low=1e-5, high=1e-3, log=True),
+    "agent_cfg.framework.algorithm.parameters.n_steps":
+        IntParam(low=128, high=4096, step=128),
+}
+
+# Build a custom objective
+def objective(trial):
+    params = suggest_params(trial, search_space)
+    config_dict = apply_params(base_config_dict, params)
+    # ... validate, train, return metric
+    return metric_value
+
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=20)
+```
+
+### Tips
+
+- **Start small**: use `trial_timesteps` to shorten runs during exploration,
+  then retrain the best config at full length.
+- **Persist studies**: set `storage: "sqlite:///tuning.db"` so you can resume
+  interrupted runs and analyse results later.
+- **Pruning**: the `median` pruner works well for most cases. Use `none` if you
+  want to complete every trial.
+- **Categorical params**: great for architecture choices (e.g.
+  `architecture_name`) or discrete batch sizes.
+- **Parallel tuning**: Optuna supports multi-process optimisation when using
+  a database storage backend.
+
+> See the `rosnav_rl/tuning/` module source for implementation details.
+
+---
+
+## 10. Configuring the Agent Directory
+
+By default, trained agents are saved to `arena_training/agents/<agent_name>/`.
+This path is fully configurable via a **3-level fallback chain**.
+
+### Resolution Order
+
+| Priority | Source | Example |
+| --- | --- | --- |
+| 1 (highest) | `agents_dir` in `TrainingCfg` YAML | `agents_dir: /data/my_agents` |
+| 2 | `ROSNAV_AGENTS_DIR` env var | `export ROSNAV_AGENTS_DIR=/data/my_agents` |
+| 3 (default) | Built-in path | `arena_training/agents/` |
+
+### Option A — In the Training Config
+
+```yaml
+# training_config.yaml
+agents_dir: /data/experiments/run_42
+agent_cfg:
+  name: my_agent
+  # ...
+```
+
+The agent will be saved to `/data/experiments/run_42/my_agent/`.
+
+### Option B — Via Environment Variable
+
+```bash
+export ROSNAV_AGENTS_DIR=/data/experiments
+python3 scripts/train_agent.py --config training_config.yaml
+```
+
+### Option C — Default (No Configuration)
+
+If neither the config field nor the env var is set, agents are saved to the
+default `arena_training/agents/` directory. This is backward-compatible with
+existing workflows.
+
+### Inference Side
+
+The action server uses the same env var for loading agents:
+
+```bash
+export ROSNAV_AGENTS_DIR=/data/experiments
+ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=my_agent
+```
+
+The action server additionally supports 3 fallback strategies (ament index,
+file-path walking, prefix paths) so it typically finds agents automatically.
+
+### Script Usage
+
+The `create_test_agent.py` script also supports `--agents-dir`:
+
+```bash
+python3 scripts/create_test_agent.py --agent-name test_ppo --agents-dir /tmp/test_agents
+```
+
+---
+
 ## Quick Reference
 
 | I want to… | See |
@@ -713,5 +1021,7 @@ For advanced customization (custom policy classes, feature extractors), see
 | Add a ROS topic collector | [Tutorial 6](#6-adding-a-new-observation-data-source) |
 | Build a custom reward | [Tutorial 7](#7-adding-a-new-reward-unit) |
 | Design a network architecture | [Tutorial 8](#8-adding-a-new-model-architecture) |
+| Tune hyperparameters | [Tutorial 9](#9-hyperparameter-tuning) |
+| Change agent output directory | [Tutorial 10](#10-configuring-the-agent-directory) |
 | Understand the architecture | [Developer Guide](GUIDE.md) |
 | Configure an agent | [cfg/README.md](rosnav_rl/cfg/README.md) |

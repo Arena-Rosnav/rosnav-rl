@@ -15,6 +15,7 @@
 5. [Core Concepts](#5-core-concepts)
 6. [SB3 Configuration Architecture](#6-sb3-configuration-architecture)
 7. [Development Workflow](#7-development-workflow)
+8. [Hyperparameter Tuning](#8-hyperparameter-tuning)
 
 ---
 
@@ -641,6 +642,54 @@ arena_training/agents/<agent_name>/
 └── observations.yaml       # (Optional) agent-specific observation config
 ```
 
+The agent directory location is configurable via a 3-level fallback chain:
+1. `agents_dir` field in `TrainingCfg` (highest priority)
+2. `ROSNAV_AGENTS_DIR` environment variable
+3. Default: `arena_training/agents/`
+
+See [Tutorial 10](TUTORIALS.md#10-configuring-the-agent-directory) for details.
+
+---
+
+## 8. Hyperparameter Tuning
+
+The `rosnav_rl.tuning` module provides Optuna-based hyperparameter optimisation
+that integrates with the Pydantic config system.  Key components:
+
+```
+tuning/
+├── __init__.py        # Public API exports
+├── search_space.py    # FloatParam, IntParam, CategoricalParam models
+├── sampler.py         # suggest_params() and apply_params() utilities
+├── cfg.py             # TuningCfg — full study configuration model
+└── callbacks.py       # TrialPruningCallback for SB3
+```
+
+### Design
+
+Search spaces use **dot-notation config paths** so that any field in a
+`TrainingCfg` can be tuned without code changes:
+
+```yaml
+search_space:
+  agent_cfg.framework.algorithm.parameters.learning_rate:
+    type: float
+    low: 1.0e-5
+    high: 1.0e-3
+    log: true
+```
+
+The flow is:
+1. `suggest_params(trial, search_space)` → flat dict of sampled values
+2. `apply_params(base_config_dict, params)` → deep-copied config with overrides
+3. `TrainingCfg.model_validate(modified_dict)` → Pydantic validation
+4. Normal training run → metric extraction → report to Optuna
+
+The `TrialPruningCallback` plugs into SB3's callback system to report
+intermediate metrics, enabling early stopping of unpromising trials.
+
+See [Tutorial 9](TUTORIALS.md#9-hyperparameter-tuning) for the full walkthrough.
+
 ---
 
 ## Further Reading
@@ -654,3 +703,4 @@ arena_training/agents/<agent_name>/
 | [spaces/README.md](rosnav_rl/spaces/README.md) | SpaceFactory, encoding pipeline, ActionSpaceManager |
 | [cfg/README.md](rosnav_rl/cfg/README.md) | AgentCfg, discriminated unions, serialization |
 | [action_server/README.md](rosnav_rl/action_server/README.md) | ROS 2 deployment, GetCommand service |
+| Tuning module | `rosnav_rl/tuning/` — Optuna search spaces, samplers, pruning callback |
