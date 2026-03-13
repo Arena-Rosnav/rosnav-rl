@@ -4,27 +4,39 @@
   <img width="600" src="img/logo.png" alt="Rosnav-RL Logo"/>
 </p>
 
-> **Modular deep reinforcement learning for ROS 2 robot navigation.**
+> **The research toolkit for RL-based ROS 2 robot navigation.**
 >
-> Train, evaluate, and deploy RL navigation agents with swappable algorithms,
-> composable observation spaces, and plug-and-play reward functions.
+> RosNav-RL wraps any reinforcement learning framework - Stable-Baselines3,
+> DreamerV3, or your own - with a unified, fully modular pipeline:
+> sensor data collection and preprocessing, typed observation spaces,
+> composable reward shaping, automatic dependency resolution between pipeline
+> units, and Optuna-based hyperparameter search.
+> Every layer is independently swappable so you can isolate and iterate on
+> exactly the component you care about without rewriting the rest.
+
+**The core idea:** define your robot's *sensors*, *observations*, *reward*, and
+*algorithm* as composable YAML configs. Switch from PPO to DreamerV3, add a new
+reward term, or plug in a custom observation generator - all without changing
+a single line of training code.
+
 
 | | |
 | --- | --- |
-| **ROS** | Humble (ROS 2 only - no rospy/rospkg) |
+| **ROS** | Humble (ROS 2 only) |
 | **Python** | 3.10+ |
 | **RL Backends** | Stable-Baselines3, sb3-contrib, DreamerV3 |
-| **Config** | Pydantic v2 (type-safe, auto-validated, YAML round-trip) |
+| **Config** | Pydantic v2 - type-safe, auto-validated, YAML round-trip |
 
 ---
 
 ## Key Features
 
-- **Framework-agnostic** - common `RL_Model` interface lets you swap SB3 ↔ DreamerV3 without touching training code.
-- **Composable observation spaces** - mix laser, goal, velocity, pedestrian, and custom spaces via a registry. Parallel encoding, auto-normalization.
-- **Modular reward system** - stack reward units declaratively in YAML. Parallel evaluation, safety categorization, schema-based dependency validation.
-- **Observation pipeline** - collectors → generators → agents. Dependency resolution via topological sort. Observation synchronization.
-- **One-command deployment** - `ros2 run rosnav_rl action_server.py` wraps any trained agent in a `GetCommand` service.
+- **Wrap any RL backend** - the common `RL_Model` interface means you swap SB3 ↔ DreamerV3 ↔ your own implementation without touching training code. Same observations, same reward, same config.
+- **Declarative data pipeline** - define collectors by ROS message type (`sensor_msgs/LaserScan`); preprocessing and topic wiring happen automatically.
+- **Dependency-resolved observation graph** - generators declare what they need; a topological sort determines execution order at startup so you never manage it manually.
+- **Composable reward shaping** - stack reward units in YAML, evaluated in parallel with safety categorization and schema-validated inter-unit dependencies.
+- **Built-in hyperparameter tuning** - Optuna integration with MedianPruner / HyperbandPruner, framework-specific pruning callbacks, and automatic best-param export.
+- **One-command deployment** - `ros2 run rosnav_rl action_server.py` wraps any trained agent behind a `GetCommand` service.
 
 ---
 

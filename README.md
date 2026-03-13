@@ -16,26 +16,42 @@
 </p>
 
 <p align="center">
-  <strong>Train, deploy, and swap deep RL navigation agents in ROS 2 - without rewriting your pipeline every time.</strong>
+  <strong>The research toolkit for RL-based robot navigation on ROS 2.</strong>
 </p>
 
 ---
 
-Rosnav-RL is a modular framework for building RL-based robot navigation on ROS 2 Humble. It handles the tedious parts - observation pipelines, reward composition, action spaces, deployment - so you can focus on the research.
+> RosNav-RL wraps any reinforcement learning framework - Stable-Baselines3,
+> DreamerV3, or your own - with a unified, fully modular pipeline:
+> sensor data collection and preprocessing, typed observation spaces,
+> composable reward shaping, automatic dependency resolution between pipeline
+> units, and Optuna-based hyperparameter search.
+> Every layer is independently swappable so you can isolate and iterate on
+> exactly the component you care about without rewriting the rest.
 
-Pick PPO or DreamerV3. Change your mind later. The rest of the code stays the same.
+**The core idea:** define your robot's *sensors*, *observations*, *reward*, and
+*algorithm* as composable YAML configs. Switch from PPO to DreamerV3, add a new
+reward term, or plug in a custom observation generator - all without changing
+a single line of training code.
+
+
+| | |
+| --- | --- |
+| **ROS** | Humble (ROS 2 only) |
+| **Python** | 3.10+ |
+| **RL Backends** | Stable-Baselines3, sb3-contrib, DreamerV3 |
+| **Config** | Pydantic v2 - type-safe, auto-validated, YAML round-trip |
 
 ---
 
-## ✨ What makes it different
+## Key Features
 
-| | |
-|---|---|
-| **9 algorithms, zero boilerplate** | PPO, SAC, TD3, DDPG, TQC, A2C, TRPO, RecurrentPPO, CrossQ. Add a custom one with a single config file. |
-| **Swap backends freely** | A common `RL_Model` interface means SB3 <-> DreamerV3 is a one-line YAML change. |
-| **Composable everything** | Observation spaces, reward units, and action spaces are all registry-based and YAML-driven. Mix and match without touching Python. |
-| **Type-safe config** | Pydantic v2 with discriminated unions. If the YAML is wrong, you find out at load time, not mid-training. |
-| **Deploy in one command** | `ros2 run rosnav_rl action_server.py` wraps any trained agent behind a `GetCommand` service - no extra code. |
+- **Wrap any RL backend** - the common `RL_Model` interface means you swap SB3 ↔ DreamerV3 ↔ your own implementation without touching training code. Same observations, same reward, same config.
+- **Declarative data pipeline** - define collectors by ROS message type (`sensor_msgs/LaserScan`); preprocessing and topic wiring happen automatically.
+- **Dependency-resolved observation graph** - generators declare what they need; a topological sort determines execution order at startup so you never manage it manually.
+- **Composable reward shaping** - stack reward units in YAML, evaluated in parallel with safety categorization and schema-validated inter-unit dependencies.
+- **Built-in hyperparameter tuning** - Optuna integration with MedianPruner / HyperbandPruner, framework-specific pruning callbacks, and automatic best-param export.
+- **One-command deployment** - `ros2 run rosnav_rl action_server.py` wraps any trained agent behind a `GetCommand` service.
 
 ---
 
