@@ -66,17 +66,17 @@ The observations config tells the server which ROS topics to subscribe to. A min
 # observations.yaml
 datasources:
   front_laser:
-    type: LaserScanCollector
+    type: sensor_msgs/LaserScan    # ROS message type → resolves to LaserScanCollector
     params:
       topic: "scan"              # your lidar topic
       up_to_date_required: true
   goal_pose:
-    type: PoseStampedCollector
+    type: geometry_msgs/PoseStamped
     params:
       topic: "goal_pose"
       up_to_date_required: false
   robot_pose_from_tf:
-    type: RobotPoseTFGenerator
+    type: RobotPoseTFGenerator     # Generators always use class names
     params: {}
 ```
 

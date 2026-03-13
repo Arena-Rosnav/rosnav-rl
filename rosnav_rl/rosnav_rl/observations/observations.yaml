@@ -47,7 +47,7 @@ datasources:
   
   # Robot localization sources
   # robot_pose_from_odom:
-  #   type: OdometryCollector            # Processes nav_msgs/Odometry → Pose2D
+  #   type: nav_msgs/Odometry            # → Pose2D
   #   params:
   #     topic: "odom"                    # Standard odometry topic
   #     up_to_date_required: true        # Require fresh data for temporal synchronization
@@ -58,66 +58,66 @@ datasources:
 
   # Sensor data collectors
   front_laser:
-    type: LaserScanCollector           # Processes sensor_msgs/LaserScan → LidarRanges
+    type: sensor_msgs/LaserScan        # → LidarRanges
     params:
       topic: "lidar"                    # Primary lidar topic
       up_to_date_required: true        # Critical for obstacle avoidance
 
   # Navigation target collectors  
   goal_pose:
-    type: PoseStampedCollector         # Processes geometry_msgs/PoseStamped → Pose2D
+    type: geometry_msgs/PoseStamped    # → Pose2D
     params:
       topic: "goal_pose"                # Navigation goal from planner (relative to namespace)
       up_to_date_required: false       # Goal updates less frequently
 
   subgoal_pose:
-    type: PoseStampedCollector         # Processes geometry_msgs/PoseStamped → Pose2D
+    type: geometry_msgs/PoseStamped    # → Pose2D
     params:
       topic: "subgoal"                # Intermediate waypoint
       up_to_date_required: false       # Subgoal updates less frequently
 
   # Robot control and action data
   last_action:
-    type: TwistCollector               # Processes geometry_msgs/Twist → RobotVelocity
+    type: geometry_msgs/Twist          # → RobotVelocity
     params:
       topic: "cmd_vel"                 # Robot velocity commands
       # up_to_date_required: true
 
   # Social navigation - people detection
   # people_detections:
-  #   type: PeopleCollector              # Processes people_msgs/People → PedestrianDetections
+  #   type: people_msgs/People           # → PedestrianDetections
   #   params:
   #     topic: "/task_generator_node/people"                  # People tracker output
   #     up_to_date_required: true
 
   # Arena pedestrian detection (arena_people_msgs)
   # arena_pedestrian_detections:
-  #   type: ArenaPedestrianCollector     # Processes arena_people_msgs/Pedestrians → ArenaPedestrianDetections
+  #   type: arena_people_msgs/Pedestrians  # → ArenaPedestrianDetections
   #   params:
   #     topic: "/task_generator_node/arena_peds"  # Arena pedestrian simulator output
   #     up_to_date_required: true
 
   collision_monitor:
-    type: CollisionMonitorStateCollector  # Processes nav2_msgs/CollisionMonitorState → SafetyStatus
+    type: nav2_msgs/CollisionMonitorState  # → SafetyStatus
     params:
       topic: "collision_monitor_state"
       state_key: "StopPolygon"            # Specific collision state to monitor
 
   # Visual perception
   # front_camera:
-  #   type: ImageColorCollector          # Processes sensor_msgs/Image → ImageData
+  #   type: sensor_msgs/Image            # → ImageData
   #   params:
   #     topic: "camera/image_raw"        # Camera feed (supports multiple encodings)
 
   # Navigation planning data
   # navigation_path:
-  #   type: PathCollector                # Processes nav_msgs/Path → NavigationPath  
+  #   type: nav_msgs/Path                # → NavigationPath
   #   params:
   #     topic: "global_plan"                    # Global planner output
 
   # Safety monitoring
   # collision_monitor:
-  #   type: CollisionMonitorStateCollector  # Processes nav2_msgs/CollisionMonitorState → SafetyStatus
+  #   type: nav2_msgs/CollisionMonitorState  # → SafetyStatus
   #   params:
   #     topic: "collision_monitor_state"
   #     state_key: "collision"            # Specific collision state to monitor
@@ -130,23 +130,23 @@ datasources:
   
   # Additional lidar sensors
   # rear_laser:
-  #   type: LaserScanCollector
+  #   type: sensor_msgs/LaserScan
   #   params:
   #     topic: "scan_rear"             # Rear-facing lidar
   #
   # Multi-camera setup for 360° vision
   # left_camera:
-  #   type: ImageColorCollector
+  #   type: sensor_msgs/Image
   #   params:
   #     topic: "camera_left/image_raw"
   #
   # right_camera:
-  #   type: ImageColorCollector
+  #   type: sensor_msgs/Image
   #   params:
   #     topic: "camera_right/image_raw"
   #
   # depth_camera:
-  #   type: ImageColorCollector        # Can also handle depth images
+  #   type: sensor_msgs/Image
   #   params:
   #     topic: "camera/depth/image_raw"
 
@@ -246,7 +246,7 @@ datasources:
 #
 # Additional collectors:
 #   rear_camera:
-#     type: ImageColorCollector
+#     type: sensor_msgs/Image
 #     params:
 #       topic: "camera_rear/image_raw"
 #
@@ -262,11 +262,11 @@ datasources:
 #
 # Additional collectors:
 #   rear_laser:
-#     type: LaserScanCollector  
+#     type: sensor_msgs/LaserScan
 #     params:
 #       topic: "scan_rear"
 #   left_laser:
-#     type: LaserScanCollector
+#     type: sensor_msgs/LaserScan
 #     params:
 #       topic: "scan_left"
 #

@@ -144,19 +144,35 @@ aliases:
 # 2. Data sources — collectors and generators
 datasources:
   front_laser:
-    type: LaserScanCollector
+    type: sensor_msgs/LaserScan      # ← ROS message type (preferred)
     params:
       topic: "lidar"
       up_to_date_required: true
 
   robot_pose_from_tf:
-    type: RobotPoseTFGenerator
+    type: RobotPoseTFGenerator       # ← generator class name (unchanged)
     params: {}
 
   dist_angle_to_goal:
     type: DistAngleToGoalGenerator
     params: {}
 ```
+
+### Collector type resolution
+
+The `type` field for collectors supports two equivalent formats:
+
+| Format | Example | When to use |
+| ------ | ------- | ----------- |
+| **ROS message type** (preferred) | `sensor_msgs/LaserScan` | One collector per message type (most cases) |
+| **Class name** (legacy / fallback) | `LaserScanCollector` | Multiple collectors handle the same message type |
+
+The factory automatically maps each message type to the unique collector class
+that declares `Collector[<msg_type>, …]`.  If two collectors share the same
+message type a `ValueError` listing the conflicting class names is raised —
+use the class name directly to resolve the ambiguity.
+
+Generators always use their class name since they have no ROS message type.
 
 Aliases let observation spaces reference logical names (e.g. `robot_pose`)
 instead of concrete data-source names, making it trivial to swap sensors
@@ -185,13 +201,26 @@ from rosnav_rl.observations.factory.resolver import DependencyResolver
 
 1. Subclass `Collector[RosMessageType, ProcessedDataType]` in `data_sources/collectors.py`.
 2. Implement `_preprocess(self, msg) -> ProcessedDataType`.
-3. Reference it by class name in `observations.yaml`.
+3. The factory picks it up automatically — reference it in `observations.yaml` by
+   **ROS message type** (preferred) or class name.
 
 ```python
 class DepthImageCollector(Collector[sensor_msgs.Image, np.ndarray]):
     def _preprocess(self, msg: sensor_msgs.Image) -> np.ndarray:
         return np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width)
 ```
+
+```yaml
+# observations.yaml — use the ROS message type directly:
+depth_cam:
+  type: sensor_msgs/Image      # resolves to DepthImageCollector
+  params:
+    topic: "camera/depth/image_raw"
+```
+
+> **Note:** If your new collector handles the same message type as an existing
+> one (e.g. a second `sensor_msgs/Image` collector), the mapping becomes
+> ambiguous.  Use the class name (`DepthImageCollector`) in the YAML instead.
 
 ## Adding a New Generator
 

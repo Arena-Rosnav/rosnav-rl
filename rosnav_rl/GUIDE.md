@@ -346,10 +346,10 @@ aliases:
   robot_pose: robot_pose_from_tf
 datasources:
   front_laser:
-    type: LaserScanCollector
+    type: sensor_msgs/LaserScan    # ROS message type → resolves to LaserScanCollector
     params: { topic: "lidar" }
   dist_angle_to_goal:
-    type: DistAngleToGoalGenerator
+    type: DistAngleToGoalGenerator # Generators always use class names
     params: {}
 ```
 
