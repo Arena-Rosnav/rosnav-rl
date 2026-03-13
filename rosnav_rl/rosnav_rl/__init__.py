@@ -38,6 +38,7 @@ __all__ = [
     "AgentCfg",
     "RewardCfg",
     "SupportedRLFrameworks",
+    "tuning",
 ]
 
 

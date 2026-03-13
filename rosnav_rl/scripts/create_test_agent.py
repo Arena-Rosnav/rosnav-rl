@@ -67,7 +67,17 @@ ARENA_ROOT = _find_arena_root()
 DEFAULT_CONFIG = (
     ARENA_ROOT / "arena_bringup" / "configs" / "training" / "sb_training_config.yaml"
 )
-AGENTS_DIR = ARENA_ROOT / "arena_training" / "agents"
+_DEFAULT_AGENTS_DIR = ARENA_ROOT / "arena_training" / "agents"
+
+
+def _resolve_agents_dir(cli_agents_dir: Path | None = None) -> Path:
+    """Resolve agents directory with fallback chain: CLI > env var > default."""
+    if cli_agents_dir is not None:
+        return Path(cli_agents_dir).expanduser().resolve()
+    env_dir = os.environ.get("ROSNAV_AGENTS_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser().resolve()
+    return _DEFAULT_AGENTS_DIR
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -80,7 +90,9 @@ def _build_simulation_state(training_cfg):
     return _get_arena_states(training_cfg)
 
 
-def create_test_agent(agent_name: str, config_path: Path) -> Path:
+def create_test_agent(
+    agent_name: str, config_path: Path, agents_dir: Path | None = None
+) -> Path:
     """Create and save a minimal test agent.
 
     Returns the path to the created agent directory.
@@ -136,7 +148,8 @@ def create_test_agent(agent_name: str, config_path: Path) -> Path:
     agent.model._model = ppo
 
     # ── Save agent directory ───────────────────────────────────────────────
-    agent_dir = AGENTS_DIR / agent_name
+    resolved_dir = _resolve_agents_dir(agents_dir)
+    agent_dir = resolved_dir / agent_name
     agent_dir.mkdir(parents=True, exist_ok=True)
 
     # Save training_config.yaml
@@ -161,7 +174,7 @@ def create_test_agent(agent_name: str, config_path: Path) -> Path:
     print(f"\n✓ Test agent '{agent_name}' created at {agent_dir}")
     print("\nTo start the action server with this agent run:")
     print(f"  source ~/arena5_ws/install/setup.bash")
-    print(f"  export ROSNAV_AGENTS_DIR={AGENTS_DIR}")
+    print(f"  export ROSNAV_AGENTS_DIR={resolved_dir}")
     print(f"  ros2 run rosnav_rl action_server.py --ros-args -p agent_name:={agent_name}")
     print("\nThen, in another terminal:")
     print("  ros2 service call /get_command rosnav_rl_msgs/srv/GetCommand {}")
@@ -184,13 +197,22 @@ def main():
         default=DEFAULT_CONFIG,
         help=f"Path to the training config YAML (default: {DEFAULT_CONFIG})",
     )
+    parser.add_argument(
+        "--agents-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Base directory for agent artifacts "
+            "(default: ROSNAV_AGENTS_DIR env var or arena_training/agents/)"
+        ),
+    )
     args = parser.parse_args()
 
     if not args.config.exists():
         print(f"ERROR: config not found: {args.config}", file=sys.stderr)
         sys.exit(1)
 
-    create_test_agent(args.agent_name, args.config)
+    create_test_agent(args.agent_name, args.config, agents_dir=args.agents_dir)
 
 
 if __name__ == "__main__":
