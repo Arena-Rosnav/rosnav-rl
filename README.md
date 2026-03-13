@@ -81,17 +81,15 @@ The observations config (`observations.yaml`) maps your robot's sensors to colle
 # observations.yaml
 datasources:
   front_laser:
-    type: LaserScanCollector
+    type: sensor_msgs/LaserScan
     params:
       topic: "scan"              # your lidar topic
       up_to_date_required: true
-
   goal_pose:
-    type: PoseStampedCollector
+    type: geometry_msgs/PoseStamped
     params:
       topic: "goal_pose"
       up_to_date_required: false
-
   robot_pose_from_tf:
     type: RobotPoseTFGenerator
     params: {}
