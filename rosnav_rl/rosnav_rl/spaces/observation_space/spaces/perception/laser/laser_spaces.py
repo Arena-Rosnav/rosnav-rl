@@ -5,11 +5,14 @@ Enhanced laser processing with proven, reliable features for production use.
 
 import numpy as np
 from gymnasium import spaces
+from numpy.lib.stride_tricks import sliding_window_view
 
 from rosnav_rl.observations.utils.types import LidarRanges
+
 from ....observation_space_factory import SpaceFactory
 from ....space_categories import SpaceCategory
 from ...base_observation_space import BaseObservationSpace
+
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
@@ -73,6 +76,11 @@ class ReliableLaserSpace(BaseObservationSpace):
         self.enable_median_filter = enable_median_filter
         self.filter_window = filter_window
 
+        # Cached indices for beam reduction (computed lazily)
+        self._reduce_indices: np.ndarray | None = None
+        self._interp_indices: np.ndarray | None = None
+        self._last_scan_len: int = -1
+
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:
@@ -97,32 +105,49 @@ class ReliableLaserSpace(BaseObservationSpace):
         return scan
 
     def _apply_median_filter(self, scan: np.ndarray) -> np.ndarray:
-        """Apply simple median filter for outlier removal."""
+        """Apply vectorized median filter for outlier removal using sliding windows."""
         if not self.enable_median_filter or len(scan) < self.filter_window:
             return scan
 
-        filtered_scan = np.copy(scan)
-        half_window = self.filter_window // 2
+        n = len(scan)
+        w = self.filter_window
+        half = w // 2
 
-        for i in range(half_window, len(scan) - half_window):
-            window = scan[i - half_window : i + half_window + 1]
-            filtered_scan[i] = np.median(window)
+        # Use stride tricks to create sliding window view (zero-copy)
+        windows = sliding_window_view(scan, w)
+        medians = np.median(windows, axis=1)
 
-        return filtered_scan
+        # Build result: keep edges unchanged, replace middle with medians
+        result = scan.copy()
+        result[half : n - half] = medians
+        return result
 
     def _reduce_beams(self, scan: np.ndarray) -> np.ndarray:
-        """Reduce number of beams through simple subsampling."""
-        if len(scan) == self.reduced_beams:
+        """Reduce number of beams through subsampling with cached indices."""
+        scan_len = len(scan)
+        if scan_len == self.reduced_beams:
             return scan
 
-        if len(scan) > self.reduced_beams:
-            # Subsample evenly
-            indices = np.linspace(0, len(scan) - 1, self.reduced_beams, dtype=int)
-            return scan[indices]
+        # Recompute indices only when scan length changes
+        if scan_len != self._last_scan_len:
+            self._last_scan_len = scan_len
+            if scan_len > self.reduced_beams:
+                self._reduce_indices = np.linspace(
+                    0, scan_len - 1, self.reduced_beams, dtype=int
+                )
+                self._interp_indices = None
+            else:
+                self._interp_indices = np.linspace(
+                    0, scan_len - 1, self.reduced_beams
+                )
+                self._reduce_indices = None
+
+        if self._reduce_indices is not None:
+            return scan[self._reduce_indices]
         else:
-            # Interpolate to target size
-            indices = np.linspace(0, len(scan) - 1, self.reduced_beams)
-            return np.interp(indices, np.arange(len(scan)), scan)
+            return np.interp(
+                self._interp_indices, np.arange(scan_len), scan
+            )
 
     def encode_observation(
         self, front_laser: LidarRanges, *args, **kwargs
@@ -148,10 +173,11 @@ class ReliableLaserSpace(BaseObservationSpace):
         raw_scan = front_laser
         if len(raw_scan) == 0:
             return np.full(self.reduced_beams, self.max_range, dtype=np.float32)
-        processed_scan = self._validate_scan(raw_scan.astype(np.float32))
+        # _validate_scan already produces float32 via np.nan_to_num/np.clip
+        processed_scan = self._validate_scan(raw_scan if raw_scan.dtype == np.float32 else raw_scan.astype(np.float32))
         processed_scan = self._apply_median_filter(processed_scan)
         processed_scan = self._reduce_beams(processed_scan)
-        return processed_scan.astype(np.float32)
+        return processed_scan
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
@@ -205,6 +231,20 @@ class MultiRangeLaserSpace(BaseObservationSpace):
         self.base_max_range = laser_max_range
         self.min_range = min_range
 
+        # Pre-compute scale denominators for vectorized multi-scale encoding
+        self._max_ranges = np.array(
+            [self.base_max_range * s for s in self.range_scales], dtype=np.float32
+        ).reshape(-1, 1)  # Shape: (num_scales, 1) for broadcasting
+
+        # Cache for interp indices
+        self._interp_source: np.ndarray | None = None
+        self._interp_target: np.ndarray | None = None
+        self._last_scan_len: int = -1
+
+        # Pre-allocate output buffer
+        total_dims = self.num_beams * len(self.range_scales)
+        self._output_buffer = np.empty(total_dims, dtype=np.float32)
+
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:
@@ -244,14 +284,18 @@ class MultiRangeLaserSpace(BaseObservationSpace):
             scan, self.min_range, self.base_max_range * max(self.range_scales)
         )
         if len(scan) != self.num_beams:
-            indices = np.linspace(0, len(scan) - 1, self.num_beams)
-            scan = np.interp(indices, np.arange(len(scan)), scan)
-        multi_scale_data = []
-        for scale in self.range_scales:
-            max_range = self.base_max_range * scale
-            normalized_scan = np.clip(scan / max_range, 0.0, 1.0)
-            multi_scale_data.extend(normalized_scan)
-        return np.array(multi_scale_data, dtype=np.float32)
+            # Cache interp indices for consistent scan lengths
+            if len(scan) != self._last_scan_len:
+                self._last_scan_len = len(scan)
+                self._interp_target = np.linspace(0, len(scan) - 1, self.num_beams)
+                self._interp_source = np.arange(len(scan))
+            scan = np.interp(self._interp_target, self._interp_source, scan)
+
+        # Vectorized multi-scale: broadcast scan (1, num_beams) / max_ranges (num_scales, 1)
+        multi_scale = np.clip(scan[np.newaxis, :] / self._max_ranges, 0.0, 1.0)
+        # Flatten row-major into output buffer (scale0_beam0..beamN, scale1_beam0..beamN, ...)
+        np.copyto(self._output_buffer, multi_scale.ravel())
+        return self._output_buffer
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)

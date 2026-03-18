@@ -1,6 +1,4 @@
-import concurrent.futures
 import logging
-import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -9,7 +7,6 @@ from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.logging import (
     ComponentType,
     ErrorReportingMixin,
-    ErrorSeverity,
 )
 from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.utils.validation import validate_reward_units
@@ -20,8 +17,6 @@ if TYPE_CHECKING:
     from .reward_units.base_reward_units import RewardUnit
 
 # Configuration constants
-DEFAULT_MAX_WORKERS = 8
-DEFAULT_TIMEOUT_SECONDS = 0.1
 ERROR_MESSAGE_SUFFIX = " ---> thus not applied (+/- 0.0)."
 
 
@@ -70,9 +65,7 @@ class RewardFunction(ErrorReportingMixin):
         unit_kwargs: Optional[Dict[str, Any]] = None,
         enable_validation: bool = True,
         verbose: int = 0,
-        parallel: bool = False,
-        max_workers: Optional[int] = DEFAULT_MAX_WORKERS,
-        timeout: Optional[float] = DEFAULT_TIMEOUT_SECONDS,
+        **kwargs,
     ):
         """Initialize the reward function.
 
@@ -81,9 +74,6 @@ class RewardFunction(ErrorReportingMixin):
             unit_kwargs: Additional arguments for reward units.
             enable_validation: Whether to validate reward units.
             verbose: Enable detailed logging.
-            parallel: Enable parallel calculation of reward units.
-            max_workers: Maximum number of worker threads for parallel execution.
-            timeout: Timeout in seconds for parallel execution.
         """
         super().__init__(
             component_type=ComponentType.REWARD_FUNCTION,
@@ -94,14 +84,10 @@ class RewardFunction(ErrorReportingMixin):
         self.reward_function_dict = function_dict
         self.unit_kwargs = unit_kwargs or {}
         self.verbose = verbose
-        self.parallel = parallel
-        self.max_workers = max_workers
-        self.timeout = timeout
 
         # State
         self.state = RewardState()
         self._validate_units = enable_validation
-        self._lock = threading.Lock() if parallel else None
 
         # Reusable kwargs dict to avoid per-step allocation
         self._execution_kwargs: Dict[str, Any] = {}
@@ -227,11 +213,9 @@ class RewardFunction(ErrorReportingMixin):
     def _execute_reward_units(
         self, units: List["RewardUnit"], kwargs: Dict[str, Any]
     ) -> None:
-        """Execute reward units using the appropriate strategy."""
+        """Execute reward units sequentially."""
         if len(units) == 1:
             self._execute_single_unit(units[0], kwargs)
-        elif self.parallel and len(units) > 1:
-            self._calculate_reward_parallel(units, kwargs)
         else:
             self._calculate_reward_sequential(units, kwargs)
 
@@ -259,93 +243,6 @@ class RewardFunction(ErrorReportingMixin):
                 reward_unit(**all_kwargs)
             except Exception as e:
                 self._handle_unit_error(reward_unit.__class__.__name__, e)
-
-    def _calculate_reward_parallel(
-        self, reward_units: List["RewardUnit"], all_kwargs: Dict[str, Any]
-    ) -> None:
-        """Calculate rewards in parallel using ThreadPoolExecutor."""
-        try:
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=self.max_workers
-            ) as executor:
-                results = self._execute_parallel_tasks(
-                    executor, reward_units, all_kwargs
-                )
-                self._process_parallel_results(results, len(reward_units))
-        except concurrent.futures.TimeoutError as e:
-            self._handle_timeout_error(e)
-        except Exception as e:
-            self._handle_parallel_execution_error(e, reward_units, all_kwargs)
-
-    def _execute_parallel_tasks(
-        self,
-        executor: concurrent.futures.ThreadPoolExecutor,
-        reward_units: List["RewardUnit"],
-        all_kwargs: Dict[str, Any],
-    ) -> List[Tuple[bool, str, Optional[Exception]]]:
-        """Execute reward units in parallel and collect results."""
-        future_to_unit = {
-            executor.submit(self._execute_unit_safely, unit, all_kwargs): unit
-            for unit in reward_units
-        }
-
-        completed_futures = concurrent.futures.as_completed(
-            future_to_unit, timeout=self.timeout
-        )
-
-        return [future.result() for future in completed_futures]
-
-    def _execute_unit_safely(
-        self, unit: "RewardUnit", kwargs: Dict[str, Any]
-    ) -> Tuple[bool, str, Optional[Exception]]:
-        """Execute a single reward unit and return success status."""
-        try:
-            unit(**kwargs)
-            return True, unit.__class__.__name__, None
-        except Exception as e:
-            return False, unit.__class__.__name__, e
-
-    def _process_parallel_results(
-        self, results: List[Tuple[bool, str, Optional[Exception]]], total_units: int
-    ) -> None:
-        """Process results from parallel execution."""
-        failed_units = [(name, exc) for success, name, exc in results if not success]
-
-        for unit_name, exception in failed_units:
-            if self.verbose and exception:
-                self._report_error(
-                    component_name=unit_name,
-                    severity=ErrorSeverity.WARNING,
-                    message=str(exception),
-                    error_type=type(exception).__name__,
-                )
-
-        if self.verbose and failed_units:
-            self._report_warning(
-                f"Parallel reward calculation: {len(failed_units)} units failed out of {total_units}"
-            )
-
-    def _handle_timeout_error(self, error: concurrent.futures.TimeoutError) -> None:
-        """Handle timeout errors in parallel execution."""
-        error_msg = f"Parallel reward calculation exceeded timeout of {self.timeout}s"
-        self._report_error(error_msg, error_type="TimeoutError")
-        raise TimeoutError(error_msg) from error
-
-    def _handle_parallel_execution_error(
-        self,
-        error: Exception,
-        reward_units: List["RewardUnit"],
-        all_kwargs: Dict[str, Any],
-    ) -> None:
-        """Handle general errors in parallel execution with fallback."""
-        error_msg = f"Parallel execution failed: {str(error)}"
-
-        if self.verbose:
-            self._report_warning(f"{error_msg}, falling back to sequential")
-        else:
-            self._report_error(error_msg, error_type=type(error).__name__)
-
-        self._calculate_reward_sequential(reward_units, all_kwargs)
 
     def get_reward(
         self,
@@ -380,11 +277,9 @@ class RewardFunction(ErrorReportingMixin):
         """
         called_by = kwargs.get("called_by")
 
-        if self.parallel and self._lock:
-            with self._lock:
-                self._update_reward_and_overview(value, called_by)
-        else:
-            self._update_reward_and_overview(value, called_by)
+        self.state.current_reward += value
+        if called_by:
+            self.state.reward_overview[called_by] = value
 
     def _update_reward_and_overview(
         self, value: float, called_by: Optional[str]
@@ -459,7 +354,4 @@ class RewardFunction(ErrorReportingMixin):
             unit_kwargs=self.unit_kwargs,
             enable_validation=self._validate_units,
             verbose=self.verbose,
-            parallel=self.parallel,
-            max_workers=self.max_workers,
-            timeout=self.timeout,
         )

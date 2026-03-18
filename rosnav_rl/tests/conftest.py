@@ -73,8 +73,6 @@ def make_reward_function():
         rf.state.info = {}
         rf.state.reward_overview = {}
         rf.verbose = 0
-        rf.parallel = False
-        rf._lock = None
 
         # Track cumulative reward
         _reward_accum = {"total": 0.0}

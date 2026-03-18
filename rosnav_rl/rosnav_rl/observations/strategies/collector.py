@@ -44,27 +44,20 @@ class CollectorManager:
         Returns:
             Updated observation dictionary with collector data
         """
-        self._logger.debug(f"Collecting observations from {len(collectors)} collectors")
-
-        # Check which collectors need fresh data
-        stale_collectors = []
+        stale_collectors = None
         for name, collector in collectors.items():
-            if collector.stale and collector.up_to_date_required:
-                self._logger.debug(
-                    f"Collector '{name}' has been stale for {collector.age:.2f} seconds."
-                )
-                if self._wait_for_obs:
-                    stale_collectors.append(name)
-            # Always get the current value (stale or not)
-            obs_dict[name] = collector.get_observation()
+            obs_dict[name] = collector._value  # Direct attribute access (bypass method call)
+            if collector._stale and collector.up_to_date_required and self._wait_for_obs:
+                if stale_collectors is None:
+                    stale_collectors = []
+                stale_collectors.append(name)
 
         # Wait for stale collectors if needed
         if stale_collectors:
             self._waiting_strategy.wait_for_collectors(stale_collectors, collectors)
-
             # Update observation values after waiting
             for name in stale_collectors:
-                obs_dict[name] = collectors[name].get_observation()
+                obs_dict[name] = collectors[name]._value
 
         # Mark all collectors as stale for next collection cycle
         self._invalidate_observations(collectors)
@@ -74,4 +67,4 @@ class CollectorManager:
     def _invalidate_observations(self, collectors: Dict[str, Collector]) -> None:
         """Mark all collectors as stale to ensure fresh data on next collection."""
         for collector in collectors.values():
-            collector.stale = True
+            collector._stale = True

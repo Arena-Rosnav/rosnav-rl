@@ -55,13 +55,22 @@ class GeneratorManager:
         if not generators:
             return
 
-        # Optional validation of root generators (those that only depend on collectors)
+        # Validate root generators only once, then disable (keys are static)
         if self._validate_generators:
             self._validate_root_generators(obs_dict, generators)
+            self._validate_generators = False
 
         # Execute generators in dependency order
+        sim_state = self._simulation_state_container
         for name in self._dependency_resolver.execution_order:
-            self._execute_generator(name, generators[name], obs_dict)
+            try:
+                generator = generators[name]
+                obs_dict[name] = generator.get_observation(
+                    obs_dict, simulation_state_container=sim_state
+                )
+            except Exception as e:
+                self._logger.error(f"Error generating observation '{name}': {e}")
+                obs_dict[name] = None
 
     def _validate_root_generators(
         self, obs_dict: Dict[str, Any], generators: Dict[str, Generator]
@@ -78,6 +87,8 @@ class GeneratorManager:
     ) -> None:
         """
         Execute a single generator with proper error handling.
+        Note: Primarily used for one-off calls. The hot path in generate_observations()
+        is inlined above for performance.
 
         Args:
             name: Name of the generator
@@ -85,19 +96,10 @@ class GeneratorManager:
             obs_dict: Observation dictionary to update
         """
         try:
-            # Optional per-generator validation (dependency-aware)
-            if self._validate_generators:
-                GeneratorSchemaValidator.validate_single_generator(
-                    obs_dict, name, generator
-                )
-
-            # Generate the observation
             obs_dict[name] = generator.get_observation(
                 obs_dict,
                 simulation_state_container=self._simulation_state_container,
             )
-
-            self._logger.debug(f"Successfully generated observation '{name}'")
         except Exception as e:
             self._logger.error(f"Error generating observation '{name}': {e}")
             obs_dict[name] = None  # Graceful degradation
