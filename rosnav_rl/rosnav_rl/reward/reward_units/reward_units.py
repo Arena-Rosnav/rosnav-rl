@@ -15,7 +15,7 @@ from rosnav_rl.observations.utils.types import (
     SafetyStatus,
     SubgoalRelativePosition,
 )
-from rosnav_rl.states import SimulationStateContainer
+from rosnav_rl.cfg.parameters import AgentParameters
 
 from ..constants import DEFAULTS, DONE_REASONS, REWARD_CONSTANTS
 from ..reward_function import RewardFunction
@@ -51,7 +51,7 @@ class RewardGoalReached(RewardUnit):
     requires = {
         "dist_angle_to_goal": DistanceAngleMetrics,
         "dist_angle_to_subgoal": DistanceAngleMetrics,
-        "simulation_state_container": SimulationStateContainer,
+        "simulation_state_container": AgentParameters,
     }
 
     DONE_INFO = {
@@ -99,7 +99,7 @@ class RewardGoalReached(RewardUnit):
         self,
         dist_angle_to_goal: GoalRelativePosition,
         dist_angle_to_subgoal: SubgoalRelativePosition,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -115,7 +115,7 @@ class RewardGoalReached(RewardUnit):
             dist_angle_to_subgoal[0] if self._follow_subgoal else dist_angle_to_goal[0]
         )
 
-        if target_distance < simulation_state_container.task.goal_radius:
+        if target_distance < simulation_state_container.goal_radius:
             self.add_reward(self._reward)
             self.add_info(self.DONE_INFO)
         else:
@@ -225,7 +225,7 @@ class RewardFactoredSafeDistance(RewardUnit):
     requires = {
         "laser_safety_violation": SafetyStatus,
         "front_laser": LidarRanges,
-        "simulation_state_container": SimulationStateContainer,
+        "simulation_state_container": AgentParameters,
     }
 
     SAFE_DIST_VIOLATION_INFO = {"safe_dist_violation": True}
@@ -262,7 +262,7 @@ class RewardFactoredSafeDistance(RewardUnit):
         self,
         laser_safety_violation: SafetyStatus,
         front_laser: LidarRanges,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         *args: Any,
         **kwargs: Any,
     ):
@@ -286,7 +286,7 @@ class RewardFactoredSafeDistance(RewardUnit):
                 - Constraints: ranges ∈ [0, max_range], NaN replaced with max_range
                 - Example: [0.3, 0.25, 0.4, ..., 2.1] (minimum used for penalty scaling)
 
-            simulation_state_container (SimulationStateContainer): Robot and environment configuration
+            simulation_state_container (AgentParameters): Robot and environment configuration
                 - Contains: robot safety distance, radius, and system parameters
                 - Source: simulation environment
                 - Used for: safety threshold calculation and penalty scaling
@@ -297,8 +297,8 @@ class RewardFactoredSafeDistance(RewardUnit):
 
             # Calculate proportional penalty based on safety margin violation
             safety_threshold = (
-                simulation_state_container.robot.safety_distance
-                + simulation_state_container.robot.radius
+                simulation_state_container.safety_distance
+                + simulation_state_container.robot_radius
             )
             distance_violation = safety_threshold - laser_min
 
@@ -572,7 +572,7 @@ class RewardCollision(RewardUnit):
     requires = {
         "front_laser": LidarRanges,
         "collision_monitor": SafetyStatus,
-        "simulation_state_container": SimulationStateContainer,
+        "simulation_state_container": AgentParameters,
     }
 
     DONE_INFO = {
@@ -619,7 +619,7 @@ class RewardCollision(RewardUnit):
     def __call__(
         self,
         front_laser: LidarRanges,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         collision_monitor: SafetyStatus = None,
         *args: Any,
         **kwargs: Any,
@@ -645,14 +645,14 @@ class RewardCollision(RewardUnit):
                 - Constraints: True if collision detected, False otherwise
                 - Example: True (indicating nav2 detected collision)
 
-            simulation_state_container (SimulationStateContainer): Container with task configuration
+            simulation_state_container (AgentParameters): Container with task configuration
                 - Contains: robot parameters, safety thresholds, episode state
                 - Source: simulation environment
                 - Used for: collision zone configuration and episode termination
         """
         # If no collision monitor signal yet, fallback to laser-based collision check
         if not collision_monitor:
-            robot_radius = simulation_state_container.robot.radius
+            robot_radius = simulation_state_container.robot_radius
             collision_threshold = robot_radius + self._bumper_zone
 
             # Check for collision by finding minimum laser reading
@@ -1252,7 +1252,7 @@ class RewardActiveHeadingDirection(RewardUnit):
         "last_action": RobotActionVector,
         "pedestrian_relative_locations": PedestrianRelativeLocations,
         "pedestrian_relative_velocities": PedestrianRelativeVelocities,
-        "simulation_state_container": SimulationStateContainer,
+        "simulation_state_container": AgentParameters,
     }
 
     @check_params
@@ -1298,7 +1298,7 @@ class RewardActiveHeadingDirection(RewardUnit):
         last_action: RobotActionVector,
         pedestrian_relative_locations: PedestrianRelativeLocations,
         pedestrian_relative_velocities: PedestrianRelativeVelocities,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         *args,
         **kwargs,
     ) -> None:
@@ -1339,7 +1339,7 @@ class RewardActiveHeadingDirection(RewardUnit):
                 - Source: pedestrian tracking system
                 - Constraints: N×2 array matching pedestrian_relative_locations
                 - Example: [[0.5, 0.2], [-0.3, 0.8]] (pedestrian velocities for VO prediction)
-            simulation_state_container (SimulationStateContainer): Robot and environment state
+            simulation_state_container (AgentParameters): Robot and environment state
                 - Contains: robot configuration, dimensions, and simulation parameters
                 - Used for: robot radius in velocity obstacle calculations
         """
@@ -1386,13 +1386,13 @@ class RewardActiveHeadingDirection(RewardUnit):
                         # Calculate VO cone using robot radius estimation
                         vector = (
                             ped_dis**2
-                            - (3 * simulation_state_container.robot.radius) ** 2
+                            - (3 * simulation_state_container.robot_radius) ** 2
                         )
                         if vector < 0:
                             continue  # Robot too close to pedestrian, skip
 
                         vo_theta = np.arctan2(
-                            3 * simulation_state_container.robot.radius,
+                            3 * simulation_state_container.robot_radius,
                             np.sqrt(vector),
                         )
                         # Check if trajectory intersects with pedestrian's VO cone
@@ -1651,7 +1651,7 @@ class RewardPedTypeCollision(RewardUnit):
 
     requires = {
         "pedestrian_distances": PedestrianTypeMinDistances,
-        "simulation_state_container": SimulationStateContainer,
+        "simulation_state_container": AgentParameters,
     }
 
     @check_params
@@ -1687,7 +1687,7 @@ class RewardPedTypeCollision(RewardUnit):
     def __call__(
         self,
         pedestrian_distances: PedestrianTypeMinDistances,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -1703,7 +1703,7 @@ class RewardPedTypeCollision(RewardUnit):
                 - Source: pedestrian distance tracking system
                 - Constraints: Keys are group IDs, values are minimum distances ≥ 0
                 - Example: {1: 2.5, 2: 4.1, 3: 1.8} (collision detection per type)
-            simulation_state_container (SimulationStateContainer): Robot and environment state
+            simulation_state_container (AgentParameters): Robot and environment state
                 - Contains: robot configuration, dimensions, and simulation parameters
                 - Used for: robot radius in collision detection calculations
         """
@@ -1715,7 +1715,7 @@ class RewardPedTypeCollision(RewardUnit):
 
         # Calculate collision threshold including robot dimensions
         collision_threshold = (
-            self._bumper_zone + simulation_state_container.robot.radius
+            self._bumper_zone + simulation_state_container.robot_radius
         )
 
         for ped_type, reward in self._type_reward_pairs.items():
@@ -1941,7 +1941,7 @@ class RewardMaxStepsExceeded(RewardUnit):
     """
 
     requires = {
-        "simulation_state_container": SimulationStateContainer,
+        "simulation_state_container": AgentParameters,
     }
 
     DONE_INFO = {
@@ -1974,7 +1974,7 @@ class RewardMaxStepsExceeded(RewardUnit):
 
     def __call__(
         self,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -1986,7 +1986,7 @@ class RewardMaxStepsExceeded(RewardUnit):
             **kwargs: Arbitrary keyword arguments.
         """
         self._steps += 1
-        if self._steps >= simulation_state_container.task.max_steps:
+        if self._steps >= simulation_state_container.max_steps:
             self.add_reward(-self._penalty)
             self.add_info(self.DONE_INFO)
 

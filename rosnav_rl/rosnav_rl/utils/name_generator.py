@@ -21,7 +21,7 @@ def _create_formatted_name(*args: str) -> str:
         >>> _create_formatted_name("model", "v1")
         'model_v1_2023_04_15__14_30_22'
     """
-    formatted_args = "_".join(args)
+    formatted_args = "_".join(str(a) for a in args if a is not None)
     return f"{formatted_args}_{dt.now().strftime('%Y_%m_%d__%H_%M_%S')}"
 
 

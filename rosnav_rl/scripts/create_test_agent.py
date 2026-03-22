@@ -8,9 +8,9 @@ Usage
 
 The script:
   1. Loads a TrainingCfg from an existing arena_bringup config YAML.
-  2. Builds a SimulationStateContainer + AgentStateContainer from the config.
-  3. Instantiates an RL_Agent (AGENT_3 / PPO) which sets up the observation and
-     action spaces.
+  2. Populates an AgentParameters from the robot description.
+  3. Instantiates an RL_Agent from the AgentConfig which sets up the observation
+     and action spaces.
   4. Calls setup_model() with a mock VecEnv to create the PPO model with random
      initial weights.
   5. Saves training_config.yaml + best_model.zip to
@@ -82,12 +82,63 @@ def _resolve_agents_dir(cli_agents_dir: Path | None = None) -> Path:
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-def _build_simulation_state(training_cfg):
-    """Re-use the arena_server helper to build the SimulationStateContainer."""
-    # Import lazily so the script works even if installed via editable install
-    from rosnav_rl.action_server.arena_server import _get_arena_states  # noqa: PLC0415
+def _populate_agent_spec(training_cfg):
+    """Derive action_space, observation and environment from the robot description."""
+    from rosnav_rl.cfg.action_spaces import (  # noqa: PLC0415
+        DifferentialDriveActionSpace,
+        OmnidirectionalActionSpace,
+    )
+    from rosnav_rl.cfg.parameters import AgentParameters  # noqa: PLC0415
 
-    return _get_arena_states(training_cfg)
+    robot_desc = training_cfg.arena_cfg.robot.robot_description
+    general = training_cfg.arena_cfg.general
+    cont = robot_desc.actions.continuous
+
+    if robot_desc.is_holonomic:
+        action_space = OmnidirectionalActionSpace(
+            linear_range_x=tuple(cont.linear_range),
+            linear_range_y=tuple(cont.linear_range),
+            angular_range=tuple(cont.angular_range),
+        )
+    else:
+        action_space = DifferentialDriveActionSpace(
+            linear_range=tuple(cont.linear_range),
+            angular_range=tuple(cont.angular_range),
+        )
+
+    # Carry over the discretization config from the agent_config YAML, then
+    # resolve it immediately using the robot's built-in discrete action list.
+    discretization_cfg = training_cfg.agent_config.discretization
+    if discretization_cfg is not None:
+        action_space = action_space.model_copy(
+            update={"discretization": discretization_cfg}
+        )
+        action_space = action_space.resolve_discretization(
+            robot_discrete_actions=robot_desc.actions.discrete
+        )
+
+    parameters = AgentParameters(
+        laser_num_beams=robot_desc.laser.num_beams,
+        laser_max_range=robot_desc.laser.range,
+        min_linear_vel=cont.linear_range[0],
+        max_linear_vel=cont.linear_range[1],
+        min_angular_vel=cont.angular_range[0],
+        max_angular_vel=cont.angular_range[1],
+        min_translational_vel=cont.linear_range[0],
+        max_translational_vel=cont.linear_range[1],
+        robot_radius=robot_desc.robot_radius,
+        safety_distance=general.safety_distance,
+        goal_radius=general.goal_radius,
+        max_steps=general.max_num_moves_per_eps,
+    )
+
+    training_cfg.agent_config = training_cfg.agent_config.model_copy(
+        update={
+            "robot": robot_desc.robot_model,
+            "action_space": action_space,
+            "parameters": parameters,
+        }
+    )
 
 
 def create_test_agent(
@@ -104,22 +155,17 @@ def create_test_agent(
     from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg  # noqa: PLC0415
 
     training_cfg = TrainingCfg.model_validate(load_yaml(config_path))
-    training_cfg.agent_cfg.name = agent_name
+    training_cfg.agent_config.name = agent_name
     print(f"[create_test_agent] Using robot: {training_cfg.arena_cfg.robot.robot_description.robot_model}")
 
-    # ── Build state containers ─────────────────────────────────────────────
-    print("[create_test_agent] Building SimulationStateContainer …")
-    sim_state = _build_simulation_state(training_cfg)
-    agent_state = sim_state.to_agent_state_container()
+    # ── Build everything from robot description ────────────────────────────
+    _populate_agent_spec(training_cfg)
 
     # ── Create RL_Agent (sets up spaces + model wrapper) ──────────────────
     print("[create_test_agent] Creating RL_Agent …")
     from rosnav_rl.rl_agent import RL_Agent  # noqa: PLC0415
 
-    agent = RL_Agent(
-        agent_cfg=training_cfg.agent_cfg,
-        agent_state_container=agent_state,
-    )
+    agent = RL_Agent(training_cfg.agent_config)
     print(f"[create_test_agent] Observation space: {agent.observation_space}")
     print(f"[create_test_agent] Action space:      {agent.action_space}")
 

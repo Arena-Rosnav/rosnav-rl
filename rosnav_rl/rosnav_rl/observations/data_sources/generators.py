@@ -8,7 +8,7 @@ calculations on data from other `DataSource`s.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import List, Union
+from typing import TYPE_CHECKING, List, Union
 from warnings import warn
 
 import arena_people_msgs.msg as arena_people_msgs
@@ -19,7 +19,8 @@ from rosnav_rl.utils.rostopic import Namespace
 import tf2_ros
 from tf_transformations import euler_from_quaternion
 
-from ...states import SimulationStateContainer
+if TYPE_CHECKING:
+    from rosnav_rl.cfg.parameters import AgentParameters
 from ..utils.pose import Pose2DType
 from ..utils.semantic import get_relative_pos_to_robot, get_relative_vel_to_robot
 from ..utils.types import (
@@ -89,11 +90,11 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
             else "jackal/base_link"  # Robot frame
         )
 
-    def _generate(self, simulation_state_container: SimulationStateContainer, **kwargs) -> Pose2D:
+    def _generate(self, simulation_state_container: AgentParameters, **kwargs) -> Pose2D:
         """Generates the robot's 2D pose (x, y, theta) from the TF tree.
 
         Args:
-            simulation_state_container (SimulationStateContainer):
+            simulation_state_container (AgentParameters):
                 - Simulation state for context (may provide robot config)
                 - Used to update frame configuration if needed
             **kwargs: Additional keyword arguments (unused)
@@ -179,7 +180,7 @@ class GoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
         self,
         robot_pose: Pose2D,
         goal_pose: GoalLocation,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> RobotRelativePosition:
         """Transforms the global goal position into the robot's local coordinate frame.
@@ -187,7 +188,7 @@ class GoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
         Args:
             robot_pose (Pose2D): Robot pose in map frame [x, y, theta]
             goal_pose (GoalLocation): Goal pose in map frame [x, y]
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -224,7 +225,7 @@ class SubgoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
         self,
         subgoal_pose: SubgoalLocation,
         robot_pose: Pose2D,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> RobotRelativePosition:
         """Transforms the global subgoal position into the robot's local coordinate frame.
@@ -232,7 +233,7 @@ class SubgoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
         Args:
             subgoal_pose (SubgoalLocation): Subgoal pose in map frame [x, y]
             robot_pose (Pose2D): Robot pose in map frame [x, y, theta]
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -267,14 +268,14 @@ class DistAngleToGoalGenerator(Generator[DistanceAngleMetrics]):
     def _generate(
         self,
         goal_in_robot_frame: RobotRelativePosition,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> DistanceAngleMetrics:
         """Computes the distance and angle to the goal from the robot's perspective.
 
         Args:
             goal_in_robot_frame (RobotRelativePosition): Goal position in robot frame [x, y]
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -311,14 +312,14 @@ class DistAngleToSubgoalGenerator(Generator[DistanceAngleMetrics]):
     def _generate(
         self,
         subgoal_in_robot_frame: RobotRelativePosition,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> DistanceAngleMetrics:
         """Computes the distance and angle to the subgoal from the robot's perspective.
 
         Args:
             subgoal_in_robot_frame (RobotRelativePosition): Subgoal position in robot frame [x, y]
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -355,14 +356,14 @@ class LaserSafeDistanceGenerator(Generator[SafetyStatus]):
     def _generate(
         self,
         front_laser: LidarRanges,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> SafetyStatus:
         """Computes the minimum safe distance from front laser scan data.
 
         Args:
             front_laser (LidarRanges): Laser scan ranges (np.ndarray)
-            simulation_state_container (SimulationStateContainer): Provides robot safety distance
+            simulation_state_container (AgentParameters): Provides robot safety distance
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -372,7 +373,7 @@ class LaserSafeDistanceGenerator(Generator[SafetyStatus]):
             True (if too close), False (if safe)
         """
         min_distance = np.min(front_laser) if len(front_laser) > 0 else float("inf")
-        safety_distance = simulation_state_container.robot.safety_distance
+        safety_distance = simulation_state_container.safety_distance
         return min_distance <= safety_distance
 
 
@@ -406,7 +407,7 @@ class PedestrianRelativeLocationGenerator(Generator[PedestrianRelativeLocations]
         self,
         robot_pose: Pose2D,
         people_data: people_msgs.People,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianRelativeLocations:
         """Generates the relative locations of pedestrians with respect to the robot.
@@ -414,7 +415,7 @@ class PedestrianRelativeLocationGenerator(Generator[PedestrianRelativeLocations]
         Args:
             robot_pose (Pose2D): Robot pose in map frame [x, y, theta]
             people_data (people_msgs.People): List of detected pedestrians (global positions)
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -474,14 +475,14 @@ class PedestrianLocationGenerator(Generator[PedestrianWorldLocations]):
     def _generate(
         self,
         people_data: people_msgs.People,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianWorldLocations:
         """Generates absolute locations of pedestrians in world coordinates.
 
         Args:
             people_data (people_msgs.People): List of detected pedestrians (global positions)
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -534,7 +535,7 @@ class PedestrianRelativeVelGenerator(Generator[PedestrianRelativeVelocities]):
         self,
         robot_pose: Pose2D,
         people_data: people_msgs.People,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianRelativeVelocities:
         """Generates the full velocity vectors of pedestrians relative to the robot.
@@ -542,7 +543,7 @@ class PedestrianRelativeVelGenerator(Generator[PedestrianRelativeVelocities]):
         Args:
             robot_pose (Pose2D): Robot pose in map frame [x, y, theta]
             people_data (people_msgs.People): List of detected pedestrians (global velocities)
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -591,14 +592,14 @@ class PedestrianRelativeVelXGenerator(Generator[PedestrianRelativeVelocities]):
     def _generate(
         self,
         pedestrian_relative_velocities: PedestrianRelativeVelocities,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianRelativeVelocities:
         """Extracts the X component of pedestrian velocities in the robot's frame.
 
         Args:
             pedestrian_relative_velocities (PedestrianRelativeVelocities): np.ndarray (N, 2) of velocities
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -635,14 +636,14 @@ class PedestrianRelativeVelYGenerator(Generator[PedestrianRelativeVelocities]):
     def _generate(
         self,
         pedestrian_relative_velocities: PedestrianRelativeVelocities,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianRelativeVelocities:
         """Extracts the Y component of pedestrian velocities in the robot's frame.
 
         Args:
             pedestrian_relative_velocities (PedestrianRelativeVelocities): np.ndarray (N, 2) of velocities
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -683,7 +684,7 @@ class PedestrianDistanceGenerator(Generator[PedestrianTypeMinDistances]):
         self,
         pedestrian_relative_locations: PedestrianRelativeLocations,
         people_data: people_msgs.People,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianTypeMinDistances:
         """Calculates the minimum distance to pedestrians of each type/group.
@@ -691,7 +692,7 @@ class PedestrianDistanceGenerator(Generator[PedestrianTypeMinDistances]):
         Args:
             pedestrian_relative_locations (PedestrianRelativeLocations): np.ndarray (N, 2) of positions in robot frame
             people_data (people_msgs.People): List of detected pedestrians (tags for group_id)
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -755,14 +756,14 @@ class PedestrianTypeGenerator(Generator[PedestrianTypeArray]):
     def _generate(
         self,
         people_data: people_msgs.People,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianTypeArray:
         """Generates an array of pedestrian group/type IDs (in order).
 
         Args:
             people_data (people_msgs.People): List of detected pedestrians (tags for group_id)
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -831,14 +832,14 @@ class PedestrianSocialStateGenerator(Generator[PedestrianSocialStates]):
     def _generate(
         self,
         people_data: people_msgs.People,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianSocialStates:
         """Generates an array of pedestrian social/behavior states (in order).
 
         Args:
             people_data (people_msgs.People): List of detected pedestrians (tags for behavior)
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -911,7 +912,7 @@ class ArenaPedestrianRelativeLocationGenerator(Generator[PedestrianRelativeLocat
         self,
         robot_pose: Pose2D,
         arena_people_data: arena_people_msgs.Pedestrians,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianRelativeLocations:
         """Generates relative locations of Arena pedestrians with respect to the robot.
@@ -919,7 +920,7 @@ class ArenaPedestrianRelativeLocationGenerator(Generator[PedestrianRelativeLocat
         Args:
             robot_pose (Pose2D): Robot pose in map frame [x, y, theta]
             arena_people_data (arena_people_msgs.Pedestrians): Arena pedestrian detections
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -973,14 +974,14 @@ class ArenaPedestrianLocationGenerator(Generator[PedestrianWorldLocations]):
     def _generate(
         self,
         arena_people_data: arena_people_msgs.Pedestrians,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianWorldLocations:
         """Generates world locations of Arena pedestrians.
 
         Args:
             arena_people_data (arena_people_msgs.Pedestrians): Arena pedestrian detections
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -1031,7 +1032,7 @@ class ArenaPedestrianRelativeVelGenerator(Generator[PedestrianRelativeVelocities
         self,
         robot_pose: Pose2D,
         arena_people_data: arena_people_msgs.Pedestrians,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianRelativeVelocities:
         """Generates relative velocities of Arena pedestrians.
@@ -1039,7 +1040,7 @@ class ArenaPedestrianRelativeVelGenerator(Generator[PedestrianRelativeVelocities
         Args:
             robot_pose (Pose2D): Robot pose in map frame [x, y, theta]
             arena_people_data (arena_people_msgs.Pedestrians): Arena pedestrian detections
-            simulation_state_container (SimulationStateContainer): Simulation state (unused)
+            simulation_state_container (AgentParameters): Simulation state (unused)
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
@@ -1087,7 +1088,7 @@ class ArenaPedestrianDistanceGenerator(Generator[PedestrianDistances]):
         self,
         arena_pedestrian_relative_locations: PedestrianRelativeLocations,
         arena_people_data: arena_people_msgs.Pedestrians,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> PedestrianDistances:
         """Computes minimum distances to Arena pedestrians by ID.
@@ -1145,7 +1146,7 @@ class ArenaPedestrianStateGenerator(Generator[ArenaPedestrianStates]):
     def _generate(
         self,
         arena_people_data: arena_people_msgs.Pedestrians,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> ArenaPedestrianStates:
         """Extracts animation states from Arena pedestrian data.

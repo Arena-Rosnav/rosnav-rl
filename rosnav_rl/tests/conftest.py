@@ -7,7 +7,6 @@ Run tests with the ROS environment sourced:
 """
 
 from unittest.mock import MagicMock
-from dataclasses import dataclass
 
 import numpy as np
 import pytest
@@ -26,29 +25,13 @@ def make_pose2d(x: float = 0.0, y: float = 0.0, yaw: float = 0.0) -> np.ndarray:
 
 
 # ============================================================
-# Simulation state container stubs
+# Agent parameters (unified config, replaces former SimulationStateContainer)
 # ============================================================
 
-@dataclass
-class _RobotState:
-    radius: float = 0.3
-    safety_distance: float = 0.5
+from rosnav_rl.cfg.parameters import AgentParameters
 
-@dataclass
-class _TaskState:
-    goal_radius: float = 0.3
-    max_steps: int = 500
-
-@dataclass
-class SimulationStateContainerStub:
-    robot: _RobotState = None
-    task: _TaskState = None
-
-    def __post_init__(self):
-        if self.robot is None:
-            self.robot = _RobotState()
-        if self.task is None:
-            self.task = _TaskState()
+# Backward-compat alias still available at the old import path
+SimulationStateContainerStub = AgentParameters
 
 
 # ============================================================
@@ -57,8 +40,13 @@ class SimulationStateContainerStub:
 
 @pytest.fixture
 def sim_state():
-    """Default simulation state container."""
-    return SimulationStateContainerStub()
+    """Default AgentParameters used as the per-step config in reward unit tests."""
+    return AgentParameters(
+        robot_radius=0.3,
+        safety_distance=0.5,
+        goal_radius=0.3,
+        max_steps=500,
+    )
 
 
 @pytest.fixture

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TypeVar, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar, Type, Union
 
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 
 from rosnav_rl.utils.validation import GeneratorSchemaValidator
-from rosnav_rl.states import SimulationStateContainer
 from rosnav_rl.utils.rostopic import Namespace
 from ..data_sources.base import Collector, DataSource, Generator
 from ..factory.resolver import DependencyResolver
@@ -15,6 +14,9 @@ from ..strategies.collector import CollectorManager
 from ..strategies.generator import GeneratorManager
 from ..strategies.subscription import SubscriptionManager
 from .pipeline import ObservationPipeline
+
+if TYPE_CHECKING:
+    from rosnav_rl.cfg.parameters import AgentParameters
 
 T = TypeVar("T")
 
@@ -120,7 +122,7 @@ class ObservationManager:
         node: Node,
         ns: Union[str, Namespace],
         data_sources: Dict[str, DataSource],
-        simulation_state_container: SimulationStateContainer = None,
+        simulation_state_container: AgentParameters = None,
         wait_for_obs: bool = True,
         qos_profile: Optional[QoSProfile] = 10,
         enable_synchronization: bool = True,
@@ -135,7 +137,7 @@ class ObservationManager:
             node (Node): The ROS node used for creating subscribers
             ns (Namespace): Namespace for the ROS topics
             data_sources (Dict[str, DataSource]): Dictionary mapping names to DataSource instances
-            simulation_state_container (SimulationStateContainer): Container for simulation state data
+            simulation_state_container (AgentParameters): Container for simulation state data
             wait_for_obs (bool): Whether to wait for initial observations before proceeding
             qos_profile (Optional[QoSProfile]): Quality of Service profile for subscribers
             enable_synchronization (bool): Enable temporal synchronization of observations
@@ -146,10 +148,11 @@ class ObservationManager:
                 - At runtime: Validates root generators upfront, other generators just-in-time
         """
         if simulation_state_container is None:
-            simulation_state_container = SimulationStateContainer()
+            from rosnav_rl.cfg.parameters import AgentParameters  # noqa: PLC0415
+            simulation_state_container = AgentParameters()
             logging.getLogger(__name__).warning(
-                "No simulation state container provided. Using default empty container. "
-                "Not recommended for production use."
+                "No AgentParameters provided to ObservationManager. "
+                "Using default values — not recommended for production use."
             )
 
         self._node = node
@@ -215,7 +218,7 @@ class ObservationManager:
         config: Dict[str, Any],
         node: Node,
         ns: Union[str, Namespace],
-        simulation_state_container: SimulationStateContainer = None,
+        simulation_state_container: AgentParameters = None,
         **manager_kwargs,
     ) -> "ObservationManager":
         """

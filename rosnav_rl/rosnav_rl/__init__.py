@@ -9,7 +9,7 @@ The module includes:
 - Observation space management and collection
 - Custom reward function framework
 - Action space handling
-- State management for agent and simulation
+- State management for simulation
 - Configuration structures
 
 Version: 0.1.0
@@ -17,33 +17,41 @@ Version: 0.1.0
 
 __version__ = "0.1.0"
 __all__ = [
+    # ── Agent ──────────────────────────────────────────────
     "RL_Agent",
+    # ── Config (single source of truth) ───────────────────
+    "AgentConfig",
+    "AgentParameters",
+    "RewardCfg",
+    # ── Typed action spaces ───────────────────────────────
+    "ActionSpaceSpec",
+    "DifferentialDriveActionSpace",
+    "OmnidirectionalActionSpace",
+    "DiscretizationCfg",
+    "DiscretizationStrategy",
+    # ── Models ────────────────────────────────────────────
     "RL_Model",
     "StableBaselinesModel",
-    "DreamerV3Cfg",
     "DreamerV3Model",
     "dreamerv3",
     "stable_baselines3",
+    # ── Spaces ────────────────────────────────────────────
     "ActionSpaceManager",
     "BaseSpaceManager",
     "ObservationSpaceManager",
+    # ── Observations ──────────────────────────────────────
     "ObservationManager",
-    "collectors",
-    "generators",
-    "static",
+    # ── Reward ────────────────────────────────────────────
     "RewardFunction",
     "reward_units",
-    "AgentStateContainer",
-    "SimulationStateContainer",
-    "AgentCfg",
-    "RewardCfg",
+
+    # ── Utils ─────────────────────────────────────────────
     "SupportedRLFrameworks",
     "tuning",
 ]
 
 
 from .model import (
-    # DreamerV3Cfg,
     DreamerV3Model,
     RL_Model,
     StableBaselinesModel,
@@ -54,6 +62,14 @@ from .observations import ObservationManager
 from .reward import RewardFunction, reward_units
 from .rl_agent import RL_Agent
 from .spaces import ActionSpaceManager, BaseSpaceManager, ObservationSpaceManager
-from .states import AgentStateContainer, SimulationStateContainer
-from .cfg import AgentCfg, RewardCfg
+from .cfg import (
+    AgentConfig,
+    AgentParameters,
+    RewardCfg,
+    ActionSpaceSpec,
+    DifferentialDriveActionSpace,
+    OmnidirectionalActionSpace,
+    DiscretizationCfg,
+    DiscretizationStrategy,
+)
 from .utils.type_aliases import SupportedRLFrameworks

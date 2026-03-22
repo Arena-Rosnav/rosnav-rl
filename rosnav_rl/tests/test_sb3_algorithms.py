@@ -3,7 +3,7 @@ Stable Baselines 3 algorithm configuration.
 
 Each parametrized test:
   1. Validates the algorithm-specific Pydantic config (defaults + overrides).
-  2. Wraps it in an AgentCfg (with the matching architecture name).
+  2. Wraps it in an AgentConfig (with the matching architecture name).
   3. Instantiates an RL_Agent and calls initialize_model() with a DummyVecEnv.
 
 Registered test architectures (TEST_AGENT_*) are minimal stubs that re-use
@@ -26,7 +26,9 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from sb3_contrib import CrossQ, RecurrentPPO, TQC, TRPO
 
 import rosnav_rl.spaces.observation_space.spaces as spaces
-from rosnav_rl.cfg.agent import AgentCfg
+from rosnav_rl.cfg.agent import AgentConfig
+from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
+from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.stable_baselines3.cfg import (
     A2C_Algorithm_Cfg,
     A2C_Cfg,
@@ -52,8 +54,6 @@ from rosnav_rl.model.stable_baselines3.policy.feature_extractors.classic import 
     EXTRACTOR_5,
 )
 from rosnav_rl.rl_agent import RL_Agent
-from rosnav_rl.states.agent.container import AgentStateContainer
-from rosnav_rl.states.agent.states import ActionSpaceState, ObservationSpaceState
 from rosnav_rl.utils.utils import make_mock_env
 
 # ── Minimal shared observation-space kwargs (same as AGENT_1 / AGENT_2) ──────
@@ -151,32 +151,24 @@ class _TestAgentCrossQ(StableBaselinesPolicyDescription):
 
 
 @pytest.fixture(scope="module")
-def agent_state() -> AgentStateContainer:
-    """A minimal but fully-specified AgentStateContainer for testing."""
-    return AgentStateContainer(
-        action_space=ActionSpaceState(
-            actions={"linear_range": [-0.5, 0.5], "angular_range": [-1.0, 1.0]},
-            is_discrete=False,
-            is_holonomic=False,
+def agent_state() -> AgentConfig:
+    """A minimal AgentConfig for testing SB3 algorithms."""
+    return AgentConfig(
+        name="test_fixture_agent",
+        action_space=DifferentialDriveActionSpace(
+            linear_range=(-0.5, 0.5),
+            angular_range=(-1.0, 1.0),
         ),
-        observation_space=ObservationSpaceState(
+        parameters=AgentParameters(
             laser_num_beams=360,
             laser_max_range=30.0,
-            min_linear_vel=-0.5,
-            max_linear_vel=0.5,
-            min_translational_vel=0.0,
-            max_translational_vel=0.0,
-            min_angular_vel=-1.0,
-            max_angular_vel=1.0,
-            ped_num_types=3,
-            ped_min_speed_x=-1.0,
-            ped_max_speed_x=1.0,
-            ped_min_speed_y=-1.0,
-            ped_max_speed_y=1.0,
-            ped_social_state_num=5,
-            goal_max_dist=10.0,
-            subgoal_max_dist=10.0,
             normalize=True,
+        ),
+        framework=StableBaselinesCfg(
+            algorithm=PPO_Cfg(
+                architecture_name="AGENT_1",
+                parameters=PPO_Algorithm_Cfg(),
+            )
         ),
     )
 
@@ -321,28 +313,26 @@ class TestSB3AgentCreation:
     @pytest.mark.parametrize("algo_cfg,arch_name", _ALGORITHM_CASES)
     def test_agent_can_be_created(self, algo_cfg, arch_name, agent_state):
         """RL_Agent should be constructible for every SB3 algorithm config."""
-        agent_cfg = AgentCfg(
-            name=f"test_agent_{arch_name.lower()}",
-            framework=StableBaselinesCfg(algorithm=algo_cfg),
+        spec = agent_state.model_copy(
+            update={
+                "name": f"test_agent_{arch_name.lower()}",
+                "framework": StableBaselinesCfg(algorithm=algo_cfg),
+            }
         )
-        agent = RL_Agent(
-            agent_cfg=agent_cfg,
-            agent_state_container=agent_state,
-        )
+        agent = RL_Agent(spec)
         assert agent.model is not None
         assert agent.space_manager is not None
 
     @pytest.mark.parametrize("algo_cfg,arch_name", _ALGORITHM_CASES_INIT_MODEL)
     def test_agent_initialize_model(self, algo_cfg, arch_name, agent_state):
         """initialize_model() must successfully build the SB3 model with a mock env."""
-        agent_cfg = AgentCfg(
-            name=f"test_init_{arch_name.lower()}",
-            framework=StableBaselinesCfg(algorithm=algo_cfg),
+        spec = agent_state.model_copy(
+            update={
+                "name": f"test_init_{arch_name.lower()}",
+                "framework": StableBaselinesCfg(algorithm=algo_cfg),
+            }
         )
-        agent = RL_Agent(
-            agent_cfg=agent_cfg,
-            agent_state_container=agent_state,
-        )
+        agent = RL_Agent(spec)
 
         mock_env = make_mock_env(
             ns="",
@@ -486,11 +476,12 @@ class TestSB3DictParsing:
     def test_agent_cfg_from_full_dict(
         self, type_tag, cfg_cls, param_cls, arch_name, param_overrides, agent_state
     ):
-        """Complete AgentCfg → RL_Agent pipeline works when the entire config
+        """Complete AgentConfig → RL_Agent pipeline works when the entire config
         originates from a nested dict (simulating YAML file loading).
         """
-        raw_agent_cfg = {
+        raw_agent_spec = {
             "name": f"dict_test_{type_tag.lower()}",
+            "action_space": {"type": "differential_drive"},
             "framework": {
                 "name": "stable_baselines3",
                 "algorithm": {
@@ -500,14 +491,11 @@ class TestSB3DictParsing:
                 },
             },
         }
-        agent_cfg = AgentCfg.model_validate(raw_agent_cfg)
-        assert isinstance(agent_cfg.framework.algorithm, cfg_cls)
-        assert isinstance(agent_cfg.framework.algorithm.parameters, param_cls)
+        spec = AgentConfig.model_validate(raw_agent_spec)
+        assert isinstance(spec.framework.algorithm, cfg_cls)
+        assert isinstance(spec.framework.algorithm.parameters, param_cls)
 
-        agent = RL_Agent(
-            agent_cfg=agent_cfg,
-            agent_state_container=agent_state,
-        )
+        agent = RL_Agent(spec)
         assert agent.model is not None
         assert agent.space_manager is not None
 

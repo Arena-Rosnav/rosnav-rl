@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import asyncio
 import rosnav_rl
 
 import rclpy
@@ -11,11 +10,11 @@ from rclpy.qos import (
     QoSProfile,
     QoSReliabilityPolicy,
 )
-from rl_utils.cfg import RobotCfg
-from rl_utils.cfg.arena_cfg.task import TaskCfg
-from rl_utils.envs import GazeboEnv
-from rl_utils.envs.wrappers import TimeSyncWrapper
-from rl_utils.tools.states import get_arena_states
+from arena_training.arena_rosnav_rl.cfg.arena_cfg.robot import RobotCfg
+from arena_training.arena_rosnav_rl.cfg.arena_cfg.task import TaskCfg
+from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg
+from arena_training.arena_rosnav_rl.envs import GazeboEnv
+from arena_training.arena_rosnav_rl.envs.wrappers import TimeSyncWrapper
 
 # For other ROS 2 messages:
 # from geometry_msgs.msg import Twist
@@ -107,30 +106,22 @@ def main(args=None):
 
 def test_env():
     rclpy.init()
-    simulation_state_container = get_arena_states(
-        goal_radius=0.33,
-        max_steps=350,
-        is_discrete=False,
-        safety_distance=1.0,
-        robot_cfg=RobotCfg(),
-        task_modules_cfg=TaskCfg(),
+
+    config_path = "/home/le/arena5_ws/src/Arena/arena_bringup/configs/training/sb_training_config.yaml"
+    with open(config_path, "r") as f:
+        raw = yaml.safe_load(f)
+    training_cfg = TrainingCfg.model_validate(raw)
+
+    # Build simulation state & populate agent_spec from robot description
+    from scripts.create_test_agent import (  # noqa: PLC0415
+        _build_simulation_state,
+        _populate_agent_spec,
     )
-    agent_state_cont = simulation_state_container.to_agent_state_container()
-    agent_state_cont.action_space.actions = {
-        "linear_range": [-2.0, 2.0],
-        "angular_range": [-4.0, 4.0],
-    }
-    rl_agent = rosnav_rl.RL_Agent(
-        agent_cfg=rosnav_rl.AgentCfg.model_validate(
-            yaml.safe_load(
-                open(
-                    "/home/le/arena4_ws_exp/src/arena/arena-rosnav/arena_bringup/configs/training/sb_training_config.yaml",
-                    "r",
-                )
-            )["agent_cfg"]
-        ),
-        agent_state_container=agent_state_cont,
-    )
+
+    simulation_state_container = _build_simulation_state(training_cfg)
+    _populate_agent_spec(training_cfg, simulation_state_container)
+
+    rl_agent = rosnav_rl.RL_Agent(training_cfg.agent_config)
 
     env = GazeboEnv(
         ns="/task_generator_node/jackal",

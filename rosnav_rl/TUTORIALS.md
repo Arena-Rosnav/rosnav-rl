@@ -72,13 +72,18 @@ class NavEnv(gym.Env):
 
 ```python
 import rosnav_rl
+from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
 from rosnav_rl.model.stable_baselines3.cfg import (
     StableBaselinesCfg, PPO_Cfg, PPO_Algorithm_Cfg,
 )
 
-agent_cfg = rosnav_rl.AgentCfg(
-    name="my_ppo_agent",        # auto-generated if omitted
+spec = rosnav_rl.AgentConfig(
+    name="my_ppo_agent",
     robot="jackal",
+    action_space=DifferentialDriveActionSpace(
+        linear_range=(-2.0, 2.0),
+        angular_range=(-4.0, 4.0),
+    ),
     framework=StableBaselinesCfg(
         algorithm=PPO_Cfg(
             architecture_name="AGENT_1",
@@ -97,22 +102,18 @@ agent_cfg = rosnav_rl.AgentCfg(
             "safe_distance": {"reward": -0.15},
         },
     ),
-    action_space=rosnav_rl.cfg.ActionSpaceCfg(is_discrete=False),
 )
 ```
+
+> **With Arena:** You don't need to specify `action_space`, `observation`, or
+> `environment` manually — the trainer derives these automatically from the
+> robot's `model_params.yaml`. Just configure the RL framework and reward.
 
 ### Step 3 — Build and Train
 
 ```python
-# Build state containers
-sim_state = rosnav_rl.SimulationStateContainer(...)
-agent_state = sim_state.to_agent_state_container()
-
 # Create the agent
-agent = rosnav_rl.RL_Agent(
-    agent_cfg=agent_cfg,
-    agent_state_container=agent_state,
-)
+agent = rosnav_rl.RL_Agent(spec)
 agent.initialize_model()
 
 # Create vectorized environments
@@ -193,7 +194,7 @@ rclpy.shutdown()
 
 ```
 arena_training/agents/my_ppo_agent/
-├── training_config.yaml    # Full TrainingCfg (AgentCfg + ArenaCfg)
+├── training_config.yaml    # Full TrainingCfg (AgentConfig + ArenaCfg)
 ├── best_model.zip          # SB3 checkpoint
 └── observations.yaml       # (Optional) agent-specific observation pipeline
 ```
@@ -211,7 +212,8 @@ from rosnav_rl.rl_agent import RL_Agent
 
 class MyActionServer(ActionServer):
     def _initialize_agent(self) -> RL_Agent:
-        agent = RL_Agent(agent_cfg=..., agent_state_container=...)
+        spec = rosnav_rl.AgentConfig.from_yaml("path/to/training_config.yaml")
+        agent = RL_Agent(spec)
         agent.load_model(path="path/to/model.zip")
         return agent
 
@@ -340,9 +342,9 @@ class MyFrameworkCfg(FrameworkCfg):
     batch_size: int = 64
 ```
 
-### Step 4 — Update AgentCfg
+### Step 4 — Update AgentConfig
 
-Add your config to the discriminated union in `cfg/agent.py`:
+Add your config to the discriminated union in `cfg/agent_spec.py`:
 ```python
 framework: Annotated[
     Union[StableBaselinesCfg, DreamerV3Cfg, MyFrameworkCfg],
@@ -350,7 +352,7 @@ framework: Annotated[
 ]
 ```
 
-Now `AgentCfg(framework={"name": "my_framework", ...})` automatically creates
+Now `AgentConfig(framework={"name": "my_framework", ...})` automatically creates
 your config.
 
 ---
@@ -718,7 +720,7 @@ no code changes required.
 │  ├─ base_config: sb_training_config.yaml                │
 │  ├─ study_name / n_trials / direction / metric          │
 │  └─ search_space:                                       │
-│       agent_cfg.framework.algorithm.parameters.lr: ...  │
+│       agent_spec.framework.algorithm.parameters.lr: ...  │
 └──────────────────────┬──────────────────────────────────┘
                        │
               ┌────────▼────────┐
@@ -775,29 +777,29 @@ agents_dir: /tmp/tuning_agents
 
 # Search space — dot-notation paths into the TrainingCfg
 search_space:
-  agent_cfg.framework.algorithm.parameters.learning_rate:
+  agent_spec.framework.algorithm.parameters.learning_rate:
     type: float
     low: 1.0e-5
     high: 1.0e-3
     log: true
 
-  agent_cfg.framework.algorithm.parameters.gamma:
+  agent_spec.framework.algorithm.parameters.gamma:
     type: float
     low: 0.9
     high: 0.9999
 
-  agent_cfg.framework.algorithm.parameters.n_steps:
+  agent_spec.framework.algorithm.parameters.n_steps:
     type: int
     low: 128
     high: 4096
     step: 128
 
-  agent_cfg.framework.algorithm.parameters.n_epochs:
+  agent_spec.framework.algorithm.parameters.n_epochs:
     type: int
     low: 1
     high: 20
 
-  agent_cfg.framework.algorithm.parameters.clip_range:
+  agent_spec.framework.algorithm.parameters.clip_range:
     type: float
     low: 0.1
     high: 0.4
@@ -833,7 +835,7 @@ study = optuna.load_study(
 
 # Best parameters
 print(study.best_trial.params)
-# {'agent_cfg.framework.algorithm.parameters.learning_rate': 0.000342, ...}
+# {'agent_spec.framework.algorithm.parameters.learning_rate': 0.000342, ...}
 
 # Visualization (requires matplotlib)
 from optuna.visualization.matplotlib import (
@@ -866,23 +868,23 @@ metric: mean_reward
 trial_timesteps: 300000
 
 search_space:
-  agent_cfg.framework.algorithm.parameters.learning_rate:
+  agent_spec.framework.algorithm.parameters.learning_rate:
     type: float
     low: 1.0e-5
     high: 3.0e-3
     log: true
 
-  agent_cfg.framework.algorithm.parameters.tau:
+  agent_spec.framework.algorithm.parameters.tau:
     type: float
     low: 0.001
     high: 0.1
     log: true
 
-  agent_cfg.framework.algorithm.parameters.batch_size:
+  agent_spec.framework.algorithm.parameters.batch_size:
     type: categorical
     choices: [64, 128, 256, 512, 1024]
 
-  agent_cfg.framework.algorithm.parameters.train_freq:
+  agent_spec.framework.algorithm.parameters.train_freq:
     type: int
     low: 1
     high: 16
@@ -894,12 +896,12 @@ You can tune **any** config field, not just algorithm parameters:
 
 ```yaml
 search_space:
-  agent_cfg.reward.reward_function_dict.approach_goal.pos_factor:
+  agent_spec.reward.reward_function_dict.approach_goal.pos_factor:
     type: float
     low: 0.1
     high: 1.0
 
-  agent_cfg.reward.reward_function_dict.safe_distance.reward:
+  agent_spec.reward.reward_function_dict.safe_distance.reward:
     type: float
     low: -0.5
     high: -0.01
@@ -915,9 +917,9 @@ from rosnav_rl.tuning import TuningCfg, suggest_params, apply_params
 from rosnav_rl.tuning import FloatParam, IntParam
 
 search_space = {
-    "agent_cfg.framework.algorithm.parameters.learning_rate":
+    "agent_spec.framework.algorithm.parameters.learning_rate":
         FloatParam(low=1e-5, high=1e-3, log=True),
-    "agent_cfg.framework.algorithm.parameters.n_steps":
+    "agent_spec.framework.algorithm.parameters.n_steps":
         IntParam(low=128, high=4096, step=128),
 }
 
@@ -967,7 +969,7 @@ This path is fully configurable via a **3-level fallback chain**.
 ```yaml
 # training_config.yaml
 agents_dir: /data/experiments/run_42
-agent_cfg:
+agent_spec:
   name: my_agent
   # ...
 ```

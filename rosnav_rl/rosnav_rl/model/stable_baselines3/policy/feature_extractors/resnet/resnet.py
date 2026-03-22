@@ -129,7 +129,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
     def _get_num_pedestrian_feature_maps(self):
         num_pedestrian_feature_maps = 0
         for space in self._observation_space:
-            if "PEDESTRIAN" in space:
+            if "pedestrian" in space.lower():
                 num_pedestrian_feature_maps += 1
 
         return num_pedestrian_feature_maps
@@ -426,7 +426,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan, ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1) if ped_map is not None else scan
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -488,11 +488,11 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         ped_map = None
         if self.num_pedestrian_feature_maps > 0:
-            ped_map = torch.concat(
+            ped_map = torch.stack(
                 [
                     observations[space]
                     for space in self._observation_space
-                    if "PEDESTRIAN" in space
+                    if "pedestrian" in space.lower()
                 ],
                 dim=1,
             )  # (num_envs, num_semantic_layers, 80, 80)
@@ -782,7 +782,7 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan, ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1) if ped_map is not None else scan
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -925,7 +925,7 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan, ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1) if ped_map is not None else scan
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu
@@ -1046,7 +1046,7 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan, ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1) if ped_map is not None else scan
 
         x = self.conv1(fusion_in)
         x = self.bn1(x)
@@ -1309,7 +1309,7 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
             torch.Tensor: Output tensor after forward pass
         """
         ###### Start of fusion net ######
-        fusion_in = torch.cat((scan, ped_map), dim=1)
+        fusion_in = torch.cat((scan, ped_map), dim=1) if ped_map is not None else scan
 
         # See note [TorchScript super()]
         # extra layer conv, bn, relu

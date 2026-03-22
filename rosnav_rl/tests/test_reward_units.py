@@ -12,7 +12,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 # conftest.py ensures ROS stubs are available before importing rosnav_rl
-from conftest import SimulationStateContainerStub, _RobotState, _TaskState, make_pose2d
+from conftest import SimulationStateContainerStub, make_pose2d
 
 from rosnav_rl.reward.reward_units.reward_units import (
     RewardGoalReached,
@@ -846,7 +846,7 @@ class TestRewardMaxStepsExceeded:
 
     def test_at_max_steps_penalized(self, make_reward_function):
         rf = make_reward_function()
-        sim = SimulationStateContainerStub(task=_TaskState(max_steps=5))
+        sim = SimulationStateContainerStub(max_steps=5)
         unit = RewardMaxStepsExceeded(rf, penalty=10.0)
 
         for _ in range(5):

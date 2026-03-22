@@ -6,12 +6,14 @@ Handles the execution and validation of generators with proper dependency orderi
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
 from rclpy.node import Node
 
 from rosnav_rl.utils.validation import GeneratorSchemaValidator
-from rosnav_rl.states import SimulationStateContainer
+
+if TYPE_CHECKING:
+    from rosnav_rl.cfg.parameters import AgentParameters
 
 from ..data_sources.base import Generator
 from ..factory.resolver import DependencyResolver
@@ -24,7 +26,7 @@ class GeneratorManager:
         self,
         node: Node,
         dependency_resolver: DependencyResolver,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         validate_generators: bool = True,
     ):
         """

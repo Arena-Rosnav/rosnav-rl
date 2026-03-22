@@ -138,12 +138,31 @@ The cleanest way to train is via [arena_training](https://github.com/Arena-Rosna
 
 ```python
 import rosnav_rl
+from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
+from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.stable_baselines3.cfg import (
     StableBaselinesCfg, PPO_Cfg, PPO_Algorithm_Cfg,
 )
 
-agent_cfg = rosnav_rl.AgentCfg(
+spec = rosnav_rl.AgentConfig(
     robot="jackal",
+    action_space=DifferentialDriveActionSpace(
+        linear_range=(-2.0, 2.0),
+        angular_range=(-4.0, 4.0),
+    ),
+    # Review and adjust these before every training run - especially
+    # laser_num_beams / laser_max_range (must match your robot's LIDAR),
+    # robot_radius / safety_distance, and goal_radius / max_steps.
+    # When using arena_training these are auto-populated from the robot
+    # description, but you should still verify them
+    parameters=AgentParameters(
+        laser_num_beams=720,
+        laser_max_range=30.0,
+        robot_radius=0.215,
+        safety_distance=0.3,
+        goal_radius=0.35,
+        max_steps=500,
+    ),
     framework=StableBaselinesCfg(
         algorithm=PPO_Cfg(
             architecture_name="AGENT_1",
@@ -163,14 +182,17 @@ agent_cfg = rosnav_rl.AgentCfg(
     ),
 )
 
-sim_state = rosnav_rl.SimulationStateContainer(...)
-agent = rosnav_rl.RL_Agent(
-    agent_cfg=agent_cfg,
-    agent_state_container=sim_state.to_agent_state_container(),
-)
+agent = rosnav_rl.RL_Agent(spec)
 agent.initialize_model()
 agent.train(train_envs=train_envs, eval_envs=eval_envs)
 ```
+
+> **Before every training run:** open the generated `agent.yaml` and verify the
+> `parameters:` block.  Key fields: `laser_num_beams`, `laser_max_range`,
+> `robot_radius`, `safety_distance`, `goal_radius`, `max_steps`, and all
+> velocity bounds.  A mismatch between these and your actual robot will silently
+> degrade policy quality.  See the [AgentParameters reference](rosnav_rl/README.md#agentparameters--tuning-before-training)
+> for a full field table.
 
 To swap to DreamerV3, replace `StableBaselinesCfg(...)` with `DreamerV3Cfg(...)` - everything else stays the same. With Arena:
 

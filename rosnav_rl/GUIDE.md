@@ -71,7 +71,7 @@ The core principle is **modularity and separation of concerns**:
 | **Mixin** | Cross-cutting concerns injected via MRO | `ErrorReportingMixin` (structured logging) |
 | **Strategy** | Swappable execution strategies | `CollectorManager`, `GeneratorManager`, `SubscriptionManager`, `WaitingStrategy` |
 | **Composite** | Tree structures evaluated as one | `RewardFunction` (aggregates `RewardUnit`s) |
-| **Discriminated Union** | Type-safe polymorphic configs | `AgentCfg.framework` (Pydantic `Discriminator`) |
+| **Discriminated Union** | Type-safe polymorphic configs | `AgentConfig.framework` (Pydantic `Discriminator`), `ActionSpaceSpec` |
 
 ### Key Components
 
@@ -86,7 +86,6 @@ The core principle is **modularity and separation of concerns**:
 | **Observations** | `ObservationManager` with `Collector` (ROS topics) and `Generator` (derived features). YAML-configured. |
 | **Spaces** | `ObservationSpaceManager` (parallel encoding, validate-once) + `ActionSpaceManager` (discrete/continuous, holonomic). |
 | **Reward** | `RewardFunction` composite. `RewardUnit` ABC with `RequiresProtocol` + `ErrorReportingMixin`. Parallel execution. |
-| **States** | `SimulationStateContainer` → `AgentStateContainer`. Frozen dataclass trees. |
 | **Action Server** | ROS 2 `GetCommand` service. `ActionServer` ABC → `ArenaActionServer`. |
 | **Cross-cutting** | `RequiresProtocol`, `ErrorReportingMixin`, `SchemaValidator`, `MissingObservationError` (smart suggestions). |
 
@@ -170,12 +169,13 @@ rosnav_rl/
 │
 ├── action_server/           # ROS 2 service server (GetCommand)
 │   ├── base_server.py       # ActionServer ABC — ROS 2 service, ObservationCollector protocol
-│   └── arena_server.py      # ArenaActionServer — agent loading, SimulationStateContainer setup
+│   └── arena_server.py      # ArenaActionServer — agent loading, stores spec.parameters as AgentParameters
 │
 ├── cfg/                     # Top-level Pydantic configuration
-│   ├── agent.py             # AgentCfg (discriminated union on framework.name)
+│   ├── agent.py             # AgentConfig — single source of truth, EnvironmentConfig
+│   ├── action_spaces.py     # Typed action spaces: DifferentialDrive, Omnidirectional, DiscretizationCfg, etc.
+│   ├── observation.py       # ObservationConfig — laser, velocity, semantic params
 │   ├── framework.py         # FrameworkCfg ABC
-│   ├── action_space.py      # ActionSpaceCfg, DiscreteFromBoxActionSpaceCfg
 │   ├── reward.py            # RewardCfg, RewardFunctionDict
 │   └── logging.py           # LoggingCfg, VERBOSE_TO_LEVEL, configure_rosnav_rl_logging
 │
@@ -246,11 +246,8 @@ rosnav_rl/
 │
 ├── states/                  # State containers
 │   ├── simulation/
-│   │   ├── container.py     # SimulationStateContainer → to_agent_state_container()
+│   │   ├── container.py     # backward-compat shim: SimulationStateContainer = AgentParameters
 │   │   └── states.py        # RobotState, TaskState, LaserState, VelocityState, …
-│   ├── agent/
-│   │   ├── container.py     # AgentStateContainer (action_space + observation_space)
-│   │   └── states.py        # ActionSpaceState, ObservationSpaceState
 │   └── distributor.py       # State distribution placeholder
 │
 └── utils/                   # Shared utilities
@@ -268,15 +265,19 @@ rosnav_rl/
 
 ### 5.1 The Agent
 
-**`RL_Agent`** (`rl_agent.py`) is the top-level orchestrator. It wires together model, spaces, and reward:
+**`RL_Agent`** (`rl_agent.py`) is the top-level orchestrator. It wires together model, spaces, and reward from a single **`AgentConfig`**:
 
 ```python
 class RL_Agent:
-    def __init__(self, agent_cfg: AgentCfg, agent_state_container: AgentStateContainer):
-        self._initialize_model(agent_cfg)          # → ModelFactory.create_model_instance()
-        self._initialize_space_manager(agent_cfg)   # → BaseSpaceManager(...)
-        self._initialize_reward_function(agent_cfg) # → RewardFunction(...) if reward config exists
+    def __init__(self, spec: AgentConfig):
+        self._initialize_model(spec)          # → ModelFactory.create_model_instance()
+        self._initialize_space_manager(spec)   # → BaseSpaceManager(...)
+        self._initialize_reward_function(spec) # → RewardFunction(...) if reward config exists
 ```
+
+`AgentConfig` is a Pydantic v2 model that serves as the **single source of truth** for the entire agent configuration — framework, typed action space, observation spec, environment spec, reward, and logging.
+
+When training with Arena, the action space, observation, and environment specs are **derived automatically** from the robot's `model_params.yaml` (via `arena_robots`) and the training config. You never need to specify laser beam counts, velocity ranges, or action limits manually.
 
 | Method / Property | Description |
 | --- | --- |
@@ -284,7 +285,7 @@ class RL_Agent:
 | `load_model(path)` | Loads weights from disk (skips if already initialized) |
 | `train(train_envs, eval_envs)` | Delegates to `model.train()` |
 | `get_action(obs_dict)` | Returns `np.ndarray` from the policy network |
-| `config` | Dict with agent_cfg, model config, space config, state container |
+| `config` | Dict with spec, model config, space config |
 | `model` | The `RL_Model` implementation (SB3 or DreamerV3) |
 | `reward_function` | `RewardFunction` instance (or `None`) |
 | `space_manager` | `BaseSpaceManager` (observation encoding + action decoding) |
@@ -437,16 +438,51 @@ See [reward/README.md](rosnav_rl/reward/README.md) for the full reward unit refe
 
 All configs are **Pydantic v2 `BaseModel`** instances supporting `model_validate()` / `model_dump()` round-trip.
 
-**`AgentCfg`** — top-level agent config:
+**`AgentConfig`** — single source of truth for a complete RL agent:
 
 ```python
-AgentCfg(
+AgentConfig(
     name="my_agent",           # auto-generated if omitted
-    robot="jackal",
+    robot="jackal",             # one has to specifyaction_space/observation/environment manually
+    observations_config="path/to/observations.yaml",  # optional; relative to config file
+    discretization=DiscretizationCfg(strategy="navigational"),  # optional; omit for continuous
     framework=StableBaselinesCfg(...),  # discriminated union on framework.name
     reward=RewardCfg(...),
-    action_space=ActionSpaceCfg(is_discrete=False),
 )
+```
+
+`action_space`, `observation`, and `environment` are **`None` in the input YAML** and filled in by
+the trainer from the robot description.
+
+**Typed action spaces** — each robot kinematic type has its own Pydantic model
+(`DifferentialDriveActionSpace`, `OmnidirectionalActionSpace`, etc.). The trainer always derives
+the `type` and velocity ranges from the robot's `model_params.yaml`; you never need to specify
+them in the training YAML.
+
+**Discrete action configuration** — set `discretization` at the `agent_config` level to request
+discrete actions.  The trainer calls `action_space.resolve_discretization()` at startup which
+populates `action_space.discrete_actions` and switches the gym space to `gymnasium.spaces.Discrete`.
+
+Available strategies:
+
+| Strategy | Description | Extra fields |
+|---|---|---|
+| `robot_defined` | Use the robot’s built-in action list from `model_params.yaml` | — |
+| `uniform` | Regular N×M grid over the velocity ranges | `buckets_linear` (default 7), `buckets_angular` (default 9) |
+| `navigational` | ~12 hand-crafted forward-biased actions — fastest convergence | — |
+| `exponential` | Log-spaced grid — fine control near zero, coarse at extremes | `buckets_linear` (default 5), `buckets_angular` (default 7) |
+
+In a YAML training config:
+
+```yaml
+agent_config:
+  name: my_agent
+  observations_config: observations/observations.yaml  # relative to this config file
+  discretization:
+    strategy: navigational  # omit the discretization block entirely for continuous actions
+  framework:
+    name: stable_baselines3
+    ...
 ```
 
 The `framework` field is a discriminated union — Pydantic routes dicts to the correct class based on the `name` field:
@@ -455,16 +491,19 @@ The `framework` field is a discriminated union — Pydantic routes dicts to the 
 
 See [cfg/README.md](rosnav_rl/cfg/README.md) for all config classes and serialization examples.
 
-### 5.7 State Containers
+### 5.7 Agent Parameters (formerly SimulationStateContainer)
 
-**`SimulationStateContainer`** — frozen dataclass tree with global environment data:
-- `RobotState` (radius, safety_distance, `ActionState`, `LaserState`)
-- `TaskState` (goal_radius, max_steps, `SemanticState`, `TaskModuleState`)
-- `to_agent_state_container()` — flattens to `AgentStateContainer`
+**`AgentParameters`** (`cfg/parameters.py`) is the single config model for all
+scalar constants consumed by the observation pipeline, reward units, and
+generators. There is no separate "simulation state container" — it was absorbed.
 
-**`AgentStateContainer`** — lightweight dataclass with only what the agent needs:
-- `ActionSpaceState` (actions, is_discrete, is_holonomic)
-- `ObservationSpaceState` (laser config, velocity bounds, normalize flag)
+- **Observation-space fields** (laser, velocity, pedestrian, navigation, normalize)
+  — fed via `observation_kwargs()` at construction time.
+- **Reward/generator fields** (`robot_radius`, `safety_distance`, `goal_radius`,
+  `max_steps`) — read per-step directly from this object.
+
+At inference time use `spec.parameters` directly, or
+`AgentParameters.from_spec(agent_config)` as a convenience wrapper.
 
 ### 5.8 Deployment
 
@@ -476,7 +515,7 @@ See [cfg/README.md](rosnav_rl/cfg/README.md) for all config classes and serializ
 
 **`ArenaActionServer`** — Arena-specific implementation:
 - Resolves agent directory via `ROSNAV_AGENTS_DIR`, `ament_index`, or path search
-- Loads `training_config.yaml` → reconstructs `SimulationStateContainer`
+- Loads `training_config.yaml` → uses `spec.parameters` (`AgentParameters`) directly
 - Creates `ObservationManager` from bundled or agent-specific `observations.yaml`
 
 ```bash
@@ -612,11 +651,11 @@ See [model/README.md](rosnav_rl/model/README.md) for the complete reference.
 
 1. **Create a Gym environment** — `gym.Env` subclass that interfaces with your simulation. Use `ObservationManager`, `BaseSpaceManager`, and `RewardFunction` in `step()` and `reset()`.
 
-2. **Configure the agent** — `AgentCfg` with framework, reward, and action space settings. The `framework` field auto-routes to the correct config class.
+2. **Configure the agent** — `AgentConfig` with framework, typed action space, and reward settings. When training with Arena, the action space, observation, and environment specs are derived automatically from the robot description.
 
 3. **Write a training script**:
    ```python
-   agent = RL_Agent(agent_cfg=cfg, agent_state_container=state)
+   agent = RL_Agent(spec)
    agent.initialize_model()
    agent.train(train_envs=envs, eval_envs=eval_envs)
    ```
@@ -637,7 +676,7 @@ The server exposes `get_command` under the robot's namespace. On inference error
 
 ```
 arena_training/agents/<agent_name>/
-├── training_config.yaml    # Full TrainingCfg (AgentCfg + ArenaCfg)
+├── training_config.yaml    # Full TrainingCfg (AgentConfig + ArenaCfg)
 ├── best_model.zip          # SB3 model checkpoint
 └── observations.yaml       # (Optional) agent-specific observation config
 ```
@@ -672,7 +711,7 @@ Search spaces use **dot-notation config paths** so that any field in a
 
 ```yaml
 search_space:
-  agent_cfg.framework.algorithm.parameters.learning_rate:
+  agent_spec.framework.algorithm.parameters.learning_rate:
     type: float
     low: 1.0e-5
     high: 1.0e-3
@@ -701,6 +740,6 @@ See [Tutorial 9](TUTORIALS.md#9-hyperparameter-tuning) for the full walkthrough.
 | [observations/README.md](rosnav_rl/observations/README.md) | Collectors, Generators, YAML pipeline, DependencyResolver |
 | [reward/README.md](rosnav_rl/reward/README.md) | RewardFunction, RewardUnit, safety categorization |
 | [spaces/README.md](rosnav_rl/spaces/README.md) | SpaceFactory, encoding pipeline, ActionSpaceManager |
-| [cfg/README.md](rosnav_rl/cfg/README.md) | AgentCfg, discriminated unions, serialization |
+| [cfg/README.md](rosnav_rl/cfg/README.md) | AgentConfig, typed action spaces, discriminated unions, serialization |
 | [action_server/README.md](rosnav_rl/action_server/README.md) | ROS 2 deployment, GetCommand service |
 | Tuning module | `rosnav_rl/tuning/` — Optuna search spaces, samplers, pruning callback |

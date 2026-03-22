@@ -57,8 +57,8 @@ The Arena-specific implementation that handles model loading from disk.
    - Walks up from this file's path looking for `arena_training/agents/`
    - Checks `COLCON_PREFIX_PATH` / `AMENT_PREFIX_PATH`
 2. Loads `training_config.yaml` as `TrainingCfg` (Pydantic)
-3. Reconstructs `SimulationStateContainer` from the saved training config
-4. Creates `RL_Agent` and loads `best_model.zip`
+3. Uses `spec.parameters` (`AgentParameters`) directly
+4. Creates `RL_Agent(spec)` and loads `best_model.zip`
 
 **Observation collector:**
 - Uses `create_observation_manager_from_config()` with the agent-specific or default `observations.yaml`
@@ -109,7 +109,7 @@ rclpy.shutdown()
 
 ```
 arena_training/agents/<agent_name>/
-├── training_config.yaml    # Full TrainingCfg (AgentCfg + ArenaCfg)
+├── training_config.yaml    # Full TrainingCfg (AgentConfig + ArenaCfg)
 ├── best_model.zip          # SB3 model checkpoint
 └── observations.yaml       # (Optional) agent-specific observation pipeline config
 ```
@@ -127,7 +127,8 @@ from rosnav_rl.rl_agent import RL_Agent
 class MyActionServer(ActionServer):
     def _initialize_agent(self) -> RL_Agent:
         # Load your agent however you need
-        agent = RL_Agent(agent_cfg=..., agent_state_container=...)
+        spec = AgentConfig.from_yaml("path/to/training_config.yaml")
+        agent = RL_Agent(spec)
         agent.load_model(path="path/to/model.zip")
         return agent
 

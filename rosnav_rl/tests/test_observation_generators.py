@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 from unittest.mock import MagicMock
 
-from conftest import SimulationStateContainerStub, _RobotState
+from conftest import SimulationStateContainerStub
 
 from geometry_msgs.msg import Point
 from people_msgs.msg import Person, People
@@ -358,7 +358,7 @@ class TestLaserSafeDistanceGenerator:
     def test_safe(self):
         gen = LaserSafeDistanceGenerator(name="test_laser_safe")
         laser = np.array([1.0, 2.0, 3.0, 4.0])
-        sim = SimulationStateContainerStub(robot=_RobotState(safety_distance=0.5))
+        sim = SimulationStateContainerStub(safety_distance=0.5)
 
         result = gen._generate(
             front_laser=laser,
@@ -370,7 +370,7 @@ class TestLaserSafeDistanceGenerator:
     def test_violation(self):
         gen = LaserSafeDistanceGenerator(name="test_laser_safe")
         laser = np.array([0.3, 2.0, 3.0])
-        sim = SimulationStateContainerStub(robot=_RobotState(safety_distance=0.5))
+        sim = SimulationStateContainerStub(safety_distance=0.5)
 
         result = gen._generate(
             front_laser=laser,
@@ -382,7 +382,7 @@ class TestLaserSafeDistanceGenerator:
     def test_at_boundary(self):
         gen = LaserSafeDistanceGenerator(name="test_laser_safe")
         laser = np.array([0.5, 2.0, 3.0])
-        sim = SimulationStateContainerStub(robot=_RobotState(safety_distance=0.5))
+        sim = SimulationStateContainerStub(safety_distance=0.5)
 
         result = gen._generate(
             front_laser=laser,
@@ -394,7 +394,7 @@ class TestLaserSafeDistanceGenerator:
     def test_empty_laser(self):
         gen = LaserSafeDistanceGenerator(name="test_laser_safe")
         laser = np.array([])
-        sim = SimulationStateContainerStub(robot=_RobotState(safety_distance=0.5))
+        sim = SimulationStateContainerStub(safety_distance=0.5)
 
         result = gen._generate(
             front_laser=laser,

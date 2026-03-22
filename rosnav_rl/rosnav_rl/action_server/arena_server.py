@@ -8,7 +8,7 @@ from rosnav_rl.observations.factory.factory import (
     create_observation_manager_from_config,
 )
 from rosnav_rl.rl_agent import RL_Agent
-from rosnav_rl.states import AgentStateContainer, SimulationStateContainer
+from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.utils.utils import load_yaml
 
 from .base_server import ActionServer, ObservationCollector
@@ -76,81 +76,13 @@ def _resolve_agent_dir(agent_name: str) -> Path:
     )
 
 
-def _get_arena_states(training_cfg) -> SimulationStateContainer:
-    """Build SimulationStateContainer from the saved training config.
-
-    This replaces the old `from tools.states import get_arena_states` which
-    depended on arena_training internals. We construct the state container
-    directly from rosnav_rl's own state classes.
-    """
-    import rosnav_rl.states.simulation as simulation_states
-
-    arena_cfg = training_cfg.arena_cfg
-    agent_cfg = training_cfg.agent_cfg
-
-    robot_cfg = arena_cfg.robot
-    robot_desc = robot_cfg.robot_description
-
-    robot_state = simulation_states.RobotState(
-        radius=robot_desc.robot_radius,
-        safety_distance=arena_cfg.general.safety_distance,
-        action_state=simulation_states.ActionState(
-            is_discrete=agent_cfg.action_space.is_discrete,
-            actions=(
-                robot_desc.actions.discrete
-                if agent_cfg.action_space.is_discrete
-                else robot_desc.actions.continuous.model_dump()
-            ),
-            is_holonomic=robot_desc.is_holonomic,
-            velocity_state=simulation_states.VelocityState(
-                min_linear_vel=-2.0,
-                max_linear_vel=2.0,
-                min_translational_vel=-2.0,
-                max_translational_vel=2.0,
-                min_angular_vel=-4.0,
-                max_angular_vel=4.0,
-            ),
-        ),
-        laser_state=simulation_states.LaserState(
-            attach_full_range_laser=robot_cfg.attach_full_range_laser,
-            laser_max_range=robot_desc.laser.range,
-            laser_num_beams=robot_desc.laser.num_beams,
-        ),
-    )
-
-    task_state = simulation_states.TaskState(
-        goal_radius=arena_cfg.general.goal_radius,
-        max_steps=arena_cfg.general.max_num_moves_per_eps,
-        semantic_state=simulation_states.SemanticState(
-            num_ped_types=5,
-            ped_min_speed_x=-5.0,
-            ped_max_speed_x=5.0,
-            ped_min_speed_y=-5.0,
-            ped_max_speed_y=5.0,
-            social_state_num=99,
-        ),
-        task_modules=simulation_states.TaskModuleState(
-            tm_robots=arena_cfg.task.tm_robots,
-            tm_obstacles=arena_cfg.task.tm_obstacles,
-            tm_modules=arena_cfg.task.tm_modules,
-        ),
-    )
-
-    return simulation_states.SimulationStateContainer(
-        robot=robot_state, task=task_state
-    )
-
 
 class ArenaActionServer(ActionServer):
     def _initialize_agent(self) -> RL_Agent:
-        """
-        Initializes and returns an RL_Agent instance.
+        """Initialize and return an RL_Agent from a saved training config.
 
-        Loads the training config and model checkpoint from the agent directory,
-        reconstructs the simulation state, and creates an RL_Agent ready for inference.
-
-        Returns:
-            RL_Agent: An initialized agent with loaded model weights.
+        Loads the ``AgentConfig`` from the training config and stores
+        ``spec.parameters`` as ``agent_parameters`` for the observation pipeline.
         """
         from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg
 
@@ -161,17 +93,10 @@ class ArenaActionServer(ActionServer):
             load_yaml(model_dir / "training_config.yaml")
         )
 
-        self.simulation_state_container: SimulationStateContainer = (
-            _get_arena_states(training_cfg)
-        )
-        agent_state_container: AgentStateContainer = (
-            self.simulation_state_container.to_agent_state_container()
-        )
+        spec = training_cfg.agent_config
+        self.agent_parameters: AgentParameters = spec.parameters
 
-        agent = RL_Agent(
-            agent_cfg=training_cfg.agent_cfg,
-            agent_state_container=agent_state_container,
-        )
+        agent = RL_Agent(spec)
         agent.load_model(path=model_dir / "best_model.zip")
         return agent
 
@@ -204,7 +129,7 @@ class ArenaActionServer(ActionServer):
             config=config,
             node=self.node,
             ns=str(self.namespace),
-            simulation_state_container=self.simulation_state_container,
+            simulation_state_container=self.agent_parameters,
             wait_for_obs=False,
         )
 

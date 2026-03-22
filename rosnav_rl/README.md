@@ -98,12 +98,28 @@ A full annotated config with all available collectors and generators is at [`obs
 
 ```python
 import rosnav_rl
+from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
+from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.stable_baselines3.cfg import (
     StableBaselinesCfg, PPO_Cfg, PPO_Algorithm_Cfg,
 )
 
-agent_cfg = rosnav_rl.AgentCfg(
+spec = rosnav_rl.AgentConfig(
     robot="jackal",
+    action_space=DifferentialDriveActionSpace(
+        linear_range=(-0.5, 1.0),
+        angular_range=(-1.0, 1.0),
+    ),
+    # Adjust these to match your robot and training scenario before starting
+    # a run - see the AgentParameters section below for a full field reference.
+    parameters=AgentParameters(
+        laser_num_beams=720,
+        laser_max_range=30.0,
+        robot_radius=0.215,
+        safety_distance=0.3,
+        goal_radius=0.35,
+        max_steps=500,
+    ),
     framework=StableBaselinesCfg(
         algorithm=PPO_Cfg(
             architecture_name="AGENT_1",
@@ -123,16 +139,49 @@ agent_cfg = rosnav_rl.AgentCfg(
     ),
 )
 
-sim_state = rosnav_rl.SimulationStateContainer(...)
-agent = rosnav_rl.RL_Agent(
-    agent_cfg=agent_cfg,
-    agent_state_container=sim_state.to_agent_state_container(),
-)
+agent = rosnav_rl.RL_Agent(spec)
 agent.initialize_model()
 agent.train(train_envs=train_envs, eval_envs=eval_envs)
+
+# Save / load the spec
+spec.to_yaml("my_agent.yaml")
+loaded = rosnav_rl.AgentConfig.from_yaml("my_agent.yaml")
 ```
 
 For full training with a simulator see [`arena_training`](https://github.com/Arena-Rosnav/Arena-Training) and its [config reference](https://github.com/Arena-Rosnav/Arena-Training/tree/main/configs).
+
+### AgentParameters — tuning before training
+
+`AgentParameters` is the unified config for all scalar constants consumed by the
+observation pipeline, reward units, and observation generators.  When training
+via `arena_training`, these values are **auto-populated** from the robot
+description and arena config.  When building a spec manually, review them
+before starting a run.
+
+| Group | Fields | Used by |
+|---|---|---|
+| **Laser** | `laser_num_beams`, `laser_max_range` | `LaserObservationSpace`, `StackedLaserMapSpace` |
+| **Velocity** | `min/max_linear_vel`, `min/max_translational_vel`, `min/max_angular_vel` | `VelocityObservationSpace` |
+| **Pedestrian** | `ped_num_types`, `ped_min/max_speed_x/y`, `ped_social_state_num` | `PedestrianObservationSpace` |
+| **Navigation** | `goal_max_dist`, `subgoal_max_dist` | `GoalObservationSpace`, `SubgoalObservationSpace` |
+| **General** | `normalize` | All observation spaces |
+| **Robot** | `robot_radius`, `safety_distance` | `RewardSafeDistance`, `LaserSafeDistanceGenerator` |
+| **Episode** | `goal_radius`, `max_steps` | `RewardGoalReached`, `RewardMaxStepsExceeded` |
+
+In YAML the parameters live under the `parameters:` key of the agent config:
+
+```yaml
+# In your training config or saved agent.yaml
+agent_config:
+  parameters:
+    laser_num_beams: 720       # must match your robot's LIDAR
+    laser_max_range: 30.0
+    robot_radius: 0.215
+    safety_distance: 0.3
+    goal_radius: 0.35
+    max_steps: 500
+    # ... velocity bounds, pedestrian config, etc.
+```
 
 ---
 
@@ -156,7 +205,7 @@ Sensors ──▶ ObservationManager ──▶ ObservationSpaceManager ──▶
 | **Reward** | Composable reward units with safety categorization |
 | **Config** | Pydantic v2 discriminated unions - YAML in, validated config out |
 | **Action Server** | `GetCommand` ROS 2 service for real-time deployment |
-| **States** | Typed dataclass containers for simulation & agent state |
+| **States** | Typed dataclass containers for simulation runtime state |
 
 ---
 
@@ -175,7 +224,7 @@ Sensors ──▶ ObservationManager ──▶ ObservationSpaceManager ──▶
 | Observations | [observations/README.md](rosnav_rl/observations/README.md) - Collectors, Generators, YAML pipeline, DependencyResolver |
 | Reward | [reward/README.md](rosnav_rl/reward/README.md) - RewardFunction, RewardUnit, safety categorization |
 | Spaces | [spaces/README.md](rosnav_rl/spaces/README.md) - SpaceFactory, encoding pipeline, ActionSpaceManager |
-| Config | [cfg/README.md](rosnav_rl/cfg/README.md) - AgentCfg, discriminated unions, serialization |
+| Config | [cfg/README.md](rosnav_rl/cfg/README.md) - AgentConfig, typed action spaces, discriminated unions, serialization |
 | Action Server | [action_server/README.md](rosnav_rl/action_server/README.md) - ROS 2 deployment, GetCommand service |
 
 ---
@@ -194,14 +243,17 @@ python3 -m pytest tests/ -v
 ```
 rosnav_rl/
 ├── rl_agent.py           # RL_Agent - top-level orchestrator
-├── cfg/                  # Pydantic v2 configuration (AgentCfg, RewardCfg, …)
+├── cfg/                  # Pydantic v2 configuration (AgentConfig, AgentParameters, action spaces, …)
+│   ├── parameters.py     # AgentParameters — unified observation + environment constants
+│   ├── agent.py          # AgentConfig — single source of truth for the full agent spec
+│   └── …                 # action_spaces, reward, framework, logging
 ├── model/                # RL_Model ABC + SB3 & DreamerV3 implementations
 ├── observations/         # Collector/Generator pipeline, YAML-driven
 ├── reward/               # Composable reward units + RewardFunction
 ├── spaces/               # Observation & action space management
-├── states/               # SimulationStateContainer, AgentStateContainer
+├── states/               # Backward-compat shim (SimulationStateContainer = AgentParameters)
 ├── action_server/        # ROS 2 GetCommand service server
-├── utils/                # RequiresProtocol, ErrorReportingMixin, validation
+├── utils/                # RequiresProtocol, ErrorReportingMixin, validation, yaml_utils
 └── scripts/              # create_test_agent.py, test.py
 ```
 

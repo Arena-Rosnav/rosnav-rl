@@ -1,120 +1,108 @@
-from dataclasses import asdict
+from __future__ import annotations
+
 from typing import Dict, Optional, Union
 
 import numpy as np
 from gymnasium import spaces
 
-import rosnav_rl.cfg as rosnav_rl_cfg
-
+from rosnav_rl.cfg.agent import AgentConfig
 from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
 from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
-from rosnav_rl.states import AgentStateContainer
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 from .model import RL_Model
 
 
 class RL_Agent:
-    """A class representing a Reinforcement Learning Agent that manages model training and inference.
+    """
+    High-level interface for a Reinforcement Learning (RL) navigation agent.
 
-    This class serves as a high-level interface for reinforcement learning agents, handling model
-    initialization, training, action selection, and space management. It works with both custom RL
-    models and those from stable-baselines3.
+    The RL_Agent class encapsulates the full lifecycle and interaction logic for a navigation agent powered by RL models. It is designed to be constructed exclusively from a validated AgentConfig specification, ensuring reproducibility and modularity across different frameworks and robot configurations.
 
-    Attributes:
-        _name (str): The identifier name of the agent.
-        _model (Union[RL_Model, StableBaselinesModel, DreamerV3Model]): The underlying RL model implementation.
-        _reward_function (Optional[RewardFunction]): Function to calculate rewards during training.
-        _space_manager (BaseSpaceManager): Manages observation and action spaces.
-        _agent_state_container (AgentStateContainer): Contains and manages agent state information.
+    **Key Features:**
+    - Unified interface for model initialization, training, inference, and reward computation
+    - Supports multiple RL frameworks (Stable Baselines3, DreamerV3, custom RL_Model)
+    - Handles observation and action spaces via BaseSpaceManager
+    - Integrates reward function logic for environment feedback
+    - Provides access to agent configuration, model, and space manager
 
-    Properties:
-        config (Dict[str, dict]): Configuration dictionary containing model, space, and state settings.
-        model (StableBaselinesModel): Access to the underlying RL model.
-        reward_function (Union[None, RewardFunction]): Access to the reward function if defined.
-        space_manager (BaseSpaceManager): Access to the space management system.
-        observation_space (spaces.Dict): The agent's observation space.
-        action_space (Union[spaces.Discrete, spaces.Box]): The agent's action space.
-        agent_state_container (AgentStateContainer): Access to the agent's state container.
-        name (str): The agent's identifier name.
+    **Usage Example:**
+        >>> from rosnav_rl.cfg.agent import AgentConfig
+        >>> spec = AgentConfig.from_yaml("agent.yaml")
+        >>> agent = RL_Agent(spec)
+        >>> agent.initialize_model()
+        >>> action = agent.get_action(observation)
 
-    Example:
-        agent = RL_Agent(agent_cfg, agent_state_container)
-        agent.initialize_model()
-        action = agent.get_action(observation)
-        agent.train()
+    **Initialization:**
+        RL_Agent(spec: AgentConfig)
+        - spec: Validated AgentConfig instance containing robot, environment, framework, reward, and observation settings.
+        - Internally constructs the RL model, space manager, and reward function.
+
+    **Model Management:**
+        - initialize_model(*args, **kwargs): Sets up the underlying RL model for training or inference.
+        - load_model(*args, **kwargs): Loads a pre-trained model checkpoint if not already initialized.
+        - train(*args, **kwargs): Trains the RL model using provided data or environment.
+
+    **Action Selection:**
+        - get_action(observation: ObservationDict, ...): Returns the action vector for a given observation, using the model's policy.
+
+    **Reward Computation:**
+        - reward_function: Accesses the RewardFunction instance (if specified in config).
+        - (Optional) get_reward(observation): Computes reward for a given observation and simulation state.
+
+    **Configuration Access:**
+        - config: Returns a dictionary with agent, model, and space manager configuration.
+        - spec: Returns the AgentConfig instance used for construction.
+        - model: Returns the underlying RL model instance.
+        - space_manager: Returns the BaseSpaceManager instance.
+        - observation_space: Returns the Gymnasium Dict observation space.
+        - action_space: Returns the Gymnasium action space (Discrete or Box).
+        - name: Returns the agent's name.
+
+    **Extensibility:**
+        RL_Agent is designed for extension and integration with custom RL models, reward units, and observation generators. All major components are accessible via properties for advanced use cases.
+
+    **Thread Safety:**
+        RL_Agent is not inherently thread-safe. For concurrent environments, ensure proper synchronization when accessing model or reward function.
+
+    **References:**
+        - AgentConfig: rosnav_rl.cfg.agent.AgentConfig
+        - RL_Model: rosnav_rl.model.RL_Model
+        - StableBaselinesModel: rosnav_rl.model.stable_baselines3.StableBaselinesModel
+        - DreamerV3Model: rosnav_rl.model.dreamerv3.DreamerV3Model
+        - RewardFunction: rosnav_rl.reward.reward_function.RewardFunction
+        - BaseSpaceManager: rosnav_rl.spaces.space_manager.base_space_manager.BaseSpaceManager
     """
 
     _name: str = ""
     _model: Union[RL_Model, StableBaselinesModel, DreamerV3Model]
     _reward_function: Optional[RewardFunction] = None
     _space_manager: BaseSpaceManager
-    _agent_state_container: AgentStateContainer
 
-    def __init__(
-        self,
-        agent_cfg: rosnav_rl_cfg.AgentCfg,
-        agent_state_container: AgentStateContainer,
-    ):
-        """Initialize the RLAgent class.
-
-        This class represents a reinforcement learning agent that can be trained and used for
-        navigation tasks.
-
-        Args:
-            agent_cfg (AgentCfg): Configuration object containing all settings for the agent,
-                including name, framework settings, action space configuration, and reward settings.
-            agent_state_container (AgentStateContainer): Container object that maintains the
-                agent's state information.
-
-        Attributes:
-            _name (str): Name identifier for the agent.
-            _agent_state_container (AgentStateContainer): Reference to the state container.
-            _model (Union[StableBaselinesModel, DreamerV3Model]): The underlying RL model
-                using stable-baselines3 or DreamerV3.
-            _space_manager (BaseSpaceManager): Manages observation and action spaces.
-            _reward_function (RewardFunction, optional): Function to calculate rewards,
-                initialized if reward configuration is provided.
-
-        Note:
-            The agent is configured using the provided agent_cfg which should contain all
-            necessary parameters for initialization including model architecture, reward
-            function specifications, and space configurations.
-        """
-        self._name = agent_cfg.name
-        self._agent_cfg = agent_cfg
-        self._agent_state_container = agent_state_container
-
-        self._initialize_model(agent_cfg)
-        self._initialize_space_manager(agent_cfg)
-        self._initialize_reward_function(agent_cfg)
-
-    def _initialize_model(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
-        """Initialize the RL model based on the provided configuration using model factory."""
+    def __init__(self, spec: AgentConfig):
         from rosnav_rl.model.model_factory import ModelFactory
 
+        self._spec = spec
+        self._name = spec.name or ""
+        self._reward_function = None
+
         self._model = ModelFactory.create_model_instance(
-            framework_cfg=agent_cfg.framework, rl_agent=self
+            framework_cfg=spec.framework, rl_agent=self,
         )
 
-    def _initialize_space_manager(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
-        """Initialize the space manager based on the provided configuration."""
         self._space_manager = BaseSpaceManager(
-            action_space_kwargs={"is_discrete": agent_cfg.action_space.is_discrete},
-            agent_state_container=self._agent_state_container,
+            spec=spec,
             observation_space_list=self.model.observation_space_list,
             observation_space_kwargs=self.model.observation_space_kwargs,
         )
 
-    def _initialize_reward_function(self, agent_cfg: rosnav_rl_cfg.AgentCfg):
-        """Initialize the reward function if provided in the configuration."""
-        if agent_cfg.reward is not None:
+        if spec.reward is not None:
             self._reward_function = RewardFunction(
-                function_dict=agent_cfg.reward.reward_function_dict,
-                unit_kwargs=agent_cfg.reward.reward_unit_kwargs,
-                verbose=agent_cfg.reward.verbose,
+                function_dict=spec.reward.reward_function_dict,
+                unit_kwargs=spec.reward.reward_unit_kwargs,
+                verbose=spec.reward.verbose,
             )
 
     def initialize_model(self, *args, **kwargs):
@@ -203,25 +191,17 @@ class RL_Agent:
 
     @property
     def config(self) -> Dict[str, dict]:
-        """
-        Get the configuration dictionary for the RL agent.
-
-        This property returns a dictionary containing the agent's configuration,
-        including model, space, state settings, and reward function if defined.
-
-        Returns:
-            Dict[str, dict]: Configuration dictionary with agent settings.
-        """
+        """Configuration dictionary for the agent."""
         config_dict = {
-            "agent_cfg": asdict(self._agent_cfg),
-            "model": self.model.config,
+            "spec": self._spec.to_dict(),
+            "model": self._model.config,
             "space": self._space_manager.config,
-            "agent_state_container": asdict(self.agent_state_container),
-            # "simulation_state_container": asdict(self._simulation_state_container),
         }
-        if self._reward_function is not None:
-            config_dict["reward"] = self._reward_function.config
         return config_dict
+
+    @property
+    def spec(self) -> AgentConfig:
+        return self._spec
 
     @property
     def model(self) -> Union[StableBaselinesModel, DreamerV3Model]:
@@ -242,19 +222,6 @@ class RL_Agent:
     @property
     def action_space(self) -> Union[spaces.Discrete, spaces.Box]:
         return self._space_manager.action_space
-
-    @property
-    def agent_cfg(self) -> rosnav_rl_cfg.AgentCfg:
-        """
-        Get the agent configuration.
-
-        Returns:
-            rosnav_rl_cfg.AgentCfg: The configuration object for the agent.
-        """
-        return self._agent_cfg
-
-    def agent_state_container(self) -> AgentStateContainer:
-        return self._agent_state_container
 
     @property
     def name(self) -> str:

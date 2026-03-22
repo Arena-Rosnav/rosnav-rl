@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from rosnav_rl.cfg.reward import RewardFunctionDict
-from rosnav_rl.states import SimulationStateContainer
+from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.utils.logging import (
     ComponentType,
     ErrorReportingMixin,
@@ -141,7 +141,7 @@ class RewardFunction(ErrorReportingMixin):
     def calculate_reward(
         self,
         obs_dict: ObservationDict,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> None:
         """Calculate rewards using all reward units with optional parallel processing.
@@ -194,7 +194,7 @@ class RewardFunction(ErrorReportingMixin):
     def _prepare_execution_kwargs(
         self,
         obs_dict: ObservationDict,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> Dict[str, Any]:
         """Prepare arguments for reward unit execution.
@@ -247,7 +247,7 @@ class RewardFunction(ErrorReportingMixin):
     def get_reward(
         self,
         obs_dict: ObservationDict,
-        simulation_state_container: SimulationStateContainer,
+        simulation_state_container: AgentParameters,
         **kwargs,
     ) -> Tuple[float, Dict[str, Any]]:
         """Calculate and return the current reward and information.
