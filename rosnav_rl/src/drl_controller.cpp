@@ -144,7 +144,17 @@ geometry_msgs::msg::TwistStamped DRLController::computeVelocityCommands(
   auto start = node->now();
   while (rclcpp::ok()) {
     if (future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-      cmd_vel.twist = future.get()->twist;
+      auto result = future.get();
+      // response.action is [linear_x, linear_y, angular_z] for mobile robots
+      if (result->action.size() >= 3) {
+        cmd_vel.twist.linear.x  = result->action[0];
+        cmd_vel.twist.linear.y  = result->action[1];
+        cmd_vel.twist.angular.z = result->action[2];
+      } else if (result->action.size() == 2) {
+        // differential_drive may omit linear_y
+        cmd_vel.twist.linear.x  = result->action[0];
+        cmd_vel.twist.angular.z = result->action[1];
+      }
       RCLCPP_DEBUG(
         logger_,
         "[ROSNAV_CONTROLLER] Received command: linear_x=%.2f, linear_y=%.2f, angular_z=%.2f",

@@ -21,11 +21,17 @@ Abstract base class that wraps a trained `RL_Agent` in a ROS 2 service server. P
 
 **Service:** `get_command` (type `rosnav_rl_msgs/srv/GetCommand`)
 - **Request**: Empty (agent polls its own ROS 2 topics)
-- **Response**: `geometry_msgs/Twist` with `linear.x`, `linear.y`, `angular.z`
+- **Response**:
+  - `string action_type` — discriminator matching `BaseActionSpace.type` (e.g. `"differential_drive"`, `"omnidirectional"`, `"manipulator"`, `"humanoid"`)
+  - `float64[] action` — fully decoded command whose layout depends on `action_type`:
+    - `differential_drive` → `[linear_x, 0.0, angular_z]` (3 elements)
+    - `omnidirectional` → `[linear_x, linear_y, angular_z]` (3 elements)
+    - `manipulator` → `[joint_1, ..., joint_n]` (n elements)
+    - `humanoid` → `[locomotion..., upper_body...]` (variable)
 
 **Key features:**
 - **`ObservationCollector` protocol**: Duck-typed interface — any object with `get_observations() -> ObservationDict` is accepted
-- **Graceful error handling**: Logs warnings and returns zero velocity on transient failures (e.g., missing sensor data at startup)
+- **Graceful error handling**: Logs warnings and returns empty `action[]` on transient failures (e.g., missing sensor data at startup)
 - **Scene reset**: Subscribes to `/scenario_reset` (`std_msgs/Int16`) and calls `agent.model.reset()` on each reset
 
 ```python
@@ -98,8 +104,10 @@ client.wait_for_service()
 
 future = client.call_async(GetCommand.Request())
 rclpy.spin_until_future_complete(node, future)
-twist = future.result().twist  # geometry_msgs/Twist
-# twist.linear.x, twist.linear.y, twist.angular.z
+
+response = future.result()
+print(response.action_type)   # e.g. "differential_drive"
+print(response.action)        # e.g. [0.5, 0.0, -0.3]
 
 node.destroy_node()
 rclpy.shutdown()

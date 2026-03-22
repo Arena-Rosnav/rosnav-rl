@@ -209,7 +209,7 @@ class TestGetCommandService:
         self.server.node.destroy_node()
 
     def test_get_command_returns_twist(self):
-        """Calling GetCommand must return a Twist with the mock agent's values."""
+        """Calling GetCommand must return the decoded action with correct values."""
         import rclpy
         from rosnav_rl_msgs.srv import GetCommand
 
@@ -226,20 +226,19 @@ class TestGetCommandService:
 
         response = future.result()
         assert response is not None, "Service call timed out"
-        twist = response.twist
-        assert abs(twist.linear.x - 0.5) < 1e-6
-        assert abs(twist.linear.y - 0.0) < 1e-6
-        assert abs(twist.angular.z - 0.3) < 1e-6
+        assert len(response.action) == 3
+        assert abs(response.action[0] - 0.5) < 1e-6
+        assert abs(response.action[1] - 0.0) < 1e-6
+        assert abs(response.action[2] - 0.3) < 1e-6
 
         client_node.destroy_node()
 
     def test_get_command_before_agent_init_returns_zero_twist(self):
-        """If agent is None the handler must return a zero-velocity Twist.
+        """If agent is None the handler must return an empty action list.
 
         Tested by calling the method directly (no separate ROS2 node needed).
         """
         from rosnav_rl_msgs.srv import GetCommand
-        from geometry_msgs.msg import Twist
 
         # Temporarily clear the agent
         saved_agent = self.server.agent
@@ -250,9 +249,8 @@ class TestGetCommandService:
         # Access the name-mangled handler
         result = self.server._ActionServer__handle_next_action_srv(request, response)
 
-        assert result.twist.linear.x == 0.0
-        assert result.twist.linear.y == 0.0
-        assert result.twist.angular.z == 0.0
+        assert result.action == []
+        assert result.action_type == ""
 
         # Restore
         self.server.agent = saved_agent

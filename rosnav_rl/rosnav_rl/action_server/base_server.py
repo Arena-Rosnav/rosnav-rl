@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Protocol
 
 import rclpy
-from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rosnav_rl_msgs.srv import GetCommand
@@ -89,12 +88,13 @@ class ActionServer(ABC):
         Returns:
             GetCommand.Response: The service response containing the next action.
         """
-        cmd_vel = Twist()
-
         if self.agent is None:
             self.logger.info("Agent not initialized yet.")
-            response.twist = cmd_vel
             return response
+
+        # Populate action_type from the agent's action space spec.
+        action_space_spec = self.agent.space_manager.action_space_manager.spec
+        response.action_type = action_space_spec.type
 
         try:
             action = self.agent.get_action(
@@ -104,18 +104,13 @@ class ActionServer(ABC):
             # Gracefully handle transient observation failures (e.g. missing
             # topic data at startup) instead of crashing the whole node.
             self.logger.warn(
-                f"[Rosnav-RL] get_action failed — returning zero velocity. "
+                f"[Rosnav-RL] get_action failed — returning empty command. "
                 f"Reason: {type(exc).__name__}: {exc}"
             )
-            response.twist = cmd_vel
             return response
 
-        # Action is a numpy array with [linear.x, linear.y, angular.z]
-        cmd_vel.linear.x = float(action[0])
-        cmd_vel.linear.y = float(action[1])
-        cmd_vel.angular.z = float(action[2])
-
-        response.twist = cmd_vel
+        # Generic decoded command — works for any robot morphology.
+        response.action = [float(v) for v in action]
 
         return response
 

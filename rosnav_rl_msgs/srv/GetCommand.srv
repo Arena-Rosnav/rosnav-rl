@@ -1,2 +1,12 @@
 ---
-geometry_msgs/Twist twist
+# Discriminator matching BaseActionSpace.type:
+#   "differential_drive" | "omnidirectional" | "manipulator" | "humanoid"
+string action_type
+
+# Full decoded command for any robot morphology.
+# Shape/semantics depend on action_type:
+#   differential_drive  -> [linear_x, 0.0, angular_z]   (3 elements)
+#   omnidirectional     -> [linear_x, linear_y, angular_z] (3 elements)
+#   manipulator         -> [joint_1, ..., joint_n]       (n elements)
+#   humanoid            -> [locomotion..., upper_body...] (variable)
+float64[] action

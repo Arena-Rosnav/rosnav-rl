@@ -108,8 +108,8 @@ The core principle is **modularity and separation of concerns**:
    RL_Model (policy network) → outputs raw action
 
 4. Action Decoding
-   ActionSpaceManager → decodes to [linear.x, linear.y, angular.z]
-   → geometry_msgs/Twist
+   ActionSpaceManager → decodes to action vector (shape depends on robot type)
+   → float64[] action  +  string action_type
 
 5. Execution
    Command sent to robot hardware / simulator
@@ -385,7 +385,7 @@ Four registration modes: explicit name, auto-derived, with aliases, with categor
 **`BaseObservationSpace`** provides:
 - Schema-based `requires` (validated via `RequiresProtocol`)
 - Normalization (`max_abs`, `min_max`, `standard`, `identity`)
-- Decorators: `@apply_normalization`, `@check_dtype`
+- Decorators: `@apply_norvomalization`, `@check_dtype`
 - Null fallback on encoding errors
 
 **`ActionSpaceManager`** handles:
@@ -508,9 +508,12 @@ At inference time use `spec.parameters` directly, or
 ### 5.8 Deployment
 
 **`ActionServer`** (ABC) wraps any trained agent in a ROS 2 service:
-- **Service**: `get_command` (`rosnav_rl_msgs/srv/GetCommand`) → `geometry_msgs/Twist`
+- **Service**: `get_command` (`rosnav_rl_msgs/srv/GetCommand`)
+  - Response: `string action_type` + `float64[] action`
+  - `action_type` matches `BaseActionSpace.type` (e.g. `"differential_drive"`, `"manipulator"`)
+  - `action` layout: `[vx, wz]` for diff-drive; `[vx, vy, wz]` for omni; `[j1..jN]` for manipulators
 - **Protocol**: `ObservationCollector` — duck-typed, any object with `get_observations() → ObservationDict`
-- **Error handling**: logs warnings, returns zero velocity on transient failures
+- **Error handling**: logs warnings, returns empty `action[]` on transient failures
 - **Scene reset**: subscribes to `/scenario_reset` and calls `agent.model.reset()`
 
 **`ArenaActionServer`** — Arena-specific implementation:
@@ -670,7 +673,7 @@ ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=my_agent
 arena launch local_planner:=rosnav_rl agent_name:=my_agent
 ```
 
-The server exposes `get_command` under the robot's namespace. On inference errors it returns zero velocity and logs a warning.
+The server exposes `get_command` under the robot's namespace. Response contains `action_type` (e.g. `"differential_drive"`) and `action` (decoded command vector). On inference errors it returns empty `action[]` and logs a warning.
 
 ### Agent Directory Structure
 

@@ -8,7 +8,6 @@
 #include <tf2_ros/buffer.h>
 #include <nav2_costmap_2d/costmap_2d_ros.hpp>
 #include <rosnav_rl_msgs/srv/get_command.hpp>
-#include <geometry_msgs/msg/twist.hpp>
 
 namespace rosnav_rl_planner
 {
