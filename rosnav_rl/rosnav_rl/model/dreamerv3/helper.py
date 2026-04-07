@@ -292,7 +292,7 @@ def create_agent(
 
 def load_checkpoint(agent: dreamer.Dreamer, logdir: pathlib.Path):
     if (logdir / "latest.pt").exists():
-        checkpoint = torch.load(logdir / "latest.pt")
+        checkpoint = torch.load(logdir / "latest.pt", weights_only=False)
         agent.load_state_dict(checkpoint["agent_state_dict"])
         tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
         agent._should_pretrain._once = False

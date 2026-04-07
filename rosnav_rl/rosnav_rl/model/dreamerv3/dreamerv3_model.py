@@ -242,7 +242,7 @@ class DreamerV3Model(RL_Model):
             FileNotFoundError: Implicitly if the checkpoint file does not exist
         """
         if (self._logdir / f"{file_name}.pt").exists():
-            checkpoint = torch.load(self._logdir / f"{file_name}.pt")
+            checkpoint = torch.load(self._logdir / f"{file_name}.pt", weights_only=False)
             self._model.load_state_dict(checkpoint["agent_state_dict"])
             tools.recursively_load_optim_state_dict(
                 self._model, checkpoint["optims_state_dict"]

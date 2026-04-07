@@ -579,9 +579,35 @@ class StableBaselinesModel(RL_Model):
 
         if env:
             algorithm_args["observation_space"] = env.observation_space
-        return self._policy_description.algorithm_class.load(
-            path, env=env, custom_objects=algorithm_args
-        )
+
+        # SB3 >= 2.3.0 calls torch.load(..., weights_only=True) which breaks
+        # loading models saved with older SB3 or containing non-tensor objects
+        # (e.g. numpy arrays).  Patch the load function used by SB3 to retry
+        # transparently with weights_only=False on failure.
+        import stable_baselines3.common.save_util as _sb3_save_util
+        import torch as _th
+
+        _orig_th_load = _th.load
+        _orig_sb3_load = _sb3_save_util.th.load
+
+        def _robust_load(*args, **kwargs):
+            if kwargs.get("weights_only", False):
+                try:
+                    return _orig_th_load(*args, **kwargs)
+                except Exception:
+                    kwargs["weights_only"] = False
+                    return _orig_th_load(*args, **kwargs)
+            return _orig_th_load(*args, **kwargs)
+
+        _th.load = _robust_load
+        _sb3_save_util.th.load = _robust_load
+        try:
+            return self._policy_description.algorithm_class.load(
+                path, env=env, custom_objects=algorithm_args
+            )
+        finally:
+            _th.load = _orig_th_load
+            _sb3_save_util.th.load = _orig_sb3_load
 
     @property
     def _is_recurrent(self) -> bool:
