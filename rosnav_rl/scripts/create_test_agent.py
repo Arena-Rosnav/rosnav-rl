@@ -65,7 +65,7 @@ def _find_arena_root() -> Path:
 ARENA_ROOT = _find_arena_root()
 
 DEFAULT_CONFIG = (
-    ARENA_ROOT / "arena_bringup" / "configs" / "training" / "sb_training_config.yaml"
+    ARENA_ROOT / "arena_training" / "configs" / "sb_training_config.yaml"
 )
 _DEFAULT_AGENTS_DIR = ARENA_ROOT / "arena_training" / "agents"
 
