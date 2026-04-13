@@ -90,8 +90,8 @@ def _populate_agent_spec(training_cfg):
     )
     from rosnav_rl.cfg.parameters import AgentParameters  # noqa: PLC0415
 
-    robot_desc = training_cfg.arena_cfg.robot.robot_description
-    general = training_cfg.arena_cfg.general
+    robot_desc = training_cfg.arena_config.robot.robot_description
+    general = training_cfg.arena_config.general
     cont = robot_desc.actions.continuous
 
     if robot_desc.is_holonomic:
@@ -108,7 +108,7 @@ def _populate_agent_spec(training_cfg):
 
     # Carry over the discretization config from the agent_cfg YAML, then
     # resolve it immediately using the robot's built-in discrete action list.
-    discretization_cfg = training_cfg.agent_cfg.discretization
+    discretization_cfg = training_cfg.agent_config.discretization
     if discretization_cfg is not None:
         action_space = action_space.model_copy(
             update={"discretization": discretization_cfg}
@@ -132,7 +132,7 @@ def _populate_agent_spec(training_cfg):
         max_steps=general.max_num_moves_per_eps,
     )
 
-    training_cfg.agent_cfg = training_cfg.agent_cfg.model_copy(
+    training_cfg.agent_config = training_cfg.agent_config.model_copy(
         update={
             "robot": robot_desc.robot_model,
             "action_space": action_space,
@@ -155,8 +155,8 @@ def create_test_agent(
     from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg  # noqa: PLC0415
 
     training_cfg = TrainingCfg.model_validate(load_yaml(config_path))
-    training_cfg.agent_cfg.name = agent_name
-    print(f"[create_test_agent] Using robot: {training_cfg.arena_cfg.robot.robot_description.robot_model}")
+    training_cfg.agent_config.name = agent_name
+    print(f"[create_test_agent] Using robot: {training_cfg.arena_config.robot.robot_description.robot_model}")
 
     # ── Build everything from robot description ────────────────────────────
     _populate_agent_spec(training_cfg)
@@ -165,7 +165,7 @@ def create_test_agent(
     print("[create_test_agent] Creating RL_Agent …")
     from rosnav_rl.rl_agent import RL_Agent  # noqa: PLC0415
 
-    agent = RL_Agent(training_cfg.agent_cfg)
+    agent = RL_Agent(training_cfg.agent_config)
     print(f"[create_test_agent] Observation space: {agent.observation_space}")
     print(f"[create_test_agent] Action space:      {agent.action_space}")
 
