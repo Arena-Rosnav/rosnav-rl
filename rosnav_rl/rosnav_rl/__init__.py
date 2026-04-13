@@ -21,6 +21,7 @@ __all__ = [
     "RL_Agent",
     # ── Config (single source of truth) ───────────────────
     "AgentConfig",
+    "AgentCfg",   # backward-compat alias for AgentConfig
     "AgentParameters",
     "RewardCfg",
     # ── Typed action spaces ───────────────────────────────
@@ -72,4 +73,5 @@ from .cfg import (
     DiscretizationCfg,
     DiscretizationStrategy,
 )
+AgentCfg = AgentConfig  # backward-compat alias
 from .utils.type_aliases import SupportedRLFrameworks

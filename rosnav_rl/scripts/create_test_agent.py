@@ -106,9 +106,9 @@ def _populate_agent_spec(training_cfg):
             angular_range=tuple(cont.angular_range),
         )
 
-    # Carry over the discretization config from the agent_config YAML, then
+    # Carry over the discretization config from the agent_cfg YAML, then
     # resolve it immediately using the robot's built-in discrete action list.
-    discretization_cfg = training_cfg.agent_config.discretization
+    discretization_cfg = training_cfg.agent_cfg.discretization
     if discretization_cfg is not None:
         action_space = action_space.model_copy(
             update={"discretization": discretization_cfg}
@@ -132,7 +132,7 @@ def _populate_agent_spec(training_cfg):
         max_steps=general.max_num_moves_per_eps,
     )
 
-    training_cfg.agent_config = training_cfg.agent_config.model_copy(
+    training_cfg.agent_cfg = training_cfg.agent_cfg.model_copy(
         update={
             "robot": robot_desc.robot_model,
             "action_space": action_space,
@@ -155,7 +155,7 @@ def create_test_agent(
     from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg  # noqa: PLC0415
 
     training_cfg = TrainingCfg.model_validate(load_yaml(config_path))
-    training_cfg.agent_config.name = agent_name
+    training_cfg.agent_cfg.name = agent_name
     print(f"[create_test_agent] Using robot: {training_cfg.arena_cfg.robot.robot_description.robot_model}")
 
     # ── Build everything from robot description ────────────────────────────
@@ -165,23 +165,30 @@ def create_test_agent(
     print("[create_test_agent] Creating RL_Agent …")
     from rosnav_rl.rl_agent import RL_Agent  # noqa: PLC0415
 
-    agent = RL_Agent(training_cfg.agent_config)
+    agent = RL_Agent(training_cfg.agent_cfg)
     print(f"[create_test_agent] Observation space: {agent.observation_space}")
     print(f"[create_test_agent] Action space:      {agent.action_space}")
 
     # ── Initialise model with random weights via mock env ─────────────────
     print("[create_test_agent] Initialising PPO model with random weights …")
-    from stable_baselines3 import PPO  # noqa: PLC0415
+    from rosnav_rl.model.stable_baselines3.policy.constants import POLICY_TYPE  # noqa: PLC0415
     from rosnav_rl.utils.utils import make_mock_env  # noqa: PLC0415
 
     mock_env = make_mock_env(ns="", space_manager=agent.space_manager)
 
-    # Build the PPO directly (as the trainer would, but without batch-size
-    # checks and without an actual training run).  We use the same policy
-    # kwargs as the AGENT_3 architecture so weights are compatible.
-    policy_kwargs = agent.model._policy_description.get_kwargs()
-    ppo = PPO(
-        policy="MultiInputPolicy",
+    # Derive the algorithm class and matching policy type from the architecture
+    # description so that LSTM-based agents (RecurrentPPO + MultiInputLstmPolicy)
+    # and standard agents (PPO + MultiInputPolicy) are handled correctly.
+    # Hardcoding PPO/"MultiInputPolicy" caused:
+    #   TypeError: MultiInputActorCriticPolicy.__init__() got an unexpected
+    #   keyword argument 'n_lstm_layers'
+    # for any RecurrentPPO-based architecture.
+    policy_description = agent.model._policy_description
+    algo_cls = policy_description.algorithm_class
+    policy_type = POLICY_TYPE[algo_cls]
+    policy_kwargs = policy_description.get_kwargs()
+    ppo = algo_cls(
+        policy=policy_type,
         env=mock_env,
         policy_kwargs=policy_kwargs,
         n_steps=64,    # minimal batch — only for model init, not training
