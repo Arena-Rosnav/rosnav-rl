@@ -45,6 +45,7 @@ import time
 from rclpy.node import Node
 from rcl_interfaces.srv import SetParameters
 from rcl_interfaces.msg import Parameter, ParameterType
+from task_generator_msgs.srv import QueueEpisode
 
 
 StageInput = Union[Dict[str, List[Any]], List[Dict[str, Any]]]
@@ -115,11 +116,16 @@ class CurriculumBase(ABC):
 
         # Parameter clients keyed by node_name
         self.parameter_clients = self._init_parameter_clients()
+        self.task_mode_clients = self._init_task_mode_clients()
 
         # Lifecycle hooks
         self._on_apply: List[Callable[[int, Dict[str, Any]], None]] = []
         self._on_advance: List[Callable[[int], None]] = []
         self._on_retreat: List[Callable[[int], None]] = []
+
+        # Nodes confirmed to lack config/queue_episode; task-prefixed params fall
+        # back to SetParameters for these (same as legacy behaviour).
+        self._non_task_generator_nodes: set = set()
 
         # Apply initial stage
         self._apply_curriculum()
@@ -192,6 +198,18 @@ class CurriculumBase(ABC):
 
         if self.verbose > 0:
             print(f"[CURRICULUM_BASE] Created {len(clients)} parameter clients total")
+        return clients
+
+    def _init_task_mode_clients(self) -> Dict[str, Any]:
+        """Create ROS2 service clients for config/queue_episode on each node."""
+        clients: Dict[str, Any] = {}
+        for i in range(self.num_envs):
+            if "{i}" in self.parameter_node_template:
+                node_name = self.parameter_node_template.format(i=i)
+            else:
+                node_name = self.parameter_node_template
+            service_name = f"{node_name}/config/queue_episode"
+            clients[node_name] = self.node.create_client(QueueEpisode, service_name)
         return clients
 
     # ------------------------- Hooks API -------------------------
@@ -270,23 +288,50 @@ class CurriculumBase(ABC):
             raise TypeError(f"Unsupported parameter type for {name}: {type(value)}")
         return param
 
-    def _set_parameters_batch(self, node_name: str, param_dict: Dict[str, Any]) -> bool:
-        """Set parameters for a single node with detailed error reporting.
+    def _split_task_mode_params(
+        self, param_dict: Dict[str, Any]
+    ) -> tuple:
+        """Partition param_dict into (obstacles_params, robots_params, plain_dict).
 
-        Args:
-            node_name: Name of the target node
-            param_dict: Dictionary of parameter name -> value
-
-        Returns:
-            True if all parameters were set successfully, False otherwise
+        Keys of the form ``task.<mode>.<leaf>`` are routed to obstacles_params
+        with leaf ``<leaf>`` (the node prepends ``task.<active_mode>.`` at apply time).
+        Robot-side curriculum keys are not currently produced by any config.
         """
+        obstacles: List[Parameter] = []
+        robots: List[Parameter] = []
+        plain: Dict[str, Any] = {}
+
+        for key, val in param_dict.items():
+            parts = key.split(".", 2)
+            if len(parts) == 3 and parts[0] == "task":
+                leaf = parts[2]
+                if isinstance(val, list) and not val:
+                    continue
+                try:
+                    rcl_param = self._param_to_rcl_param(leaf, val)
+                except TypeError as exc:
+                    if self.verbose > 0:
+                        print(
+                            f"[CURRICULUM_BASE] Failed to convert {key}={val}: {exc}"
+                        )
+                    plain[key] = val
+                    continue
+                obstacles.append(rcl_param)
+            else:
+                plain[key] = val
+
+        return obstacles, robots, plain
+
+    def _send_set_parameters(
+        self, node_name: str, params: List[Parameter]
+    ) -> bool:
+        """Send a SetParameters request for the given pre-built param list."""
         client = self.parameter_clients.get(node_name)
         if client is None:
             if self.verbose > 0:
                 print(f"[CURRICULUM_BASE] No client found for node {node_name}")
             return False
 
-        # Test service availability with shorter timeout first
         if not client.wait_for_service(timeout_sec=2.0):
             if self.verbose > 0:
                 print(
@@ -294,33 +339,10 @@ class CurriculumBase(ABC):
                 )
             return False
 
-        params: List[Parameter] = []
-
-        for pname, pval in param_dict.items():
-            # Skip empty lists (explicitly absent)
-            if isinstance(pval, list) and not pval:
-                continue
-            try:
-                converted_param = self._param_to_rcl_param(pname, pval)
-                params.append(converted_param)
-            except Exception as e:
-                if self.verbose > 0:
-                    print(
-                        f"[CURRICULUM_BASE] Failed to convert parameter {pname}={pval} for node {node_name}: {e}"
-                    )
-                return False
-
-        if not params:
-            if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] No parameters to set for node {node_name}")
-            return True  # No parameters to set is not an error
-
         request = SetParameters.Request(parameters=params)
         try:
             future = client.call_async(request)
             start = time.time()
-
-            # Use shorter polling timeout to detect hanging services
             poll_timeout = min(self.timeout, 5.0)
 
             # Do not call rclpy.spin_once here: the node may already be spinning in
@@ -346,27 +368,124 @@ class CurriculumBase(ABC):
                         f"[CURRICULUM_BASE] Successfully set {len(params)} parameters for {node_name}"
                     )
                 return True
-            else:
-                if self.verbose > 0:
-                    print(
-                        f"[CURRICULUM_BASE] Parameter setting failed for {node_name}:"
-                    )
-                    if response:
-                        for i, result in enumerate(response.results):
-                            if not result.successful:
-                                param_name = (
-                                    params[i].name if i < len(params) else "unknown"
-                                )
-                                print(f"  - Parameter '{param_name}': {result.reason}")
-                    else:
-                        print("  - No response received from service")
-                return False
+
+            if self.verbose > 0:
+                print(f"[CURRICULUM_BASE] Parameter setting failed for {node_name}:")
+                if response:
+                    for i, result in enumerate(response.results):
+                        if not result.successful:
+                            param_name = params[i].name if i < len(params) else "unknown"
+                            print(f"  - Parameter '{param_name}': {result.reason}")
+                else:
+                    print("  - No response received from service")
+            return False
         except Exception as e:
             if self.verbose > 0:
                 print(
                     f"[CURRICULUM_BASE] Exception while setting parameters for {node_name}: {e}"
                 )
             return False
+
+    def _set_parameters_batch(self, node_name: str, param_dict: Dict[str, Any]) -> bool:
+        """Set parameters for a single node with detailed error reporting.
+
+        Keys matching ``task.<mode>.<leaf>`` are routed through QueueEpisode
+        (buffered server-side, applied at next reset) for nodes that expose
+        ``config/queue_episode``.  If the service is absent the first time it
+        is checked, the node is marked as non-task-generator for this run and
+        those keys fall back to the legacy SetParameters path.
+
+        Args:
+            node_name: Name of the target node
+            param_dict: Dictionary of parameter name -> value
+
+        Returns:
+            True if all parameters were set successfully, False otherwise
+        """
+        obstacles_params, robots_params, plain_dict = self._split_task_mode_params(
+            param_dict
+        )
+        has_task_params = bool(obstacles_params or robots_params)
+
+        ok = True
+
+        if has_task_params and node_name not in self._non_task_generator_nodes:
+            tm_client = self.task_mode_clients.get(node_name)
+            if tm_client is not None and tm_client.wait_for_service(timeout_sec=2.0):
+                req = QueueEpisode.Request()
+                req.tm_robots = ""
+                req.tm_obstacles = ""
+                req.tm_modules = []
+                req.keep_modules = True
+                req.obstacles_params = obstacles_params
+                req.robots_params = robots_params
+                try:
+                    future = tm_client.call_async(req)
+                    start = time.time()
+                    poll_timeout = min(self.timeout, 5.0)
+                    while not future.done():
+                        time.sleep(0.01)
+                        if time.time() - start > poll_timeout:
+                            if self.verbose > 0:
+                                print(
+                                    f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}"
+                                )
+                            ok = False
+                            break
+                    if future.done():
+                        response = future.result()
+                        if not (response and response.success):
+                            reason = response.error_msg if response else "no response"
+                            if self.verbose > 0:
+                                print(
+                                    f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}"
+                                )
+                            ok = False
+                except Exception as e:
+                    if self.verbose > 0:
+                        print(
+                            f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}"
+                        )
+                    ok = False
+            else:
+                # Service absent: mark node so we don't re-check and fall back.
+                self._non_task_generator_nodes.add(node_name)
+                if self.verbose > 0:
+                    print(
+                        f"[CURRICULUM_BASE] config/queue_episode not available for {node_name};"
+                        " falling back to SetParameters for task-prefixed keys"
+                    )
+                all_fallback = obstacles_params + robots_params
+                if all_fallback:
+                    ok = self._send_set_parameters(node_name, all_fallback) and ok
+
+        elif has_task_params and node_name in self._non_task_generator_nodes:
+            # Already confirmed non-task-generator; send via SetParameters.
+            all_fallback = obstacles_params + robots_params
+            if all_fallback:
+                ok = self._send_set_parameters(node_name, all_fallback) and ok
+
+        # Plain (non-task-prefixed) parameters always go through SetParameters.
+        if plain_dict:
+            params: List[Parameter] = []
+            for pname, pval in plain_dict.items():
+                if isinstance(pval, list) and not pval:
+                    continue
+                try:
+                    params.append(self._param_to_rcl_param(pname, pval))
+                except Exception as e:
+                    if self.verbose > 0:
+                        print(
+                            f"[CURRICULUM_BASE] Failed to convert parameter {pname}={pval} for node {node_name}: {e}"
+                        )
+                    return False
+            if params:
+                ok = self._send_set_parameters(node_name, params) and ok
+
+        if not plain_dict and not has_task_params:
+            if self.verbose > 0:
+                print(f"[CURRICULUM_BASE] No parameters to set for node {node_name}")
+        return ok
 
     def _set_parameters(self, param_dict: Dict[str, Any]) -> bool:
         if not self.parameter_clients:
@@ -398,6 +517,56 @@ class CurriculumBase(ABC):
             print(f"[CURRICULUM_BASE] Parameter setting complete: {success}")
         return success
 
+    # ------------------------- Task-mode routing -------------------------
+    _TASK_MODE_KEYS = frozenset({"tm_robots", "tm_obstacles", "tm_modules"})
+
+    def _queue_episode_batch(self, node_name: str, tm_dict: Dict[str, Any]) -> bool:
+        """Route task-mode keys to config/queue_episode on a single node."""
+        client = self.task_mode_clients.get(node_name)
+        if client is None:
+            return False
+        if not client.wait_for_service(timeout_sec=2.0):
+            if self.verbose > 0:
+                print(f"[CURRICULUM_BASE] config/queue_episode not available for {node_name}")
+            return False
+
+        req = QueueEpisode.Request()
+        req.tm_robots = tm_dict.get("tm_robots", "")
+        req.tm_obstacles = tm_dict.get("tm_obstacles", "")
+        raw_modules = tm_dict.get("tm_modules", [])
+        if isinstance(raw_modules, str):
+            raw_modules = [m.strip() for m in raw_modules.split(",") if m.strip()]
+        req.tm_modules = raw_modules
+        req.keep_modules = not bool(raw_modules)
+
+        try:
+            future = client.call_async(req)
+            start = time.time()
+            while not future.done():
+                time.sleep(0.01)
+                if time.time() - start > min(self.timeout, 5.0):
+                    if self.verbose > 0:
+                        print(f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}")
+                    return False
+            response = future.result()
+            if response and response.success:
+                return True
+            if self.verbose > 0:
+                reason = response.error_msg if response else "no response"
+                print(f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}")
+            return False
+        except Exception as e:
+            if self.verbose > 0:
+                print(f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}")
+            return False
+
+    def _queue_episode(self, tm_dict: Dict[str, Any]) -> bool:
+        success = True
+        for node_name in list(self.task_mode_clients.keys()):
+            if not self._queue_episode_batch(node_name, tm_dict):
+                success = False
+        return success
+
     # ------------------------- Curriculum application and control -------------------------
     def _apply_curriculum(self) -> bool:
         """Apply the current curriculum stage with enhanced debugging.
@@ -415,7 +584,15 @@ class CurriculumBase(ABC):
                 f"[CURRICULUM_BASE] Parameter node template: {self.parameter_node_template}"
             )
 
-        ok = self._set_parameters(stage)
+        tm_keys = self._TASK_MODE_KEYS.intersection(stage)
+        param_dict = {k: v for k, v in stage.items() if k not in self._TASK_MODE_KEYS and k != "train_mode"}
+        tm_dict = {k: stage[k] for k in tm_keys}
+
+        ok = True
+        if param_dict:
+            ok = self._set_parameters(param_dict) and ok
+        if tm_dict:
+            ok = self._queue_episode(tm_dict) and ok
         # call hooks even if setting fails (observer may want to react)
         self._call_hooks(self._on_apply, self.curriculum_index, stage)
         return ok

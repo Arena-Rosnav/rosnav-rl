@@ -94,14 +94,8 @@ def main(args=None):
         # )
         rclpy.spin_once(node, timeout_sec=0.1)
 
-    try:
-        rclpy.spin(node)
-
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    from arena_rclpy_mixins.spin import spin_node
+    spin_node(node)
 
 
 def test_env():

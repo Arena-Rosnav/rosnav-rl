@@ -80,7 +80,7 @@ ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=my_trained_agent
 
 ### Via Arena launch (automatic)
 
-When `local_planner:=rosnav_rl` and `train_mode:=false`, the server starts automatically:
+When `local_planner:=rosnav_rl`, the server starts automatically:
 ```bash
 arena launch local_planner:=rosnav_rl agent_name:=my_trained_agent
 ```
