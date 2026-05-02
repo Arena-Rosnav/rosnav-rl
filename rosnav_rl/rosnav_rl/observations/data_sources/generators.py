@@ -8,14 +8,13 @@ calculations on data from other `DataSource`s.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING
 from warnings import warn
 
 import arena_people_msgs.msg as arena_people_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
 import rclpy
-from rosnav_rl.utils.rostopic import Namespace
 import tf2_ros
 from tf_transformations import euler_from_quaternion
 
@@ -49,16 +48,9 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
     """Robot 2D Pose Generator (TF-based)
 
     Generates the robot's 2D pose (x, y, theta) by listening to the TF tree.
-    Looks up the transform from a global frame (e.g., 'map') to the robot's base frame.
-
-    Technical Specifications:
-    - Source: ROS 2 TF tree
-    - Output: 2D pose (x, y, theta) in map frame
-    - Handles initialization and frame configuration
+    Looks up the transform from source_frame to target_frame.
 
     Output Format: np.ndarray of shape (3,) [x, y, theta]
-
-    Applications: Localization, navigation, and robot-centric transformations.
     """
 
     # This generator doesn't depend on other data sources - it gets data from TF
@@ -68,52 +60,38 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
         self,
         name: str,
         node: rclpy.Node | None = None,
-        ns: Union[str, Namespace] | None = None,
+        source_frame: str = "",
+        target_frame: str = "map",
         **kwargs,
     ):
         super().__init__(name, **kwargs)
         self._node = node
         if not self._node:
             raise ValueError("RobotPoseTFGenerator requires a ROS 2 node.")
+        if not source_frame:
+            raise ValueError("RobotPoseTFGenerator requires a non-empty source_frame.")
 
         self._tf_buffer = tf2_ros.Buffer(node=self._node)
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self._node)
         self._last_pose = np.array((0.0, 0.0, 0.0), dtype=Pose2DType)
         self._is_initialized = False
-        self._namespace = Namespace(ns) if ns else None
 
-        # Set default frame names, will be updated when simulation_state_container is available
-        self.TARGET_FRAME: str = "map"  # Reference/parent frame
-        self.SOURCE_FRAME: str = (
-            f"{self._namespace.simulation_ns.without_slashes()}_{self._namespace.robot_ns.without_slashes()}/base_link"
-            if self._namespace
-            else "jackal/base_link"  # Robot frame
-        )
+        self.SOURCE_FRAME: str = source_frame
+        self.TARGET_FRAME: str = target_frame
 
     def _generate(self, simulation_state_container: AgentParameters, **kwargs) -> Pose2D:
         """Generates the robot's 2D pose (x, y, theta) from the TF tree.
 
         Args:
-            simulation_state_container (AgentParameters):
-                - Simulation state for context (may provide robot config)
-                - Used to update frame configuration if needed
+            simulation_state_container (AgentParameters): Simulation state for context
             **kwargs: Additional keyword arguments (unused)
 
         Returns:
-            Pose2D: Robot pose as np.ndarray of shape (3,) [x, y, theta] in map frame
+            Pose2D: Robot pose as np.ndarray of shape (3,) [x, y, theta] in target frame
 
         Example:
             [1.2, 3.4, 0.78]
         """
-
-        # Update frame configuration from simulation state if needed
-        if simulation_state_container and not self._is_initialized:
-            # Use simulation state to get proper robot configuration
-            # robot_params = arena_simulation_setup.entities.robot.Robot(
-            #     "jackal"
-            # ).model_params
-            # self.TARGET_FRAME = f"jackal/{robot_params.base_frame}"
-            pass
 
         if not self._is_initialized:
             try:
