@@ -45,7 +45,11 @@ ament_python_install_package(rosnav_rl)
 # Install everything else...
 install(DIRECTORY include/ DESTINATION include/)
 install(TARGETS rosnav_rl_planner DESTINATION lib)
-install(PROGRAMS scripts/action_server.py DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS
+  scripts/action_server.py
+  scripts/arena_inference_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(FILES local_planner_plugin.xml DESTINATION share/${PROJECT_NAME})
 
