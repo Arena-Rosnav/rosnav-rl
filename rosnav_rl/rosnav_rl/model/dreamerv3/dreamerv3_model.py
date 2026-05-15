@@ -280,12 +280,12 @@ class DreamerV3Model(RL_Model):
             instantiated to create the actual observation spaces for the model.
         """
         return [
-            spaces.environment.StackedLaserMapSpace,
+            spaces.perception.ReducedLaserScanSpace,
             spaces.environment.PedestrianVelXSpace,
             spaces.environment.PedestrianVelYSpace,
             spaces.environment.PedestrianTypeSpace,
             spaces.environment.PedestrianSocialStateSpace,
-            spaces.navigation.DistAngleToSubgoalSpace,
+            spaces.navigation.DistAngleToGoalSpace,
             spaces.dynamics.LastActionSpace,
             spaces.meta.IsFirstStepSpace,
             spaces.meta.IsTerminalStepSpace,
@@ -294,9 +294,13 @@ class DreamerV3Model(RL_Model):
     @property
     def observation_space_kwargs(self) -> Dict[str, Any]:
         return {
+            "reduced_num_beams": 72,  # 720 beams / 10 = 3.75° angular resolution
+            "normalize": True,
+            "goal_max_dist": 10,
+            # Kwargs for feature-map spaces (PedestrianVel/Type/SocialState).
+            # These are collected but NOT encoded (not in mlp_keys/cnn_keys);
+            # they just need to init without errors.
             "roi_in_m": 40,
             "feature_map_size": 80,
             "laser_stack_size": 10,
-            "normalize": True,
-            "goal_max_dist": 10,
         }
