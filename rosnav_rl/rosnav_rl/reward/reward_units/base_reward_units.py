@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 import logging
+import numpy as np
 
 from rosnav_rl.utils.validation import RequiresProtocol
 from rosnav_rl.utils.logging import ErrorReportingMixin, ComponentType
@@ -112,7 +113,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
         Args:
             value (float): The reward value to add
         """
-        if not isinstance(value, (int, float)):
+        if not isinstance(value, (int, float, np.floating, np.integer)):
             self._report_error(
                 f"Reward value must be numeric, got {type(value)}: {value}",
                 error_type="TypeError",
