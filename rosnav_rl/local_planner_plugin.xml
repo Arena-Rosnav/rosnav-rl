@@ -1,0 +1,7 @@
+<library path="rosnav_rl_planner">
+  <class name="rosnav_rl_planner::DRLController"
+         type="rosnav_rl_planner::DRLController"
+         base_class_type="nav2_core::Controller">
+    <description>Rosnav-RL local planner plugin</description>
+  </class>
+</library>

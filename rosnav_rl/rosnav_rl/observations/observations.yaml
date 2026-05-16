@@ -1,0 +1,311 @@
+# =============================================================================
+# OBSERVATION PIPELINE CONFIGURATION
+# =============================================================================
+# This file defines the complete data pipeline for the reinforcement learning agent.
+# It specifies how to acquire raw sensor data (collectors) and transform it into
+# meaningful features for decision-making (generators).
+#
+# ARCHITECTURE OVERVIEW:
+# ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+# │ ROS Topics  │───▶│ Collectors  │───▶│ Generators  │───▶│ RL Agent    │
+# │ (Raw Data)  │    │ (Preprocess)│    │ (Features)  │    │ (Actions)   │
+# └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+#
+# COMPONENTS:
+# - COLLECTORS: Subscribe to ROS topics and preprocess raw sensor data
+# - GENERATORS: Compute derived features from collector outputs and other generators
+# - ALIASES: Provide semantic names for easy reference in observation spaces
+
+# Aliases provide a semantic abstraction layer that decouples observation space
+# definitions from specific data source implementations. This allows:
+# 1. Easy switching between different sensors (e.g., odom vs TF for robot pose)
+# 2. Simplified observation space configuration
+# 3. Consistent naming across different robot platforms
+# 4. Clean separation between logical concepts and physical sensors
+aliases:
+  # Core robot state
+  robot_pose: robot_pose_from_tf    # Primary robot localization source
+  # robot_pose_tf: robot_pose_from_tf   # Alternative TF-based localization
+  
+  # Navigation targets
+  # goal: goal_pose                     # Final navigation target
+  # subgoal: subgoal_pose              # Intermediate waypoint
+  # nav_path: navigation_path          # Planned trajectory
+  
+  # Social navigation - pedestrian data
+  people_data: people_detections          # Raw pedestrian detections (people_msgs)
+  arena_people_data: arena_pedestrian_detections  # Arena pedestrian detections (arena_people_msgs)
+
+datasources:
+  # ---------------------------------------------------------------------------
+  # COLLECTORS: Raw sensor data acquisition from ROS topics
+  # ---------------------------------------------------------------------------
+  # Collectors subscribe to ROS topics, preprocess raw messages, and provide
+  # clean, typed data to the observation system. Each collector handles a
+  # specific message type and applies appropriate preprocessing (e.g., NaN
+  # handling for laser scans, coordinate transformations for poses).
+  
+  # Robot localization sources
+  # robot_pose_from_odom:
+  #   type: nav_msgs/Odometry            # → Pose2D
+  #   params:
+  #     topic: "odom"                    # Standard odometry topic
+  #     up_to_date_required: true        # Require fresh data for temporal synchronization
+
+  robot_pose_from_tf:
+    type: RobotPoseTFGenerator         # Listens to TF tree → Pose2D 
+    params: {}                         # Uses simulation_state_container for frame config
+
+  # Sensor data collectors
+  front_laser:
+    type: sensor_msgs/LaserScan        # → LidarRanges
+    params:
+      topic: "lidar"                    # Primary lidar topic
+      up_to_date_required: true        # Critical for obstacle avoidance
+
+  # Navigation target collectors  
+  goal_pose:
+    type: geometry_msgs/PoseStamped    # → Pose2D
+    params:
+      topic: "goal_pose"                # Navigation goal from planner (relative to namespace)
+      up_to_date_required: false       # Goal updates less frequently
+
+  subgoal_pose:
+    type: geometry_msgs/PoseStamped    # → Pose2D
+    params:
+      topic: "subgoal"                # Intermediate waypoint
+      up_to_date_required: false       # Subgoal updates less frequently
+
+  # Robot control and action data
+  last_action:
+    type: geometry_msgs/Twist          # → RobotVelocity
+    params:
+      topic: "cmd_vel"                 # Robot velocity commands
+      # up_to_date_required: true
+
+  # Social navigation - people detection
+  # people_detections:
+  #   type: people_msgs/People           # → PedestrianDetections
+  #   params:
+  #     topic: "/task_generator_node/people"                  # People tracker output
+  #     up_to_date_required: true
+
+  # Arena pedestrian detection (arena_people_msgs)
+  # arena_pedestrian_detections:
+  #   type: arena_people_msgs/Pedestrians  # → ArenaPedestrianDetections
+  #   params:
+  #     topic: "/task_generator_node/arena_peds"  # Arena pedestrian simulator output
+  #     up_to_date_required: true
+
+  collision_monitor:
+    type: nav2_msgs/CollisionMonitorState  # → SafetyStatus
+    params:
+      topic: "collision_monitor_state"
+      state_key: "StopPolygon"            # Specific collision state to monitor
+
+  # Visual perception
+  # front_camera:
+  #   type: sensor_msgs/Image            # → ImageData
+  #   params:
+  #     topic: "camera/image_raw"        # Camera feed (supports multiple encodings)
+
+  # Navigation planning data
+  # navigation_path:
+  #   type: nav_msgs/Path                # → NavigationPath
+  #   params:
+  #     topic: "global_plan"                    # Global planner output
+
+  # Safety monitoring
+  # collision_monitor:
+  #   type: nav2_msgs/CollisionMonitorState  # → SafetyStatus
+  #   params:
+  #     topic: "collision_monitor_state"
+  #     state_key: "collision"            # Specific collision state to monitor
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL COLLECTORS: Additional sensors for advanced configurations
+  # ---------------------------------------------------------------------------
+  # Uncomment and configure these collectors for multi-sensor setups.
+  # Useful for robots with multiple cameras, lidars, or specialized sensors.
+  
+  # Additional lidar sensors
+  # rear_laser:
+  #   type: sensor_msgs/LaserScan
+  #   params:
+  #     topic: "scan_rear"             # Rear-facing lidar
+  #
+  # Multi-camera setup for 360° vision
+  # left_camera:
+  #   type: sensor_msgs/Image
+  #   params:
+  #     topic: "camera_left/image_raw"
+  #
+  # right_camera:
+  #   type: sensor_msgs/Image
+  #   params:
+  #     topic: "camera_right/image_raw"
+  #
+  # depth_camera:
+  #   type: sensor_msgs/Image
+  #   params:
+  #     topic: "camera/depth/image_raw"
+
+  # ---------------------------------------------------------------------------
+  # GENERATORS: Derived features computed from collector outputs
+  # ---------------------------------------------------------------------------
+  # Generators transform raw sensor data into navigation-relevant features.
+  # They can depend on multiple collectors and other generators, creating
+  # a processing pipeline.
+  
+  # Coordinate frame transformations
+  goal_in_robot_frame:
+    type: GoalLocationInRobotFrameGenerator  # Transforms goal from world → robot frame
+
+  subgoal_in_robot_frame:
+    type: SubgoalLocationInRobotFrameGenerator  # Transforms subgoal from world → robot frame
+
+  # Navigation metrics - distance and angle computations
+  dist_angle_to_goal:
+    type: DistAngleToGoalGenerator           # Computes [distance, angle] to goal
+
+  dist_angle_to_subgoal:
+    type: DistAngleToSubgoalGenerator        # Computes [distance, angle] to subgoal
+
+  # Safety and collision detection
+  laser_safety_violation:
+    type: LaserSafeDistanceGenerator         # Checks if obstacles are within safety distance
+
+  # ---------------------------------------------------------------------------
+  # PEDESTRIAN ANALYSIS GENERATORS - Social navigation features
+  # ---------------------------------------------------------------------------
+  # These generators process pedestrian detection data to create features for
+  # social-aware navigation. They handle coordinate transformations, motion
+  # analysis, and social state extraction for human-robot interaction.
+  
+  # Pedestrian position processing
+  # pedestrian_relative_locations:
+  #   type: PedestrianRelativeLocationGenerator    # Transforms pedestrian positions to robot frame
+
+  # pedestrian_world_locations:
+  #   type: PedestrianLocationGenerator            # Extracts world coordinates of pedestrians
+
+  # # Pedestrian motion analysis
+  # pedestrian_relative_velocities:
+  #   type: PedestrianRelativeVelGenerator         # Computes pedestrian velocities in robot frame
+
+  # pedestrian_vel_x:
+  #   type: PedestrianRelativeVelXGenerator        # Forward/backward velocity component
+
+  # pedestrian_vel_y:
+  #   type: PedestrianRelativeVelYGenerator        # Left/right velocity component  
+
+  # # Social navigation metrics
+  # pedestrian_distances:
+  #   type: PedestrianDistanceGenerator            # Minimum distances to each pedestrian group
+
+  # # Pedestrian classification and social states
+  # pedestrian_types:
+  #   type: PedestrianTypeGenerator                # Extracts pedestrian group/type classifications
+
+  # pedestrian_social_states:
+  #   type: PedestrianSocialStateGenerator         # Extracts social behavior states
+
+  # ---------------------------------------------------------------------------
+  # ARENA PEDESTRIAN ANALYSIS GENERATORS - Arena-specific pedestrian features
+  # ---------------------------------------------------------------------------
+  # These generators process arena_people_msgs/Pedestrians data with full pose,
+  # twist, and animation state information from the Arena simulator.
+  
+  # Arena pedestrian position processing
+  # arena_pedestrian_relative_locations:
+  #   type: ArenaPedestrianRelativeLocationGenerator  # Transforms Arena pedestrian positions to robot frame
+
+  # arena_pedestrian_world_locations:
+  #   type: ArenaPedestrianLocationGenerator          # Extracts world coordinates of Arena pedestrians
+
+  # # Arena pedestrian motion analysis
+  # arena_pedestrian_relative_velocities:
+  #   type: ArenaPedestrianRelativeVelGenerator       # Computes Arena pedestrian velocities in robot frame
+
+  # # Arena pedestrian metrics
+  # arena_pedestrian_distances:
+  #   type: ArenaPedestrianDistanceGenerator          # Minimum distances to each Arena pedestrian by ID
+
+  # # Arena pedestrian animation/behavior states
+  # arena_pedestrian_states:
+  #   type: ArenaPedestrianStateGenerator    # Extracts animation states (IDLE, WALKING, RUNNING, etc.)
+
+# =============================================================================
+# CONFIGURATION EXAMPLES & USAGE PATTERNS
+# =============================================================================
+# This section provides examples of how to configure the observation pipeline
+# for different robot platforms, sensor configurations, and use cases.
+
+# EXAMPLE 1: Multi-camera robot configuration
+# For robots with multiple cameras, add camera collectors and update aliases:
+#
+# Additional collectors:
+#   rear_camera:
+#     type: sensor_msgs/Image
+#     params:
+#       topic: "camera_rear/image_raw"
+#
+# Updated aliases:
+#   aliases:
+#     front_cam: front_camera
+#     rear_cam: rear_camera
+#     left_cam: left_camera  
+#     right_cam: right_camera
+
+# EXAMPLE 2: Multi-lidar setup for 360° sensing
+# Useful for warehouse robots or outdoor autonomous vehicles:
+#
+# Additional collectors:
+#   rear_laser:
+#     type: sensor_msgs/LaserScan
+#     params:
+#       topic: "scan_rear"
+#   left_laser:
+#     type: sensor_msgs/LaserScan
+#     params:
+#       topic: "scan_left"
+#
+# Updated aliases:
+#   aliases:
+#     front_laser: front_laser_sensor
+#     rear_laser: rear_laser_sensor
+#     left_laser: left_laser_sensor
+
+# EXAMPLE 3: TF-based localization instead of odometry
+# For robots using advanced SLAM or when odometry is unreliable:
+#
+#   aliases:
+#     robot_pose: robot_pose_from_tf    # Switch primary pose source
+
+# EXAMPLE 4: Social navigation focused configuration  
+# Emphasizes pedestrian interaction features:
+#
+#   aliases:
+#     people_pos: pedestrian_relative_locations
+#     people_vel: pedestrian_relative_velocities  
+#     social_distances: pedestrian_distances
+#     social_types: pedestrian_types
+#     social_behaviors: pedestrian_social_states
+
+# EXAMPLE 5: Custom generator chains
+# Create complex feature pipelines by chaining generators:
+#
+#   custom_safety_metric:
+#     type: CustomSafetyGenerator
+#     params:
+#       inputs:
+#         laser_safety: laser_safety_violation
+#         pedestrian_dist: pedestrian_distances
+#         collision_state: collision_monitor
+
+# USAGE NOTES:
+# 1. All collectors run in separate threads and cache the latest data
+# 2. Generators are computed on-demand when requested by observation spaces
+# 3. The simulation_state_container provides robot configuration parameters
+# 4. Type annotations ensure data consistency throughout the pipeline
+# 5. Failed data sources gracefully degrade (return empty arrays/default values)

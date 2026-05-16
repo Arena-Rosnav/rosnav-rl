@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rosnav_rl</name>
+  <version>0.1.0</version>
+  <description>The RosNav-RL package</description>
+
+  <maintainer email="anh.maxiking@hotmail.de">tuananhroman</maintainer>
+  <license>BSD</license>
+
+  <!-- ROS2 Build Requirements -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>nav2_core</build_depend>
+  <build_depend>pluginlib</build_depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>rosnav_rl_msgs</build_depend>
+
+  <!-- Core Dependencies -->
+  <exec_depend>arena_rclpy_mixins</exec_depend>
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>python3-pip</depend>
+  <depend>python3-pytest</depend>
+  <depend>message_filters</depend>
+
+  <!-- Message Handling -->
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <exec_depend>nav2_core</exec_depend>
+  <exec_depend>pluginlib</exec_depend>
+  <exec_depend>rclcpp</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <pluginlib_plugin>
+      <nav2_core plugin="${prefix}/local_planner_plugin.xml"/>
+    </pluginlib_plugin>
+  </export>
+</package>
