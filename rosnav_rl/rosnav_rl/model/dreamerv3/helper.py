@@ -358,9 +358,10 @@ def train(
                     is_image_available=is_image_available,
                 )
                 if after_eval_fn is not None:
-                    after_eval_fn(
-                        logger._scalars.get("eval_return", float("-inf"))
-                    )
+                    after_eval_fn({
+                        "eval_return": logger._scalars.get("eval_return", float("-inf")),
+                        "eval_success_rate": logger._scalars.get("eval_success_rate", 0.0),
+                    })
 
             # Run training phase
             _log.info(

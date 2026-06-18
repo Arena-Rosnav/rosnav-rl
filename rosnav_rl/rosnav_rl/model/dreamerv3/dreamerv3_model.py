@@ -280,7 +280,7 @@ class DreamerV3Model(RL_Model):
             instantiated to create the actual observation spaces for the model.
         """
         return [
-            spaces.perception.ReducedLaserScanSpace,
+            spaces.environment.LaserCartesianMapSpace,
             spaces.environment.PedestrianVelXSpace,
             spaces.environment.PedestrianVelYSpace,
             spaces.environment.PedestrianTypeSpace,
