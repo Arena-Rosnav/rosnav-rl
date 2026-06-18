@@ -1,6 +1,7 @@
 import numpy as np
 from gymnasium import spaces
 
+from rosnav_rl.observations.utils.types import IsFirst, IsTerminal
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
@@ -17,6 +18,7 @@ class IsFirstStepSpace(BaseObservationSpace):
     """
 
     name = "IsFirstStepSpace"
+    requires = {"is_first": IsFirst}
 
     def get_gym_space(self) -> spaces.Space:
         """
@@ -49,6 +51,7 @@ class IsTerminalStepSpace(BaseObservationSpace):
     """
 
     name = "IsTerminalStepSpace"
+    requires = {"is_terminal": IsTerminal}
 
     def get_gym_space(self) -> spaces.Space:
         """

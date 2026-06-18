@@ -315,7 +315,8 @@ def simulate(
         length += 1
         step += len(envs)
         length *= 1 - done
-        # add to cache
+        # add to cache; capture terminal success flag for eval success-rate tracking
+        _done_successes: dict = {}
         for a, result, env in zip(action, results, envs):
             o, r, d, info = result
             o = {k: convert(v) for k, v in o.items()}
@@ -327,6 +328,8 @@ def simulate(
             transition["reward"] = r
             transition["discount"] = info.get("discount", np.array(1 - float(d)))
             add_to_cache(cache, env.id, transition)
+            if d:
+                _done_successes[env.id] = int(info.get("is_success", 0))
 
         if done.any():
             indices = [index for index, d in enumerate(done) if d]
@@ -359,10 +362,12 @@ def simulate(
                     if not "eval_lengths" in locals():
                         eval_lengths = []
                         eval_scores = []
+                        eval_successes = []
                         eval_done = False
                     # start counting scores for evaluation
                     eval_scores.append(score)
                     eval_lengths.append(length)
+                    eval_successes.append(_done_successes.get(eid, 0))
 
                     score = sum(eval_scores) / len(eval_scores)
                     length = sum(eval_lengths) / len(eval_lengths)
@@ -373,6 +378,7 @@ def simulate(
                         logger.scalar(f"eval_return", score)
                         logger.scalar(f"eval_length", length)
                         logger.scalar(f"eval_episodes", len(eval_scores))
+                        logger.scalar(f"eval_success_rate", sum(eval_successes) / len(eval_successes))
                         logger.write(step=logger.step)
                         eval_done = True
 

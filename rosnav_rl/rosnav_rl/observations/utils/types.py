@@ -165,6 +165,16 @@ IsTerminal = Annotated[
     ),
 ]
 
+IsFirst = Annotated[
+    bool,
+    DataSpec(
+        description="Flag indicating if this is the first step of an episode",
+        constraints="True on the first step after reset, False otherwise",
+        source="environment reset/step bookkeeping",
+        example="True",
+    ),
+]
+
 # Pedestrian detection and tracking data types
 PedestrianDetections = Annotated[
     people_msgs.People,

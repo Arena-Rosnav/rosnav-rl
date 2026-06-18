@@ -71,18 +71,20 @@ class DreamerV3TrialPruner(TrialPrunerBase):
 
     # ── DreamerV3 hook ────────────────────────────────────────────────────
 
-    def after_eval_hook(self, eval_return: float) -> None:
+    def after_eval_hook(self, metrics: "Dict[str, float]") -> None:
         """Called by ``helper.train()`` after every evaluation phase.
 
-        Stores *eval_return* and immediately reports it to Optuna.  If the
-        pruner decides to stop this trial, ``optuna.TrialPruned`` is raised
-        (which should propagate out of the training loop).
+        Stores the ``eval_return`` from *metrics* and immediately reports it
+        to Optuna.  If the pruner decides to stop this trial,
+        ``optuna.TrialPruned`` is raised (which should propagate out of the
+        training loop).
 
         Args:
-            eval_return: Mean episodic return from the latest evaluation.
+            metrics: Dict with at least ``eval_return`` (and ``eval_success_rate``).
 
         Raises:
             optuna.TrialPruned: If the trial should be stopped early.
         """
+        eval_return = metrics.get("eval_return", float("-inf"))
         self._last_value = eval_return
         self.report_metric(eval_return)

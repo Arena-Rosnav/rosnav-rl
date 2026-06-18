@@ -95,12 +95,18 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
 
         if not self._is_initialized:
             try:
-                self._tf_buffer.can_transform(
-                    self.TARGET_FRAME,  # "map" (was SOURCE_FRAME)
-                    self.SOURCE_FRAME,  # "jackal/base_link" (was TARGET_FRAME)
+                available = self._tf_buffer.can_transform(
+                    self.TARGET_FRAME,
+                    self.SOURCE_FRAME,
                     rclpy.time.Time(),
                     timeout=rclpy.duration.Duration(seconds=1.0),
                 )
+                if not available:
+                    self._node.get_logger().warn(
+                        f"Waiting for transform from '{self.SOURCE_FRAME}' to"
+                        f" '{self.TARGET_FRAME}': frame not yet available"
+                    )
+                    return self._last_pose
                 self._is_initialized = True
             except (
                 tf2_ros.LookupException,

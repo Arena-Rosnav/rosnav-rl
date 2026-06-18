@@ -7,7 +7,7 @@ Handles efficient waiting and polling for collector updates using ROS simulation
 from __future__ import annotations
 
 import time
-from typing import List
+from typing import Dict, List
 
 from rclpy.node import Node
 
@@ -16,6 +16,11 @@ from ..data_sources.base import Collector
 
 class WaitingStrategy:
     """Handles waiting for collector updates with simulation time awareness."""
+
+    # Number of consecutive per-collector timeouts before declaring a stall
+    # and aborting the worker process so the multiprocessing pool can restart
+    # it with a fresh Gazebo entity spawn (which re-initialises the GPU lidar).
+    _STALL_THRESHOLD: int = 10
 
     def __init__(self, node: Node):
         """
@@ -26,6 +31,8 @@ class WaitingStrategy:
         """
         self._node = node
         self._logger = node.get_logger()
+        # Tracks consecutive timeouts per collector name.
+        self._consecutive_failures: Dict[str, int] = {}
 
     def wait_for_collectors(self, collectors: List[str], collector_dict: dict) -> int:
         """
@@ -76,11 +83,20 @@ class WaitingStrategy:
         try:
             self._poll_for_update_with_timeout(collector, timeout)
             self._logger.debug(f"Collector '{collector_name}' updated successfully")
+            self._consecutive_failures[collector_name] = 0
             return True
         except TimeoutError:
+            n = self._consecutive_failures.get(collector_name, 0) + 1
+            self._consecutive_failures[collector_name] = n
             self._logger.warn(
                 f"Timeout waiting for '{collector_name}' after {timeout}s"
             )
+            if collector.up_to_date_required and n >= self._STALL_THRESHOLD:
+                raise RuntimeError(
+                    f"Sensor stall: '{collector_name}' timed out {n} consecutive "
+                    f"times. Worker will exit so the pool can respawn this env "
+                    f"with a fresh Gazebo entity (GPU lidar re-initialisation)."
+                )
             return False
         except Exception as e:
             self._logger.error(f"Exception while waiting for '{collector_name}': {e}")
