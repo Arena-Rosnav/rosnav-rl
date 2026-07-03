@@ -35,6 +35,8 @@ from rosnav_rl.reward.reward_units.reward_units import (
     RewardAngularVelocityConstraint,
     RewardLinearVelBoost,
     RewardMaxStepsExceeded,
+    RewardProxemicIntrusion,
+    RewardSocialPotential,
 )
 from rosnav_rl.reward.constants import DEFAULTS, DONE_REASONS
 
@@ -1061,3 +1063,157 @@ class TestRewardActiveHeadingDirection:
              simulation_state_container=sim_state)
 
         assert total_reward(rf) == 0.0
+
+
+class TestRewardProxemicIntrusion:
+    def _call(self, unit, ped_loc, ped_vel, sim_state):
+        unit(
+            pedestrian_relative_locations=np.array([ped_loc]),
+            pedestrian_relative_velocities=np.array([ped_vel]),
+            simulation_state_container=sim_state,
+        )
+
+    def test_front_intrusion_penalized_more_than_side_or_behind(
+        self, make_reward_function, sim_state
+    ):
+        # Pedestrian walking in +x (robot frame). pedestrian_relative_locations gives
+        # the ped's position in the robot frame, so the robot's position relative to
+        # the ped is the negation of that vector: placing the ped at (-d, 0) puts the
+        # robot at (+d, 0) relative to the ped, i.e. directly ahead of its heading.
+        # Front should incur the largest penalty since sigma_front > sigma_side >
+        # sigma_back stretches the comfort zone furthest into the pedestrian's path.
+        d = 0.8
+        ped_vel = [1.0, 0.0]
+
+        rf_front = make_reward_function()
+        unit_front = RewardProxemicIntrusion(rf_front)
+        self._call(unit_front, [-d, 0.0], ped_vel, sim_state)
+
+        rf_side = make_reward_function()
+        unit_side = RewardProxemicIntrusion(rf_side)
+        self._call(unit_side, [0.0, d], ped_vel, sim_state)
+
+        rf_back = make_reward_function()
+        unit_back = RewardProxemicIntrusion(rf_back)
+        self._call(unit_back, [d, 0.0], ped_vel, sim_state)
+
+        penalty_front = -total_reward(rf_front)
+        penalty_side = -total_reward(rf_side)
+        penalty_back = -total_reward(rf_back)
+
+        assert penalty_front > penalty_side > penalty_back > 0.0
+
+    def test_pedestrian_outside_activation_radius_ignored(
+        self, make_reward_function, sim_state
+    ):
+        rf = make_reward_function()
+        unit = RewardProxemicIntrusion(rf, activation_radius=3.0)
+        self._call(unit, [10.0, 0.0], [1.0, 0.0], sim_state)
+        assert total_reward(rf) == 0.0
+
+    def test_no_pedestrians_no_crash(self, make_reward_function, sim_state):
+        rf = make_reward_function()
+        unit = RewardProxemicIntrusion(rf)
+        unit(
+            pedestrian_relative_locations=np.array([]),
+            pedestrian_relative_velocities=np.array([]),
+            simulation_state_container=sim_state,
+        )
+        assert total_reward(rf) == 0.0
+
+    def test_stationary_pedestrian_uses_isotropic_zone(
+        self, make_reward_function, sim_state
+    ):
+        # A stationary pedestrian has no defined heading, so front/behind should be
+        # penalized identically (both fall back to sigma_side).
+        d = 0.8
+        ped_vel = [0.0, 0.0]
+
+        rf_front = make_reward_function()
+        unit_front = RewardProxemicIntrusion(rf_front)
+        self._call(unit_front, [d, 0.0], ped_vel, sim_state)
+
+        rf_back = make_reward_function()
+        unit_back = RewardProxemicIntrusion(rf_back)
+        self._call(unit_back, [-d, 0.0], ped_vel, sim_state)
+
+        assert total_reward(rf_front) == pytest.approx(total_reward(rf_back))
+
+
+# =====================================================================
+#  RewardSocialPotential
+# =====================================================================
+
+class TestRewardSocialPotential:
+    def _call(self, unit, ped_locations):
+        unit(pedestrian_relative_locations=np.array(ped_locations))
+
+    def test_moving_away_gives_positive_reward(self, make_reward_function):
+        rf = make_reward_function()
+        unit = RewardSocialPotential(rf)
+
+        self._call(unit, [[1.0, 0.0]])
+        self._call(unit, [[1.3, 0.0]])
+
+        assert total_reward(rf) > 0
+
+    def test_moving_toward_gives_negative_reward(self, make_reward_function):
+        rf = make_reward_function()
+        unit = RewardSocialPotential(rf)
+
+        self._call(unit, [[2.0, 0.0]])
+        self._call(unit, [[1.7, 0.0]])
+
+        assert total_reward(rf) < 0
+
+    def test_no_pedestrians_gives_constant_drift_no_live_signal(
+        self, make_reward_function
+    ):
+        # With gamma < 1 a constant potential yields a fixed per-step drift
+        # (factor*(gamma-1)*clip_distance), not exactly zero — same property as
+        # `approach_goal`'s PBRS branch. The invariant under test is that an
+        # absent pedestrian contributes no *live* gradient beyond that drift.
+        rf = make_reward_function()
+        unit = RewardSocialPotential(rf)
+
+        self._call(unit, np.empty((0, 2)))
+        self._call(unit, np.empty((0, 2)))
+
+        expected_drift = unit._factor * (unit._gamma - 1) * unit._clip_distance
+        assert total_reward(rf) == pytest.approx(expected_drift)
+
+    def test_nearest_pedestrian_switch_skips_shaping(self, make_reward_function):
+        rf = make_reward_function()
+        unit = RewardSocialPotential(rf, jump_threshold=0.5)
+
+        self._call(unit, [[1.0, 0.0]])
+        self._call(unit, [[2.5, 0.0]])
+
+        assert total_reward(rf) == pytest.approx(0.0)
+
+    def test_pedestrian_beyond_clip_distance_matches_no_pedestrian_drift(
+        self, make_reward_function
+    ):
+        # A pedestrian beyond clip_distance should be indistinguishable from no
+        # pedestrian at all — both clip Phi(s) to the same constant.
+        rf_far_ped = make_reward_function()
+        unit_far_ped = RewardSocialPotential(rf_far_ped, clip_distance=3.0)
+        self._call(unit_far_ped, [[5.0, 0.0]])
+        self._call(unit_far_ped, [[4.0, 0.0]])
+
+        rf_no_ped = make_reward_function()
+        unit_no_ped = RewardSocialPotential(rf_no_ped, clip_distance=3.0)
+        self._call(unit_no_ped, np.empty((0, 2)))
+        self._call(unit_no_ped, np.empty((0, 2)))
+
+        assert total_reward(rf_far_ped) == pytest.approx(total_reward(rf_no_ped))
+
+    def test_reset_clears_last_phi(self, make_reward_function):
+        rf = make_reward_function()
+        unit = RewardSocialPotential(rf)
+
+        self._call(unit, [[1.0, 0.0]])
+        assert unit.last_phi is not None
+
+        unit.reset()
+        assert unit.last_phi is None

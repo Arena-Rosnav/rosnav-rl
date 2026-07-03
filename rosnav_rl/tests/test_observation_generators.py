@@ -40,6 +40,7 @@ from rosnav_rl.observations.data_sources.generators import (
     PedestrianRelativeVelXGenerator,
     PedestrianRelativeVelYGenerator,
     PedestrianDistanceGenerator,
+    PedestrianGraphNodeGenerator,
 )
 
 
@@ -735,3 +736,139 @@ class TestGoalPipeline:
 
         assert da[0] == pytest.approx(3.0 * np.sqrt(2))
         assert da[1] == pytest.approx(np.pi / 4)
+
+
+# =====================================================================
+#  PedestrianGraphNodeGenerator
+# =====================================================================
+
+def _people(*entries):
+    """Build a People msg from (x, y, vx, vy, name[, tag]) tuples."""
+    persons = []
+    for entry in entries:
+        x, y, vx, vy, name = entry[:5]
+        tag = entry[5] if len(entry) > 5 else "moving"
+        persons.append(
+            Person(
+                position=Point(x=float(x), y=float(y), z=0.0),
+                velocity=Point(x=float(vx), y=float(vy), z=0.0),
+                name=str(name),
+                tags=[tag],
+                tagnames=["behavior"],
+            )
+        )
+    return People(people=persons)
+
+
+class TestPedestrianGraphNodeGenerator:
+    def _gen(self, max_peds=8, include_social_state=True):
+        return PedestrianGraphNodeGenerator(
+            name="test_peds",
+            max_peds=max_peds,
+            include_social_state=include_social_state,
+        )
+
+    def _call(self, gen, robot_pose, people_data):
+        return gen._generate(
+            robot_pose=robot_pose,
+            people_data=people_data,
+            simulation_state_container=SimulationStateContainerStub(),
+        )
+
+    # ------------------------------------------------------------------ shape
+    def test_output_shape_with_social_state(self):
+        gen = self._gen(max_peds=8, include_social_state=True)
+        out = self._call(gen, make_pose(0, 0, 0), _people((1, 0, 0, 0, "p0")))
+        assert out.shape == (8, 6)  # 4 kin + 1 social + 1 validity
+
+    def test_output_shape_without_social_state(self):
+        gen = self._gen(max_peds=4, include_social_state=False)
+        out = self._call(gen, make_pose(0, 0, 0), _people((1, 0, 0, 0, "p0")))
+        assert out.shape == (4, 5)  # 4 kin + 1 validity
+
+    # ------------------------------------------------------------------ empty
+    def test_empty_people_all_zeros(self):
+        gen = self._gen()
+        out = self._call(gen, make_pose(0, 0, 0), People(people=[]))
+        assert out.shape == (8, 6)
+        assert (out == 0).all()
+
+    def test_none_people_all_zeros(self):
+        gen = self._gen()
+        out = self._call(gen, make_pose(0, 0, 0), None)
+        assert out.shape == (8, 6)
+        assert (out == 0).all()
+
+    # ------------------------------------------------------------------ padding
+    def test_fewer_peds_than_max_pads_remainder(self):
+        gen = self._gen(max_peds=8)
+        out = self._call(gen, make_pose(0, 0, 0), _people((1, 0, 0, 0, "p0"), (2, 0, 0, 0, "p1")))
+        assert out[0, -1] == 1.0  # valid
+        assert out[1, -1] == 1.0  # valid
+        assert (out[2:, :] == 0).all()  # padded rows all zero
+
+    def test_more_peds_than_max_keeps_nearest(self):
+        gen = self._gen(max_peds=2)
+        # 4 peds at distances 5, 1, 3, 0.5 — nearest 2 are 0.5 and 1.0
+        people = _people((5, 0, 0, 0, "far"), (1, 0, 0, 0, "mid"), (3, 0, 0, 0, "mid2"), (0.5, 0, 0, 0, "near"))
+        out = self._call(gen, make_pose(0, 0, 0), people)
+        assert out.shape == (2, 6)
+        assert (out[:, -1] == 1.0).all()  # both valid
+        # nearest ped is at (0.5, 0) in robot frame → rel_x ≈ 0.5
+        assert out[0, 0] == pytest.approx(0.5, abs=1e-4)
+        assert out[1, 0] == pytest.approx(1.0, abs=1e-4)
+
+    # ------------------------------------------------------------------ robot-frame transform
+    def test_robot_facing_plus_x_ped_ahead(self):
+        """Robot at origin facing +x, ped at (3,0) world → rel_pos = (3,0)."""
+        gen = self._gen(max_peds=1, include_social_state=False)
+        out = self._call(gen, make_pose(0, 0, 0), _people((3, 0, 0, 0, "p")))
+        assert out[0, 0] == pytest.approx(3.0, abs=1e-4)
+        assert out[0, 1] == pytest.approx(0.0, abs=1e-4)
+
+    def test_robot_facing_plus_y_ped_ahead(self):
+        """Robot at origin facing +y (yaw=pi/2), ped at (0,3) world → rel_pos = (3,0)."""
+        gen = self._gen(max_peds=1, include_social_state=False)
+        out = self._call(gen, make_pose(0, 0, np.pi / 2), _people((0, 3, 0, 0, "p")))
+        assert out[0, 0] == pytest.approx(3.0, abs=1e-4)
+        assert out[0, 1] == pytest.approx(0.0, abs=1e-4)
+
+    def test_robot_offset_position(self):
+        """Robot at (1,1) facing +x, ped at world (4,1) → rel_pos = (3,0)."""
+        gen = self._gen(max_peds=1, include_social_state=False)
+        out = self._call(gen, make_pose(1, 1, 0), _people((4, 1, 0, 0, "p")))
+        assert out[0, 0] == pytest.approx(3.0, abs=1e-4)
+        assert out[0, 1] == pytest.approx(0.0, abs=1e-4)
+
+    # ------------------------------------------------------------------ determinism
+    def test_deterministic_on_repeated_call(self):
+        gen = self._gen()
+        people = _people((2, 0, 0, 0, "a"), (0, 2, 0.5, 0, "b"), (2, 0, 0, 0.1, "c"))
+        pose = make_pose(0, 0, 0)
+        out1 = self._call(gen, pose, people)
+        out2 = self._call(gen, pose, people)
+        assert np.array_equal(out1, out2)
+
+    def test_tie_break_by_stable_id(self):
+        """Two peds equidistant — ordering must be stable (CRC32 tie-break, not dict order)."""
+        gen = self._gen(max_peds=2)
+        # both at distance 2.0 from origin
+        people = _people((2, 0, 0, 0, "ped_z"), (0, 2, 0, 0, "ped_a"))
+        out1 = self._call(gen, make_pose(0, 0, 0), people)
+        out2 = self._call(gen, make_pose(0, 0, 0), people)
+        # must agree across calls — content determined by CRC32 order
+        assert np.array_equal(out1, out2)
+
+    # ------------------------------------------------------------------ validity flag
+    def test_validity_flag_is_last_column(self):
+        gen = self._gen(max_peds=3)
+        out = self._call(gen, make_pose(0, 0, 0), _people((1, 0, 0, 0, "p")))
+        assert out[0, -1] == 1.0   # real ped
+        assert out[1, -1] == 0.0   # padding
+        assert out[2, -1] == 0.0   # padding
+
+    # ------------------------------------------------------------------ dtype
+    def test_output_dtype_float32(self):
+        gen = self._gen()
+        out = self._call(gen, make_pose(0, 0, 0), _people((1, 0, 0, 0, "p")))
+        assert out.dtype == np.float32
