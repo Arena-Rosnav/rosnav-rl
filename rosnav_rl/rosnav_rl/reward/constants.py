@@ -27,8 +27,17 @@ class DEFAULTS:
     class APPROACH_GOAL:
         POS_FACTOR: float = 0.3
         NEG_FACTOR: float = 0.5
+        FACTOR: float = 0.3
+        GAMMA: float = 0.99
         _GOAL_UPDATE_THRESHOLD: float = 2.5
         _TERM_THRESHOLD: float = 2.0
+        _ON_SAFE_DIST_VIOLATION: bool = True
+
+    class SOCIAL_POTENTIAL:
+        FACTOR: float = 0.2
+        GAMMA: float = 0.99
+        CLIP_DISTANCE: float = 3.0
+        JUMP_THRESHOLD: float = 0.5
         _ON_SAFE_DIST_VIOLATION: bool = True
 
     class COLLISION:

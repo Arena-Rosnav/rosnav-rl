@@ -1236,8 +1236,8 @@ def static_scan_for_lambda_return(fn, inputs, start):
     flag = True
     for index in indices:
         # (inputs, pcont) -> (inputs[index], pcont[index])
-        inp = lambda x: (_input[x] for _input in inputs)
-        last = fn(last, *inp(index))
+        inp = tuple(_input[index] for _input in inputs)
+        last = fn(last, *inp)
         if flag:
             outputs = last
             flag = False
@@ -1316,6 +1316,7 @@ class Optimizer:
         wd_pattern=r".*",
         opt="adam",
         use_amp=False,
+        warmup_steps: int = 0,
     ):
         """Initialize an Optimizer wrapper.
 
@@ -1332,6 +1333,7 @@ class Optimizer:
             wd_pattern (str, optional): Regex pattern for selecting variables for weight decay. Defaults to r".*"
             opt (str, optional): Optimizer type ('adam', 'nadam', 'adamax', 'sgd', 'momentum'). Defaults to "adam"
             use_amp (bool, optional): Whether to use automatic mixed precision. Defaults to False
+            warmup_steps (int, optional): Number of linear LR warmup steps (0 = disabled). Defaults to 0
 
         Raises:
             AssertionError: If weight decay is not between 0 and 1, or if clip is less than 1
@@ -1351,6 +1353,12 @@ class Optimizer:
             "momentum": lambda: torch.optim.SGD(parameters, lr=lr, momentum=0.9),
         }[opt]()
         self._scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+        if warmup_steps > 0:
+            self._sched = torch.optim.lr_scheduler.LinearLR(
+                self._opt, start_factor=0.01, end_factor=1.0, total_iters=warmup_steps
+            )
+        else:
+            self._sched = None
 
     def __call__(self, loss, params, retain_graph=True):
         """Update optimizer parameters based on computed loss.
@@ -1381,8 +1389,11 @@ class Optimizer:
         self._scaler.step(self._opt)
         self._scaler.update()
         # self._opt.step()
+        if self._sched is not None:
+            self._sched.step()
         self._opt.zero_grad()
         metrics[f"{self._name}_grad_norm"] = to_np(norm)
+        metrics[f"{self._name}_lr"] = self._opt.param_groups[0]["lr"]
         return metrics
 
     def _apply_weight_decay(self, varibs):
@@ -1472,47 +1483,41 @@ def static_scan(fn, inputs, start):
         - Each element of the output preserves the structure of the state (dict or tensor)
     """
     last = start
-    indices = range(inputs[0].shape[0])
-    flag = True
-    for index in indices:
-        inp = lambda x: (_input[x] for _input in inputs)
-        last = fn(last, *inp(index))
-        if flag:
-            if type(last) == type({}):
-                outputs = {
-                    key: value.clone().unsqueeze(0) for key, value in last.items()
-                }
+    T = inputs[0].shape[0]
+    outputs = None
+
+    for index in range(T):
+        inp = tuple(_input[index] for _input in inputs)
+        last = fn(last, *inp)
+
+        if outputs is None:
+            # Pre-allocate full T-size output buffers from the first step's shapes.
+            # Cannot pre-allocate from `start` because start may contain None placeholders
+            # (e.g. _imagine passes (state_dict, None, None, init_buf, init_pose)).
+            if isinstance(last, dict):
+                outputs = {k: v.new_empty((T,) + v.shape) for k, v in last.items()}
             else:
-                outputs = []
-                for _last in last:
-                    if type(_last) == type({}):
-                        outputs.append(
-                            {
-                                key: value.clone().unsqueeze(0)
-                                for key, value in _last.items()
-                            }
-                        )
-                    else:
-                        outputs.append(_last.clone().unsqueeze(0))
-            flag = False
+                outputs = [
+                    {k: v.new_empty((T,) + v.shape) for k, v in elem.items()}
+                    if isinstance(elem, dict)
+                    else elem.new_empty((T,) + elem.shape)
+                    for elem in last
+                ]
+
+        # In-place write at current index — O(T) total copies instead of O(T^2).
+        if isinstance(last, dict):
+            for k, v in last.items():
+                outputs[k][index] = v
         else:
-            if type(last) == type({}):
-                for key in last.keys():
-                    outputs[key] = torch.cat(
-                        [outputs[key], last[key].unsqueeze(0)], dim=0
-                    )
-            else:
-                for j in range(len(outputs)):
-                    if type(last[j]) == type({}):
-                        for key in last[j].keys():
-                            outputs[j][key] = torch.cat(
-                                [outputs[j][key], last[j][key].unsqueeze(0)], dim=0
-                            )
-                    else:
-                        outputs[j] = torch.cat(
-                            [outputs[j], last[j].unsqueeze(0)], dim=0
-                        )
-    if type(last) == type({}):
+            for j, elem in enumerate(last):
+                if isinstance(elem, dict):
+                    for k, v in elem.items():
+                        outputs[j][k][index] = v
+                else:
+                    outputs[j][index] = elem
+
+    # Preserve original return convention: dict state → wrap in list.
+    if isinstance(last, dict):
         outputs = [outputs]
     return outputs
 

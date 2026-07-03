@@ -87,7 +87,7 @@ class EncoderCfg(BaseModel):
         symlog_inputs (bool): Whether to apply symmetric log transformation to inputs. Default: True
     """
 
-    mlp_keys: str = "DIST_ANGLE_TO_SUBGOAL"
+    mlp_keys: str = "DIST_ANGLE_TO_SUBGOAL|PedestrianNodeSetSpace"
     cnn_keys: str = (
         "PEDESTRIAN_SOCIAL_STATE|PEDESTRIAN_TYPE|PEDESTRIAN_VEL_X|PEDESTRIAN_VEL_Y|STACKED_LASER_MAP"
     )
@@ -270,6 +270,7 @@ class BehaviorCfg(BaseModel):
         imag_gradient (str): Imagination gradient type.
         imag_gradient_mix (float): Gradient mixing ratio.
         eval_state_mean (bool): Use mean state in evaluation.
+        use_imagination_checkpointing (bool): Wrap img_step in gradient checkpointing to save VRAM. Default: False
     """
 
     discount: float = 0.997
@@ -278,6 +279,188 @@ class BehaviorCfg(BaseModel):
     imag_gradient: str = "dynamics"
     imag_gradient_mix: float = 0.0
     eval_state_mean: bool = False
+    use_imagination_checkpointing: bool = False
+
+
+class SocialGATCfg(BaseModel):
+    """Configuration for the Social-RSSM graph attention network (C1).
+
+    Attributes:
+        out_dim (int): Dimension of the social context vector c_t. Default: 64
+        heads (int): Number of heterogeneous attention heads. Default: 4
+        hidden (int): Hidden dimension of the attention projections. Default: 128
+        layers (int): Number of GAT layers. Default: 2
+        radius_m (float): Distance threshold (meters) for proximity edges. Default: 4.0
+        converge_angle_deg (float): Relative-heading threshold (degrees) below which a
+            velocity-converging edge is added. Default: 90.0
+        variant (str): Graph encoder, "gat" (shared-Q soft-blend, default) or "height"
+            (HEIGHT-style separate per-edge-type multi-head attention).
+        obstacle_edges (bool): Enable obstacle-agent (OA) edges. HEIGHT only; requires
+            ObstacleNodeSetSpace observations. Default: False (obstacles stay in the laser CNN).
+        max_obstacles (int): Fixed number of obstacle nodes O (padded/masked). Default: 8
+        obstacle_radius_m (float): Distance threshold (meters) for obstacle-agent edges. Default: 3.0
+    """
+
+    out_dim: int = 64
+    heads: int = 4
+    hidden: int = 128
+    layers: int = 2
+    radius_m: float = 4.0
+    converge_angle_deg: float = 90.0
+    variant: Literal["gat", "height"] = "gat"
+    obstacle_edges: bool = False
+    max_obstacles: int = 8
+    obstacle_radius_m: float = 3.0
+
+
+class SocialDALICfg(BaseModel):
+    """Configuration for the DALI dynamics-context encoder (C2).
+
+    Attributes:
+        enabled (bool): Whether DALI (d_t and L_dyn) is active. Default: False
+        out_dim (int): Dimension of the dynamics context vector d_t. Default: 64
+        hidden (int): Hidden dimension of the trajectory GRU. Default: 64
+        k_steps (int): Trajectory window length. FIXED at 40 (= 2 s at 20 Hz) so the GRU
+            sees a full SFM/HSFM avoidance cycle. Default: 40
+        lambda_dyn (float): Weight of the auxiliary forward-prediction loss in the ELBO. Default: 0.1
+        imag_backprop_steps (int): Number of imagination steps over which L_dyn and the
+            d_t->actor gradient through imagined peds are back-propagated. Beyond this, d_t is
+            computed with detached decoded peds to bound error amplification. Default: 5
+    """
+
+    enabled: bool = False
+    out_dim: int = 64
+    hidden: int = 64
+    k_steps: int = 40
+    lambda_dyn: float = 0.1
+    imag_backprop_steps: int = 5
+
+
+class SocialContextCfg(BaseModel):
+    """Configuration for the Contextual Social RSSM (cSRSSM) crowd-behavior context b.
+
+    Casts social navigation as a contextual MDP: a slow, probabilistic crowd-behavior code
+    ``b`` (aggressiveness, yielding, preferred speed, personal-space, local policy) is inferred
+    from a trajectory window and conditions the RSSM *transition* (unlike GAT/DALI, which only
+    enter the feature). This enables zero-shot generalization across crowd behaviors and
+    counterfactual social rollouts. Inferred once per sequence and held fixed across the
+    imagination horizon (realtime: no graph-in-transition loop).
+
+    Attributes:
+        enabled (bool): Master switch. When False, context_size is 0 and the RSSM transition is
+            byte-identical to baseline. Default: False
+        b_dim (int): Dimension of the context vector b fed into the transition. Default: 16
+        hidden (int): Hidden width of the context encoder (reuses the DALI trajectory GRU).
+            Default: 64
+        window (int): Trajectory-window length k the encoder summarizes. Default: 8
+        kl_scale (float): Weight of KL(q(b)||N(0,1)) in the ELBO (information bottleneck). Default: 1.0
+        pred_scale (float): Weight of the prediction-driven identifiability term (primary
+            anti-collapse mechanism, VariBAD-style): from (b, pooled crowd summary at t)
+            predict the pooled summary at t+1 for steps beyond the inference window. Requires
+            batch_length > window to have any effect. Default: 0.1
+        infonce_scale (float): Weight of the InfoNCE identifiability term (secondary /
+            ablation-only; known false-negative issue under domain randomization -- see
+            context.py). Default: 0.0
+    """
+
+    enabled: bool = False
+    b_dim: int = 16
+    hidden: int = 64
+    window: int = 8
+    kl_scale: float = 1.0
+    pred_scale: float = 0.1
+    infonce_scale: float = 0.0
+
+
+class SocialCurriculumCfg(BaseModel):
+    """Configuration for the staged, gated social-training curriculum (M6.1).
+
+    Stages advance only when the gate metric is met; a stage that hits its step cap without
+    passing halts training with a diagnostic rather than silently proceeding.
+
+    Step caps are additive: S1 activates at warmup_steps, S2 at warmup_steps+gat_steps, etc.
+
+    Attributes:
+        enabled (bool): Whether the gated curriculum callback is active. Default: False
+        warmup_steps (int): S0 world-model warmup step cap. Default: 500_000
+        gat_steps (int): S1 additional steps for GAT-online stage. Default: 1_000_000
+        dali_steps (int): S2 additional steps for DALI-online stage. Default: 1_000_000
+        density_steps (int): S3 additional steps for pedestrian-density ramp. Default: 2_500_000
+        recon_mse_gate (float): Max ped-reconstruction MSE (m^2) to pass S0. Default: 0.10
+        probe_acc_gate (float): Min cross-simulator probe accuracy to pass S0. Default: 0.70
+        success_gate (float): Min success rate to pass S1 (0.0 = accept any). Default: 0.0
+        ct_ablation_drop_gate (float): Min success-rate drop when zeroing c_t (proves C1 useful).
+            Default: 0.03 (3 pp).
+        collision_gate (float): Ratio of S2 collision rate to S1; must be ≤ this to pass S2.
+            Default: 1.0 (collision must not increase).
+    """
+
+    enabled: bool = False
+    warmup_steps: int = 500_000
+    gat_steps: int = 1_000_000
+    dali_steps: int = 1_000_000
+    density_steps: int = 2_500_000
+    recon_mse_gate: float = 0.10
+    probe_acc_gate: float = 0.70
+    success_gate: float = 0.0
+    ct_ablation_drop_gate: float = 0.03
+    collision_gate: float = 1.0
+
+
+class SocialCfg(BaseModel):
+    """Configuration for the Social-Dreamer augmentation (C1 + C2).
+
+    When ``enabled`` is False the augmented state reduces to the baseline DreamerV3 feature
+    ``concat(stoch, deter)`` and no social parameters are added to any network. This is the
+    firebreak that keeps the baseline run byte-identical and prevents C1/C2 dimensional drift
+    (all heads read their input width from ``social.dims.augmented_feat_size``).
+
+    Attributes:
+        enabled (bool): Master switch for the social augmentation. Default: False
+        max_peds (int): Fixed number of pedestrian nodes N (padded/masked). Default: 8
+        node_feat_dim (int): Node feature width F (Dx, Dy, vx, vy, social_state). Default: 5
+        peds_recon_scale (float): Loss scale for the pedestrian reconstruction head. Default: 1.0
+        cell_type (str): RSSM deterministic backbone. "gru" (default), "transformer"
+            (M5.1: causal sliding-window attention cell inside the sequential scan), or
+            "tssm" (M5.2: STORM-style TSSM — obs-only posterior + one parallel causal
+            attention pass over the whole sequence in observe(); imagination stays
+            sequential with a per-layer KV cache).
+        gat (SocialGATCfg): Graph attention network configuration.
+        dali (SocialDALICfg): Dynamics-context encoder configuration.
+        curriculum (SocialCurriculumCfg): Staged training-curriculum configuration.
+        use_se2_frame_canon (bool): Enable SE(2) frame canonicalization. When True, decoded
+            pedestrian positions are transformed from the anchor frame to the current robot frame
+            before GAT/DALI, eliminating accumulating bias over imagination horizons. Default: False
+        kinematics_dt (float): Control period in seconds (10 Hz → 0.1). Used by integrate_se2
+            for imagination pose accumulation. Default: 0.1
+        se2_augment_prob (float): Probability of applying random SE(2) augmentation per batch
+            element during training. Default: 0.5
+        action_scale_linear (float): Physical linear velocity range (m/s). Populated by
+            arena_trainer from robot_description. Default: 1.0
+        action_scale_angular (float): Physical angular velocity range (rad/s). Populated by
+            arena_trainer from robot_description. Default: 1.0
+    """
+
+    enabled: bool = False
+    max_peds: int = 8
+    node_feat_dim: int = 5
+    peds_recon_scale: float = 1.0
+    cell_type: Literal["gru", "transformer", "tssm"] = "gru"
+    transformer_ctx_len: int = 64      # sliding-window length (TransformerCell and TSSM)
+    transformer_num_heads: int = 4     # attention heads (TransformerCell and TSSM)
+    tssm_num_layers: int = 2           # TSSM only: causal attention blocks in the h-pathway
+    tssm_ff_mult: int = 2              # TSSM only: block MLP width multiplier (ff = mult*deter)
+    gat: SocialGATCfg = SocialGATCfg()
+    dali: SocialDALICfg = SocialDALICfg()
+    context: SocialContextCfg = SocialContextCfg()
+    curriculum: SocialCurriculumCfg = SocialCurriculumCfg()
+    use_se2_frame_canon: bool = False
+    kinematics_dt: float = 0.1
+    se2_augment_prob: float = 0.5
+    action_scale_linear: float = 1.0
+    action_scale_linear_y: float = 1.0
+    action_scale_angular: float = 1.0
+    action_holonomic: bool = False
 
 
 class ModelCfg(BaseModel):
@@ -340,6 +523,7 @@ class ModelCfg(BaseModel):
     cont_head: ContHeadCfg = ContHeadCfg()
     behavior: BehaviorCfg = BehaviorCfg()
     exploration: ExplorationCfg = ExplorationCfg()
+    social: SocialCfg = SocialCfg()
 
 
 class TrainingCfg(BaseModel):
@@ -363,6 +547,7 @@ class TrainingCfg(BaseModel):
         opt (str): Optimizer type, currently supporting 'adam'
         eval_every (float): Number of steps between evaluations (1e5)
         eval_episode_num (int): Number of episodes for evaluation (20)
+        warmup_steps (int): Linear LR warmup steps for model optimizer (0 = disabled). Default: 1000
     """
 
     steps: float = 1e8
@@ -378,6 +563,7 @@ class TrainingCfg(BaseModel):
     opt: str = "adam"
     eval_every: float = 200
     eval_episode_num: int = 5
+    warmup_steps: int = 1000
 
 
 class DreamerV3Cfg(FrameworkCfg):

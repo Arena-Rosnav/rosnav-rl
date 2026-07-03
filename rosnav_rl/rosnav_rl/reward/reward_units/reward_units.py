@@ -423,6 +423,9 @@ class RewardApproachGoal(RewardUnit):
         reward_function: RewardFunction,
         pos_factor: float = DEFAULTS.APPROACH_GOAL.POS_FACTOR,
         neg_factor: float = DEFAULTS.APPROACH_GOAL.NEG_FACTOR,
+        _potential_based: bool = False,
+        factor: float = DEFAULTS.APPROACH_GOAL.FACTOR,
+        gamma: float = DEFAULTS.APPROACH_GOAL.GAMMA,
         _goal_update_threshold: float = DEFAULTS.APPROACH_GOAL._GOAL_UPDATE_THRESHOLD,
         _follow_subgoal: bool = False,
         _on_safe_dist_violation: bool = DEFAULTS.APPROACH_GOAL._ON_SAFE_DIST_VIOLATION,
@@ -435,6 +438,15 @@ class RewardApproachGoal(RewardUnit):
             reward_function: The reward function object managing this unit
             pos_factor: Positive scaling factor for goal approach (default: 0.1)
             neg_factor: Negative scaling factor for goal retreat (default: 0.2)
+            _potential_based: use potential-based reward shaping (PBRS, Ng et al. 1999)
+                instead of the asymmetric pos/neg factor form. reward = factor *
+                (last_distance - gamma * current_distance), i.e. F = gamma*Phi(s') -
+                Phi(s) with Phi(s) = -distance_to_goal. Policy-invariant for any factor
+                or gamma value, so it needs no pos/neg asymmetry to resist reward hacking.
+            factor: symmetric scaling factor used when _potential_based is True
+            gamma: discount used in the potential difference when _potential_based is
+                True; must match the RL algorithm's discount factor for the PBRS
+                policy-invariance guarantee to hold
             _goal_update_threshold: Minimum distance for goal change detection
             _follow_subgoal: Use subgoal instead of main goal for tracking
             _on_safe_dist_violation: Enable reward during safety violations
@@ -444,6 +456,9 @@ class RewardApproachGoal(RewardUnit):
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._pos_factor = pos_factor
         self._neg_factor = neg_factor
+        self._potential_based = _potential_based
+        self._factor = factor
+        self._gamma = gamma
         self._goal_update_threshold_sq = _goal_update_threshold**2
         self._follow_subgoal = _follow_subgoal
 
@@ -452,6 +467,8 @@ class RewardApproachGoal(RewardUnit):
         self._last_goal_world: np.ndarray = None  # world-frame target for jump detection
 
     def check_parameters(self, *args, **kwargs):
+        if self._potential_based:
+            return
         if self._pos_factor < 0 or self._neg_factor < 0:
             warn_msg = (
                 f"Both factors should be positive. "
@@ -531,9 +548,14 @@ class RewardApproachGoal(RewardUnit):
         # Apply reward only when we have a valid previous distance and the goal
         # has NOT just been reassigned.
         if self.last_goal_distance is not None and not goal_jumped:
-            distance_change = self.last_goal_distance - current_distance
-            factor = self._pos_factor if distance_change > 0 else self._neg_factor
-            self.add_reward(factor * distance_change)
+            if self._potential_based:
+                # F(s,a,s') = gamma*Phi(s') - Phi(s), Phi(s) = -distance_to_goal
+                shaped = self.last_goal_distance - self._gamma * current_distance
+                self.add_reward(self._factor * shaped)
+            else:
+                distance_change = self.last_goal_distance - current_distance
+                factor = self._pos_factor if distance_change > 0 else self._neg_factor
+                self.add_reward(factor * distance_change)
 
         # Update tracking variables
         self.last_robot_pose = robot_pose.copy()
@@ -2078,3 +2100,266 @@ class RewardLinearVelBoost(RewardUnit):
     def reset(self):
         """Reset internal state for new episode."""
         pass
+
+
+@RewardUnitFactory.register("proxemic_intrusion")
+class RewardProxemicIntrusion(RewardUnit):
+    """Reward unit for asymmetric, heading-aware pedestrian personal-space intrusion.
+
+    Penalizes the robot for entering a pedestrian's Gaussian comfort zone, with the zone
+    stretched further ahead of the pedestrian's direction of travel than behind it (Kirby/SARL
+    proxemics). This gives the policy a smooth gradient to route around a pedestrian's future
+    path rather than just its current position, complementing the isotropic safety-distance
+    units above.
+
+    Technical Specifications:
+    - Heading-Frame Rotation: Robot position relative to each pedestrian is rotated into that
+      pedestrian's own heading frame (derived from its relative velocity).
+    - Asymmetric Gaussian: Separate along-heading sigma ahead (sigma_front) vs. behind
+      (sigma_back) the pedestrian; lateral spread uses sigma_side.
+    - Stationary Fallback: Pedestrians with negligible speed use sigma_side for the along-axis
+      too, since their heading is undefined.
+
+    Configuration:
+    - weight: Penalty scale applied to the summed per-pedestrian intrusion.
+    - sigma_front / sigma_back / sigma_side: Comfort-zone spreads (meters) ahead, behind, and
+      to the side of a pedestrian's heading.
+    - activation_radius: Pedestrians farther than this (meters) are skipped entirely.
+    - min_ped_speed: Speed (m/s) below which a pedestrian is treated as stationary.
+
+    Output Behavior: reward = -weight * sum_i exp(-0.5 * [(d_along_i / sigma_i)^2 +
+    (d_perp_i / sigma_side)^2]), sigma_i = sigma_front if d_along_i > 0 else sigma_back.
+
+    Applications: Social navigation, proxemic comfort, path-anticipatory pedestrian avoidance.
+    """
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+        "pedestrian_relative_velocities": PedestrianRelativeVelocities,
+        "simulation_state_container": AgentParameters,
+    }
+
+    @check_params
+    def __init__(
+        self,
+        reward_function: RewardFunction,
+        weight: float = 0.1,
+        sigma_front: float = 1.2,
+        sigma_back: float = 0.4,
+        sigma_side: float = 0.6,
+        activation_radius: float = 3.0,
+        min_ped_speed: float = 0.15,
+        _on_safe_dist_violation: bool = True,
+        *args,
+        **kwargs,
+    ) -> None:
+        """Initialize the proxemic intrusion reward unit.
+
+        Args:
+            reward_function: The reward function object holding this unit
+            weight: Penalty scale applied to the summed per-pedestrian intrusion
+            sigma_front: Comfort-zone spread (meters) ahead of a pedestrian's heading
+            sigma_back: Comfort-zone spread (meters) behind a pedestrian's heading
+            sigma_side: Comfort-zone spread (meters) lateral to a pedestrian's heading
+            activation_radius: Pedestrians farther than this (meters) are skipped
+            min_ped_speed: Speed (m/s) below which a pedestrian is treated as stationary
+            _on_safe_dist_violation: Whether to apply penalty on safe distance violation
+            *args: Variable arguments
+            **kwargs: Keyword arguments
+        """
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+        self._weight = weight
+        self._sigma_front = sigma_front
+        self._sigma_back = sigma_back
+        self._sigma_side = sigma_side
+        self._activation_radius = activation_radius
+        self._min_ped_speed = min_ped_speed
+
+    def __call__(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        pedestrian_relative_velocities: PedestrianRelativeVelocities,
+        simulation_state_container: AgentParameters,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Penalize the robot for intruding into pedestrians' asymmetric comfort zones.
+
+        Args:
+            pedestrian_relative_locations (PedestrianRelativeLocations): Pedestrian positions
+                in the robot frame
+                - Format: N×2 array of [x, y] positions in meters
+                - Source: pedestrian tracking system
+                - Example: [[2.0, 1.5], [-1.0, 0.5]]
+            pedestrian_relative_velocities (PedestrianRelativeVelocities): Pedestrian velocities
+                in the robot frame
+                - Format: N×2 array of [vx, vy] velocities in meters/second
+                - Source: pedestrian tracking system
+                - Constraints: N×2 array matching pedestrian_relative_locations
+                - Example: [[0.5, 0.2], [-0.3, 0.8]]
+            simulation_state_container (AgentParameters): Robot and environment state
+                - Unused here; part of the common schema surface for future robot-frame needs
+        """
+        if (
+            pedestrian_relative_locations is None
+            or pedestrian_relative_velocities is None
+            or len(pedestrian_relative_locations) == 0
+        ):
+            return
+
+        intrusion = 0.0
+        for ped_location, ped_velocity in zip(
+            pedestrian_relative_locations, pedestrian_relative_velocities
+        ):
+            px, py = ped_location[0], ped_location[1]
+            dist = np.hypot(px, py)
+            if dist > self._activation_radius:
+                continue
+
+            speed = np.hypot(ped_velocity[0], ped_velocity[1])
+            if speed >= self._min_ped_speed:
+                heading = np.arctan2(ped_velocity[1], ped_velocity[0])
+            else:
+                heading = None
+
+            # Vector from pedestrian to robot, in robot-frame coordinates.
+            rx, ry = -px, -py
+
+            if heading is not None:
+                cos_h, sin_h = np.cos(heading), np.sin(heading)
+                d_along = rx * cos_h + ry * sin_h
+                d_perp = -rx * sin_h + ry * cos_h
+                sigma_along = self._sigma_front if d_along > 0 else self._sigma_back
+            else:
+                d_along, d_perp = rx, ry
+                sigma_along = self._sigma_side
+
+            intrusion += np.exp(
+                -0.5
+                * (
+                    (d_along / sigma_along) ** 2
+                    + (d_perp / self._sigma_side) ** 2
+                )
+            )
+
+        if intrusion > 0.0:
+            self.add_reward(-self._weight * intrusion)
+
+    def reset(self):
+        """Reset internal state for new episode."""
+        pass
+
+
+@RewardUnitFactory.register("social_potential")
+class RewardSocialPotential(RewardUnit):
+    """Reward unit for potential-based shaping toward crowd separation.
+
+    Provides a dense, policy-invariant gradient (PBRS, Ng et al. 1999) that rewards
+    increasing separation from the nearest pedestrian, complementing the cumulative
+    comfort-zone cost of `proxemic_intrusion` with a telescoping gradient that helps
+    the policy reach the low-cost region faster in imagination.
+
+    Technical Specifications:
+    - Potential: Phi(s) = min(nearest_ped_distance, clip_distance). Sign convention
+      is the OPPOSITE of `approach_goal` (Phi = -distance_to_goal there): here Phi
+      increases with pedestrian *separation*, since the objective is to move away
+      from crowds rather than toward a goal. Do not "fix" this sign later.
+    - Shaping: F = factor * (gamma * Phi(s') - Phi(s)). Per Ng et al. 1999 this
+      leaves the optimal policy invariant for any factor/gamma — note this holds
+      for the *optimal* policy, not per-step: with gamma < 1 a constant potential
+      still yields a fixed per-step drift factor*(gamma-1)*Phi rather than exactly
+      zero (same property already present in `approach_goal`'s PBRS branch).
+    - Discontinuity Guard: skips shaping when the potential jumps by more than
+      jump_threshold in one step (nearest-pedestrian identity switch, or a
+      pedestrian entering/leaving clip_distance), avoiding spurious spikes.
+    - Degenerate Cases: no pedestrians, or nearest pedestrian beyond clip_distance,
+      both clip Phi(s) to clip_distance — identical, distance-independent drift in
+      either case, so a far/absent pedestrian never adds a live gradient signal.
+
+    Configuration:
+    - factor: shaping scale.
+    - gamma: discount used in the potential difference; must match the RL
+      algorithm's discount factor for the PBRS policy-invariance guarantee.
+    - clip_distance: potential saturates beyond this distance (meters).
+    - jump_threshold: skip shaping if |Phi(s') - Phi(s)| exceeds this (meters).
+
+    Applications: Dense crowd-separation gradient for imagination-horizon training,
+    complementing `proxemic_intrusion`'s cumulative comfort-zone cost.
+    """
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+    }
+
+    @check_params
+    def __init__(
+        self,
+        reward_function: RewardFunction,
+        factor: float = DEFAULTS.SOCIAL_POTENTIAL.FACTOR,
+        gamma: float = DEFAULTS.SOCIAL_POTENTIAL.GAMMA,
+        clip_distance: float = DEFAULTS.SOCIAL_POTENTIAL.CLIP_DISTANCE,
+        jump_threshold: float = DEFAULTS.SOCIAL_POTENTIAL.JUMP_THRESHOLD,
+        _on_safe_dist_violation: bool = DEFAULTS.SOCIAL_POTENTIAL._ON_SAFE_DIST_VIOLATION,
+        *args,
+        **kwargs,
+    ) -> None:
+        """Initialize the social potential reward unit.
+
+        Args:
+            reward_function: The reward function object holding this unit
+            factor: shaping scale applied to the potential difference
+            gamma: discount used in the potential difference; must match the RL
+                algorithm's discount factor for the PBRS policy-invariance guarantee
+            clip_distance: potential saturates beyond this distance (meters)
+            jump_threshold: skip shaping this step if the potential jumps more than
+                this (meters), e.g. on a nearest-pedestrian identity switch
+            _on_safe_dist_violation: Whether to apply shaping on safe distance violation
+            *args: Variable arguments
+            **kwargs: Keyword arguments
+        """
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+        self._factor = factor
+        self._gamma = gamma
+        self._clip_distance = clip_distance
+        self._jump_threshold = jump_threshold
+
+        self.last_phi = None
+
+    def __call__(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Shape reward toward increasing separation from the nearest pedestrian.
+
+        Args:
+            pedestrian_relative_locations (PedestrianRelativeLocations): Pedestrian
+                positions in the robot frame
+                - Format: N×2 array of [x, y] positions in meters
+                - Source: pedestrian tracking system
+                - Example: [[2.0, 1.5], [-1.0, 0.5]]
+        """
+        if pedestrian_relative_locations is None or len(pedestrian_relative_locations) == 0:
+            nearest_dist = self._clip_distance
+        else:
+            nearest_dist = np.min(
+                np.hypot(
+                    pedestrian_relative_locations[:, 0],
+                    pedestrian_relative_locations[:, 1],
+                )
+            )
+
+        current_phi = min(float(nearest_dist), self._clip_distance)
+
+        if self.last_phi is not None:
+            phi_jumped = abs(current_phi - self.last_phi) > self._jump_threshold
+            if not phi_jumped:
+                shaped = self._gamma * current_phi - self.last_phi
+                self.add_reward(self._factor * shaped)
+
+        self.last_phi = current_phi
+
+    def reset(self):
+        """Reset internal state for new episode."""
+        self.last_phi = None

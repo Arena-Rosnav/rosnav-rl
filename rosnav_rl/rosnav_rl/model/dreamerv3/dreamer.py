@@ -11,6 +11,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# DreamerV3 backprops the actor through the imagined trajectory with
+# retain_graph=True (shared graph between actor and value losses). torch.compile's
+# AOT-autograd donated-buffer optimisation (default-on since torch 2.6) frees those
+# buffers after the first backward, which is incompatible with retain_graph. Disable
+# it globally so the compiled img_step kernel keeps its backward buffers alive.
+import torch._functorch.config  # noqa: E402
+
+torch._functorch.config.donated_buffer = False
+
 from ..dreamerv3 import exploration as expl
 from ..dreamerv3 import models, tools
 
@@ -184,15 +193,28 @@ class Dreamer(nn.Module):
             - Handles special case for onehot_gumble action distribution
         """
         if state is None:
-            latent = action = None
+            latent = action = ctx_window = None
         else:
-            latent, action = state
+            latent, action, ctx_window = state
         obs = self._wm.preprocess(obs)
         embed = self._wm.encoder(obs)
-        latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
+        # cSRSSM (Phase 1, realtime): deploy-time single rollout conditioned on b = mean of
+        # q(b|window), maintained via a rolling K-step ped window across real env steps. No-op
+        # (context_b stays None) when social.context is disabled -- baseline byte-identical.
+        context_b = None
+        if self._config.model.social.enabled and self._config.model.social.context.enabled:
+            ctx_window, context_b = self._wm.step_social_context(
+                ctx_window, obs, obs["is_first"]
+            )
+        latent, _ = self._wm.dynamics.obs_step(
+            latent, action, embed, obs["is_first"], context=context_b
+        )
         if self._config.model.behavior.eval_state_mean:
             latent["stoch"] = latent["mean"]
-        feat = self._wm.dynamics.get_feat(latent)
+        # Actor expects the social-augmented feature (base_feat + GAT social code), the
+        # same as during imagined training. At a single observe step the current frame is
+        # the anchor, so no SE(2) pose_rel correction is needed (pose_rel=None).
+        feat = self._wm._get_augmented_feat(latent)
         if not training:
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
@@ -215,7 +237,7 @@ class Dreamer(nn.Module):
                 ),
             )
         policy_output = {"action": action, "logprob": logprob}
-        state = (latent, action)
+        state = (latent, action, ctx_window)
         return policy_output, state
 
     def _train(self, data):
@@ -253,7 +275,7 @@ class Dreamer(nn.Module):
             Calculate the reward based on feature, state, and action.
 
             Args:
-                f: Feature tensor
+                f: Feature tensor (augmented: base_feat + social_feat from _imagine)
                 s: State tensor
                 a: Action tensor
 
@@ -261,7 +283,7 @@ class Dreamer(nn.Module):
                 torch.Tensor: The predicted reward from the world model's reward head,
                 using the mode of the distribution.
             """
-            return self._wm.heads["reward"](self._wm.dynamics.get_feat(s)).mode()
+            return self._wm.heads["reward"](f).mode()
 
         metrics.update(self._task_behavior._train(start, reward)[-1])
         if self._config.model.exploration.behavior != "greedy":

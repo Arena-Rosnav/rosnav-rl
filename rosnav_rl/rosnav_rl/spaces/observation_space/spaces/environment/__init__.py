@@ -34,6 +34,15 @@ from .advanced_environment_spaces import (
     ObstacleProximitySpace,
 )
 
+# Graph-based pedestrian spaces (Social-Dreamer)
+from .graph_spaces import (
+    PedestrianNodeSetSpace,
+    PedestrianMaskSpace,
+)
+
+# World-frame robot pose for SE(2) frame canonicalization (Social-Dreamer M5.2+)
+from .robot_pose_space import RobotPoseSpace
+
 __all__ = [
     "PedestrianVelXSpace",
     "PedestrianVelYSpace",
@@ -45,4 +54,7 @@ __all__ = [
     "EnvironmentContextSpace",
     "SpatialAwarenessSpace",
     "ObstacleProximitySpace",
+    "PedestrianNodeSetSpace",
+    "PedestrianMaskSpace",
+    "RobotPoseSpace",
 ]

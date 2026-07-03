@@ -5,11 +5,47 @@ import torch
 from torch import nn
 
 from ..dreamerv3 import networks, tools
+from ..dreamerv3.social import dims as social_dims
+from ..dreamerv3.social.dali import DALI as SocialDALI, dali_loss as social_dali_loss
+from ..dreamerv3.social.gat import GAT as SocialGAT
+from ..dreamerv3.social.height import HeightGAT
+from ..dreamerv3.social.context import (
+    SocialContextEncoder,
+    context_infonce_loss as social_context_infonce_loss,
+    context_kl_loss as social_context_kl_loss,
+    context_pred_loss as social_context_pred_loss,
+)
 
 to_np = lambda x: x.detach().cpu().numpy()
 
 if TYPE_CHECKING:
     from ..dreamerv3 import cfg
+
+
+def _compute_se2_relative_poses(
+    world_poses: "torch.Tensor",
+    is_first: "torch.Tensor",
+) -> "torch.Tensor":
+    """Compute per-step SE(2) relative poses from the anchor frame.
+
+    Args:
+        world_poses: (B, T, 3) world-frame robot poses from RobotPoseSpace.
+        is_first:    (B, T)    True at episode-start steps.
+
+    Returns:
+        (B, T, 3)  P_k = se2_between(anchor_pose, world_pose_k) for each (b, t).
+        At t=0 (or any is_first step) the result is the identity (zero vector).
+    """
+    from ..dreamerv3.se2_utils import se2_between
+    B, T, _ = world_poses.shape
+    result = torch.zeros_like(world_poses)
+    anchor = world_poses[:, 0].clone()   # (B, 3) — initialise to first pose
+    for t in range(T):
+        reset = is_first[:, t].bool()    # (B,)
+        # Update anchor where a new episode starts.
+        anchor = torch.where(reset.unsqueeze(-1), world_poses[:, t], anchor)
+        result[:, t] = se2_between(anchor, world_poses[:, t])
+    return result
     
 
 class RewardEMA:
@@ -112,7 +148,27 @@ class WorldModel(nn.Module):
             shapes, device=config.general.device, **config.model.encoder.model_dump()
         )
         self.embed_size = self.encoder.outdim
-        self.dynamics = networks.RSSM(
+        # cSRSSM: crowd-behavior context b conditions the RSSM transition. context_size==0
+        # (context disabled or social disabled) keeps img_step's cat byte-identical to baseline.
+        _context_size = (
+            config.model.social.context.b_dim
+            if config.model.social.enabled and config.model.social.context.enabled
+            else 0
+        )
+        # TSSM (cell_type "tssm") is a subclass with a restructured observe()/img_step();
+        # it takes two extra width knobs. GRU/TransformerCell go through plain RSSM.
+        _dyn_cls = (
+            networks.TSSM if config.model.social.cell_type == "tssm" else networks.RSSM
+        )
+        _dyn_kwargs = (
+            dict(
+                tssm_num_layers=config.model.social.tssm_num_layers,
+                tssm_ff_mult=config.model.social.tssm_ff_mult,
+            )
+            if config.model.social.cell_type == "tssm"
+            else {}
+        )
+        self.dynamics = _dyn_cls(
             config.model.dyn_stoch,
             config.model.dyn_deter,
             config.model.dyn_hidden,
@@ -128,23 +184,26 @@ class WorldModel(nn.Module):
             (act_space.n if hasattr(act_space, "n") else act_space.shape[0]),
             self.embed_size,
             config.general.device,
+            cell_type=config.model.social.cell_type,
+            transformer_ctx_len=config.model.social.transformer_ctx_len,
+            transformer_num_heads=config.model.social.transformer_num_heads,
+            context_size=_context_size,
+            **_dyn_kwargs,
         )
         self.heads = nn.ModuleDict()
-        if config.model.dyn_discrete:
-            feat_size = (
-                config.model.dyn_stoch * config.model.dyn_discrete
-                + config.model.dyn_deter
-            )
-        else:
-            feat_size = config.model.dyn_stoch + config.model.dyn_deter
+        # The decoder reconstructs observations from the base latent (h, z); the reward and cont
+        # heads consume the augmented feature s_hat_t = (h, z, c, d). With social disabled both
+        # widths are equal, so the baseline network stays byte-identical (M0 firebreak).
+        base_feat_size = social_dims.base_feat_size(config)
+        aug_feat_size = social_dims.augmented_feat_size(config)
         self.heads["decoder"] = networks.MultiDecoder(
-            feat_size,
+            base_feat_size,
             shapes,
             device=config.general.device,
             **config.model.decoder.model_dump(),
         )
         self.heads["reward"] = networks.MLP(
-            feat_size,
+            aug_feat_size,
             (255,) if config.model.reward_head.dist == "symlog_disc" else (),
             config.model.reward_head.layers,
             config.model.units,
@@ -156,7 +215,7 @@ class WorldModel(nn.Module):
             name="Reward",
         )
         self.heads["cont"] = networks.MLP(
-            feat_size,
+            aug_feat_size,
             (),
             config.model.cont_head.layers,
             config.model.units,
@@ -167,6 +226,56 @@ class WorldModel(nn.Module):
             device=config.general.device,
             name="Cont",
         )
+        # Pedestrian reconstruction head (M2): decode peds from base_feat so
+        # GAT/DALI can run on decoded peds during imagination (decode-then-GAT invariant).
+        # Key matches the obs-space class name so data["PedestrianNodeSetSpace"] is found.
+        # Only instantiated when social is enabled; zero overhead for the baseline.
+        if config.model.social.enabled:
+            _social = config.model.social
+            _ped_out_dim = _social.max_peds * (_social.node_feat_dim + 1)
+            self.heads["PedestrianNodeSetSpace"] = networks.MLP(
+                base_feat_size,
+                (_ped_out_dim,),
+                config.model.decoder.mlp_layers,
+                config.model.units,
+                config.model.act,
+                config.model.norm,
+                dist="normal",
+                outscale=config.model.decoder.outscale,
+                device=config.general.device,
+                name="PedsDecoder",
+            )
+        # Social GAT (C1): instantiated here so it is part of model_opt gradient graph.
+        # variant=="height" swaps in the HEIGHT-style per-edge-type attention (Part 2); same
+        # interface/out_dim as GAT, so nothing downstream needs to know which one is active.
+        self._social_gat: SocialGAT | None = None
+        if config.model.social.enabled:
+            _gat_cls = HeightGAT if config.model.social.gat.variant == "height" else SocialGAT
+            self._social_gat = _gat_cls(
+                cfg=config.model.social.gat,
+                node_feat_dim=config.model.social.node_feat_dim,
+                deter_size=config.model.dyn_deter,
+                device=config.general.device,
+            )
+        # DALI (C2, M4): GRU dynamics context encoder + L_dyn aux loss.
+        # Only instantiated when both social and dali are enabled.
+        self._social_dali: SocialDALI | None = None
+        if config.model.social.enabled and config.model.social.dali.enabled:
+            self._social_dali = SocialDALI(
+                cfg=config.model.social.dali,
+                node_feat_dim=config.model.social.node_feat_dim,
+                device=config.general.device,
+            )
+        # cSRSSM (Part 1): crowd-behavior context encoder q(b|window). Conditions the RSSM
+        # transition (self.dynamics, context_size set above), not the feature.
+        self._social_context: SocialContextEncoder | None = None
+        if config.model.social.enabled and config.model.social.context.enabled:
+            self._social_context = SocialContextEncoder(
+                cfg=config.model.social.context,
+                node_feat_dim=config.model.social.node_feat_dim,
+                device=config.general.device,
+            )
+
         for name in config.model.grad_heads:
             assert name in self.heads, name
         self._model_opt = tools.Optimizer(
@@ -178,6 +287,7 @@ class WorldModel(nn.Module):
             config.model.weight_decay,
             opt=config.training.opt,
             use_amp=self._use_amp,
+            warmup_steps=config.training.warmup_steps,
         )
         print(
             f"Optimizer model_opt has {sum(param.numel() for param in self.parameters())} variables."
@@ -187,6 +297,14 @@ class WorldModel(nn.Module):
             reward=config.model.reward_head.loss_scale,
             cont=config.model.cont_head.loss_scale,
         )
+        if config.model.social.enabled:
+            self._scales["PedestrianNodeSetSpace"] = config.model.social.peds_recon_scale
+        # Extended set of grad heads: static config + social head when enabled.
+        # Not stored in config because the assertion "name in self.heads" would fail
+        # for "PedestrianNodeSetSpace" when social.enabled=False.
+        self._grad_heads: set = set(config.model.grad_heads)
+        if config.model.social.enabled:
+            self._grad_heads.add("PedestrianNodeSetSpace")
 
     def _train(self, data):
         """
@@ -225,12 +343,98 @@ class WorldModel(nn.Module):
         # discount (batch_size, batch_length)
         data = self.preprocess(data)
 
+        # SE(2) global frame augmentation: random rotation + translation applied to
+        # both RobotPoseSpace and PedestrianNodeSetSpace, forcing decoder equivariance.
+        _se2_cfg = self._config.model.social
+        if _se2_cfg.use_se2_frame_canon and _se2_cfg.se2_augment_prob > 0:
+            from ..dreamerv3.se2_utils import augment_se2 as _augment_se2
+            data = _augment_se2(
+                data,
+                max_peds=_se2_cfg.max_peds,
+                node_feat_dim=_se2_cfg.node_feat_dim,
+                p=_se2_cfg.se2_augment_prob,
+            )
+
+        # Invariant 5: compute per-step relative poses from anchor frame for SE(2)
+        # frame canonicalization.  This is pure pose arithmetic — no grad needed.
+        _pose_rel_bt = None
+        if (
+            _se2_cfg.use_se2_frame_canon
+            and self._social_gat is not None
+            and "RobotPoseSpace" in data
+        ):
+            with torch.no_grad():
+                _pose_rel_bt = _compute_se2_relative_poses(
+                    data["RobotPoseSpace"], data["is_first"]
+                )
+
         with tools.RequiresGrad(self):
             with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=self._use_amp):
                 embed = self.encoder(data)
+
+                # cSRSSM (Part 1): infer crowd-behavior context b once per sequence, from a
+                # window of the real (ground-truth) ped node-set, before the transition scan.
+                # Held fixed across T (b is slow/global per sequence) -- see social/context.py.
+                context_b = None
+                context_kl = embed.new_zeros(())
+                context_infonce = embed.new_zeros(())
+                context_pred = embed.new_zeros(())
+                if self._social_context is not None and "PedestrianNodeSetSpace" in data:
+                    _ctx_cfg = _se2_cfg.context
+                    N_c, F_c = _se2_cfg.max_peds, _se2_cfg.node_feat_dim
+                    _peds_bt = data["PedestrianNodeSetSpace"]  # (B, T, N*(F+1))
+                    B_c, T_c = _peds_bt.shape[:2]
+                    K_c = min(_ctx_cfg.window, T_c)
+                    _peds_win = _peds_bt[:, :K_c].view(B_c, K_c, N_c, F_c + 1)
+                    _win_feat, _win_valid = _peds_win[..., :F_c], _peds_win[..., -1]
+
+                    b_mean, b_std = self._social_context(_win_feat, _win_valid)
+                    context_b = self._social_context.sample(b_mean, b_std, sample=True)
+                    context_kl = _ctx_cfg.kl_scale * social_context_kl_loss(b_mean, b_std)
+
+                    # Prediction-driven identifiability (primary, VariBAD-style): from
+                    # (b, pooled crowd summary at step t) predict the pooled summary at t+1,
+                    # for steps AFTER the inference window only -- b must extrapolate the
+                    # regime, not memorize the window. See context_pred_loss docstring.
+                    if _ctx_cfg.pred_scale > 0 and T_c > K_c:
+                        _fut = _peds_bt[:, K_c - 1 :].view(B_c, -1, N_c, F_c + 1)
+                        _fut_feat, _fut_valid = _fut[..., :F_c], _fut[..., -1]
+                        M_c = _fut_feat.shape[1]
+                        _pooled_fut = self._social_context.pool_step(
+                            _fut_feat.reshape(B_c * M_c, N_c, F_c),
+                            _fut_valid.reshape(B_c * M_c, N_c),
+                        ).view(B_c, M_c, F_c)
+                        _step_valid = _fut_valid.sum(-1) > 0  # (B, M)
+                        context_pred = _ctx_cfg.pred_scale * social_context_pred_loss(
+                            self._social_context, context_b, _pooled_fut, _step_valid
+                        )
+
+                    # InfoNCE identifiability (secondary/ablation-only, see context.py):
+                    # encode the two halves of the same window independently; same-sequence
+                    # halves are positives. Off by default (infonce_scale: 0).
+                    _half = K_c // 2
+                    if _half >= 1 and _ctx_cfg.infonce_scale > 0:
+                        m1, s1 = self._social_context(
+                            _win_feat[:, :_half], _win_valid[:, :_half]
+                        )
+                        m2, s2 = self._social_context(
+                            _win_feat[:, _half : 2 * _half], _win_valid[:, _half : 2 * _half]
+                        )
+                        b1 = self._social_context.sample(m1, s1, sample=True)
+                        b2 = self._social_context.sample(m2, s2, sample=True)
+                        _b_cat = torch.cat([b1, b2], dim=0)
+                        _ep_id = torch.arange(B_c, device=_b_cat.device).repeat(2)
+                        context_infonce = _ctx_cfg.infonce_scale * social_context_infonce_loss(
+                            _b_cat, _ep_id
+                        )
+
                 post, prior = self.dynamics.observe(
-                    embed, data["action"], data["is_first"]
+                    embed, data["action"], data["is_first"], context=context_b
                 )
+                if context_b is not None:
+                    # Broadcast the per-sequence b across T so it flattens correctly when
+                    # `post` is later used as `start` for imagination (see ImagBehavior._imagine).
+                    post["context_b"] = context_b.unsqueeze(1).expand(-1, embed.shape[1], -1)
                 kl_free = self._config.model.kl_free
                 dyn_scale = self._config.model.dyn_scale
                 rep_scale = self._config.model.rep_scale
@@ -238,19 +442,47 @@ class WorldModel(nn.Module):
                     post, prior, kl_free, dyn_scale, rep_scale
                 )
                 assert kl_loss.shape == embed.shape[:2], kl_loss.shape
+                # Compute both feat variants once; share across head iterations.
+                # Decoder and ped-reconstruction heads use base_feat (M0 firebreak).
+                # Reward, cont, and any future social-aware heads use aug_feat.
+                _base_feat = self.dynamics.get_feat(post)
+                # Invariant 5: pass pose_rel so decoded peds are in current frame for GAT/DALI.
+                _aug_feat  = (
+                    self._get_augmented_feat(post, pose_rel=_pose_rel_bt)
+                    if self._social_gat is not None
+                    else _base_feat
+                )
+                _BASE_FEAT_HEADS = {"decoder", "PedestrianNodeSetSpace"}
                 preds = {}
                 for name, head in self.heads.items():
-                    grad_head = name in self._config.model.grad_heads
-                    feat = self.dynamics.get_feat(post)
+                    grad_head = name in self._grad_heads
+                    feat = _base_feat if name in _BASE_FEAT_HEADS else _aug_feat
                     feat = feat if grad_head else feat.detach()
                     pred = head(feat)
                     if type(pred) is dict:
                         preds.update(pred)
                     else:
                         preds[name] = pred
+
+                # Transform PedestrianNodeSetSpace targets to anchor frame so the
+                # decoder is supervised on anchor-frame peds (Invariant 5).
+                _loss_targets = data
+                if _pose_rel_bt is not None and "PedestrianNodeSetSpace" in data:
+                    from ..dreamerv3.se2_utils import apply_se2_to_peds_flat
+                    _peds_bt = data["PedestrianNodeSetSpace"]   # (B, T, N*(F+1))
+                    _B_t, _T_t = _peds_bt.shape[:2]
+                    _peds_anch = apply_se2_to_peds_flat(
+                        _pose_rel_bt.reshape(_B_t * _T_t, 3),
+                        _peds_bt.reshape(_B_t * _T_t, -1),
+                        _se2_cfg.max_peds,
+                        _se2_cfg.node_feat_dim,
+                    ).reshape(_B_t, _T_t, -1)
+                    _loss_targets = dict(data)
+                    _loss_targets["PedestrianNodeSetSpace"] = _peds_anch
+
                 losses = {}
                 for name, pred in preds.items():
-                    loss = -pred.log_prob(data[name])
+                    loss = -pred.log_prob(_loss_targets[name])
                     assert loss.shape == embed.shape[:2], (name, loss.shape)
                     losses[name] = loss
                 scaled = {
@@ -258,9 +490,45 @@ class WorldModel(nn.Module):
                     for key, value in losses.items()
                 }
                 model_loss = sum(scaled.values()) + kl_loss
-            metrics = self._model_opt(torch.mean(model_loss), self.parameters())
+                # DALI auxiliary forward-prediction loss (M4.2, observe-time only).
+                # Trains the DALI GRU and ped decoder on next-step ped prediction.
+                # L_dyn is never computed inside imagination rollouts.
+                _dali_aux = torch.zeros((), device=self._config.general.device)
+                if self._social_dali is not None:
+                    _soc = self._config.model.social
+                    K = _soc.dali.k_steps
+                    # Decoded ped sequence from the ped reconstruction head.
+                    _peds_seq = preds["PedestrianNodeSetSpace"].mode()  # (B, T, N*(F+1))
+                    B_s, T_s, _ = _peds_seq.shape
+                    N_s = _soc.max_peds
+                    F_s = _soc.node_feat_dim
+                    if T_s > K:
+                        _peds_seq = _peds_seq.view(B_s, T_s, N_s, F_s + 1)
+                        _ped_feats = _peds_seq[..., :F_s]              # (B, T, N, F)
+                        _validity  = _peds_seq[..., -1]                # (B, T, N)
+                        # Build sliding K-step windows via unfold over T dimension.
+                        _pf = _ped_feats.permute(0, 2, 3, 1)           # (B, N, F, T)
+                        _wins = _pf.unfold(-1, K, 1)                   # (B, N, F, T-K+1, K)
+                        _wins = _wins.permute(0, 3, 1, 4, 2)           # (B, T-K+1, N, K, F)
+                        _val_wins = _validity[:, K - 1:]               # (B, T-K+1, N)
+                        # Consecutive window pairs: traj_t → predict traj_tp1
+                        _n_win = T_s - K                               # number of valid pairs
+                        _traj_t   = _wins[:, :_n_win].reshape(-1, N_s, K, F_s)
+                        _traj_tp1 = _wins[:, 1:_n_win + 1].reshape(-1, N_s, K, F_s)
+                        _v_t      = _val_wins[:, :_n_win].reshape(-1, N_s)
+                        _dali_aux = _soc.dali.lambda_dyn * social_dali_loss(
+                            self._social_dali, _traj_t, _traj_tp1, _v_t
+                        )
+            metrics = self._model_opt(
+                torch.mean(model_loss) + _dali_aux + context_kl + context_infonce + context_pred,
+                self.parameters(),
+            )
 
         metrics.update({f"{name}_loss": to_np(loss) for name, loss in losses.items()})
+        metrics["dali_aux_loss"] = to_np(_dali_aux)
+        metrics["context_kl_loss"] = to_np(context_kl)
+        metrics["context_infonce_loss"] = to_np(context_infonce)
+        metrics["context_pred_loss"] = to_np(context_pred)
         metrics["kl_free"] = kl_free
         metrics["dyn_scale"] = dyn_scale
         metrics["rep_scale"] = rep_scale
@@ -282,6 +550,190 @@ class WorldModel(nn.Module):
             )
         post = {k: v.detach() for k, v in post.items()}
         return post, context, metrics
+
+    def step_social_context(
+        self, ctx_window: "dict | None", obs: dict, is_first: torch.Tensor
+    ) -> "tuple[dict | None, torch.Tensor | None]":
+        """Maintain the rolling K-step ped window for deploy-time context inference (Phase 1).
+
+        Called once per real env step, before ``dynamics.obs_step``, when
+        ``social.context.enabled``. Deploy uses ``b = mean`` (single, fully-realtime rollout);
+        Phase-2 K-mode counterfactual planning would sample here instead.
+
+        Args:
+            ctx_window: Previous ``{"feat": (B,K,N,F), "valid": (B,K,N)}`` window, or None at
+                rollout start.
+            obs: Preprocessed observation dict containing "PedestrianNodeSetSpace".
+            is_first: ``(B,)`` bool/float, True where a new episode just started -- those rows'
+                windows are reseeded with the current frame (mirrors ``RSSM.obs_step``'s own
+                is_first handling) rather than rolling across the episode boundary.
+
+        Returns:
+            (new_ctx_window, b): ``new_ctx_window`` to persist in the caller's policy state,
+            ``b`` (mean of q(b|window), shape (B, b_dim)) to pass into ``obs_step``.
+        """
+        if self._social_context is None:
+            return None, None
+        _social = self._config.model.social
+        N_c, F_c = _social.max_peds, _social.node_feat_dim
+        K_c = _social.context.window
+        peds = obs["PedestrianNodeSetSpace"].view(-1, N_c, F_c + 1)
+        feat, valid = peds[..., :F_c], peds[..., -1]  # (B, N, F), (B, N)
+        reset_feat = feat.unsqueeze(1).expand(-1, K_c, -1, -1).contiguous()
+        reset_valid = valid.unsqueeze(1).expand(-1, K_c, -1).contiguous()
+
+        if ctx_window is None or torch.sum(is_first) == len(is_first):
+            window_feat, window_valid = reset_feat, reset_valid
+        else:
+            window_feat = torch.cat([ctx_window["feat"][:, 1:], feat.unsqueeze(1)], dim=1)
+            window_valid = torch.cat([ctx_window["valid"][:, 1:], valid.unsqueeze(1)], dim=1)
+            if torch.sum(is_first) > 0:
+                m = is_first.float()[:, None, None]
+                window_feat = window_feat * (1.0 - m.unsqueeze(-1)) + reset_feat * m.unsqueeze(-1)
+                window_valid = window_valid * (1.0 - m) + reset_valid * m
+
+        with torch.no_grad():
+            b_mean, _ = self._social_context(window_feat, window_valid)
+
+        return {"feat": window_feat, "valid": window_valid}, b_mean
+
+    def _get_augmented_feat(
+        self,
+        state: dict,
+        imag_step: int = 0,
+        ped_buf: "torch.Tensor | None" = None,
+        pose_rel: "torch.Tensor | None" = None,
+        _return_decoded_peds: bool = False,
+    ):
+        """Compute ŝ_t = cat(base_feat, c_t [, d_t]) for reward/cont/actor heads.
+
+        When ``social.enabled=False`` returns base_feat unchanged.
+
+        At imagination step > ``imag_backprop_steps``, the ped-decoder call is
+        wrapped in ``torch.no_grad()`` to cap error amplification.
+
+        Args:
+            state:               RSSM posterior/prior dict (keys: stoch, deter, …).
+            imag_step:           Imagination horizon index (0 = first step or observe-time).
+            ped_buf:             ``(B, N, K, F)`` rolling trajectory buffer threaded through
+                                 ``_imagine``.  When provided, DALI uses this real K-step window
+                                 instead of the single-frame-repeat fallback.
+            pose_rel:            ``(B, 3)`` SE(2) pose of the current step relative to the anchor
+                                 frame [x, y, theta].  When provided and ``use_se2_frame_canon``
+                                 is True, decoded ped positions are transformed from anchor frame
+                                 into the current robot frame before GAT/DALI.
+            _return_decoded_peds: When True, return ``(aug_feat, decoded_peds)`` so the caller
+                                 can reuse decoded_peds for ``_shift_ped_buf`` without double-decoding.
+
+        Returns:
+            aug_feat tensor, or ``(aug_feat, decoded_peds)`` when ``_return_decoded_peds=True``.
+        """
+        import torch as _torch
+        base_feat = self.dynamics.get_feat(state)    # (B, feat) or (B, T, feat)
+
+        if self._social_gat is None:
+            if _return_decoded_peds:
+                return base_feat, None
+            return base_feat
+
+        _social = self._config.model.social
+        cap = _social.dali.imag_backprop_steps       # 5 by default
+
+        # int() guards against 0-dim tensors from static_scan's torch.arange()[i].
+        detach_peds = int(imag_step) > cap
+
+        # GAT/DALI expect (B, ...) 2D leading dims.  Observe-time state has (B, T, ...)
+        # shape — fold the T axis into the batch axis for all GAT/DALI calls.
+        _leading = base_feat.shape[:-1]              # (B,) or (B, T)
+        _needs_fold = base_feat.ndim == 3
+        if _needs_fold:
+            _B_orig, _T = base_feat.shape[:2]
+            _BT = _B_orig * _T
+            state_2d = {k: v.reshape(_BT, *v.shape[2:]) for k, v in state.items()}
+            base_feat_2d = base_feat.reshape(_BT, base_feat.shape[-1])
+            pose_rel_2d = pose_rel.reshape(_BT, 3) if pose_rel is not None else None
+        else:
+            state_2d = state
+            base_feat_2d = base_feat
+            pose_rel_2d = pose_rel
+
+        with (_torch.no_grad() if detach_peds else _torch.enable_grad()):
+            peds_dist = self.heads["PedestrianNodeSetSpace"](base_feat_2d)
+            decoded_peds = peds_dist.mode()           # (BT, N*(F+1))
+
+        # Invariant 5: SE(2) frame canonicalization — transform decoded peds from
+        # anchor frame into current robot frame before GAT/DALI.
+        if pose_rel_2d is not None and _social.use_se2_frame_canon:
+            from ..dreamerv3.se2_utils import se2_inverse, apply_se2_to_peds_flat
+            T_inv = se2_inverse(pose_rel_2d)
+            decoded_peds = apply_se2_to_peds_flat(
+                T_inv, decoded_peds, _social.max_peds, _social.node_feat_dim
+            )
+
+        c_t = self._social_gat(
+            decoded_peds,
+            state_2d["deter"],
+            max_peds=_social.max_peds,
+            node_feat_dim=_social.node_feat_dim,
+        )
+        parts = [base_feat_2d, c_t]
+
+        if self._social_dali is not None:
+            N = _social.max_peds
+            F = _social.node_feat_dim
+            BT = decoded_peds.shape[0]
+            peds_2d = decoded_peds.view(BT, N, F + 1)
+            validity = peds_2d[..., -1]              # (BT, N) decoded validity scores
+
+            if ped_buf is not None:
+                # Rolling-buffer path: real K-step decoded-ped trajectory.
+                # Buffer was shifted before this call — contains frames [t-K, t-1].
+                with (_torch.no_grad() if detach_peds else _torch.enable_grad()):
+                    d_t = self._social_dali(ped_buf, validity)
+            else:
+                # Single-frame repeat fallback: observe-time or DALI-disabled path.
+                K = _social.dali.k_steps
+                ped_feats = peds_2d[..., :F]
+                traj = ped_feats.unsqueeze(2).expand(-1, -1, K, -1)   # (BT, N, K, F)
+                with (_torch.no_grad() if detach_peds else _torch.enable_grad()):
+                    d_t = self._social_dali(traj, validity)
+            parts.append(d_t)
+
+        aug_feat = _torch.cat(parts, dim=-1)         # (BT, aug_dim)
+
+        # Unfold back to (B, T, aug_dim) for observe-time callers.
+        if _needs_fold:
+            aug_feat = aug_feat.reshape(_leading + (aug_feat.shape[-1],))
+            decoded_peds = decoded_peds.reshape(_leading + (decoded_peds.shape[-1],))
+
+        if _return_decoded_peds:
+            return aug_feat, decoded_peds
+        return aug_feat
+
+    def _shift_ped_buf(
+        self,
+        decoded_peds_flat: "torch.Tensor",
+        prev_buf: "torch.Tensor",
+        detach: bool = False,
+    ) -> "torch.Tensor":
+        """Shift K-step ped trajectory buffer: drop oldest frame, append current decoded peds.
+
+        Args:
+            decoded_peds_flat: ``(B, N*(F+1))`` tensor from ``heads["PedestrianNodeSetSpace"].mode()``.
+            prev_buf:          ``(B, N, K, F)`` current K-step buffer.
+            detach:            Detach new frame from grad graph (used beyond imag_backprop_steps cap).
+
+        Returns:
+            ``(B, N, K, F)`` new buffer with oldest frame dropped and current peds appended.
+        """
+        import torch as _torch
+        _social = self._config.model.social
+        N, F = _social.max_peds, _social.node_feat_dim
+        B = decoded_peds_flat.shape[0]
+        new_frame = decoded_peds_flat.view(B, N, F + 1)[..., :F]   # (B, N, F)
+        if detach:
+            new_frame = new_frame.detach()
+        return _torch.cat([prev_buf[:, :, 1:, :], new_frame.unsqueeze(2)], dim=2)
 
     # this function is called during both rollout and training
     def preprocess(self, obs):
@@ -341,15 +793,29 @@ class WorldModel(nn.Module):
         data = self.preprocess(data)
         embed = self.encoder(data)
 
+        # cSRSSM: context_size > 0 requires context on every observe/imagine call — infer
+        # b (mean, deploy-style) from the same 6-example slice used below.
+        context_b = None
+        if self._social_context is not None and "PedestrianNodeSetSpace" in data:
+            _social = self._config.model.social
+            _ctx_cfg = _social.context
+            N_c, F_c = _social.max_peds, _social.node_feat_dim
+            _peds_bt = data["PedestrianNodeSetSpace"][:6]
+            K_c = min(_ctx_cfg.window, _peds_bt.shape[1])
+            _peds_win = _peds_bt[:, :K_c].view(6, K_c, N_c, F_c + 1)
+            with torch.no_grad():
+                b_mean, _ = self._social_context(_peds_win[..., :F_c], _peds_win[..., -1])
+            context_b = b_mean
+
         states, _ = self.dynamics.observe(
-            embed[:6, :5], data["action"][:6, :5], data["is_first"][:6, :5]
+            embed[:6, :5], data["action"][:6, :5], data["is_first"][:6, :5], context=context_b
         )
         recon = self.heads["decoder"](self.dynamics.get_feat(states))["image"].mode()[
             :6
         ]
         reward_post = self.heads["reward"](self.dynamics.get_feat(states)).mode()[:6]
         init = {k: v[:, -1] for k, v in states.items()}
-        prior = self.dynamics.imagine_with_action(data["action"][:6, 5:], init)
+        prior = self.dynamics.imagine_with_action(data["action"][:6, 5:], init, context=context_b)
         openl = self.heads["decoder"](self.dynamics.get_feat(prior))["image"].mode()
         reward_prior = self.heads["reward"](self.dynamics.get_feat(prior)).mode()
         # observed image is given until 5 steps
@@ -421,13 +887,9 @@ class ImagBehavior(nn.Module):
         self._use_amp = True if config.general.precision == 16 else False
         self._config = config
         self._world_model = world_model
-        if config.model.dyn_discrete:
-            feat_size = (
-                config.model.dyn_stoch * config.model.dyn_discrete
-                + config.model.dyn_deter
-            )
-        else:
-            feat_size = config.model.dyn_stoch + config.model.dyn_deter
+        # Actor and value both consume the augmented feature s_hat_t = (h, z, c, d); with social
+        # disabled this equals the base feature, keeping the baseline byte-identical (M0 firebreak).
+        feat_size = social_dims.augmented_feat_size(config)
         self.actor = networks.MLP(
             feat_size,
             ((act_space.n if hasattr(act_space, "n") else act_space.shape[0]),),
@@ -585,37 +1047,150 @@ class ImagBehavior(nn.Module):
         return imag_feat, imag_state, imag_action, weights, metrics
 
     def _imagine(self, start, policy, horizon):
-        """
-        Simulates the imagination process over a given horizon using the provided policy.
+        """Simulates imagination trajectories over the given horizon.
+
+        When DALI is enabled, threads a K-step decoded-ped trajectory buffer through
+        the scan state so DALI receives a real rolling window at each step instead of
+        a single-frame repeat.  The buffer is seeded from the start-state decoded peds
+        (K identical copies) and shifts by one frame on every imagination step.
 
         Args:
-            start (dict): A dictionary containing the initial states.
-            policy (callable): A policy function that takes in features and returns an action distribution.
-            horizon (int): The number of steps to simulate.
+            start:   RSSM state dict ``(B, T, …)`` — flattened to ``(B*T, …)`` inside.
+            policy:  Actor callable taking detached aug_feat, returning action distribution.
+            horizon: Number of imagination steps.
 
         Returns:
-            tuple: A tuple containing:
-                - feats (torch.Tensor): The features at each step of the imagination.
-                - states (dict): A dictionary of states at each step.
-                - actions (torch.Tensor): The actions taken at each step.
+            (feats, states, actions) — each ``(horizon, B*T, …)``.
         """
         dynamics = self._world_model.dynamics
         flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
         start = {k: flatten(v) for k, v in start.items()}
+        # cSRSSM: b was attached to `post`/`start` broadcast over T so it flattens alongside
+        # the state; pop it out here and close over it (constant across the horizon), since
+        # img_step's returned state dict never carries it forward (unlike ped_buf/pose_accum).
+        _context_b = start.pop("context_b", None)
+        # TSSM: the per-layer K/V cache must be *threaded*, not stacked — static_scan
+        # pre-allocates a (horizon, ...) output buffer per state key, which for the
+        # (B*T, ctx_len, layers*2*deter) cache would multiply imagination memory by the
+        # horizon. The scan is strictly sequential, so carry the cache in a closure box:
+        # merged into the state before img_step, popped from its output after.
+        _tssm_keys = ("tssm_cache", "tssm_cnt")
+        _tssm_box = (
+            {k: start.pop(k) for k in _tssm_keys} if "tssm_cache" in start else None
+        )
 
-        def step(prev, _):
-            state, _, _ = prev
-            feat = dynamics.get_feat(state)
+        wm = self._world_model
+        _social = wm._config.model.social
+        _use_dali_buf = wm._social_dali is not None
+        _use_se2 = _social.use_se2_frame_canon and wm._social_gat is not None
+        _cap = _social.dali.imag_backprop_steps if _use_dali_buf else 5
+
+        if _use_dali_buf:
+            # Seed the K-step buffer: decode peds from the (flattened) start state,
+            # then repeat the single frame K times to fill the initial window.
+            _N, _F, _K = _social.max_peds, _social.node_feat_dim, _social.dali.k_steps
+            _BF = start["deter"].shape[0]
+            with torch.no_grad():
+                _s_base = dynamics.get_feat(start)                        # (BF, base_feat)
+                _s_peds = wm.heads["PedestrianNodeSetSpace"](_s_base).mode()  # (BF, N*(F+1))
+            _s_feats = _s_peds.view(_BF, _N, _F + 1)[..., :_F]           # (BF, N, F)
+            init_buf = _s_feats.unsqueeze(2).expand(-1, -1, _K, -1).contiguous()  # (BF, N, K, F)
+
+        if _use_se2:
+            from ..dreamerv3.se2_utils import integrate_se2 as _integrate_se2
+            _BF = start["deter"].shape[0]
+            _dev = start["deter"].device
+            init_pose = torch.zeros(_BF, 3, device=_dev)  # identity: anchor = start frame
+            if _social.action_holonomic:
+                _action_scale = torch.tensor(
+                    [_social.action_scale_linear, _social.action_scale_linear_y, _social.action_scale_angular],
+                    device=_dev,
+                )
+            else:
+                _action_scale = torch.tensor(
+                    [_social.action_scale_linear, _social.action_scale_angular],
+                    device=_dev,
+                )
+            _dt = _social.kinematics_dt
+            _holonomic = _social.action_holonomic
+
+        def step(prev, t):
+            if _use_dali_buf and _use_se2:
+                state, _, _, ped_buf, pose_accum = prev
+            elif _use_dali_buf:
+                state, _, _, ped_buf = prev
+                pose_accum = None
+            elif _use_se2:
+                state, _, _, pose_accum = prev
+                ped_buf = None
+            else:
+                state, _, _ = prev
+                ped_buf = None
+                pose_accum = None
+
+            # Compute augmented feat.  When DALI buffer is active, also return decoded_peds
+            # so _shift_ped_buf can reuse them without a second decoder forward pass.
+            # Invariant 5: pass pose_accum (= P_k) so decoded peds are rotated to current frame.
+            if _use_dali_buf:
+                feat, decoded_peds = wm._get_augmented_feat(
+                    state, imag_step=t, ped_buf=ped_buf, pose_rel=pose_accum,
+                    _return_decoded_peds=True
+                )
+                detach = int(t) > _cap
+                new_buf = wm._shift_ped_buf(decoded_peds, ped_buf, detach=detach)
+            else:
+                feat = wm._get_augmented_feat(state, imag_step=t, pose_rel=pose_accum)
+
             inp = feat.detach()
             action = policy(inp).sample()
-            succ = dynamics.img_step(state, action)
-            return succ, feat, action
+            if _tssm_box is not None:
+                # Re-attach the threaded K/V cache (stripped from succ below so
+                # static_scan never stacks it over the horizon).
+                state = {**state, **_tssm_box}
+            if self._config.model.behavior.use_imagination_checkpointing:
+                succ = torch.utils.checkpoint.checkpoint(
+                    lambda s, a: dynamics.img_step(s, a, context=_context_b),
+                    state,
+                    action,
+                    use_reentrant=False,
+                )
+            else:
+                succ = dynamics.img_step(state, action, context=_context_b)
+            if _tssm_box is not None:
+                for _k in _tssm_keys:
+                    _tssm_box[_k] = succ.pop(_k)
 
-        succ, feats, actions = tools.static_scan(
-            step, [torch.arange(horizon)], (start, None, None)
-        )
+            # Integrate SE(2) pose for next step: P_{t+1} = compose(P_t, delta(action_t)).
+            if _use_se2:
+                new_pose = _integrate_se2(pose_accum, action, _action_scale, dt=_dt, holonomic=_holonomic)
+
+            if _use_dali_buf and _use_se2:
+                return succ, feat, action, new_buf, new_pose
+            elif _use_dali_buf:
+                return succ, feat, action, new_buf
+            elif _use_se2:
+                return succ, feat, action, new_pose
+            else:
+                return succ, feat, action
+
+        if _use_dali_buf and _use_se2:
+            succ, feats, actions, _ped_bufs, _poses = tools.static_scan(
+                step, [torch.arange(horizon)], (start, None, None, init_buf, init_pose)
+            )
+        elif _use_dali_buf:
+            succ, feats, actions, _ped_bufs = tools.static_scan(
+                step, [torch.arange(horizon)], (start, None, None, init_buf)
+            )
+        elif _use_se2:
+            succ, feats, actions, _poses = tools.static_scan(
+                step, [torch.arange(horizon)], (start, None, None, init_pose)
+            )
+        else:
+            succ, feats, actions = tools.static_scan(
+                step, [torch.arange(horizon)], (start, None, None)
+            )
+
         states = {k: torch.cat([start[k][None], v[:-1]], 0) for k, v in succ.items()}
-
         return feats, states, actions
 
     def _compute_target(self, imag_feat, imag_state, reward):
@@ -638,10 +1213,10 @@ class ImagBehavior(nn.Module):
                 - value (torch.Tensor): The value predictions for each step.
         """
         if "cont" in self._world_model.heads:
-            inp = self._world_model.dynamics.get_feat(imag_state)
+            # cont head expects aug_feat (same size as reward/actor); use imag_feat directly.
             discount = (
                 self._config.model.behavior.discount
-                * self._world_model.heads["cont"](inp).mean
+                * self._world_model.heads["cont"](imag_feat).mean
             )
         else:
             discount = self._config.model.behavior.discount * torch.ones_like(reward)

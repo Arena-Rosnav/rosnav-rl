@@ -175,6 +175,13 @@ datasources:
   laser_safety_violation:
     type: LaserSafeDistanceGenerator         # Checks if obstacles are within safety distance
 
+  # Social-Dreamer GAT/DALI pedestrian node-set (required by PedestrianNodeSetSpace + PedestrianMaskSpace)
+  peds_nodes:
+    type: PedestrianGraphNodeGenerator
+
+  peds_mask:
+    type: PedestrianNodeMaskGenerator
+
   # ---------------------------------------------------------------------------
   # PEDESTRIAN ANALYSIS GENERATORS - Social navigation features
   # ---------------------------------------------------------------------------

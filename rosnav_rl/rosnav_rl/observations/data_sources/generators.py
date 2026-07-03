@@ -7,6 +7,7 @@ calculations on data from other `DataSource`s.
 
 from __future__ import annotations
 
+import zlib
 from collections import defaultdict
 from typing import TYPE_CHECKING
 from warnings import warn
@@ -30,6 +31,8 @@ from ..utils.types import (
     LidarRanges,
     PedestrianDetections,
     PedestrianDistances,
+    PedestrianGraphNodes,
+    PedestrianNodeMask,
     PedestrianRelativeLocations,
     PedestrianRelativeVelocities,
     PedestrianSocialStates,
@@ -858,6 +861,299 @@ class PedestrianSocialStateGenerator(Generator[PedestrianSocialStates]):
         return self._ped_social_states_buffer[:num_peds] if self._ped_social_states_buffer is not None else np.array([])
 
 
+class PedestrianGraphNodeGenerator(Generator[PedestrianGraphNodes]):
+    """Fixed-size pedestrian node-set for the Social-RSSM GAT (C1, M1.1).
+
+    Produces a padded, robot-frame node tensor of shape ``(max_peds, F + 1)`` where each row is
+    ``[dx, dy, vx, vy, (social_state,) valid]``. The nearest ``max_peds`` pedestrians by distance
+    are kept; the rest are dropped. Remaining rows are zero-padded and flagged invalid via the
+    trailing validity column, so the GAT and the mask space can mask padding unambiguously.
+
+    Ordering is deterministic: rows are sorted by ascending robot-frame distance with a stable
+    pedestrian-id tie-break (CRC32 of the name), so the node ordering does not flicker between
+    frames when two pedestrians are equidistant.
+
+    The output width is the single source of truth tied to ``SocialCfg.node_feat_dim``:
+    ``F = 4`` (dx, dy, vx, vy) or ``F = 5`` when ``include_social_state`` is True.
+    """
+
+    requires = {
+        "robot_pose": Pose2D,
+        "people_data": PedestrianDetections,
+    }
+
+    def __init__(
+        self,
+        name: str,
+        max_peds: int = 8,
+        include_social_state: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__(name, **kwargs)
+        self._max_peds = int(max_peds)
+        self._include_social_state = bool(include_social_state)
+        # F feature columns (+1 trailing validity column).
+        self._num_features = 4 + (1 if self._include_social_state else 0)
+        self._width = self._num_features + 1
+
+        # Pre-allocate reusable buffers — avoids per-step numpy allocation at 20 Hz.
+        # Sized for max possible peds (max_peds); resized lazily if scene has more.
+        self._out_buf: np.ndarray = np.zeros((self._max_peds, self._width), dtype=np.float32)
+        self._poses_h_buf: np.ndarray = np.ones((self._max_peds, 3), dtype=np.float32)
+        self._vel_buf: np.ndarray = np.zeros((self._max_peds, 2), dtype=np.float32)
+        self._social_buf: np.ndarray = np.zeros(self._max_peds, dtype=np.float32)
+        self._ids_buf: np.ndarray = np.zeros(self._max_peds, dtype=np.int64)
+        # CRC32 cache: ped name → stable integer id. Names are stable across steps.
+        self._id_cache: dict = {}
+
+    def _ensure_buffers(self, num: int) -> None:
+        """Grow all working buffers if the scene has more peds than max_peds."""
+        if num <= self._poses_h_buf.shape[0]:
+            return
+        self._poses_h_buf = np.ones((num, 3), dtype=np.float32)
+        self._vel_buf = np.zeros((num, 2), dtype=np.float32)
+        self._social_buf = np.zeros(num, dtype=np.float32)
+        self._ids_buf = np.zeros(num, dtype=np.int64)
+
+    def _stable_id(self, name: str) -> int:
+        """Return a deterministic integer id for a pedestrian name (cached CRC32)."""
+        cached = self._id_cache.get(name)
+        if cached is None:
+            cached = zlib.crc32(str(name).encode("utf-8"))
+            self._id_cache[name] = cached
+        return cached
+
+    def _extract_social_states(self, people: list, out: np.ndarray) -> None:
+        """Fill ``out`` with per-ped behavior codes from people_msgs tags (0 when absent)."""
+        out[:len(people)] = 0.0
+        try:
+            behavior_idx = people[0].tagnames.index("behavior")
+            for i, person in enumerate(people):
+                out[i] = float(int(person.tags[behavior_idx]))
+        except (ValueError, AttributeError, IndexError):
+            # No behavior tag in this simulator configuration: fall back to zeros (M1.5).
+            pass
+
+    def _generate(
+        self,
+        robot_pose: Pose2D,
+        people_data: people_msgs.People,
+        simulation_state_container: AgentParameters,
+        **kwargs,
+    ) -> PedestrianGraphNodes:
+        """Generate the padded, robot-frame pedestrian node-set.
+
+        Args:
+            robot_pose (Pose2D): Robot pose in the map frame (keys x, y, yaw).
+            people_data (people_msgs.People): Detected pedestrians in the map frame.
+            simulation_state_container (AgentParameters): Simulation state (unused).
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            PedestrianGraphNodes: ``(max_peds, F + 1)`` float32 array, nearest-N padded.
+        """
+        self._out_buf.fill(0.0)
+        if not people_data or not people_data.people:
+            return self._out_buf
+
+        people = people_data.people
+        num = len(people)
+        self._ensure_buffers(num)
+
+        # Extract world-frame positions and velocities into pre-allocated buffers.
+        ph = self._poses_h_buf
+        vb = self._vel_buf
+        ph[:num, 2] = 1.0  # homogeneous coordinate
+        for i, p in enumerate(people):
+            ph[i, 0] = p.position.x
+            ph[i, 1] = p.position.y
+            vb[i, 0] = p.velocity.x
+            vb[i, 1] = p.velocity.y
+
+        rel_pos = np.asarray(
+            get_relative_pos_to_robot(robot_pose=robot_pose, distant_poses=ph[:num])
+        )
+        rel_vel = np.asarray(get_relative_vel_to_robot(robot_pose, vb[:num]))
+
+        # Deterministic nearest-N: primary key = distance, tie-break = cached CRC32 id.
+        distances = np.linalg.norm(rel_pos, axis=1)
+        ids = self._ids_buf
+        for i, p in enumerate(people):
+            ids[i] = self._stable_id(p.name)
+        order = np.lexsort((ids[:num], distances))
+        keep = order[: self._max_peds]
+        n = len(keep)
+
+        self._out_buf[:n, 0:2] = rel_pos[keep]
+        self._out_buf[:n, 2:4] = rel_vel[keep]
+        col = 4
+        if self._include_social_state:
+            self._extract_social_states(people, self._social_buf)
+            self._out_buf[:n, col] = self._social_buf[keep]
+            col += 1
+        self._out_buf[:n, col] = 1.0  # validity flag (trailing column)
+        return self._out_buf
+
+
+class PedestrianTrajectoryBufferGenerator(Generator[PedestrianGraphNodes]):
+    """Per-ped K-step trajectory ring buffer for DALI inference (M1.3).
+
+    Maintains a ``deque(maxlen=K)`` of node rows keyed by pedestrian name so
+    DALI's GRU can seed from the real K=40-step window during acting.
+
+    **Training does NOT use this generator.** Training trajectories come from
+    the replay-buffer ``batch_length`` sequence that the RSSM already processes,
+    so no separate buffer is needed there.  This generator is active at inference
+    only (``social.dali.enabled=True``).
+
+    Output shape: ``(max_peds, K, F)`` float32.  A ped that has fewer than K
+    history frames is left-padded with zeros.  If a ped disappears and
+    reappears its history is reset (ring-buffer entry deleted).
+    """
+
+    requires = {
+        "robot_pose": Pose2D,
+        "people_data": PedestrianDetections,
+    }
+
+    def __init__(
+        self,
+        name: str,
+        max_peds: int = 8,
+        k_steps: int = 40,
+        node_feat_dim: int = 5,
+        **kwargs,
+    ) -> None:
+        from collections import deque as _deque
+
+        super().__init__(name, **kwargs)
+        self._max_peds = int(max_peds)
+        self._k_steps = int(k_steps)
+        self._node_feat_dim = int(node_feat_dim)
+        self._deque_cls = _deque
+        # Per-ped history: name → (K, F) circular buffer + write pointer.
+        # Using (K, F) ring arrays instead of deques of (F,) rows avoids
+        # per-step list() conversion and heap allocation at 20 Hz.
+        self._history: dict = {}   # name → (K, F) float32 array
+        self._history_len: dict = {}  # name → int: valid rows from the right
+        # Shared pre-allocated row buffer (reused each step).
+        self._row_buf: np.ndarray = np.zeros(self._node_feat_dim, dtype=np.float32)
+        # Pre-allocated output and working buffers.
+        self._out_buf: np.ndarray = np.zeros(
+            (self._max_peds, self._k_steps, self._node_feat_dim), dtype=np.float32
+        )
+        self._poses_h_buf: np.ndarray = np.ones((self._max_peds, 3), dtype=np.float32)
+        self._vel_buf: np.ndarray = np.zeros((self._max_peds, 2), dtype=np.float32)
+        self._ids_buf: np.ndarray = np.zeros(self._max_peds, dtype=np.int64)
+        self._id_cache: dict = {}
+
+    def _stable_id(self, name: str) -> int:
+        cached = self._id_cache.get(name)
+        if cached is None:
+            cached = zlib.crc32(str(name).encode("utf-8"))
+            self._id_cache[name] = cached
+        return cached
+
+    def reset(self) -> None:
+        """Clear history at episode boundaries."""
+        self._history.clear()
+        self._history_len.clear()
+        self._id_cache.clear()
+
+    def _push_row(self, name: str, row: np.ndarray) -> None:
+        """Append a feature row to the named ped's ring buffer (shift-left, write at end)."""
+        if name not in self._history:
+            self._history[name] = np.zeros(
+                (self._k_steps, self._node_feat_dim), dtype=np.float32
+            )
+            self._history_len[name] = 0
+        buf = self._history[name]
+        h = self._history_len[name]
+        if h < self._k_steps:
+            buf[h] = row
+            self._history_len[name] = h + 1
+        else:
+            # Ring: shift left by one, write at end.
+            buf[:-1] = buf[1:]
+            buf[-1] = row
+
+    def _generate(
+        self,
+        robot_pose: Pose2D,
+        people_data: people_msgs.People,
+        simulation_state_container: AgentParameters,
+        **kwargs,
+    ) -> np.ndarray:
+        """Build (max_peds, K, F) trajectory tensor from ring buffers.
+
+        Peds are ordered by ascending robot-frame distance (same ordering as
+        ``PedestrianGraphNodeGenerator``) so slot indices align between generators.
+        Missing history is left-padded with zeros.
+
+        Returns:
+            np.ndarray: ``(max_peds, K, F)`` float32.
+        """
+        F = self._node_feat_dim
+        self._out_buf.fill(0.0)
+        if not people_data or not people_data.people:
+            self._history.clear()
+            self._history_len.clear()
+            return self._out_buf
+
+        people = people_data.people
+        num = len(people)
+
+        # Grow working buffers lazily.
+        if num > self._poses_h_buf.shape[0]:
+            self._poses_h_buf = np.ones((num, 3), dtype=np.float32)
+            self._vel_buf = np.zeros((num, 2), dtype=np.float32)
+            self._ids_buf = np.zeros(num, dtype=np.int64)
+
+        ph = self._poses_h_buf
+        vb = self._vel_buf
+        ph[:num, 2] = 1.0
+        for i, p in enumerate(people):
+            ph[i, 0] = p.position.x
+            ph[i, 1] = p.position.y
+            vb[i, 0] = p.velocity.x
+            vb[i, 1] = p.velocity.y
+
+        rel_pos = np.asarray(
+            get_relative_pos_to_robot(robot_pose=robot_pose, distant_poses=ph[:num])
+        )
+        rel_vel = np.asarray(get_relative_vel_to_robot(robot_pose, vb[:num]))
+
+        distances = np.linalg.norm(rel_pos, axis=1)
+        ids = self._ids_buf
+        for i, p in enumerate(people):
+            ids[i] = self._stable_id(p.name)
+        order = np.lexsort((ids[:num], distances))
+        keep = order[: self._max_peds]
+
+        seen_names: set = set()
+        row = self._row_buf
+        for slot, idx in enumerate(keep):
+            p = people[idx]
+            seen_names.add(p.name)
+            row[:] = 0.0
+            row[0:2] = rel_pos[idx]
+            if F > 2:
+                row[2:4] = rel_vel[idx]
+            self._push_row(p.name, row)
+            buf = self._history[p.name]
+            h = self._history_len[p.name]
+            # Write the h valid rows into the right-aligned output slot (left-pad zeros).
+            self._out_buf[slot, self._k_steps - h :] = buf[:h]
+
+        # Drop history for peds that have left detection range.
+        stale = [n for n in self._history if n not in seen_names]
+        for name in stale:
+            del self._history[name]
+            del self._history_len[name]
+
+        return self._out_buf
+
+
 # =============================================================================
 # ARENA PEDESTRIAN GENERATORS
 # =============================================================================
@@ -1156,3 +1452,18 @@ class ArenaPedestrianStateGenerator(Generator[ArenaPedestrianStates]):
             self._animation_states_buffer[i] = p.animation_state
 
         return self._animation_states_buffer
+
+
+class PedestrianNodeMaskGenerator(Generator[PedestrianNodeMask]):
+    """Extracts the validity mask column from the padded pedestrian node-set.
+
+    The ``PedestrianGraphNodeGenerator`` stores the validity flag in the last
+    column of the ``(max_peds, F+1)`` node tensor.  This generator slices that
+    column out so ``PedestrianMaskSpace`` can consume it independently from the
+    main node features consumed by ``PedestrianNodeSetSpace``.
+    """
+
+    requires = {"peds_nodes": PedestrianGraphNodes}
+
+    def _generate(self, peds_nodes: PedestrianGraphNodes, **_: object) -> PedestrianNodeMask:
+        return peds_nodes[:, -1].astype(np.float32)

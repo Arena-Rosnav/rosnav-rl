@@ -280,6 +280,33 @@ ArenaPedestrianStates = Annotated[
     ),
 ]
 
+# Graph/set representation of pedestrians for the Social-RSSM GAT (C1).
+# A fixed-size, robot-frame node tensor with a trailing validity flag so padding is unambiguous.
+PedestrianGraphNodes = Annotated[
+    np.ndarray,
+    DataSpec(
+        description=(
+            "Fixed-size padded pedestrian node-set in the robot frame, nearest-N by distance. "
+            "Each row is [dx, dy, vx, vy, (social_state,) valid]; the trailing column is 1.0 for "
+            "a real pedestrian and 0.0 for padding."
+        ),
+        shape="(N, F+1)",
+        units="meters, meters/second, code, flag",
+        constraints="N = max_peds (fixed); rows sorted by ascending distance with id tie-break",
+        example="[[1.5, -0.8, 0.5, 0.2, 1, 1], [0, 0, 0, 0, 0, 0]]",
+    ),
+]
+
+PedestrianNodeMask = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="Validity mask for the padded pedestrian node-set (1 = real, 0 = padding)",
+        shape="(N,)",
+        constraints="N = max_peds (fixed)",
+        example="[1, 1, 1, 0, 0, 0, 0, 0]",
+    ),
+]
+
 # Additional encoded output types for observation spaces
 MotionStateVector = Annotated[
     np.ndarray,
@@ -550,6 +577,8 @@ __all__ = [
     "PedestrianTypeMinDistances",
     "PedestrianTypeArray",
     "PedestrianSocialStates",
+    "PedestrianGraphNodes",
+    "PedestrianNodeMask",
     "MotionStateVector",
     "KinematicStateVector",
     "TrajectoryStateVector",
