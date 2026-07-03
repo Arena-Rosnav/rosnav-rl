@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import ClassVar, List, Optional, Union
+from typing import Any, ClassVar, Dict, List, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from rosnav_rl.cfg.framework import FrameworkCfg
@@ -587,6 +587,40 @@ class DreamerV3Cfg(FrameworkCfg):
     environment: EnvironmentCfg = EnvironmentCfg()
     model: ModelCfg = ModelCfg()
     training: TrainingCfg = TrainingCfg()
+
+    observation_space_list: List[str] = Field(
+        default_factory=lambda: [
+            "LaserCartesianMapSpace",
+            "PedestrianVelXSpace",
+            "PedestrianVelYSpace",
+            "PedestrianTypeSpace",
+            "PedestrianSocialStateSpace",
+            "PedestrianNodeSetSpace",
+            "PedestrianMaskSpace",
+            "RobotPoseSpace",
+            "DistAngleToGoalSpace",
+            "LastActionSpace",
+            "IsFirstStepSpace",
+            "IsTerminalStepSpace",
+        ],
+        description=(
+            "Names of registered SpaceFactory observation spaces used by this model."
+        ),
+    )
+    observation_space_kwargs: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "reduced_num_beams": 72,  # 720 beams / 10 = 3.75 deg angular resolution
+            "normalize": True,
+            "goal_max_dist": 10,
+            # Kwargs for feature-map spaces (PedestrianVel/Type/SocialState).
+            # These are collected but NOT encoded (not in mlp_keys/cnn_keys);
+            # they just need to init without errors.
+            "roi_in_m": 40,
+            "feature_map_size": 80,
+            "laser_stack_size": 10,
+        },
+        description="Shared kwargs passed to each observation space on construction.",
+    )
 
     class Config:
         arbitrary_types_allowed = True

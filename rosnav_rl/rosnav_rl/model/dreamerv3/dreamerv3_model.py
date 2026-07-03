@@ -5,8 +5,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Union
 
 import torch
 
-import rosnav_rl.spaces.observation_space.spaces as spaces
-
 from ...spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
@@ -281,35 +279,23 @@ class DreamerV3Model(RL_Model):
         including environmental information such as laser scans, pedestrian data,
         navigation goals, and episode state information.
 
+        Resolved from ``algorithm_cfg.observation_space_list`` (names registered in
+        ``SpaceFactory``), so a saved agent's space list is visible in its YAML and
+        overridable, rather than hardcoded here.
+
         Returns:
             List[BaseObservationSpace]: A list of observation space classes that will be
             instantiated to create the actual observation spaces for the model.
         """
+        from rosnav_rl.spaces.observation_space.observation_space_factory import (
+            SpaceFactory,
+        )
+
         return [
-            spaces.environment.LaserCartesianMapSpace,
-            spaces.environment.PedestrianVelXSpace,
-            spaces.environment.PedestrianVelYSpace,
-            spaces.environment.PedestrianTypeSpace,
-            spaces.environment.PedestrianSocialStateSpace,
-            spaces.environment.PedestrianNodeSetSpace,
-            spaces.environment.PedestrianMaskSpace,
-            spaces.environment.RobotPoseSpace,
-            spaces.navigation.DistAngleToGoalSpace,
-            spaces.dynamics.LastActionSpace,
-            spaces.meta.IsFirstStepSpace,
-            spaces.meta.IsTerminalStepSpace,
+            SpaceFactory.registry[name]["class"]
+            for name in self._algorithm_cfg.observation_space_list
         ]
 
     @property
     def observation_space_kwargs(self) -> Dict[str, Any]:
-        return {
-            "reduced_num_beams": 72,  # 720 beams / 10 = 3.75° angular resolution
-            "normalize": True,
-            "goal_max_dist": 10,
-            # Kwargs for feature-map spaces (PedestrianVel/Type/SocialState).
-            # These are collected but NOT encoded (not in mlp_keys/cnn_keys);
-            # they just need to init without errors.
-            "roi_in_m": 40,
-            "feature_map_size": 80,
-            "laser_stack_size": 10,
-        }
+        return self._algorithm_cfg.observation_space_kwargs

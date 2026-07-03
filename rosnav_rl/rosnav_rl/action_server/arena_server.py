@@ -1,5 +1,3 @@
-import importlib.resources
-
 import yaml
 
 from rosnav_rl.observations.factory.factory import (
@@ -7,7 +5,11 @@ from rosnav_rl.observations.factory.factory import (
 )
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.cfg.parameters import AgentParameters
-from rosnav_rl.utils.agent_paths import load_agent_spec, resolve_agent_dir
+from rosnav_rl.utils.agent_paths import (
+    load_agent_spec,
+    resolve_agent_dir,
+    resolve_observations_config_path,
+)
 
 from .base_server import ActionServer, ObservationCollector
 
@@ -23,6 +25,7 @@ class ArenaActionServer(ActionServer):
         self.logger.info(f"Loading agent from: {model_dir}")
 
         spec = load_agent_spec(model_dir)
+        self._agent_spec = spec
         self.agent_parameters: AgentParameters = spec.parameters
 
         agent = RL_Agent(spec)
@@ -33,23 +36,14 @@ class ArenaActionServer(ActionServer):
         """
         Initializes and returns an ObservationCollector instance.
 
-        Uses the ObservationManager.from_config() factory with the bundled
-        observations.yaml config to set up ROS2 topic subscribers for
+        Uses the ObservationManager.from_config() factory with the observations.yaml
+        the agent was actually trained against, to set up ROS2 topic subscribers for
         collecting sensor data needed by the RL agent.
 
         Returns:
             ObservationCollector: Configured ObservationManager instance.
         """
-        # Try to use agent-specific observation config if saved, otherwise use default
-        agent_dir = resolve_agent_dir(self.agent_name)
-        obs_config_path = agent_dir / "observations.yaml"
-
-        if not obs_config_path.exists():
-            obs_config_path = str(
-                importlib.resources.files("rosnav_rl")
-                / "observations"
-                / "observations.yaml"
-            )
+        obs_config_path = resolve_observations_config_path(self._agent_spec)
 
         with open(obs_config_path, "r") as f:
             config = yaml.safe_load(f)

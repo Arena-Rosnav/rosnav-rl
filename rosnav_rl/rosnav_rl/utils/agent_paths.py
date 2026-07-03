@@ -90,3 +90,31 @@ def load_agent_spec(agent_dir: Path) -> "AgentConfig":
         ) from e
 
     return AgentConfig.model_validate(agent_config_dict)
+
+
+def resolve_observations_config_path(spec: "AgentConfig") -> Path:
+    """Resolve the observations.yaml a saved agent's training run actually used.
+
+    ``spec.observations_config`` is absolutized by arena_training's config
+    loader at training time; ``None`` means the package's built-in default was
+    used (a documented, legitimate case). If the field is set but the file no
+    longer exists, fail loudly instead of silently swapping in the package
+    default — that would silently deploy a different observation pipeline
+    than the one the agent was trained against.
+    """
+    import importlib.resources
+
+    if spec.observations_config is None:
+        return Path(
+            importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml"
+        )
+
+    path = Path(spec.observations_config)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Agent '{spec.name}' was trained with observations_config="
+            f"'{spec.observations_config}', but that file no longer exists. "
+            f"Refusing to silently fall back to the package default observation "
+            f"pipeline, since it would not match what the agent was trained on."
+        )
+    return path

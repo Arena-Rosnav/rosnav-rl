@@ -10,9 +10,7 @@ and cmd_vel publisher are skipped — the training loop owns the policy in that 
 
 from __future__ import annotations
 
-import importlib.resources
 import math
-from pathlib import Path
 
 import rclpy
 import tf2_ros
@@ -27,7 +25,11 @@ from rosnav_rl.observations.factory.factory import (
     create_observation_manager_from_config,
 )
 from rosnav_rl.rl_agent import RL_Agent
-from rosnav_rl.utils.agent_paths import load_agent_spec, resolve_agent_dir
+from rosnav_rl.utils.agent_paths import (
+    load_agent_spec,
+    resolve_agent_dir,
+    resolve_observations_config_path,
+)
 from rosnav_rl.utils.rostopic import Namespace
 
 
@@ -102,18 +104,14 @@ class ArenaInferenceNode:
     def _load_agent(self) -> RL_Agent:
         model_dir = resolve_agent_dir(self.agent_name)
         spec = load_agent_spec(model_dir)
+        self._agent_spec = spec
         self._agent_parameters: AgentParameters = spec.parameters
         agent = RL_Agent(spec)
         agent.load_model(path=model_dir / "best_model.zip")
         return agent
 
     def _load_observation_manager(self):
-        agent_dir = resolve_agent_dir(self.agent_name)
-        obs_config_path: Path | str = agent_dir / "observations.yaml"
-        if not Path(obs_config_path).exists():
-            obs_config_path = str(
-                importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml"
-            )
+        obs_config_path = resolve_observations_config_path(self._agent_spec)
         with open(obs_config_path) as f:
             config = yaml.safe_load(f)
         return create_observation_manager_from_config(

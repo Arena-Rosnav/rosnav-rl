@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import numpy as np
@@ -15,6 +17,8 @@ from ...spaces.observation_space.spaces.base_observation_space import (
 
 if TYPE_CHECKING:
     from rosnav_rl.cfg.agent import AgentConfig
+
+_logger = logging.getLogger(__name__)
 
 EncodedObservationDict = Dict[str, np.ndarray]
 ObservationDict = Dict[str, Any]
@@ -45,6 +49,16 @@ class BaseSpaceManager:
         obs_kwargs = observation_space_kwargs.copy() if observation_space_kwargs else {}
         obs_kwargs.update(spec.parameters.observation_kwargs())
 
+        unknown_kwargs = set(obs_kwargs) - self._known_observation_kwargs(
+            observation_space_list
+        )
+        if unknown_kwargs:
+            _logger.warning(
+                "observation_space_kwargs contains keys not accepted by any "
+                "configured observation space (possible typo?): %s",
+                sorted(unknown_kwargs),
+            )
+
         self._observation_space_manager = ObservationSpaceManager(
             validate_observations=True,
         )
@@ -53,6 +67,20 @@ class BaseSpaceManager:
                 s.__name__: obs_kwargs for s in observation_space_list
             },
         )
+
+    @staticmethod
+    def _known_observation_kwargs(space_classes: List[type]) -> set:
+        """Union of keyword-argument names accepted by the given space classes."""
+        known = {"normalize", "normalizer"}
+        for cls in space_classes:
+            for name, param in inspect.signature(cls.__init__).parameters.items():
+                if name == "self" or param.kind in (
+                    inspect.Parameter.VAR_KEYWORD,
+                    inspect.Parameter.VAR_POSITIONAL,
+                ):
+                    continue
+                known.add(name)
+        return known
 
     # -- encode / decode ---------------------------------------------------
 
