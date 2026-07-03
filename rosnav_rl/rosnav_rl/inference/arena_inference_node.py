@@ -11,6 +11,8 @@ and cmd_vel publisher are skipped — the training loop owns the policy in that 
 from __future__ import annotations
 
 import math
+import time
+from collections import deque
 
 import rclpy
 import tf2_ros
@@ -49,6 +51,7 @@ class ArenaInferenceNode:
         node.declare_parameter("max_lookahead_dist", 2.5)
         node.declare_parameter("lookahead_time", 1.5)
         node.declare_parameter("train_mode", False)
+        node.declare_parameter("log_step_latency", False)
 
         self.agent_name = node.get_parameter("agent").get_parameter_value().string_value
         self.train_mode = bool(node.get_parameter("train_mode").get_parameter_value().bool_value)
@@ -61,6 +64,8 @@ class ArenaInferenceNode:
         self.min_lookahead = float(node.get_parameter("min_lookahead_dist").get_parameter_value().double_value or 0.5)
         self.max_lookahead = float(node.get_parameter("max_lookahead_dist").get_parameter_value().double_value or 2.5)
         self.lookahead_time = float(node.get_parameter("lookahead_time").get_parameter_value().double_value or 1.5)
+        self._log_step_latency = bool(node.get_parameter("log_step_latency").get_parameter_value().bool_value)
+        self._step_latencies: deque[float] = deque(maxlen=100)
 
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, node)
@@ -94,8 +99,8 @@ class ArenaInferenceNode:
                 "[rosnav_rl] subgoal-only mode (train_mode=true); agent and cmd_vel publisher skipped"
             )
 
-        period = 1.0 / max(self.control_rate, 1e-3)
-        self._timer = node.create_timer(period, self._step)
+        self._period = 1.0 / max(self.control_rate, 1e-3)
+        self._timer = node.create_timer(self._period, self._step)
         self.logger.info(f"[rosnav_rl] running at {self.control_rate:.1f} Hz")
 
     def _load_agent(self) -> RL_Agent:
@@ -125,6 +130,35 @@ class ArenaInferenceNode:
         self._last_speed = 0.0
 
     def _step(self) -> None:
+        if not self._log_step_latency:
+            self._step_impl()
+            return
+        start = time.perf_counter()
+        self._step_impl()
+        self._record_step_latency(time.perf_counter() - start)
+
+    def _record_step_latency(self, elapsed: float) -> None:
+        """Log a p50/p95 summary over the last 100 steps and warn on overrun.
+
+        Enabled via the ``log_step_latency`` param; the timing/deque bookkeeping
+        is skipped entirely when off so real-time ticks pay no overhead by default.
+        """
+        if elapsed > self._period:
+            self.logger.warn(
+                f"[rosnav_rl] step took {elapsed * 1000:.1f} ms, "
+                f"overrunning control period {self._period * 1000:.1f} ms"
+            )
+        self._step_latencies.append(elapsed)
+        if len(self._step_latencies) == self._step_latencies.maxlen:
+            samples = sorted(self._step_latencies)
+            p50 = samples[len(samples) // 2]
+            p95 = samples[int(len(samples) * 0.95)]
+            self.logger.info(
+                f"[rosnav_rl] step latency over last {len(samples)} steps: "
+                f"p50={p50 * 1000:.1f}ms p95={p95 * 1000:.1f}ms"
+            )
+
+    def _step_impl(self) -> None:
         if self._goal is None:
             return
 
