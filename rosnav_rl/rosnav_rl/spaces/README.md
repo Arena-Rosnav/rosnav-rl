@@ -2,7 +2,7 @@
 
 > Back to [README](../../README.md) · [Developer Guide](../../GUIDE.md) · [Tutorials](../../TUTORIALS.md)
 >
-> Action and observation space management with registry-based composition, parallel encoding, category-organized spaces, and configurable normalization.
+> Action and observation space management with registry-based composition, category-organized spaces, and configurable normalization.
 
 ## Architecture Overview
 
@@ -11,7 +11,7 @@ spaces/
 ├── space_manager/
 │   └── base_space_manager.py          # BaseSpaceManager (orchestrator)
 ├── observation_space/
-│   ├── observation_space_manager.py   # ObservationSpaceManager (parallel encoding)
+│   ├── observation_space_manager.py   # ObservationSpaceManager (sequential encoding)
 │   ├── observation_space_factory.py   # SpaceFactory (registry + auto_name + aliases)
 │   ├── space_categories.py            # SpaceCategory enum (6 categories)
 │   ├── normalization.py               # Normalizer ABC + 4 implementations
@@ -56,7 +56,7 @@ action_cmd  = manager.decode_action(raw_action)      # → np.ndarray [linear.x,
 Manages a collection of `BaseObservationSpace` modules and produces encoded observations.
 
 **Key features:**
-- **Parallel encoding**: Uses `ThreadPoolExecutor` (up to 4 workers) when `parallel_encoding=True` and multiple spaces are loaded
+- **Sequential encoding**: Iterates over loaded spaces one at a time (no `ThreadPoolExecutor`/threading — measured to be faster than parallel dispatch for the small numpy ops involved)
 - **Validate-once pattern**: `validate_observations=True` on first call, then permanently disabled for zero-overhead steady-state
 - **Auto-collapse**: If only one space is loaded, returns the encoded value directly instead of a `Dict`
 - **Performance caching**: Pre-caches `_space_required_keys` per space to avoid `dict.keys()` on every step
@@ -64,7 +64,7 @@ Manages a collection of `BaseObservationSpace` modules and produces encoded obse
 ```python
 from rosnav_rl.spaces.observation_space.observation_space_manager import ObservationSpaceManager
 
-manager = ObservationSpaceManager(parallel_encoding=True)
+manager = ObservationSpaceManager()
 manager.load_configuration({
     "ReliableLaserSpace": {"laser_num_beams": 360, "laser_max_range": 30.0},
     "DistAngleToGoalSpace": {"goal_max_dist": 10.0},
@@ -216,8 +216,6 @@ BaseSpaceManager.encode_observation(obs_dict)
     │   │       ├─ encode_observation(front_laser=..., ...) → raw array
     │   │       ├─ @apply_normalization (if enabled)
     │   │       └─ On error: _create_null_observation() → zeros
-    │   │
-    │   └─ If parallel_encoding: ThreadPoolExecutor(max_workers=4)
     │
     └─ Return: np.ndarray (single space) or Dict[str, np.ndarray] (multiple spaces)
 ```

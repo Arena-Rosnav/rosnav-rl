@@ -2,7 +2,7 @@
 
 > Back to [README](../../README.md) · [Developer Guide](../../GUIDE.md) · [Tutorials](../../TUTORIALS.md)
 >
-> Modular, composable reward functions with parallel execution, safety categorization, and schema-based typed dependencies.
+> Modular, composable reward functions with sequential execution, safety categorization, and schema-based typed dependencies.
 
 ## Architecture Overview
 
@@ -15,7 +15,12 @@ reward/
 └── reward_units/
     ├── base_reward_units.py     # RewardUnit ABC (RequiresProtocol + ErrorReportingMixin)
     ├── reward_unit_factory.py   # RewardUnitFactory — registry with @register decorator
-    └── reward_units.py          # 15+ concrete reward unit implementations
+    ├── reward_units.py          # Re-export shim (registry names are byte-stable across the split below)
+    ├── goal.py                  # RewardGoalReached, RewardApproachGoal
+    ├── collision_safety.py      # RewardSafeDistance, RewardFactoredSafeDistance, RewardCollision
+    ├── pedestrian.py            # Ped-type safety, collision, velocity-constraint, proxemic/social reward units
+    ├── velocity.py              # No-movement, reverse-drive, velocity-change/difference reward units
+    └── progress.py              # RewardDistanceTravelled, RewardMaxStepsExceeded
 ```
 
 ## Core Components
@@ -25,12 +30,11 @@ reward/
 The central orchestrator that manages a collection of `RewardUnit`s and aggregates their outputs into a single reward signal per step.
 
 **Key features:**
-- **Parallel execution**: Optional `ThreadPoolExecutor`-based parallel evaluation (up to `max_workers=8`, configurable timeout)
+- **Sequential execution**: Reward units are evaluated one at a time per step (no `ThreadPoolExecutor`/threading — measured to be faster than parallel dispatch for the small numpy ops involved)
 - **Safety categorization**: Units are automatically partitioned into two groups:
   - `_safe_dist_violation_units`: Only evaluated when a safety distance violation is detected
   - `_non_safe_dist_violation_units`: Evaluated on every step
 - **Validate-once pattern**: `RequiresProtocol` validation runs on the first `calculate_reward()` call then permanently disables for zero-overhead steady-state
-- **Thread-safe accumulation**: Uses `threading.Lock` for safe reward aggregation in parallel mode
 - **Episode state tracking**: `RewardState` dataclass tracks `current_reward`, `info` dict, and `reward_overview` per step
 
 ```python
@@ -43,9 +47,6 @@ reward_fn = RewardFunction(
         "approach_goal": {"pos_factor": 0.3, "neg_factor": 0.5},
         "safe_distance": {"reward": -0.15},
     },
-    parallel=True,          # Enable ThreadPoolExecutor
-    max_workers=4,          # Worker threads
-    timeout=0.1,            # Per-step timeout (seconds)
     verbose=1,              # Detailed logging
 )
 
@@ -194,7 +195,7 @@ Parameters prefixed with `_` are typically internal flags:
 3. **Per-step execution**: `calculate_reward(obs, sim_state)` does:
    - Reset `RewardState` (zero reward, empty info)
    - Determine eligible units based on safety violation status
-   - Execute units sequentially or in parallel
+   - Execute units sequentially
    - Return `(total_reward, info_dict)`
 4. **Validation**: On the first call, `validate_reward_units()` checks that all `requires` keys are present in the observation dict. After validation passes, it's permanently disabled.
 

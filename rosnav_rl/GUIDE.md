@@ -41,8 +41,8 @@ composable modules so you can swap any part without touching the others.
 | Capability | How |
 | --- | --- |
 | Multi-algorithm | 9 SB3 algorithms + DreamerV3. Add a new one with a config file. |
-| Composable spaces | Registry-based observation spaces. Parallel encoding via `ThreadPoolExecutor`. |
-| Modular rewards | Declarative reward units in YAML. Parallel evaluation, safety categorization. |
+| Composable spaces | Registry-based observation spaces. Sequential encoding, category-organized. |
+| Modular rewards | Declarative reward units in YAML. Sequential evaluation, safety categorization. |
 | YAML observation pipeline | Collectors → Generators → dependency resolution via topological sort. |
 | Schema-based validation | `RequiresProtocol` enforces typed dependency declarations across all subsystems. |
 | Validate-once | First-call validation then zero-overhead steady-state in both spaces and rewards. |
@@ -84,8 +84,8 @@ The core principle is **modularity and separation of concerns**:
 | **RL Agent** | Top-level orchestrator. Owns model + spaces + reward function. |
 | **Model** | `RL_Model` ABC. Implementations: `StableBaselinesModel`, `DreamerV3Model`. `ModelFactory` registry. |
 | **Observations** | `ObservationManager` with `Collector` (ROS topics) and `Generator` (derived features). YAML-configured. |
-| **Spaces** | `ObservationSpaceManager` (parallel encoding, validate-once) + `ActionSpaceManager` (discrete/continuous, holonomic). |
-| **Reward** | `RewardFunction` composite. `RewardUnit` ABC with `RequiresProtocol` + `ErrorReportingMixin`. Parallel execution. |
+| **Spaces** | `ObservationSpaceManager` (sequential encoding, validate-once) + `ActionSpaceManager` (discrete/continuous, holonomic). |
+| **Reward** | `RewardFunction` composite. `RewardUnit` ABC with `RequiresProtocol` + `ErrorReportingMixin`. Sequential execution. |
 | **Action Server** | ROS 2 `GetCommand` service. `ActionServer` ABC → `ArenaActionServer`. |
 | **Cross-cutting** | `RequiresProtocol`, `ErrorReportingMixin`, `SchemaValidator`, `MissingObservationError` (smart suggestions). |
 
@@ -217,19 +217,20 @@ rosnav_rl/
 │   └── observations.yaml    # Default pipeline config
 │
 ├── reward/                  # Reward system
-│   ├── reward_function.py   # RewardFunction (composite, parallel ThreadPoolExecutor)
+│   ├── reward_function.py   # RewardFunction (composite, sequential execution)
 │   ├── constants.py         # REWARD_CONSTANTS, DONE_REASONS, per-unit DEFAULTS
 │   ├── utils.py             # @check_params decorator
 │   └── reward_units/
 │       ├── base_reward_units.py   # RewardUnit ABC (RequiresProtocol + ErrorReportingMixin)
 │       ├── reward_unit_factory.py # RewardUnitFactory (registry + @register)
-│       └── reward_units.py        # 15+ concrete units
+│       ├── reward_units.py        # Re-export shim (registry names byte-stable)
+│       └── goal.py, collision_safety.py, pedestrian.py, velocity.py, progress.py  # 22 concrete units, split by category
 │
 ├── spaces/                  # Action & observation spaces
 │   ├── space_manager/
 │   │   └── base_space_manager.py  # BaseSpaceManager (encode + decode)
 │   ├── observation_space/
-│   │   ├── observation_space_manager.py  # ObservationSpaceManager (parallel encoding)
+│   │   ├── observation_space_manager.py  # ObservationSpaceManager (sequential encoding)
 │   │   ├── observation_space_factory.py  # SpaceFactory (auto_name, aliases, categories)
 │   │   ├── space_categories.py           # SpaceCategory enum (6 categories)
 │   │   ├── normalization.py              # 4 normalizers (max_abs, min_max, standard, identity)
@@ -369,7 +370,7 @@ cmd     = space_manager.decode_action(raw_action)      # → [linear.x, linear.y
 ```
 
 **`ObservationSpaceManager`** features:
-- Parallel encoding via `ThreadPoolExecutor` (up to 4 workers)
+- Sequential encoding over loaded spaces (no threading — measured faster than parallel dispatch for these small numpy ops)
 - Validate-once on first call, then zero-overhead
 - Auto-collapse: single space → direct return, multiple → `Dict`
 
@@ -409,10 +410,9 @@ See [spaces/README.md](rosnav_rl/spaces/README.md) for encoding/decoding pipelin
 
 **`RewardFunction`** orchestrates a collection of `RewardUnit`s:
 
-- **Parallel execution** — `ThreadPoolExecutor` (configurable workers + timeout)
+- **Sequential execution** — units evaluated one at a time (no threading)
 - **Safety categorization** — units with `_on_safe_dist_violation=True` are only evaluated during safety violations
 - **Validate-once** — `RequiresProtocol` validation on first `calculate_reward()` call, then disabled
-- **Thread-safe** — `threading.Lock` for reward accumulation in parallel mode
 
 ```python
 reward, info = reward_fn.calculate_reward(observations, simulation_state_container)

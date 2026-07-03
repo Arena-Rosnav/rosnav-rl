@@ -144,7 +144,7 @@ class RewardFunction(ErrorReportingMixin):
         simulation_state_container: AgentParameters,
         **kwargs,
     ) -> None:
-        """Calculate rewards using all reward units with optional parallel processing.
+        """Calculate rewards by executing all reward units sequentially.
 
         Args:
             obs_dict: Dictionary of observations.
