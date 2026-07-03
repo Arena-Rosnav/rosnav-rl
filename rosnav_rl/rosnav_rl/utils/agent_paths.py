@@ -2,6 +2,12 @@
 
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+import yaml
+
+if TYPE_CHECKING:
+    from rosnav_rl.cfg.agent import AgentConfig
 
 
 def find_agents_dir() -> Path:
@@ -58,3 +64,29 @@ def resolve_agent_dir(agent_name: str) -> Path:
         f"Available agents: {[d.name for d in agents_dir.iterdir() if d.is_dir()] if agents_dir.is_dir() else '(agents dir not found)'}\n"
         f"Set ROSNAV_AGENTS_DIR environment variable to override."
     )
+
+
+def load_agent_spec(agent_dir: Path) -> "AgentConfig":
+    """Load the ``AgentConfig`` embedded in a saved agent's ``training_config.yaml``.
+
+    Only the ``agent_config`` subtree is validated — the rest of the training
+    config (arena_cfg, resume, ...) is owned by the training entrypoint, not
+    by deployment/inference consumers.
+    """
+    from rosnav_rl.cfg.agent import AgentConfig
+
+    config_path = Path(agent_dir) / "training_config.yaml"
+    if not config_path.is_file():
+        raise FileNotFoundError(f"No training_config.yaml found in agent dir: {agent_dir}")
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+
+    try:
+        agent_config_dict = raw["agent_config"]
+    except (KeyError, TypeError) as e:
+        raise KeyError(
+            f"'{config_path}' has no top-level 'agent_config' key"
+        ) from e
+
+    return AgentConfig.model_validate(agent_config_dict)

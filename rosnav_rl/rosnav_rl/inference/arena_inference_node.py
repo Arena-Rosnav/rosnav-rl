@@ -27,9 +27,8 @@ from rosnav_rl.observations.factory.factory import (
     create_observation_manager_from_config,
 )
 from rosnav_rl.rl_agent import RL_Agent
-from rosnav_rl.utils.agent_paths import resolve_agent_dir
+from rosnav_rl.utils.agent_paths import load_agent_spec, resolve_agent_dir
 from rosnav_rl.utils.rostopic import Namespace
-from rosnav_rl.utils.utils import load_yaml
 
 
 _NODE_NAME = "rosnav_rl_inference"
@@ -101,11 +100,8 @@ class ArenaInferenceNode:
         self.logger.info(f"[rosnav_rl] running at {self.control_rate:.1f} Hz")
 
     def _load_agent(self) -> RL_Agent:
-        from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg
-
         model_dir = resolve_agent_dir(self.agent_name)
-        training_cfg = TrainingCfg.model_validate(load_yaml(model_dir / "training_config.yaml"))
-        spec = training_cfg.agent_config
+        spec = load_agent_spec(model_dir)
         self._agent_parameters: AgentParameters = spec.parameters
         agent = RL_Agent(spec)
         agent.load_model(path=model_dir / "best_model.zip")

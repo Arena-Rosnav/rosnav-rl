@@ -31,8 +31,8 @@ import pytest
 
 def _get_agents_dir() -> Path:
     """Use the same resolution logic as the action server itself."""
-    from rosnav_rl.action_server.arena_server import _find_agents_dir
-    return _find_agents_dir()
+    from rosnav_rl.utils.agent_paths import find_agents_dir
+    return find_agents_dir()
 
 
 def _rclpy_available() -> bool:
@@ -68,7 +68,7 @@ class TestFindAgentsDir:
 
     def test_env_var_override(self, tmp_path):
         """ROSNAV_AGENTS_DIR env var should be preferred over all other paths."""
-        from rosnav_rl.action_server.arena_server import _find_agents_dir
+        from rosnav_rl.utils.agent_paths import find_agents_dir as _find_agents_dir
 
         with patch.dict(os.environ, {"ROSNAV_AGENTS_DIR": str(tmp_path)}):
             result = _find_agents_dir()
@@ -79,7 +79,7 @@ class TestFindAgentsDir:
         """If the env-var path doesn't exist the function falls back to other
         strategies.  It should NOT return the nonexistent env-var path when
         another valid directory can be found."""
-        from rosnav_rl.action_server.arena_server import _find_agents_dir
+        from rosnav_rl.utils.agent_paths import find_agents_dir as _find_agents_dir
 
         fake_path = tmp_path / "nonexistent_agents"
         with patch.dict(os.environ, {"ROSNAV_AGENTS_DIR": str(fake_path)}):
@@ -94,7 +94,7 @@ class TestFindAgentsDir:
 
     def test_resolve_agent_dir_found(self, tmp_path):
         """_resolve_agent_dir returns the correct path when the agent exists."""
-        from rosnav_rl.action_server.arena_server import _resolve_agent_dir
+        from rosnav_rl.utils.agent_paths import resolve_agent_dir as _resolve_agent_dir
 
         agent_name = "my_test_agent"
         agent_dir = tmp_path / agent_name
@@ -107,7 +107,7 @@ class TestFindAgentsDir:
 
     def test_resolve_agent_dir_not_found(self, tmp_path):
         """_resolve_agent_dir raises FileNotFoundError if agent is missing."""
-        from rosnav_rl.action_server.arena_server import _resolve_agent_dir
+        from rosnav_rl.utils.agent_paths import resolve_agent_dir as _resolve_agent_dir
 
         with patch.dict(os.environ, {"ROSNAV_AGENTS_DIR": str(tmp_path)}):
             with pytest.raises(FileNotFoundError, match="not found"):
@@ -115,7 +115,7 @@ class TestFindAgentsDir:
 
     def test_resolve_agent_dir_lists_available(self, tmp_path):
         """Error message for a missing agent should list available agents."""
-        from rosnav_rl.action_server.arena_server import _resolve_agent_dir
+        from rosnav_rl.utils.agent_paths import resolve_agent_dir as _resolve_agent_dir
 
         (tmp_path / "agent_a").mkdir()
         (tmp_path / "agent_b").mkdir()
@@ -281,14 +281,11 @@ class TestLoadPipeline:
         assert (TEST_AGENT_DIR / "best_model.zip").exists()
 
     def test_training_config_loads(self):
-        """TrainingCfg must be reconstructable from the saved YAML."""
-        from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg
-        from rosnav_rl.utils.utils import load_yaml
+        """AgentConfig must be reconstructable from the saved YAML via load_agent_spec."""
+        from rosnav_rl.utils.agent_paths import load_agent_spec
 
-        cfg = TrainingCfg.model_validate(
-            load_yaml(TEST_AGENT_DIR / "training_config.yaml")
-        )
-        assert cfg.agent_cfg.name == "test_agent"
+        spec = load_agent_spec(TEST_AGENT_DIR)
+        assert spec.name == "test_agent"
 
     @ros2
     def test_arena_server_initializes_agent(self):
