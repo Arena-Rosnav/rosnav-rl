@@ -313,6 +313,29 @@ class StableBaselinesModel(RL_Model):
         # lazily on the first get_action() call, so a real-time inference
         # caller's first tick doesn't pay this construction cost.
         self.__ensure_mock_env()
+        self._warmup()
+
+    def _warmup(self) -> None:
+        """Run one dummy forward pass so the first real ``get_action`` tick
+        doesn't pay CUDA kernel/allocation latency (mirrors the DreamerV3
+        backend's warm-up).
+
+        Uses a random sample from the already-encoded observation space
+        (keyed identically to ``encode_observation``'s output), run through
+        the same stack/normalize wrappers ``get_action`` uses, then a
+        discarded ``_predict`` call. Does not touch ``self.__state``.
+        """
+        observation = self._rl_agent.observation_space.sample()
+        if self.__env.has_stack_wrapper:
+            observation, _ = self.__env.stack(observation)
+        if self.__env.has_norm_wrapper:
+            observation = self.__env.normalize(observation)
+        self._predict(
+            observation=observation,
+            deterministic=True,
+            state=None,
+            episode_start=np.array([True] * self.__env.env.num_envs),
+        )
 
     def __ensure_mock_env(self) -> None:
         if self.__env is None:
