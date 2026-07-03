@@ -59,7 +59,6 @@ from .model import (
     dreamerv3,
     stable_baselines3,
 )
-from .observations import ObservationManager
 from .reward import RewardFunction, reward_units
 from .rl_agent import RL_Agent
 from .spaces import ActionSpaceManager, BaseSpaceManager, ObservationSpaceManager
@@ -75,3 +74,13 @@ from .cfg import (
 )
 AgentCfg = AgentConfig  # backward-compat alias
 from .utils.type_aliases import SupportedRLFrameworks
+
+
+def __getattr__(name: str):
+    # ObservationManager pulls in rclpy transitively (.observations -> ROS
+    # topic subscribers); deferred so `import rosnav_rl` works without ROS.
+    if name == "ObservationManager":
+        from .observations import ObservationManager
+
+        return ObservationManager
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

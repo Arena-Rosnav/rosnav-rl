@@ -9,12 +9,17 @@ to improve developer experience and documentation.
 
 from __future__ import annotations
 
-from typing import Annotated, Dict, Union
+from typing import TYPE_CHECKING, Annotated, Dict, Union
 from dataclasses import dataclass
 
 import numpy as np
-import people_msgs.msg as people_msgs
-import arena_people_msgs.msg as arena_people_msgs
+
+if TYPE_CHECKING:
+    # Only data_sources/{collectors,generators}.py (ROS-coupled) consume these
+    # two aliases; deferred so this module (pulled in by pure-python spaces/
+    # reward code too) doesn't require the ROS message packages to be built.
+    import people_msgs.msg as people_msgs
+    import arena_people_msgs.msg as arena_people_msgs
 
 
 # Schema-based data requirement specification (inspired by Albumentations)
@@ -177,7 +182,7 @@ IsFirst = Annotated[
 
 # Pedestrian detection and tracking data types
 PedestrianDetections = Annotated[
-    people_msgs.People,
+    "people_msgs.msg.People",
     DataSpec(
         description="Detected pedestrians with poses and velocities",
         source="people detector/tracker",
@@ -187,7 +192,7 @@ PedestrianDetections = Annotated[
 ]
 
 ArenaPedestrianDetections = Annotated[
-    arena_people_msgs.Pedestrians,
+    "arena_people_msgs.msg.Pedestrians",
     DataSpec(
         description="Arena pedestrians with full state information (pose, twist, animation state)",
         source="Arena pedestrian simulator/tracker",
