@@ -62,12 +62,12 @@ The Arena-specific implementation that handles model loading from disk.
    - Searches via `ament_index` (package share directory)
    - Walks up from this file's path looking for `arena_training/agents/`
    - Checks `COLCON_PREFIX_PATH` / `AMENT_PREFIX_PATH`
-2. Loads `training_config.yaml` as `TrainingCfg` (Pydantic)
+2. Loads the agent's `AgentConfig` via `RL_Agent.from_agent_dir()`, which dispatches on
+   `spec.framework` (SB3 loads `best_model.zip`; DreamerV3 loads `latest.pt`)
 3. Uses `spec.parameters` (`AgentParameters`) directly
-4. Creates `RL_Agent(spec)` and loads `best_model.zip`
 
 **Observation collector:**
-- Uses `create_observation_manager_from_config()` with the agent-specific or default `observations.yaml`
+- Uses `ObservationManager.from_config()` with the agent-specific or default `observations.yaml`
 - Passes the ROS 2 node for topic subscriptions
 
 ## Usage

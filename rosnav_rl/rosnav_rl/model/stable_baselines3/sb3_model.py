@@ -309,6 +309,20 @@ class StableBaselinesModel(RL_Model):
             env (VecEnv, optional): The environment to which the model should be loaded. Defaults to None.
         """
         self._model = self._load_model(path=path, env=env)
+        # Build the mock VecEnv (stack/normalize wrappers) here rather than
+        # lazily on the first get_action() call, so a real-time inference
+        # caller's first tick doesn't pay this construction cost.
+        self.__ensure_mock_env()
+
+    def __ensure_mock_env(self) -> None:
+        if self.__env is None:
+            self.__env = StableBaselinesEnv(
+                make_mock_env(
+                    ns="",
+                    space_manager=self._rl_agent.space_manager,
+                    stack_size=self._policy_description.stack_size,
+                )
+            )
 
     def get_action(
         self,
@@ -342,14 +356,7 @@ class StableBaselinesModel(RL_Model):
             observation
         )
 
-        if self.__env is None:
-            self.__env = StableBaselinesEnv(
-                make_mock_env(
-                    ns="",
-                    space_manager=self._rl_agent.space_manager,
-                    stack_size=self._policy_description.stack_size,
-                )
-            )
+        self.__ensure_mock_env()
 
         if self.__env.has_stack_wrapper:
             observation, _ = self.__env.stack(observation)

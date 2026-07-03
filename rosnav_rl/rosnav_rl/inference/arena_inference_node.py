@@ -21,12 +21,9 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Int16
 
 from rosnav_rl.cfg.parameters import AgentParameters
-from rosnav_rl.observations.factory.factory import (
-    create_observation_manager_from_config,
-)
+from rosnav_rl.observations import ObservationManager
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.utils.agent_paths import (
-    load_agent_spec,
     resolve_agent_dir,
     resolve_observations_config_path,
 )
@@ -103,18 +100,16 @@ class ArenaInferenceNode:
 
     def _load_agent(self) -> RL_Agent:
         model_dir = resolve_agent_dir(self.agent_name)
-        spec = load_agent_spec(model_dir)
-        self._agent_spec = spec
-        self._agent_parameters: AgentParameters = spec.parameters
-        agent = RL_Agent(spec)
-        agent.load_model(path=model_dir / "best_model.zip")
+        agent = RL_Agent.from_agent_dir(model_dir)
+        self._agent_spec = agent.spec
+        self._agent_parameters: AgentParameters = agent.spec.parameters
         return agent
 
     def _load_observation_manager(self):
         obs_config_path = resolve_observations_config_path(self._agent_spec)
         with open(obs_config_path) as f:
             config = yaml.safe_load(f)
-        return create_observation_manager_from_config(
+        return ObservationManager.from_config(
             config=config,
             node=self.node,
             ns=str(self.namespace),
@@ -152,15 +147,12 @@ class ArenaInferenceNode:
             return
 
         try:
-            raw_action = self.agent.get_action(observations)
+            # RL_Agent.get_action already returns a decoded action (both SB3
+            # and DreamerV3 backends decode internally) — decoding again here
+            # previously double-decoded the action, silently zeroing angular z.
+            cmd = self.agent.get_action(observations)
         except Exception as exc:
             self.logger.warn(f"[rosnav_rl] get_action failed: {type(exc).__name__}: {exc}")
-            return
-
-        try:
-            cmd = self.agent.space_manager.action_space_manager.decode_action(raw_action)
-        except Exception as exc:
-            self.logger.warn(f"[rosnav_rl] decode_action failed: {type(exc).__name__}: {exc}")
             return
 
         self._publish_cmd_vel(float(cmd[0]), float(cmd[1]), float(cmd[2]))

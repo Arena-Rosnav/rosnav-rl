@@ -90,8 +90,8 @@ def _populate_agent_spec(training_cfg):
     )
     from rosnav_rl.cfg.parameters import AgentParameters  # noqa: PLC0415
 
-    robot_desc = training_cfg.arena_config.robot.robot_description
-    general = training_cfg.arena_config.general
+    robot_desc = training_cfg.arena_cfg.robot.robot_description
+    general = training_cfg.arena_cfg.general
     cont = robot_desc.actions.continuous
 
     if robot_desc.is_holonomic:
@@ -156,7 +156,7 @@ def create_test_agent(
 
     training_cfg = TrainingCfg.model_validate(load_yaml(config_path))
     training_cfg.agent_config.name = agent_name
-    print(f"[create_test_agent] Using robot: {training_cfg.arena_config.robot.robot_description.robot_model}")
+    print(f"[create_test_agent] Using robot: {training_cfg.arena_cfg.robot.robot_description.robot_model}")
 
     # ── Build everything from robot description ────────────────────────────
     _populate_agent_spec(training_cfg)

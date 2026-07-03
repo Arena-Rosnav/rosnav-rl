@@ -61,7 +61,7 @@ class ModelFactory:
 
     @classmethod
     def create_model_instance(
-        cls, framework_cfg: FrameworkCfg, rl_agent: "RL_Agent"
+        cls, framework_cfg: FrameworkCfg, rl_agent: "RL_Agent", **kwargs
     ) -> "RL_Model":
         """Create an RL model instance based on the framework configuration.
 
@@ -72,6 +72,11 @@ class ModelFactory:
         Args:
             framework_cfg: Configuration object containing framework settings
             rl_agent: The RL agent instance
+            **kwargs: Forwarded to the model class's constructor (e.g.
+                ``inference_only=True`` for :class:`DreamerV3Model`). Model
+                classes that don't accept a given kwarg will raise a
+                ``TypeError`` — callers must only pass kwargs known to be
+                supported by the resolved framework's model class.
 
         Returns:
             An instance of the appropriate RL model
@@ -91,6 +96,7 @@ class ModelFactory:
         return model_class.from_framework_cfg(
             rl_agent=rl_agent,
             framework_cfg=framework_cfg,
+            **kwargs,
         )
 
     @classmethod

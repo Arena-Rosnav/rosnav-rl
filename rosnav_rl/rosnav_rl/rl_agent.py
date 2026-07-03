@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, Optional, Union
 
 import numpy as np
@@ -81,7 +82,7 @@ class RL_Agent:
     _reward_function: Optional[RewardFunction] = None
     _space_manager: BaseSpaceManager
 
-    def __init__(self, spec: AgentConfig):
+    def __init__(self, spec: AgentConfig, model_kwargs: Optional[Dict] = None):
         from rosnav_rl.model.model_factory import ModelFactory
 
         self._spec = spec
@@ -89,7 +90,7 @@ class RL_Agent:
         self._reward_function = None
 
         self._model = ModelFactory.create_model_instance(
-            framework_cfg=spec.framework, rl_agent=self,
+            framework_cfg=spec.framework, rl_agent=self, **(model_kwargs or {}),
         )
 
         self._space_manager = BaseSpaceManager(
@@ -104,6 +105,46 @@ class RL_Agent:
                 unit_kwargs=spec.reward.reward_unit_kwargs,
                 verbose=spec.reward.verbose,
             )
+
+    @classmethod
+    def from_agent_dir(cls, agent_dir: Union[str, Path]) -> "RL_Agent":
+        """Load a saved agent for inference, dispatching on ``spec.framework``.
+
+        Unifies the SB3 vs. DreamerV3 deployment path (previously duplicated
+        across ``arena_inference_node.py`` and ``action_server/arena_server.py``,
+        both of which only knew how to load an SB3 ``best_model.zip``):
+
+        - SB3: ``load_model(path=agent_dir / "best_model.zip")``.
+        - DreamerV3: constructed with ``inference_only=True`` (skips the
+          wandb/TensorBoard log-dir side effect and puts the model in
+          ``eval()`` mode), then ``setup_model()`` + ``load("latest")``
+          explicitly — ``load_model()``'s "only if not yet initialized"
+          gate would otherwise skip the load once ``setup_model()`` has
+          already set ``model._model``.
+
+        Args:
+            agent_dir: Directory containing ``training_config.yaml`` and the
+                framework-specific checkpoint (``best_model.zip`` or
+                ``latest.pt``).
+
+        Returns:
+            RL_Agent: Ready for ``get_action`` calls (already-decoded output).
+        """
+        from rosnav_rl.utils.agent_paths import load_agent_spec
+        from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
+
+        agent_dir = Path(agent_dir)
+        spec = load_agent_spec(agent_dir)
+
+        if spec.framework.name == SupportedRLFrameworks.DREAMER_V3:
+            agent = cls(spec, model_kwargs={"inference_only": True})
+            agent.initialize_model()
+            agent.model.load("latest")
+        else:
+            agent = cls(spec)
+            agent.load_model(path=agent_dir / "best_model.zip")
+
+        return agent
 
     def initialize_model(self, *args, **kwargs):
         """

@@ -185,34 +185,3 @@ class ObservationFactory:
             "collectors": self._collectors.copy(),
             "generators": self._generators.copy(),
         }
-
-
-def create_observation_manager_from_config(
-    config: Dict[str, Any], node, ns, simulation_state_container=None, **manager_kwargs
-):
-    """
-    Convenience function to create an ObservationManager from configuration.
-
-    .. deprecated::
-        Use `ObservationManager.from_config()` instead. This function is kept
-        for backward compatibility but will be removed in a future version.
-
-    Args:
-        config: Configuration dictionary with observation pipeline definition
-        node: ROS node
-        ns: Namespace
-        simulation_state_container: Simulation state container
-        **manager_kwargs: Additional arguments for ObservationManager
-
-    Returns:
-        Configured ObservationManager instance
-    """
-    from ..core.manager import ObservationManager
-
-    return ObservationManager.from_config(
-        config=config,
-        node=node,
-        ns=ns,
-        simulation_state_container=simulation_state_container,
-        **manager_kwargs,
-    )

@@ -3,12 +3,13 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Union
 
+import numpy as np
 import torch
 
 from ...spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
-from ...utils.type_aliases.spaces import EncodedObservationDict
+from ...utils.type_aliases import ObservationDict
 from ..dreamerv3 import tools
 from ..model import RL_Model
 from .dreamer import Dreamer
@@ -62,12 +63,17 @@ class DreamerV3Model(RL_Model):
     _model: Dreamer = None
     _logger: tools.Logger = None
     _logdir: pathlib.Path = None
+    _inference_only: bool = False
+    _infer_state = None
+    """Recurrent (latent, action, ctx_window) state carried across real-time
+    ``get_action`` calls; cleared on :meth:`reset` (episode boundary)."""
 
     def __init__(
         self,
         rl_agent: "rosnav_rl.RL_Agent",
         algorithm_cfg: "DreamerV3Cfg",
         *args,
+        inference_only: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -80,17 +86,30 @@ class DreamerV3Model(RL_Model):
             rl_agent: The reinforcement learning agent instance
             algorithm_cfg: Configuration for the DreamerV3 algorithm
             *args: Additional positional arguments to pass to the parent class
+            inference_only: When True, skip the training-only side effects
+                (wandb/TensorBoard log-dir creation via ``prepare_config``/
+                ``prepare_logger``) and put the model in ``eval()`` mode once
+                built. Training call sites must not pass this.
             **kwargs: Additional keyword arguments to pass to the parent class
         """
         super().__init__(rl_agent, algorithm_cfg, *args, **kwargs)
+        self._inference_only = inference_only
 
         if algorithm_cfg.general.logdir is None:
             algorithm_cfg.general.logdir = Path.cwd() / "agents"
         algorithm_cfg.general.logdir = (
             Path(algorithm_cfg.general.logdir) / rl_agent.name
         )
-        self._logdir = prepare_config(algorithm_cfg)
-        self._logger = prepare_logger(algorithm_cfg, self._logdir)
+
+        if inference_only:
+            # No log-dir/wandb creation for a pure-inference construction;
+            # self._logger is only ever read inside Dreamer.__call__'s
+            # `if training:` branch, which inference (training=False) never hits.
+            self._logdir = Path(algorithm_cfg.general.logdir)
+            self._logger = None
+        else:
+            self._logdir = prepare_config(algorithm_cfg)
+            self._logger = prepare_logger(algorithm_cfg, self._logdir)
 
     def setup_model(self, train_dataset: OrderedDict = None, *args, **kwargs):
         """
@@ -117,6 +136,8 @@ class DreamerV3Model(RL_Model):
             self._logger,
             train_dataset,
         )
+        if self._inference_only:
+            self._model.eval()
 
     def train(
         self,
@@ -253,19 +274,48 @@ class DreamerV3Model(RL_Model):
         )
         self._model._should_pretrain._once = False
 
-    def get_action(self, observation: "EncodedObservationDict", *args, **kwargs):
+    def get_action(self, observation: "ObservationDict", *args, **kwargs) -> np.ndarray:
         """
-        Extracts an action from the model's output given an observation.
+        Predicts a decoded action from a raw observation, carrying recurrent
+        state across calls (mirrors ``StableBaselinesModel.get_action``'s
+        contract: raw observation in, decoded ``[vx, vy, wz]`` out).
+
+        The underlying ``Dreamer.__call__`` expects a leading batch dimension
+        (``_wm.preprocess`` does not insert one) and a required ``reset``
+        array; both are supplied here. Recurrent state is stored on
+        ``self._infer_state`` and cleared by :meth:`reset` at episode
+        boundaries.
 
         Args:
-            observation (EncodedObservationDict): The encoded observation dictionary.
+            observation (ObservationDict): Raw (not yet encoded) observation.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            The action from the model's output for the given observation.
+            np.ndarray: Decoded action ready to publish.
         """
-        return self._model(observation)[0]["action"]
+        encoded = self._rl_agent.space_manager.encode_observation(observation)
+        batched = {key: np.asarray(value)[np.newaxis] for key, value in encoded.items()}
+
+        with torch.inference_mode():
+            policy_output, self._infer_state = self._model(
+                batched,
+                reset=np.array([False]),
+                state=self._infer_state,
+                training=False,
+            )
+            action = policy_output["action"].detach().cpu().numpy()
+
+        return self._rl_agent.space_manager.decode_action(action.squeeze(axis=0))
+
+    def reset(self) -> None:
+        """Clears recurrent state carried across ``get_action`` calls.
+
+        Must be invoked at episode boundaries (mirrors
+        ``StableBaselinesModel.reset``); otherwise the recurrent latent from
+        the previous episode would leak into the next one's first tick.
+        """
+        self._infer_state = None
 
     def transfer_weights(self, *args, **kwargs):
         raise NotImplementedError()
