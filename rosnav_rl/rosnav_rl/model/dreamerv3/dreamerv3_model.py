@@ -274,6 +274,26 @@ class DreamerV3Model(RL_Model):
         )
         self._model._should_pretrain._once = False
 
+        if self._inference_only:
+            self._warmup()
+
+    def _warmup(self) -> None:
+        """Run one dummy forward pass so the first real ``get_action`` tick
+        doesn't pay CUDA kernel/allocation latency (mirrors the SB3 backend's
+        mock-env construction moved out of the hot path in ``load()``).
+
+        Uses a random sample from the already-encoded observation space
+        (``self._rl_agent.observation_space``, keyed identically to
+        ``encode_observation``'s output) rather than a raw sensor dict, since
+        no generic raw-observation mock exists for arbitrary space configs.
+        The recurrent state produced here is discarded — it must not leak
+        into the first real ``get_action`` call.
+        """
+        sample = self._rl_agent.observation_space.sample()
+        batched = {key: np.asarray(value)[np.newaxis] for key, value in sample.items()}
+        with torch.inference_mode():
+            self._model(batched, reset=np.array([True]), state=None, training=False)
+
     def get_action(self, observation: "ObservationDict", *args, **kwargs) -> np.ndarray:
         """
         Predicts a decoded action from a raw observation, carrying recurrent
