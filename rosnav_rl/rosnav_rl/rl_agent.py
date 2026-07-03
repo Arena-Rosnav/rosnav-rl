@@ -140,20 +140,6 @@ class RL_Agent:
         if not self.model.is_model_initialized:
             self.model.load(*args, **kwargs)
 
-    # def get_reward(self, observation: ObservationDict) -> float:
-    #     """
-    #     Calculate and return the reward based on the given observation.
-
-    #     Args:
-    #         observation (ObservationDict): The current observation containing relevant state information.
-
-    #     Returns:
-    #         float: The calculated reward based on the observation and the current simulation state.
-    #     """
-    #     return self._reward_function.get_reward(
-    #         observation, simulation_state_container=self._simulation_state_container
-    #     )
-
     def train(self, *args, **kwargs):
         """Train the reinforcement learning model.
 

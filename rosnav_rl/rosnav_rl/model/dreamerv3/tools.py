@@ -1352,7 +1352,7 @@ class Optimizer:
             "sgd": lambda: torch.optim.SGD(parameters, lr=lr),
             "momentum": lambda: torch.optim.SGD(parameters, lr=lr, momentum=0.9),
         }[opt]()
-        self._scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+        self._scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
         if warmup_steps > 0:
             self._sched = torch.optim.lr_scheduler.LinearLR(
                 self._opt, start_factor=0.01, end_factor=1.0, total_iters=warmup_steps

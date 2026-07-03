@@ -63,14 +63,14 @@ class StableBaselinesModelState:
     """
 
     last_observation: np.ndarray = None
-    last_action: np.ndarray = np.ndarray([0, 0, 0])
+    last_action: np.ndarray = np.array([0.0, 0.0, 0.0])
     _reset_state: bool = True
     model_state: Tuple[np.ndarray, ...] = None
 
     def reset(self):
         self.reset_state = True
         self.model_state = None
-        self.last_action = np.ndarray([0, 0, 0])
+        self.last_action = np.array([0.0, 0.0, 0.0])
 
     @property
     def reset_state(self):

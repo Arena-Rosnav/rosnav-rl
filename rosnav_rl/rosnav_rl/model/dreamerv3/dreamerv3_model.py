@@ -180,7 +180,7 @@ class DreamerV3Model(RL_Model):
         else:
             train_dataset = self._model.dataset
 
-        self.load("latest")
+        self.load("latest", missing_ok=True)
         train(
             self._algorithm_cfg,
             self._model,
@@ -223,7 +223,7 @@ class DreamerV3Model(RL_Model):
         }
         torch.save(items_to_save, self._logdir / f"{file_name}.pt")
 
-    def load(self, file_name: str, *args, **kwargs):
+    def load(self, file_name: str, *args, missing_ok: bool = False, **kwargs):
         """
         Load a pre-trained model from a checkpoint file.
 
@@ -233,21 +233,27 @@ class DreamerV3Model(RL_Model):
         Args:
             file_name (str): Name of the checkpoint file (without .pt extension)
             *args: Variable length argument list (unused)
+            missing_ok (bool): If True, silently skip loading when the checkpoint
+                doesn't exist (used for fresh-training resume). If False, raise.
             **kwargs: Arbitrary keyword arguments (unused)
 
         Returns:
             None
 
         Raises:
-            FileNotFoundError: Implicitly if the checkpoint file does not exist
+            FileNotFoundError: If the checkpoint file does not exist and missing_ok is False
         """
-        if (self._logdir / f"{file_name}.pt").exists():
-            checkpoint = torch.load(self._logdir / f"{file_name}.pt", weights_only=False)
-            self._model.load_state_dict(checkpoint["agent_state_dict"])
-            tools.recursively_load_optim_state_dict(
-                self._model, checkpoint["optims_state_dict"]
-            )
-            self._model._should_pretrain._once = False
+        checkpoint_path = self._logdir / f"{file_name}.pt"
+        if not checkpoint_path.exists():
+            if missing_ok:
+                return
+            raise FileNotFoundError(f"DreamerV3 checkpoint not found: {checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, weights_only=False)
+        self._model.load_state_dict(checkpoint["agent_state_dict"])
+        tools.recursively_load_optim_state_dict(
+            self._model, checkpoint["optims_state_dict"]
+        )
+        self._model._should_pretrain._once = False
 
     def get_action(self, observation: "EncodedObservationDict", *args, **kwargs):
         """
