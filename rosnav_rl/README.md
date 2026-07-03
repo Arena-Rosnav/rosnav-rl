@@ -22,7 +22,7 @@ a single line of training code.
 
 | | |
 | --- | --- |
-| **ROS** | Humble (ROS 2 only) |
+| **ROS** | Jazzy · `import rosnav_rl` itself is ROS-free (only `ObservationManager` lazily pulls in `rclpy`) |
 | **Python** | 3.10+ |
 | **RL Backends** | Stable-Baselines3, sb3-contrib, DreamerV3 |
 | **Config** | Pydantic v2 - type-safe, auto-validated, YAML round-trip |
@@ -34,9 +34,10 @@ a single line of training code.
 - **Wrap any RL backend** - the common `RL_Model` interface means you swap SB3 ↔ DreamerV3 ↔ your own implementation without touching training code. Same observations, same reward, same config.
 - **Declarative data pipeline** - define collectors by ROS message type (`sensor_msgs/LaserScan`); preprocessing and topic wiring happen automatically.
 - **Dependency-resolved observation graph** - generators declare what they need; a topological sort determines execution order at startup so you never manage it manually.
-- **Composable reward shaping** - stack reward units in YAML, evaluated in parallel with safety categorization and schema-validated inter-unit dependencies.
+- **Composable reward shaping** - stack reward units in YAML, evaluated sequentially with safety categorization and schema-validated inter-unit dependencies.
 - **Built-in hyperparameter tuning** - Optuna integration with MedianPruner / HyperbandPruner, framework-specific pruning callbacks, and automatic best-param export.
-- **One-command deployment** - `ros2 run rosnav_rl action_server.py` wraps any trained agent behind a `GetCommand` service.
+- **ROS-free core** - `import rosnav_rl` works without a sourced ROS install; only `rosnav_rl.ObservationManager` (lazily imported) needs `rclpy`. Config, models, reward, and spaces are usable standalone.
+- **Two deployment paths, one loader** - `RL_Agent.from_agent_dir(path)` dispatches on the saved agent's framework (SB3 or DreamerV3) and backs both the always-on inference node and the ROS 2 action server.
 
 ---
 
@@ -60,7 +61,29 @@ source install/setup.bash
 
 ### Deploy a pre-trained agent
 
-The action server needs two things: a trained agent and an **observations config** that maps your robot's sensor topics to collector types.
+Every deployment path loads a saved **agent directory** through the same
+`RL_Agent.from_agent_dir(path)` classmethod, which reads `training_config.yaml`
+and dispatches on the saved `AgentConfig.framework`:
+
+```
+<agent_dir>/
+├── training_config.yaml   # embeds the AgentConfig read by RL_Agent.from_agent_dir()
+├── best_model.zip         # SB3 checkpoint (present for SB3 agents)
+└── latest.pt              # DreamerV3 checkpoint (present for DreamerV3 agents)
+```
+
+`ROSNAV_AGENTS_DIR` (or, inside a colcon workspace, the `arena_training`
+package share directory) tells `find_agents_dir()` where to look up an agent
+by name; see [`utils/agent_paths.py`](rosnav_rl/utils/agent_paths.py).
+
+Two ROS 2 entry points wrap this one loader:
+
+| Path | Node/script | Use case |
+| --- | --- | --- |
+| Inference node | [`inference/arena_inference_node.py`](rosnav_rl/inference/arena_inference_node.py) | Timer-driven control loop; publishes `cmd_vel` directly (used by `mobile:=rosnav_rl` in Arena) |
+| Action server | [`action_server/arena_server.py`](rosnav_rl/action_server/README.md) | `GetCommand` ROS 2 service; used behind the nav2 `DRLController` plugin (`mobile:=nav2 mobile.local_planner:=rosnav_rl`) |
+
+The action server needs a trained agent and an **observations config** that maps your robot's sensor topics to collector types.
 
 ```bash
 # Create a test agent with random weights (no training run needed)
@@ -194,17 +217,17 @@ Sensors ──▶ ObservationManager ──▶ ObservationSpaceManager ──▶
                                                                   ▲
                                                                   │
                                                            RewardFunction
-                                                         (parallel, composable)
+                                                         (sequential, composable)
 ```
 
 | Module | Role |
 | --- | --- |
 | **Observations** | ROS 2 topic → typed data via Collectors & Generators |
-| **Spaces** | Encode observations, decode actions - registry-based, parallel |
+| **Spaces** | Encode observations, decode actions - registry-based, sequential |
 | **Model** | Algorithm-agnostic training & inference (`RL_Model` ABC) |
 | **Reward** | Composable reward units with safety categorization |
 | **Config** | Pydantic v2 discriminated unions - YAML in, validated config out |
-| **Action Server** | `GetCommand` ROS 2 service for real-time deployment |
+| **Inference / Action Server** | `RL_Agent.from_agent_dir()`-backed real-time deployment (timer node or `GetCommand` service) |
 | **States** | Typed dataclass containers for simulation runtime state |
 
 ---
@@ -253,7 +276,8 @@ rosnav_rl/
 ├── spaces/               # Observation & action space management
 ├── states/               # Backward-compat shim (SimulationStateContainer = AgentParameters)
 ├── action_server/        # ROS 2 GetCommand service server
-├── utils/                # RequiresProtocol, ErrorReportingMixin, validation, yaml_utils
+├── inference/            # Timer-driven inference node (arena_inference_node.py)
+├── utils/                # RequiresProtocol, ErrorReportingMixin, validation, yaml_utils, agent_paths
 └── scripts/              # create_test_agent.py, test.py
 ```
 
