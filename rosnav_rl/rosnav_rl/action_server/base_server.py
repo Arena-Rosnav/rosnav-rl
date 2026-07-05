@@ -124,7 +124,7 @@ class ActionServer(ABC):
         if self.agent is None:
             self.logger.info("Agent not initialized yet.")
             return
-        self.agent.model.reset()
+        self.agent.reset()
 
     def start(self):
         """

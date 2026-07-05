@@ -126,7 +126,7 @@ class ArenaInferenceNode:
         self._goal = msg
 
     def _on_scenario_reset(self, _msg: Int16) -> None:
-        self.agent.model.reset()
+        self.agent.reset()
         self._last_speed = 0.0
 
     def _step(self) -> None:

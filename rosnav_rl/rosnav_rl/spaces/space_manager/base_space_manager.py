@@ -90,6 +90,10 @@ class BaseSpaceManager:
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         return self._action_space_manager.decode_action(action)
 
+    def reset_spaces(self) -> None:
+        """Reset internal state of all observation spaces for a new episode."""
+        self._observation_space_manager.reset_spaces()
+
     # -- properties --------------------------------------------------------
 
     @property

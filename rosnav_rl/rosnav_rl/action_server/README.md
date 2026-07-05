@@ -32,7 +32,7 @@ Abstract base class that wraps a trained `RL_Agent` in a ROS 2 service server. P
 **Key features:**
 - **`ObservationCollector` protocol**: Duck-typed interface — any object with `get_observations() -> ObservationDict` is accepted
 - **Graceful error handling**: Logs warnings and returns empty `action[]` on transient failures (e.g., missing sensor data at startup)
-- **Scene reset**: Subscribes to `/scenario_reset` (`std_msgs/Int16`) and calls `agent.model.reset()` on each reset
+- **Scene reset**: Subscribes to `/scenario_reset` (`std_msgs/Int16`) and calls `agent.reset()` on each reset (resets model state AND observation space state)
 
 ```python
 class ActionServer(ABC):

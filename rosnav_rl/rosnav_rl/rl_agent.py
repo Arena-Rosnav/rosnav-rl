@@ -216,6 +216,18 @@ class RL_Agent:
         """
         return self.model.get_action(observation=observation, *args, **kwargs)
 
+    def reset(self) -> None:
+        """
+        Resets the agent's model state and observation space state for a new episode.
+
+        Note:
+            Must be called on every episode reset. Stateful observation spaces
+            (e.g. stacked laser maps, pedestrian trajectory history) otherwise leak
+            state across episode boundaries.
+        """
+        self.model.reset()
+        self._space_manager.reset_spaces()
+
     @property
     def config(self) -> Dict[str, dict]:
         """Configuration dictionary for the agent."""
