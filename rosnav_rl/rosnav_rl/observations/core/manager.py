@@ -129,6 +129,7 @@ class ObservationManager:
         sync_tolerance_seconds: float = 0.1,
         buffer_size: int = 50,
         validate_generators: bool = True,
+        allow_default_params: bool = False,
     ) -> None:
         """
         Initialize the ObservationManager with a dictionary of data sources (collectors/generators).
@@ -146,8 +147,25 @@ class ObservationManager:
             validate_generators (bool): Enable dependency-aware generator validation.
                 - At init: Validates all generator dependencies exist in configuration
                 - At runtime: Validates root generators upfront, other generators just-in-time
+            allow_default_params (bool): If True, permits falling back to a default
+                AgentParameters() when simulation_state_container is None (with a
+                warning). Off by default: real robot params (e.g. safe distance)
+                silently substituted with defaults is a safety hazard, not a
+                convenience — callers that genuinely want a placeholder must opt in.
+
+        Raises:
+            ValueError: If simulation_state_container is None and allow_default_params
+                is False.
         """
         if simulation_state_container is None:
+            if not allow_default_params:
+                raise ValueError(
+                    "ObservationManager requires a simulation_state_container "
+                    "(AgentParameters) — pass one explicitly, or pass "
+                    "allow_default_params=True to fall back to defaults "
+                    "(not recommended: real robot params such as safe distance "
+                    "would silently be replaced with placeholder values)."
+                )
             from rosnav_rl.cfg.parameters import AgentParameters  # noqa: PLC0415
             simulation_state_container = AgentParameters()
             logging.getLogger(__name__).warning(
