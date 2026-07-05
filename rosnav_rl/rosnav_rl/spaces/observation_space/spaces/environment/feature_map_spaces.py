@@ -5,7 +5,7 @@ type annotations and schema-based requirements.
 """
 
 from abc import abstractmethod
-from typing import ClassVar, Union
+from typing import Any, ClassVar, Union
 
 import numpy as np
 from gymnasium import spaces
@@ -48,6 +48,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
     """
 
     background_value: ClassVar[int] = 0
+    feature_map_dtype: ClassVar[Any] = np.float32
 
     def __init__(
         self,
@@ -77,7 +78,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         self._feature_map_buffer = np.full(
             (feature_map_size, feature_map_size),
             self.background_value,
-            dtype=np.float32,
+            dtype=self.feature_map_dtype,
         )
 
         super().__init__(*args, **kwargs)
@@ -237,10 +238,7 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
                 - Grid: robot-centric with robot at center
                 - Example: 64x64 grid with pedestrian x-velocity values at corresponding locations
         """
-        # Initialize feature map with zeros
-        feature_map = np.zeros(
-            (self._feature_map_size, self._feature_map_size), dtype=np.float32
-        )
+        feature_map = self._create_feature_map()
 
         # Process pedestrian data if available — vectorized
         if len(pedestrian_relative_locations) > 0 and len(pedestrian_vel_x) > 0:
@@ -338,10 +336,7 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
                 - Grid: robot-centric with robot at center
                 - Example: 64x64 grid with pedestrian y-velocity values at corresponding locations
         """
-        # Initialize feature map with zeros
-        feature_map = np.zeros(
-            (self._feature_map_size, self._feature_map_size), dtype=np.float32
-        )
+        feature_map = self._create_feature_map()
 
         # Process pedestrian data if available — vectorized
         if len(pedestrian_relative_locations) > 0 and len(pedestrian_vel_y) > 0:
@@ -399,6 +394,19 @@ class StackedLaserMapSpace(BaseObservationSpace):
             (laser_stack_size, laser_num_beams), dtype=np.float32
         )
         self._ring_idx: int = 0
+        self._ordered_buffer = np.empty_like(self._ring_buffer)
+
+        # Pre-allocate reusable per-step containers (feature_map_size-derived
+        # shapes only — these don't change if the beam count changes later).
+        self._summary_buffer = np.empty(
+            (laser_stack_size * 2, feature_map_size), dtype=np.float32
+        )
+        self._tiled_buffer = np.empty(
+            feature_map_size * feature_map_size, dtype=np.float32
+        )
+        self._result_buffer = np.empty(
+            (1, feature_map_size, feature_map_size), dtype=np.float32
+        )
 
         super().__init__(*args, **kwargs)
 
@@ -453,6 +461,7 @@ class StackedLaserMapSpace(BaseObservationSpace):
                 self._ring_buffer = np.zeros(
                     (self._laser_stack_size, n), dtype=np.float32
                 )
+                self._ordered_buffer = np.empty_like(self._ring_buffer)
                 self._beams_per_col = max(1, n // self._feature_map_size)
                 self._usable_beams = self._feature_map_size * self._beams_per_col
             else:
@@ -463,30 +472,46 @@ class StackedLaserMapSpace(BaseObservationSpace):
         self._ring_buffer[self._ring_idx] = scan
         self._ring_idx = (self._ring_idx + 1) % self._laser_stack_size
 
-        # 4. Read in insertion order (oldest → newest)
-        ordered = np.roll(self._ring_buffer, -self._ring_idx, axis=0)
-        reshaped = ordered[:, :self._usable_beams].reshape(
+        # 4. Read in insertion order (oldest → newest) — ring index arithmetic
+        # into a pre-allocated buffer instead of np.roll (which allocates a
+        # fresh concatenated copy every call).
+        idx = self._ring_idx
+        n = self._laser_stack_size
+        if idx == 0:
+            self._ordered_buffer[:] = self._ring_buffer
+        else:
+            self._ordered_buffer[: n - idx] = self._ring_buffer[idx:]
+            self._ordered_buffer[n - idx :] = self._ring_buffer[:idx]
+        reshaped = self._ordered_buffer[:, : self._usable_beams].reshape(
             self._laser_stack_size, self._feature_map_size, self._beams_per_col
         )
 
-        # 5. Per-column min (even rows) and mean (odd rows)
-        summary = np.empty(
-            (self._laser_stack_size * 2, self._feature_map_size), dtype=np.float32
-        )
+        # 5. Per-column min (even rows) and mean (odd rows) — reuse buffer
+        summary = self._summary_buffer
         summary[::2] = reshaped.min(axis=2)
         summary[1::2] = reshaped.mean(axis=2)
 
-        # 6. Tile flat summary to fill H × W
-        flat = summary.ravel()           # 1600 for defaults
-        target = self._feature_map_size * self._feature_map_size  # 6400
-        reps = -(-target // len(flat))   # ceil division
-        tiled = np.tile(flat, reps)[:target]
+        # 6. Tile flat summary to fill H × W — reuse buffer, no np.tile
+        flat = summary.ravel()  # 1600 for defaults
+        flat_len = flat.shape[0]
+        target = self._tiled_buffer.shape[0]  # 6400
+        full_reps, remainder = divmod(target, flat_len)
+        if full_reps:
+            self._tiled_buffer[: full_reps * flat_len].reshape(
+                full_reps, flat_len
+            )[:] = flat
+        if remainder:
+            self._tiled_buffer[full_reps * flat_len :] = flat[:remainder]
 
-        # 7. MaxAbsScaler: [0, laser_max_range] → [-1, 1]
-        result = (tiled * self._norm_scale - 1.0).reshape(
-            1, self._feature_map_size, self._feature_map_size
+        # 7. MaxAbsScaler: [0, laser_max_range] → [-1, 1] — write into
+        # pre-allocated result buffer instead of allocating a fresh array.
+        np.multiply(
+            self._tiled_buffer, self._norm_scale, out=self._result_buffer.reshape(-1)
         )
-        return result.flatten() if self._flatten else result
+        self._result_buffer -= 1.0
+        return (
+            self._result_buffer.flatten() if self._flatten else self._result_buffer
+        )
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.ENVIRONMENT)
@@ -580,6 +605,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
     """
 
     name = "PedestrianSocialStateSpace"
+    feature_map_dtype: ClassVar[Any] = np.int32
     requires = {
         "pedestrian_relative_locations": PedestrianRelativeLocations,
         "pedestrian_social_states": PedestrianSocialStates,
@@ -644,10 +670,7 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
                 - Grid: Integer map with state codes for pedestrians, 0 elsewhere
                 - Example: 32x32 grid with sparse integer values
         """
-        # Create feature map with background value
-        feature_map = np.zeros(
-            (self._feature_map_size, self._feature_map_size), dtype=np.int32
-        )
+        feature_map = self._create_feature_map()
 
         # Process each pedestrian's location and social state — vectorized
         if (
@@ -682,6 +705,8 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
     """
 
     name = "PedestrianTypeSpace"
+    background_value: ClassVar[int] = -1
+    feature_map_dtype: ClassVar[Any] = np.int32
     requires = {
         "pedestrian_relative_locations": PedestrianRelativeLocations,
         "pedestrian_types": PedestrianTypeArray,
@@ -746,10 +771,7 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
                 - Grid: Integer map with type codes for pedestrians, -1 for empty cells
                 - Example: 32x32 grid with sparse integer values
         """
-        # Create feature map with background value (-1 for empty cells)
-        feature_map = np.full(
-            (self._feature_map_size, self._feature_map_size), -1, dtype=np.int32
-        )
+        feature_map = self._create_feature_map()
 
         # Process each pedestrian's location and type — vectorized
         if len(pedestrian_relative_locations) > 0 and len(pedestrian_types) > 0:
