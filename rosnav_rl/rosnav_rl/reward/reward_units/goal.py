@@ -1,5 +1,6 @@
 """Goal-reaching and approach-progress reward units."""
 
+import warnings
 from typing import Any
 
 import numpy as np
@@ -69,11 +70,12 @@ class RewardGoalReached(RewardUnit):
     def check_parameters(self, *args, **kwargs):
         if self._reward < 0.0:
             warn_msg = (
-                f"Reconsider this reward. "
+                f"'goal_reached' reward should be positive. "
                 f"Negative rewards may lead to unfavorable behaviors. "
                 f"Current value: {self._reward}"
             )
             self._report_warning(warn_msg)
+            warnings.warn(warn_msg, UserWarning, stacklevel=2)
 
     def __call__(
         self,
