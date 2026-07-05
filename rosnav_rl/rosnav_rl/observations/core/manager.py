@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar, Type, Union
 
+from rclpy.logging import LoggingSeverity
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 
@@ -372,10 +373,11 @@ class ObservationManager:
             try:
                 with self._subscription_manager.lock:
                     collector.update(msg)
-                    self._logger.debug(
-                        f"✓ Collector '{collector.name}' updated successfully "
-                        f"(count={collector.update_count})"
-                    )
+                    if self._logger.is_enabled_for(LoggingSeverity.DEBUG):
+                        self._logger.debug(
+                            f"✓ Collector '{collector.name}' updated successfully "
+                            f"(count={collector.update_count})"
+                        )
             except Exception as e:
                 self._logger.error(f"Error updating collector '{collector.name}': {e}")
 
@@ -388,10 +390,11 @@ class ObservationManager:
                     try:
                         collector = self._collectors[collector_name]
                         collector.update(msg)
-                        self._logger.debug(
-                            f"✓ Synchronized collector '{collector.name}' updated successfully "
-                            f"(count={collector.update_count})"
-                        )
+                        if self._logger.is_enabled_for(LoggingSeverity.DEBUG):
+                            self._logger.debug(
+                                f"✓ Synchronized collector '{collector.name}' updated successfully "
+                                f"(count={collector.update_count})"
+                            )
                     except Exception as e:
                         self._logger.error(
                             f"Error updating synchronized collector '{collector_name}': {e}"
