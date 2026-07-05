@@ -58,8 +58,8 @@ class StableBaselinesModelState:
 
     Methods:
         reset(): Resets the model state to its initial values.
-        reset_state (property): Gets the current reset state and updates the internal flag.
-        reset_state (setter): Sets the internal reset state flag.
+        consume_reset_state(): One-shot check-and-clear of the reset flag.
+        reset_state (property): Pure read/write access to the reset flag (no side effects).
     """
 
     last_observation: np.ndarray = None
@@ -72,11 +72,21 @@ class StableBaselinesModelState:
         self.model_state = None
         self.last_action = np.array([0.0, 0.0, 0.0])
 
-    @property
-    def reset_state(self):
+    def consume_reset_state(self) -> bool:
+        """Return True on the first call after reset(), False on every call after.
+
+        Used to pass ``episode_start=True`` to the recurrent model exactly once
+        per episode. Named explicitly (rather than folding this into the
+        ``reset_state`` property getter) so reading ``reset_state`` stays a pure,
+        side-effect-free check.
+        """
         if self._reset_state:
             self._reset_state = False
             return True
+        return False
+
+    @property
+    def reset_state(self) -> bool:
         return self._reset_state
 
     @reset_state.setter
@@ -388,7 +398,9 @@ class StableBaselinesModel(RL_Model):
         if self.__env.has_norm_wrapper:
             observation = self.__env.normalize(observation)
 
-        self.__state.last_observation = observation
+        # Shallow-copy: _predict_non_recurrent must not be able to mutate the
+        # shapes stored here out from under reset()'s later env.reset(last_observation).
+        self.__state.last_observation = dict(observation)
 
         action, self.__state.model_state = self._predict(
             observation=observation,
@@ -396,7 +408,7 @@ class StableBaselinesModel(RL_Model):
             state=self.__state.model_state,
             episode_start=(
                 np.array([True] * self.__env.env.num_envs)
-                if self.__state.reset_state
+                if self.__state.consume_reset_state()
                 else None
             ),
         )
@@ -727,9 +739,10 @@ class StableBaselinesModel(RL_Model):
             We reimplement the predict function for non recurrent models because of issues with stacked
             observations with the official implementation.
         """
-        for key, value in observation.items():
-            if value.ndim == 2:
-                observation[key] = np.expand_dims(value, axis=0)
+        observation = {
+            key: np.expand_dims(value, axis=0) if value.ndim == 2 else value
+            for key, value in observation.items()
+        }
 
         with th.no_grad():
             actions = (

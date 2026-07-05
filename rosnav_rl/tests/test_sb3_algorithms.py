@@ -17,12 +17,14 @@ identify the correct algorithm class automatically from the ``type`` field.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Type
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 import torch.nn as nn
+from gymnasium.spaces import Box
 from stable_baselines3 import A2C, PPO, SAC, TD3
 from stable_baselines3.common.base_class import BaseAlgorithm
 from sb3_contrib import CrossQ, RecurrentPPO, TQC, TRPO
@@ -54,6 +56,10 @@ from rosnav_rl.model.stable_baselines3.policy.base_policy import (
 )
 from rosnav_rl.model.stable_baselines3.policy.feature_extractors.classic import (
     EXTRACTOR_5,
+)
+from rosnav_rl.model.stable_baselines3.sb3_model import (
+    StableBaselinesModel,
+    StableBaselinesModelState,
 )
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.utils.utils import make_mock_env
@@ -576,4 +582,74 @@ class TestSB3TransferWeightsFailFast:
                 source_dir=tmp_path, source_checkpoint="irrelevant"
             )
 
+
+class TestStableBaselinesModelStateConsumeReset:
+    """Regression test for P2.5 (audit 2026-07-04): ``reset_state`` used to be
+    a property whose *getter* mutated state on first read (flip-to-False) —
+    a surprising, side-effect-bearing read. The one-shot "check and consume"
+    behavior now lives in an explicitly named ``consume_reset_state()``
+    method; ``reset_state`` itself is a pure read/write accessor.
+    """
+
+    def test_consume_reset_state_is_one_shot(self):
+        state = StableBaselinesModelState()
+        state.reset()
+
+        assert state.consume_reset_state() is True
+        assert state.consume_reset_state() is False
+        assert state.consume_reset_state() is False
+
+    def test_reset_state_property_read_has_no_side_effect(self):
+        state = StableBaselinesModelState()
+        state.reset()
+
+        # Reading the property repeatedly must not consume the flag.
+        assert state.reset_state is True
+        assert state.reset_state is True
+        # consume_reset_state() still sees it un-consumed.
+        assert state.consume_reset_state() is True
+
+
+class TestPredictNonRecurrentMutation:
+    """Regression test for P2.4 (audit 2026-07-04): ``_predict_non_recurrent()``
+    used to mutate its input observation dict in place
+    (``observation[key] = np.expand_dims(value, axis=0)`` for 2D-array
+    values). Since ``get_action()`` aliases that same dict object to
+    ``self.__state.last_observation``, the in-place mutation corrupted the
+    shape ``reset()`` later relies on for its ``env.reset(last_observation)``
+    call. ``_predict_non_recurrent()`` must build a new dict instead of
+    mutating its input.
+
+    Uses a minimal stand-in for ``self`` (rather than a fully initialized
+    ``RL_Agent``/SB3 policy) since none of the registered test algorithms use
+    a 2D (feature-map) observation space, so the mutation would never be
+    exercised through the real prediction stack.
+    """
+
+    class _FakePolicy:
+        def _predict(self, obs_tensor, deterministic):
+            import torch
+
+            return torch.zeros(1, 2)
+
+    class _FakeModel:
+        def __init__(self):
+            self.policy = TestPredictNonRecurrentMutation._FakePolicy()
+            self.device = "cpu"
+
+    class _FakeRLAgent:
+        action_space = Box(low=-1.0, high=1.0, shape=(2,))
+
+    def test_does_not_mutate_input_dict_in_place(self):
+        fake_self = SimpleNamespace(
+            _model=self._FakeModel(), _rl_agent=self._FakeRLAgent()
+        )
+
+        map_obs = np.zeros((4, 5), dtype=np.float32)
+        observation = {"feature_map": map_obs}
+
+        StableBaselinesModel._predict_non_recurrent(fake_self, observation)
+
+        assert observation["feature_map"] is map_obs
+        assert observation["feature_map"].shape == (4, 5)
 
