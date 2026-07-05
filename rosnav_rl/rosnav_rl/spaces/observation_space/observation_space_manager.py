@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 import numpy as np
 from gymnasium import spaces
 
+from rosnav_rl.utils.logging import flush_and_log_errors
 from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.utils.validation import validate_observation_spaces
 
@@ -176,9 +177,16 @@ class ObservationSpaceManager:
         return list(self.spaces.values())
 
     def reset_spaces(self) -> None:
-        """Reset internal state of all observation spaces for a new episode."""
+        """Reset internal state of all observation spaces for a new episode.
+
+        Also flushes the global error/warning collector (see
+        rosnav_rl.utils.logging.error_logging) — this is the one call site
+        every episode-reset path (training, inference, action server) already
+        goes through, so it doubles as the system's log-flush cadence.
+        """
         for space in self.spaces.values():
             space.reset()
+        flush_and_log_errors()
 
     @property
     def observation_space(self) -> spaces.Space:

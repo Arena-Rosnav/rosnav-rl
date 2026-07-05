@@ -41,6 +41,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         self,
         normalize: bool = False,
         normalizer: str = "max_abs",
+        strict: bool = False,
         **kwargs,
     ) -> None:
         """Initialize the observation space.
@@ -48,6 +49,10 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Args:
             normalize: Whether to normalize observations.
             normalizer: Name of normalizer ("max_abs", "min_max", "standard", "identity").
+            strict: If True, safe_encode_observation() re-raises encoding errors
+                instead of falling back to a null observation. Off by default so
+                the real-time loop keeps running; enable for tests/CI to catch
+                encoding bugs instead of silently masking them with zeros.
             **kwargs: Additional arguments passed to the normalizer.
         """
         # Initialize parent mixins
@@ -73,10 +78,14 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
             self._norm_low = None
             self._norm_high = None
 
+        self._strict = strict
+        self._encode_failure_count = 0
+
         # Store configuration for debugging and serialization
         self._config = {
             "normalize": normalize,
             "normalizer": normalizer,
+            "strict": strict,
             **kwargs,
         }
 
@@ -102,6 +111,11 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
     def shape(self) -> tuple:
         """Get the shape of the observation space."""
         return self._space.shape
+
+    @property
+    def encode_failure_count(self) -> int:
+        """Number of times safe_encode_observation() has fallen back to a null observation."""
+        return self._encode_failure_count
 
     # ==========================================
     # Abstract Methods
@@ -157,27 +171,45 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         """
         try:
             result = self.encode_observation(*args, **kwargs)
-            if result is not None:
-                return result
-            self._report_warning(
-                f"encode_observation() returned None. {ERROR_MESSAGE_SUFFIX}"
-            )
         except KeyError as e:
+            self._encode_failure_count += 1
+            if self._strict:
+                raise
             self._report_error(
                 f"Missing observation data key {e}. {ERROR_MESSAGE_SUFFIX}",
                 error_type="KeyError",
             )
+            return self._create_null_observation()
         except (ValueError, TypeError, AttributeError) as e:
+            self._encode_failure_count += 1
+            if self._strict:
+                raise
             self._report_error(
                 f"Error during encoding: {e}. {ERROR_MESSAGE_SUFFIX}",
                 error_type=type(e).__name__,
             )
+            return self._create_null_observation()
         except Exception as e:
+            self._encode_failure_count += 1
+            if self._strict:
+                raise
             self._report_error(
                 f"Unexpected error during encoding: {e}. {ERROR_MESSAGE_SUFFIX}",
                 error_type=type(e).__name__,
             )
+            return self._create_null_observation()
 
+        if result is not None:
+            return result
+
+        self._encode_failure_count += 1
+        if self._strict:
+            raise ValueError(
+                f"{self.__class__.__name__}.encode_observation() returned None"
+            )
+        self._report_warning(
+            f"encode_observation() returned None. {ERROR_MESSAGE_SUFFIX}"
+        )
         return self._create_null_observation()
 
     # ==========================================

@@ -15,7 +15,7 @@ Tests cover:
 
 import numpy as np
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from conftest import SimulationStateContainerStub
 
@@ -574,6 +574,55 @@ class TestSafeEncodeObservation:
 
         np.testing.assert_array_equal(result, da)
 
+    def test_increments_encode_failure_count_on_missing_key(self):
+        """Regression test for P2.2 (audit 2026-07-04)."""
+        space = DistAngleToGoalSpace(goal_max_dist=30.0)
+        assert space.encode_failure_count == 0
+
+        space.safe_encode_observation()
+        space.safe_encode_observation()
+
+        assert space.encode_failure_count == 2
+
+    def test_strict_mode_reraises_instead_of_returning_null(self):
+        """Regression test for P2.2 (audit 2026-07-04): ``strict=True`` must
+        re-raise encoding errors instead of silently falling back to a
+        zero-filled observation, so tests/CI can catch encoding bugs.
+
+        ``dist_angle_to_goal`` is a required positional argument with no
+        default, so calling with no kwargs raises ``TypeError`` (missing
+        argument) — caught by ``safe_encode_observation``'s second except
+        clause, not the ``KeyError`` clause.
+        """
+        space = DistAngleToGoalSpace(goal_max_dist=30.0, strict=True)
+
+        with pytest.raises(TypeError):
+            space.safe_encode_observation()
+
+        # The failure must still be counted even though it re-raised.
+        assert space.encode_failure_count == 1
+
+    def test_strict_mode_reraises_on_none_result(self):
+        """Regression test for P2.2 (audit 2026-07-04): the "encode_observation
+        returned None" branch must also re-raise under strict mode, not just
+        the exception-catching branches.
+        """
+        space = DistAngleToGoalSpace(goal_max_dist=30.0, strict=True)
+        with patch.object(space, "encode_observation", return_value=None):
+            with pytest.raises(ValueError, match="returned None"):
+                space.safe_encode_observation(dist_angle_to_goal=np.array([1.0, 0.0]))
+
+    def test_non_strict_mode_unaffected(self):
+        """``strict=False`` (the default) must keep returning a null
+        observation on failure, not raise — the real-time loop must keep
+        running.
+        """
+        space = DistAngleToGoalSpace(goal_max_dist=30.0, strict=False)
+
+        result = space.safe_encode_observation()
+
+        np.testing.assert_array_equal(result, np.zeros(2, dtype=np.float32))
+
 
 # =====================================================================
 #  Normalization integration
@@ -633,3 +682,35 @@ class TestApplyLimit:
 
         # Must not share memory
         assert not np.shares_memory(result, arr)
+
+
+# =====================================================================
+#  ObservationSpaceManager.reset_spaces(): error-flush cadence
+# =====================================================================
+
+
+class TestObservationSpaceManagerResetFlush:
+    """``flush_and_log_errors()`` — the only function that drains the global
+    error/warning collector into actual log output — used to have zero
+    call sites anywhere in production code, so every warning/error reported
+    through ``ErrorReportingMixin``/``_report_error``/``_report_warning``
+    was silently buffered forever and never surfaced. It is now called from
+    ``ObservationSpaceManager.reset_spaces()``, the one choke point every
+    episode-reset path (training, inference, action server) already goes
+    through.
+    """
+
+    def test_reset_spaces_flushes_error_collector(self):
+        from rosnav_rl.spaces.observation_space.observation_space_manager import (
+            ObservationSpaceManager,
+        )
+
+        manager = ObservationSpaceManager()
+
+        with patch(
+            "rosnav_rl.spaces.observation_space.observation_space_manager."
+            "flush_and_log_errors"
+        ) as mock_flush:
+            manager.reset_spaces()
+
+        mock_flush.assert_called_once()
