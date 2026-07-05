@@ -553,3 +553,27 @@ class TestRLAgentResetCascade:
         mock_model_reset.assert_called_once()
         mock_space_reset.assert_called_once()
 
+
+class TestSB3TransferWeightsFailFast:
+    """Regression test for P2.1 (audit 2026-07-04): a malformed source
+    ``training_config.yaml`` used to be silently swallowed by a bare
+    ``except Exception`` and replaced with a fabricated ``PPO_Cfg("AGENT_1")``
+    default, masking real config errors and risking loading the wrong
+    architecture. Must now raise instead of substituting a fake default.
+    """
+
+    def test_invalid_algorithm_config_raises(self, agent_state, tmp_path):
+        spec = agent_state.model_copy(update={"name": "transfer_weights_fail_fast"})
+        agent = RL_Agent(spec)
+
+        # Missing the required `architecture_name` field.
+        (tmp_path / "training_config.yaml").write_text(
+            "agent_cfg:\n  framework:\n    algorithm:\n      type: generic\n"
+        )
+
+        with pytest.raises(ValueError, match="Failed to validate algorithm configuration"):
+            agent.model.transfer_weights(
+                source_dir=tmp_path, source_checkpoint="irrelevant"
+            )
+
+

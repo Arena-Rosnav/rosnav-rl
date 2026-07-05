@@ -454,10 +454,10 @@ class StableBaselinesModel(RL_Model):
                 config["agent_cfg"]["framework"]["algorithm"]
             )
         except Exception as e:
-            print(f"Error validating algorithm configuration: {e}")
-            validated_algorithm_cfg = sb3_cfg.PPO_Cfg(
-                architecture_name="AGENT_1", parameters=sb3_cfg.PPO_Algorithm_Cfg()
-            )
+            raise ValueError(
+                f"Failed to validate algorithm configuration from "
+                f"{source_dir / cfg_file_name}: {e}"
+            ) from e
 
         source_model = StableBaselinesModel(
             rl_agent=self._rl_agent, algorithm_cfg=validated_algorithm_cfg
