@@ -40,6 +40,11 @@ class ObservationSpaceManager:
 
         # Performance optimization: cache required keys per space
         self._space_required_keys: Dict[str, List[str]] = {}
+        # Reusable per-space kwargs dicts and encoded-output dict — cleared
+        # and repopulated each call instead of rebuilt every tick (same
+        # trick as RewardFunction._prepare_execution_kwargs).
+        self._space_args_buffer: Dict[str, Dict[str, Any]] = {}
+        self._encoded_buffer: "OrderedDict[str, Any]" = OrderedDict()
 
     def _auto_load_spacefactory(self, auto_load_spaces=True):
         """Automatically load SpaceFactory and register all spaces."""
@@ -81,6 +86,8 @@ class ObservationSpaceManager:
 
         self.config = config
         self.spaces = OrderedDict()
+        self._space_args_buffer = {}
+        self._encoded_buffer = OrderedDict()
 
         # Simply load spaces in config order (or alphabetically for consistency)
         space_names = sorted(config.keys())  # Alphabetical for consistency
@@ -92,6 +99,7 @@ class ObservationSpaceManager:
 
             # Cache required keys for performance optimization
             self._space_required_keys[space_name] = list(space_instance.requires.keys())
+            self._space_args_buffer[space_name] = {}
 
         print(f"Loaded {len(self.spaces)} spaces: {list(self.spaces.keys())}")
 
@@ -141,8 +149,16 @@ class ObservationSpaceManager:
 
         Returns:
             Dictionary containing only the arguments required by this space
+
+        Note:
+            Reuses a single mutable dict per space (cleared and repopulated
+            each call) instead of allocating a fresh dict every tick.
         """
-        return {key: observations[key] for key in self._space_required_keys[space_name]}
+        args = self._space_args_buffer[space_name]
+        args.clear()
+        for key in self._space_required_keys[space_name]:
+            args[key] = observations[key]
+        return args
 
     def _encode_sequential(self, observations: ObservationDict) -> Dict[str, Any]:
         """Encode observations sequentially using new space interface.
@@ -155,8 +171,11 @@ class ObservationSpaceManager:
 
         Note:
             Space-specific errors are propagated to caller for proper error handling.
+            Reuses a single mutable OrderedDict (cleared and repopulated each
+            call) instead of allocating a fresh one every tick.
         """
-        encoded = OrderedDict()
+        encoded = self._encoded_buffer
+        encoded.clear()
 
         for space_name, space in self.spaces.items():
 
