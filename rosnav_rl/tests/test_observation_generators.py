@@ -872,3 +872,62 @@ class TestPedestrianGraphNodeGenerator:
         gen = self._gen()
         out = self._call(gen, make_pose(0, 0, 0), _people((1, 0, 0, 0, "p")))
         assert out.dtype == np.float32
+
+
+# =====================================================================
+#  GeneratorManager: per-generator failure counting (P2.3, audit 2026-07-04)
+# =====================================================================
+
+class TestGeneratorManagerFailureHandling:
+    """A raising generator used to be logged straight to a plain Python
+    logger with no counter and no connection to the unified error-collector
+    system. It must now be counted per-generator and routed through
+    ``collect_error`` (which, since the systemic flush fix, actually reaches
+    the log — see ``ObservationSpaceManager.reset_spaces()``).
+    """
+
+    def _manager(self, *, name: str = "broken_gen"):
+        from rosnav_rl.observations.strategies.generator import GeneratorManager
+
+        node = MagicMock()
+        resolver = MagicMock()
+        resolver.execution_order = [name]
+
+        manager = GeneratorManager(
+            node=node,
+            dependency_resolver=resolver,
+            simulation_state_container=SimulationStateContainerStub(),
+            validate_generators=False,
+        )
+        return manager
+
+    def test_generate_observations_counts_failures_and_nulls_output(self):
+        manager = self._manager(name="broken_gen")
+
+        broken_generator = MagicMock()
+        broken_generator.get_observation.side_effect = RuntimeError("boom")
+
+        obs_dict = {}
+        manager.generate_observations(
+            {"broken_gen": broken_generator}, obs_dict
+        )
+
+        assert obs_dict["broken_gen"] is None
+        assert manager.generator_failure_counts == {"broken_gen": 1}
+
+        manager.generate_observations(
+            {"broken_gen": broken_generator}, obs_dict
+        )
+        assert manager.generator_failure_counts == {"broken_gen": 2}
+
+    def test_execute_generator_counts_failures_and_nulls_output(self):
+        manager = self._manager(name="broken_gen")
+
+        broken_generator = MagicMock()
+        broken_generator.get_observation.side_effect = RuntimeError("boom")
+
+        obs_dict = {}
+        manager._execute_generator("broken_gen", broken_generator, obs_dict)
+
+        assert obs_dict["broken_gen"] is None
+        assert manager.generator_failure_counts == {"broken_gen": 1}

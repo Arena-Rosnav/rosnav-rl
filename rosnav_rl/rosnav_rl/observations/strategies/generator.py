@@ -6,10 +6,12 @@ Handles the execution and validation of generators with proper dependency orderi
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict
 
 from rclpy.node import Node
 
+from rosnav_rl.utils.logging import ComponentType, ErrorSeverity, collect_error
 from rosnav_rl.utils.validation import GeneratorSchemaValidator
 
 if TYPE_CHECKING:
@@ -43,6 +45,12 @@ class GeneratorManager:
         self._dependency_resolver = dependency_resolver
         self._simulation_state_container = simulation_state_container
         self._validate_generators = validate_generators
+        self._generator_failure_counts: Dict[str, int] = defaultdict(int)
+
+    @property
+    def generator_failure_counts(self) -> Dict[str, int]:
+        """Per-generator count of get_observation() failures (obs_dict[name] set to None)."""
+        return dict(self._generator_failure_counts)
 
     def generate_observations(
         self, generators: Dict[str, Generator], obs_dict: Dict[str, Any]
@@ -71,7 +79,17 @@ class GeneratorManager:
                     obs_dict, simulation_state_container=sim_state
                 )
             except Exception as e:
-                self._logger.error(f"Error generating observation '{name}': {e}")
+                self._generator_failure_counts[name] += 1
+                collect_error(
+                    component_type=ComponentType.GENERATOR,
+                    component_name=name,
+                    severity=ErrorSeverity.ERROR,
+                    message=(
+                        f"Error generating observation '{name}': {e}. "
+                        f"obs_dict['{name}'] set to None."
+                    ),
+                    error_type=type(e).__name__,
+                )
                 obs_dict[name] = None
 
     def _validate_root_generators(
@@ -103,5 +121,15 @@ class GeneratorManager:
                 simulation_state_container=self._simulation_state_container,
             )
         except Exception as e:
-            self._logger.error(f"Error generating observation '{name}': {e}")
+            self._generator_failure_counts[name] += 1
+            collect_error(
+                component_type=ComponentType.GENERATOR,
+                component_name=name,
+                severity=ErrorSeverity.ERROR,
+                message=(
+                    f"Error generating observation '{name}': {e}. "
+                    f"obs_dict['{name}'] set to None."
+                ),
+                error_type=type(e).__name__,
+            )
             obs_dict[name] = None  # Graceful degradation
