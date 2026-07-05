@@ -26,6 +26,11 @@ dependencies = [
     "pydantic>=2.10.6",
 ]
 
+[project.optional-dependencies]
+tuning = [
+    "optuna>=3.0.0",
+]
+
 [dependency-groups]
 dev = [
     "matplotlib>=3.0.0",
