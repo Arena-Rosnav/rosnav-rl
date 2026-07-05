@@ -18,7 +18,9 @@ identify the correct algorithm class automatically from the ``type`` field.
 from __future__ import annotations
 
 from typing import Type
+from unittest.mock import patch
 
+import numpy as np
 import pytest
 import torch.nn as nn
 from stable_baselines3 import A2C, PPO, SAC, TD3
@@ -498,4 +500,56 @@ class TestSB3DictParsing:
         agent = RL_Agent(spec)
         assert agent.model is not None
         assert agent.space_manager is not None
+
+
+class TestSB3ModelStateIsolation:
+    """Regression tests for P0.1/P0.2 (audit 2026-07-04): ``StableBaselinesModel``
+    used to share one mutable ``StableBaselinesModelState`` across every instance,
+    and ``reset()`` crashed on ndarray ``last_observation`` values.
+    """
+
+    def test_state_is_not_shared_between_instances(self, agent_state):
+        spec_a = agent_state.model_copy(update={"name": "state_iso_a"})
+        spec_b = agent_state.model_copy(update={"name": "state_iso_b"})
+        agent_a = RL_Agent(spec_a)
+        agent_b = RL_Agent(spec_b)
+
+        agent_a.model._StableBaselinesModel__state.last_observation = np.array(
+            [1.0, 2.0, 3.0]
+        )
+
+        assert agent_b.model._StableBaselinesModel__state.last_observation is None
+        assert (
+            agent_a.model._StableBaselinesModel__state
+            is not agent_b.model._StableBaselinesModel__state
+        )
+
+    def test_reset_does_not_raise_on_ndarray_last_observation(self, agent_state):
+        spec = agent_state.model_copy(update={"name": "state_reset_ndarray"})
+        agent = RL_Agent(spec)
+
+        agent.model._StableBaselinesModel__state.last_observation = np.array(
+            [1.0, 2.0, 3.0]
+        )
+
+        # Must not raise "truth value of an array is ambiguous".
+        agent.model.reset()
+
+
+class TestRLAgentResetCascade:
+    """Regression test for P0.3 (audit 2026-07-04): episode reset must clear
+    stateful observation-space buffers, not just the model's internal state.
+    """
+
+    def test_agent_reset_cascades_to_model_and_spaces(self, agent_state):
+        spec = agent_state.model_copy(update={"name": "reset_cascade"})
+        agent = RL_Agent(spec)
+
+        with patch.object(agent.model, "reset") as mock_model_reset, patch.object(
+            agent.space_manager, "reset_spaces"
+        ) as mock_space_reset:
+            agent.reset()
+
+        mock_model_reset.assert_called_once()
+        mock_space_reset.assert_called_once()
 

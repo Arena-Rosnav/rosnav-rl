@@ -216,6 +216,7 @@ class StableBaselinesModel(RL_Model):
             normalization (Optional[NormalizationCfg]): The configuration for normalization.
         """
         super().__init__(rl_agent, algorithm_cfg)
+        self.__state = StableBaselinesModelState()
         self.__setup_agent_factory_and_policy_description()
 
     @classmethod
@@ -752,9 +753,14 @@ class StableBaselinesModel(RL_Model):
         This method resets the internal state of the model. If the environment has a stack wrapper and there is a
         last observation available in the state, it also resets the environment with the last observation.
         """
+        last_observation = self.__state.last_observation
         self.__state.reset()
-        if self.__env is not None and self.__env.has_stack_wrapper and self.__state.last_observation:
-            self.__env.reset(self.__state.last_observation)
+        if (
+            self.__env is not None
+            and self.__env.has_stack_wrapper
+            and last_observation is not None
+        ):
+            self.__env.reset(last_observation)
 
     @property
     def observation_space_list(self) -> List["BaseObservationSpace"]:
