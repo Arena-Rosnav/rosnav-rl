@@ -7,8 +7,6 @@ import numpy as np
 from gymnasium import spaces
 
 from rosnav_rl.cfg.agent import AgentConfig
-from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
-from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
 from rosnav_rl.utils.type_aliases import ObservationDict
@@ -78,7 +76,7 @@ class RL_Agent:
     """
 
     _name: str = ""
-    _model: Union[RL_Model, StableBaselinesModel, DreamerV3Model]
+    _model: RL_Model
     _reward_function: Optional[RewardFunction] = None
     _space_manager: BaseSpaceManager
 
@@ -108,19 +106,14 @@ class RL_Agent:
 
     @classmethod
     def from_agent_dir(cls, agent_dir: Union[str, Path]) -> "RL_Agent":
-        """Load a saved agent for inference, dispatching on ``spec.framework``.
+        """Load a saved agent for inference, dispatching via ``ModelFactory``.
 
         Unifies the SB3 vs. DreamerV3 deployment path (previously duplicated
         across ``arena_inference_node.py`` and ``action_server/arena_server.py``,
-        both of which only knew how to load an SB3 ``best_model.zip``):
-
-        - SB3: ``load_model(path=agent_dir / "best_model.zip")``.
-        - DreamerV3: constructed with ``inference_only=True`` (skips the
-          wandb/TensorBoard log-dir side effect and puts the model in
-          ``eval()`` mode), then ``setup_model()`` + ``load("latest")``
-          explicitly — ``load_model()``'s "only if not yet initialized"
-          gate would otherwise skip the load once ``setup_model()`` has
-          already set ``model._model``.
+        both of which only knew how to load an SB3 ``best_model.zip``). Each
+        backend's construction kwargs and load sequence are declared on its
+        own ``RL_Model`` subclass (``inference_construction_kwargs`` /
+        ``load_for_inference``) rather than branched here.
 
         Args:
             agent_dir: Directory containing ``training_config.yaml`` and the
@@ -130,19 +123,17 @@ class RL_Agent:
         Returns:
             RL_Agent: Ready for ``get_action`` calls (already-decoded output).
         """
+        from rosnav_rl.model.model_factory import ModelFactory
         from rosnav_rl.utils.agent_paths import load_agent_spec
-        from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
 
         agent_dir = Path(agent_dir)
         spec = load_agent_spec(agent_dir)
 
-        if spec.framework.name == SupportedRLFrameworks.DREAMER_V3:
-            agent = cls(spec, model_kwargs={"inference_only": True})
-            agent.initialize_model()
-            agent.model.load("latest")
-        else:
-            agent = cls(spec)
-            agent.load_model(path=agent_dir / "best_model.zip")
+        model_class = ModelFactory.get_model_class(spec.framework.name)
+        agent = cls(
+            spec, model_kwargs=model_class.inference_construction_kwargs(agent_dir)
+        )
+        agent.model.load_for_inference(agent_dir)
 
         return agent
 
@@ -243,7 +234,7 @@ class RL_Agent:
         return self._spec
 
     @property
-    def model(self) -> Union[StableBaselinesModel, DreamerV3Model]:
+    def model(self) -> RL_Model:
         return self._model
 
     @property

@@ -1,6 +1,7 @@
 """Model Factory for creating RL models dynamically based on configuration."""
 
-from typing import TYPE_CHECKING, Callable, Dict, Type
+import importlib
+from typing import TYPE_CHECKING, Callable, Dict, Tuple, Type
 
 from rosnav_rl.cfg.framework import FrameworkCfg
 from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
@@ -24,6 +25,19 @@ class ModelFactory:
     """
 
     _model_registry: Dict[SupportedRLFrameworks, Type["RL_Model"]] = {}
+    # Backend modules are imported lazily on first lookup (via get_model_class)
+    # so constructing an SB3 agent doesn't also pull in DreamerV3's torch/jax
+    # dependency chain, and vice versa.
+    _lazy_import_paths: Dict[SupportedRLFrameworks, Tuple[str, str]] = {
+        SupportedRLFrameworks.STABLE_BASELINES3: (
+            "rosnav_rl.model.stable_baselines3",
+            "StableBaselinesModel",
+        ),
+        SupportedRLFrameworks.DREAMER_V3: (
+            "rosnav_rl.model.dreamerv3.dreamerv3_model",
+            "DreamerV3Model",
+        ),
+    }
 
     @classmethod
     def register(cls, framework: SupportedRLFrameworks) -> Callable:
@@ -60,6 +74,32 @@ class ModelFactory:
         cls._model_registry[framework] = model_class
 
     @classmethod
+    def get_model_class(cls, framework: SupportedRLFrameworks) -> Type["RL_Model"]:
+        """Resolve a framework identifier to its model class, importing the
+        backend module on first lookup only (see ``_lazy_import_paths``).
+
+        Args:
+            framework: The RL framework identifier
+
+        Returns:
+            The model class registered (or lazily importable) for that framework
+
+        Raises:
+            ValueError: If the framework is not supported
+        """
+        if framework not in cls._model_registry:
+            if framework not in cls._lazy_import_paths:
+                raise ValueError(
+                    f"Unsupported RL framework: {framework}. "
+                    f"Supported frameworks: {cls.get_supported_frameworks()}"
+                )
+            module_path, class_name = cls._lazy_import_paths[framework]
+            module = importlib.import_module(module_path)
+            cls._model_registry[framework] = getattr(module, class_name)
+
+        return cls._model_registry[framework]
+
+    @classmethod
     def create_model_instance(
         cls, framework_cfg: FrameworkCfg, rl_agent: "RL_Agent", **kwargs
     ) -> "RL_Model":
@@ -84,15 +124,7 @@ class ModelFactory:
         Raises:
             ValueError: If the framework is not supported
         """
-        framework_name = framework_cfg.name
-
-        if framework_name not in cls._model_registry:
-            raise ValueError(
-                f"Unsupported RL framework: {framework_name}. "
-                f"Supported frameworks: {list(cls._model_registry.keys())}"
-            )
-
-        model_class = cls._model_registry[framework_name]
+        model_class = cls.get_model_class(framework_cfg.name)
         return model_class.from_framework_cfg(
             rl_agent=rl_agent,
             framework_cfg=framework_cfg,
@@ -106,20 +138,6 @@ class ModelFactory:
         Returns:
             List of supported framework identifiers
         """
-        return list(cls._model_registry.keys())
-
-
-# Register the available models
-def _register_models():
-    """Register all available model implementations."""
-    from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
-    from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
-
-    ModelFactory.register_model(
-        SupportedRLFrameworks.STABLE_BASELINES3, StableBaselinesModel
-    )
-    ModelFactory.register_model(SupportedRLFrameworks.DREAMER_V3, DreamerV3Model)
-
-
-# Auto-register models when module is imported
-_register_models()
+        return list(
+            {*cls._model_registry.keys(), *cls._lazy_import_paths.keys()}
+        )

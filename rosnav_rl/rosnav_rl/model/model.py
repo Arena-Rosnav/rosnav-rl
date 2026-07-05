@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Union
 
 from pydantic import BaseModel
@@ -65,6 +66,27 @@ class RL_Model(ABC):
         config.
         """
         return cls(rl_agent=rl_agent, algorithm_cfg=framework_cfg, *args, **kwargs)
+
+    @classmethod
+    def inference_construction_kwargs(cls, agent_dir: Path) -> Dict[str, Any]:
+        """Kwargs to pass to :class:`RL_Agent`'s constructor when deploying
+        a saved agent for inference (see ``RL_Agent.from_agent_dir``).
+
+        Default: none. Subclasses override for backend-specific inference
+        setup (e.g. DreamerV3's ``inference_only=True``).
+        """
+        return {}
+
+    def load_for_inference(self, agent_dir: Path) -> None:
+        """Load a saved checkpoint for inference (called once, right after
+        the owning :class:`RL_Agent` has been constructed).
+
+        Default: load ``best_model.zip`` if the model hasn't already been
+        set up. Subclasses override for backends with a different
+        setup/load sequence (e.g. DreamerV3's ``setup_model`` + ``load``).
+        """
+        if not self.is_model_initialized:
+            self.load(path=agent_dir / "best_model.zip")
 
     @abstractmethod
     def setup_model(self, *args, **kwargs):

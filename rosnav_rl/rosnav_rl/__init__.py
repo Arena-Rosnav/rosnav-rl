@@ -52,13 +52,7 @@ __all__ = [
 ]
 
 
-from .model import (
-    DreamerV3Model,
-    RL_Model,
-    StableBaselinesModel,
-    dreamerv3,
-    stable_baselines3,
-)
+from .model import RL_Model
 from .reward import RewardFunction, reward_units
 from .rl_agent import RL_Agent
 from .spaces import ActionSpaceManager, BaseSpaceManager, ObservationSpaceManager
@@ -83,4 +77,11 @@ def __getattr__(name: str):
         from .observations import ObservationManager
 
         return ObservationManager
+    # Backend model classes/submodules are deferred to .model's own
+    # __getattr__ so importing rosnav_rl doesn't pay for both
+    # StableBaselinesModel's and DreamerV3Model's dependency chains.
+    if name in ("StableBaselinesModel", "DreamerV3Model", "dreamerv3", "stable_baselines3"):
+        from . import model
+
+        return getattr(model, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

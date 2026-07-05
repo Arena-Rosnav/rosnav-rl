@@ -139,6 +139,16 @@ class DreamerV3Model(RL_Model):
         if self._inference_only:
             self._model.eval()
 
+    @classmethod
+    def inference_construction_kwargs(cls, agent_dir: Path) -> Dict[str, Any]:
+        """Deploy construction needs ``inference_only=True`` (see ``__init__``)."""
+        return {"inference_only": True}
+
+    def load_for_inference(self, agent_dir: Path) -> None:
+        """DreamerV3 needs ``setup_model()`` before a checkpoint can be loaded."""
+        self.setup_model()
+        self.load("latest")
+
     def train(
         self,
         train_envs: DreamerEnvWrapper,
