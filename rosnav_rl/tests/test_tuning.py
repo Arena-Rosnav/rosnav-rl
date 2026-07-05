@@ -13,6 +13,7 @@ Tests cover:
 from __future__ import annotations
 
 import copy
+import importlib.util
 from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import MagicMock
@@ -23,6 +24,12 @@ from rosnav_rl.tuning.cfg import TuningCfg
 from rosnav_rl.tuning.pruner.dreamerv3_pruner import DreamerV3TrialPruner
 from rosnav_rl.tuning.pruner.pruner_base import TrialPrunerBase
 from rosnav_rl.tuning.sampler import apply_params, suggest_params
+
+# optuna is an optional `tuning` extra (rosnav_rl core does not depend on it).
+# report_metric() imports it lazily, so skip only the classes that exercise it.
+requires_optuna = pytest.mark.skipif(
+    importlib.util.find_spec("optuna") is None, reason="optuna not installed"
+)
 from rosnav_rl.tuning.pruner.sb3_pruner import SB3TrialPruner
 from rosnav_rl.tuning.search_space import (
     CategoricalParam,
@@ -395,6 +402,8 @@ class _DummyPruner(TrialPrunerBase):
 
 
 class TestTrialPrunerBase:
+    pytestmark = requires_optuna
+
     def _make_trial(self, should_prune=False):
         trial = MagicMock()
         trial.number = 0
@@ -477,6 +486,8 @@ class TestTrialPrunerBase:
 
 
 class TestSB3TrialPruner:
+    pytestmark = requires_optuna
+
     def test_instantiation(self):
         trial = MagicMock()
         trial.number = 0
@@ -579,6 +590,8 @@ class TestSB3TrialPruner:
 
 
 class TestDreamerV3TrialPruner:
+    pytestmark = requires_optuna
+
     def _make_trial(self, should_prune=False):
         trial = MagicMock()
         trial.number = 0
@@ -605,30 +618,30 @@ class TestDreamerV3TrialPruner:
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(123.4)
+        pruner.after_eval_hook({"eval_return": 123.4})
         assert pruner.read_metric() == 123.4
 
     def test_after_eval_hook_reports_to_optuna(self):
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(10.0)
+        pruner.after_eval_hook({"eval_return": 10.0})
         trial.report.assert_called_once_with(10.0, step=0)
 
-        pruner.after_eval_hook(20.0)
+        pruner.after_eval_hook({"eval_return": 20.0})
         trial.report.assert_called_with(20.0, step=1)
 
     def test_after_eval_hook_tracks_best(self):
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(5.0)
+        pruner.after_eval_hook({"eval_return": 5.0})
         assert pruner.best_metric == 5.0
 
-        pruner.after_eval_hook(3.0)
+        pruner.after_eval_hook({"eval_return": 3.0})
         assert pruner.best_metric == 5.0
 
-        pruner.after_eval_hook(8.0)
+        pruner.after_eval_hook({"eval_return": 8.0})
         assert pruner.best_metric == 8.0
 
     def test_after_eval_hook_prunes(self):
@@ -638,14 +651,14 @@ class TestDreamerV3TrialPruner:
         pruner = DreamerV3TrialPruner(trial)
 
         with pytest.raises(optuna.TrialPruned):
-            pruner.after_eval_hook(1.0)
+            pruner.after_eval_hook({"eval_return": 1.0})
 
     def test_multiple_evals_increment_step(self):
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
         for i in range(5):
-            pruner.after_eval_hook(float(i))
+            pruner.after_eval_hook({"eval_return": float(i)})
 
         assert pruner._report_step == 5
         # Last call should have step=4
@@ -656,10 +669,10 @@ class TestDreamerV3TrialPruner:
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(-10.0)
+        pruner.after_eval_hook({"eval_return": -10.0})
         assert pruner.best_metric == -10.0
 
-        pruner.after_eval_hook(-5.0)
+        pruner.after_eval_hook({"eval_return": -5.0})
         assert pruner.best_metric == -5.0  # -5 > -10
 
     def test_check_and_report_after_hook(self):
@@ -667,7 +680,7 @@ class TestDreamerV3TrialPruner:
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(42.0)
+        pruner.after_eval_hook({"eval_return": 42.0})
         # Manually call check_and_report — should use the stored value
         result = pruner.check_and_report()
         assert result is True

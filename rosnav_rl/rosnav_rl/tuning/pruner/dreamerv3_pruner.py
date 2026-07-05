@@ -17,9 +17,10 @@ Usage::
     best = pruner.best_metric
 
 When the DreamerV3 ``helper.train()`` loop finishes an evaluation phase it
-calls ``after_eval_fn(eval_return)``.  ``after_eval_hook`` stores the value
-and delegates to :meth:`TrialPrunerBase.report_metric` which handles Optuna
-reporting and pruning.
+calls ``after_eval_fn({"eval_return": ..., "eval_success_rate": ...})``.
+``after_eval_hook`` extracts ``eval_return`` and delegates to
+:meth:`TrialPrunerBase.report_metric` which handles Optuna reporting and
+pruning.
 
 The *metric* argument is kept for display/logging only — the actual value
 is always the one passed to ``after_eval_hook``.
