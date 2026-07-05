@@ -4,6 +4,7 @@ Clean, lightweight manager for hierarchical observation spaces using SpaceFactor
 No bloat, just essential functionality.
 """
 
+import logging
 from collections import OrderedDict
 from typing import Any, Dict, List
 
@@ -13,6 +14,8 @@ from gymnasium import spaces
 from rosnav_rl.utils.logging import flush_and_log_errors
 from rosnav_rl.utils.type_aliases import ObservationDict
 from rosnav_rl.utils.validation import validate_observation_spaces
+
+_logger = logging.getLogger(__name__)
 
 from .observation_space_factory import SpaceFactory
 from .spaces.base_observation_space import BaseObservationSpace
@@ -62,16 +65,16 @@ class ObservationSpaceManager:
                         perception,
                     )
 
-                    print(
+                    _logger.info(
                         f"Auto-loaded {len(SpaceFactory.registry)} observation spaces"
                     )
                 except ImportError as e:
-                    print(f"Warning: Could not auto-load all spaces: {e}")
+                    _logger.warning(f"Could not auto-load all spaces: {e}")
 
             return SpaceFactory
         except ImportError:
-            print(
-                "Warning: Could not import SpaceFactory. You'll need to provide it manually."
+            _logger.warning(
+                "Could not import SpaceFactory. You'll need to provide it manually."
             )
             return None
 
@@ -101,7 +104,7 @@ class ObservationSpaceManager:
             self._space_required_keys[space_name] = list(space_instance.requires.keys())
             self._space_args_buffer[space_name] = {}
 
-        print(f"Loaded {len(self.spaces)} spaces: {list(self.spaces.keys())}")
+        _logger.info(f"Loaded {len(self.spaces)} spaces: {list(self.spaces.keys())}")
 
     def get_available_spaces(self) -> List[str]:
         """Get list of all available spaces from SpaceFactory registry."""

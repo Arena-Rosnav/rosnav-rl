@@ -41,11 +41,14 @@ Examples
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Callable, Union
+import logging
 import time
 from rclpy.node import Node
 from rcl_interfaces.srv import SetParameters
 from rcl_interfaces.msg import Parameter, ParameterType
 from task_generator_msgs.srv import QueueEpisode
+
+_logger = logging.getLogger(__name__)
 
 
 StageInput = Union[Dict[str, List[Any]], List[Dict[str, Any]]]
@@ -192,12 +195,12 @@ class CurriculumBase(ABC):
             service_name = f"{node_name}/{self.parameter_service_name}"
             clients[node_name] = self.node.create_client(SetParameters, service_name)
             if self.verbose > 0:
-                print(
+                _logger.info(
                     f"[CURRICULUM_BASE] Created parameter client for {node_name} (service: {service_name})"
                 )
 
         if self.verbose > 0:
-            print(f"[CURRICULUM_BASE] Created {len(clients)} parameter clients total")
+            _logger.info(f"[CURRICULUM_BASE] Created {len(clients)} parameter clients total")
         return clients
 
     def _init_task_mode_clients(self) -> Dict[str, Any]:
@@ -247,7 +250,7 @@ class CurriculumBase(ABC):
                 h(*args, **kwargs)
             except Exception:
                 if self.verbose > 0:
-                    print("Ignoring exception in hook", h)
+                    _logger.info(f"Ignoring exception in hook {h}")
 
     # ------------------------- Parameter conversion and setting -------------------------
     def _param_to_rcl_param(self, name: str, value: Any) -> Parameter:
@@ -311,7 +314,7 @@ class CurriculumBase(ABC):
                     rcl_param = self._param_to_rcl_param(leaf, val)
                 except TypeError as exc:
                     if self.verbose > 0:
-                        print(
+                        _logger.info(
                             f"[CURRICULUM_BASE] Failed to convert {key}={val}: {exc}"
                         )
                     plain[key] = val
@@ -329,12 +332,12 @@ class CurriculumBase(ABC):
         client = self.parameter_clients.get(node_name)
         if client is None:
             if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] No client found for node {node_name}")
+                _logger.info(f"[CURRICULUM_BASE] No client found for node {node_name}")
             return False
 
         if not client.wait_for_service(timeout_sec=2.0):
             if self.verbose > 0:
-                print(
+                _logger.info(
                     f"[CURRICULUM_BASE] Service not available for node {node_name} after 2.0s timeout"
                 )
             return False
@@ -354,7 +357,7 @@ class CurriculumBase(ABC):
                 elapsed = time.time() - start
                 if elapsed > poll_timeout:
                     if self.verbose > 0:
-                        print(
+                        _logger.info(
                             f"[CURRICULUM_BASE] Timeout after {poll_timeout}s waiting for "
                             f"parameter response from {node_name}"
                         )
@@ -364,24 +367,24 @@ class CurriculumBase(ABC):
 
             if response and all(r.successful for r in response.results):
                 if self.verbose > 0:
-                    print(
+                    _logger.info(
                         f"[CURRICULUM_BASE] Successfully set {len(params)} parameters for {node_name}"
                     )
                 return True
 
             if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] Parameter setting failed for {node_name}:")
+                _logger.info(f"[CURRICULUM_BASE] Parameter setting failed for {node_name}:")
                 if response:
                     for i, result in enumerate(response.results):
                         if not result.successful:
                             param_name = params[i].name if i < len(params) else "unknown"
-                            print(f"  - Parameter '{param_name}': {result.reason}")
+                            _logger.info(f"  - Parameter '{param_name}': {result.reason}")
                 else:
-                    print("  - No response received from service")
+                    _logger.info("  - No response received from service")
             return False
         except Exception as e:
             if self.verbose > 0:
-                print(
+                _logger.info(
                     f"[CURRICULUM_BASE] Exception while setting parameters for {node_name}: {e}"
                 )
             return False
@@ -427,7 +430,7 @@ class CurriculumBase(ABC):
                         time.sleep(0.01)
                         if time.time() - start > poll_timeout:
                             if self.verbose > 0:
-                                print(
+                                _logger.info(
                                     f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}"
                                 )
                             ok = False
@@ -437,13 +440,13 @@ class CurriculumBase(ABC):
                         if not (response and response.success):
                             reason = response.error_msg if response else "no response"
                             if self.verbose > 0:
-                                print(
+                                _logger.info(
                                     f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}"
                                 )
                             ok = False
                 except Exception as e:
                     if self.verbose > 0:
-                        print(
+                        _logger.info(
                             f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}"
                         )
                     ok = False
@@ -451,7 +454,7 @@ class CurriculumBase(ABC):
                 # Service absent: mark node so we don't re-check and fall back.
                 self._non_task_generator_nodes.add(node_name)
                 if self.verbose > 0:
-                    print(
+                    _logger.info(
                         f"[CURRICULUM_BASE] config/queue_episode not available for {node_name};"
                         " falling back to SetParameters for task-prefixed keys"
                     )
@@ -475,7 +478,7 @@ class CurriculumBase(ABC):
                     params.append(self._param_to_rcl_param(pname, pval))
                 except Exception as e:
                     if self.verbose > 0:
-                        print(
+                        _logger.info(
                             f"[CURRICULUM_BASE] Failed to convert parameter {pname}={pval} for node {node_name}: {e}"
                         )
                     return False
@@ -484,13 +487,13 @@ class CurriculumBase(ABC):
 
         if not plain_dict and not has_task_params:
             if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] No parameters to set for node {node_name}")
+                _logger.info(f"[CURRICULUM_BASE] No parameters to set for node {node_name}")
         return ok
 
     def _set_parameters(self, param_dict: Dict[str, Any]) -> bool:
         if not self.parameter_clients:
             if self.verbose > 0:
-                print("[CURRICULUM_BASE] No parameter clients available")
+                _logger.info("[CURRICULUM_BASE] No parameter clients available")
             return False
 
         success = True
@@ -503,18 +506,18 @@ class CurriculumBase(ABC):
                 success = False
                 failed_nodes.append(node_name)
                 if self.verbose > 0:
-                    print(f"[CURRICULUM_BASE] Failed to set parameters for {node_name}")
+                    _logger.info(f"[CURRICULUM_BASE] Failed to set parameters for {node_name}")
             else:
                 successful_nodes.append(node_name)
 
         if self.verbose > 0:
             if successful_nodes:
-                print(
+                _logger.info(
                     f"[CURRICULUM_BASE] Successfully set parameters for: {successful_nodes}"
                 )
             if failed_nodes:
-                print(f"[CURRICULUM_BASE] Failed to set parameters for: {failed_nodes}")
-            print(f"[CURRICULUM_BASE] Parameter setting complete: {success}")
+                _logger.info(f"[CURRICULUM_BASE] Failed to set parameters for: {failed_nodes}")
+            _logger.info(f"[CURRICULUM_BASE] Parameter setting complete: {success}")
         return success
 
     # ------------------------- Task-mode routing -------------------------
@@ -527,7 +530,7 @@ class CurriculumBase(ABC):
             return False
         if not client.wait_for_service(timeout_sec=2.0):
             if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] config/queue_episode not available for {node_name}")
+                _logger.info(f"[CURRICULUM_BASE] config/queue_episode not available for {node_name}")
             return False
 
         req = QueueEpisode.Request()
@@ -546,18 +549,18 @@ class CurriculumBase(ABC):
                 time.sleep(0.01)
                 if time.time() - start > min(self.timeout, 5.0):
                     if self.verbose > 0:
-                        print(f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}")
+                        _logger.info(f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}")
                     return False
             response = future.result()
             if response and response.success:
                 return True
             if self.verbose > 0:
                 reason = response.error_msg if response else "no response"
-                print(f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}")
+                _logger.info(f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}")
             return False
         except Exception as e:
             if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}")
+                _logger.info(f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}")
             return False
 
     def _queue_episode(self, tm_dict: Dict[str, Any]) -> bool:
@@ -576,11 +579,11 @@ class CurriculumBase(ABC):
         """
         stage = self._stages[self.curriculum_index]
         if self.verbose > 0:
-            print(f"[CURRICULUM_BASE] Applying stage {self.curriculum_index}: {stage}")
-            print(
+            _logger.info(f"[CURRICULUM_BASE] Applying stage {self.curriculum_index}: {stage}")
+            _logger.info(
                 f"[CURRICULUM_BASE] Available parameter clients: {list(self.parameter_clients.keys())}"
             )
-            print(
+            _logger.info(
                 f"[CURRICULUM_BASE] Parameter node template: {self.parameter_node_template}"
             )
 
@@ -602,7 +605,7 @@ class CurriculumBase(ABC):
             self.curriculum_index += 1
             self._call_hooks(self._on_advance, self.curriculum_index)
             if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] Advanced to stage {self.curriculum_index}")
+                _logger.info(f"[CURRICULUM_BASE] Advanced to stage {self.curriculum_index}")
             return self._apply_curriculum()
         return True
 
@@ -611,7 +614,7 @@ class CurriculumBase(ABC):
             self.curriculum_index -= 1
             self._call_hooks(self._on_retreat, self.curriculum_index)
             if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] Retreated to stage {self.curriculum_index}")
+                _logger.info(f"[CURRICULUM_BASE] Retreated to stage {self.curriculum_index}")
             return self._apply_curriculum()
         return True
 
