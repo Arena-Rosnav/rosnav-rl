@@ -305,6 +305,14 @@ When training with Arena, the action space, observation, and environment specs a
 | `get_action(obs)` | Inference |
 | `from_framework_cfg()` | Classmethod — construct from a `FrameworkCfg` |
 
+Two more hooks (both have defaults on `RL_Model`, override only if a backend
+needs different deploy behavior) drive `RL_Agent.from_agent_dir`:
+
+| Hook | Purpose | Default |
+| --- | --- | --- |
+| `inference_construction_kwargs(agent_dir)` | Classmethod — kwargs for `RL_Agent`'s constructor when loading for inference | `{}` |
+| `load_for_inference(agent_dir)` | Load the saved checkpoint after construction | load `best_model.zip` if not already set up |
+
 | Property | Purpose |
 | --- | --- |
 | `model` | Access the wrapped algorithm object |
@@ -313,7 +321,10 @@ When training with Arena, the action space, observation, and environment specs a
 | `stack_size` | Temporal frame-stacking depth (default: 1) |
 | `parameter_number` | Total trainable parameters |
 
-**`ModelFactory`** maps framework identifiers → `RL_Model` subclasses. Registration via decorator:
+**`ModelFactory`** maps framework identifiers → `RL_Model` subclasses, imported
+lazily on first lookup via `get_model_class()` (see `_lazy_import_paths`) — so
+constructing an SB3 agent never imports DreamerV3's torch/jax stack, and vice
+versa. Registration via decorator:
 
 ```python
 @ModelFactory.register(SupportedRLFrameworks.STABLE_BASELINES3)
@@ -325,6 +336,15 @@ Creation is fully delegated — no `if/elif` branching:
 ```python
 model = ModelFactory.create_model_instance(framework_cfg=cfg, rl_agent=agent)
 # Internally calls model_class.from_framework_cfg()
+```
+
+`from_agent_dir` deploys the same way — no per-backend branch, just
+`ModelFactory.get_model_class(...)` + the two hooks above:
+
+```python
+model_class = ModelFactory.get_model_class(spec.framework.name)
+agent = cls(spec, model_kwargs=model_class.inference_construction_kwargs(agent_dir))
+agent.model.load_for_inference(agent_dir)
 ```
 
 See [model/README.md](rosnav_rl/model/README.md) for full SB3 integration details.
