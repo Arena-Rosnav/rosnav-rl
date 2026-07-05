@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from rosnav_rl.observations.utils.types import RobotActionVector
+from rosnav_rl.utils.observation_types import RobotActionVector
 from rosnav_rl.cfg.parameters import AgentParameters
 
 from ..constants import DEFAULTS, DONE_REASONS

@@ -6,7 +6,7 @@ Goal and navigation spaces with only proven, reliable features.
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.utils.types import (
+from rosnav_rl.utils.observation_types import (
     DistanceAngleMetrics,
 )
 from ...observation_space_factory import SpaceFactory

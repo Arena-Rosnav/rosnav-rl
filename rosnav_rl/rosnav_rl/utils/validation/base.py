@@ -12,11 +12,11 @@ from .protocols import RequiresProtocol
 from .exceptions import MissingObservationError
 
 try:
-    from ...observations.utils.types import DataSpec
+    from ..observation_types import DataSpec
 except ImportError:
     # Fallback for direct execution or different import contexts
     try:
-        from rosnav_rl.observations.utils.types import DataSpec
+        from rosnav_rl.utils.observation_types import DataSpec
     except ImportError:
         # Create a minimal DataSpec for standalone usage
         class DataSpec:

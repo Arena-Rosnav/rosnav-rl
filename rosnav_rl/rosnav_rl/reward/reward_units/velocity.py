@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict
 
 import numpy as np
 
-from rosnav_rl.observations.utils.types import (
+from rosnav_rl.utils.observation_types import (
     DistanceAngleMetrics,
     PedestrianRelativeLocations,
     PedestrianRelativeVelocities,

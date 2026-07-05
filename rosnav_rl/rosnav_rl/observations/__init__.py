@@ -12,8 +12,9 @@ __all__ = [
 ]
 
 # .core / .factory / .strategies are rclpy-coupled (subscribers, collectors).
-# Deferred so importing e.g. rosnav_rl.observations.utils.types (used by
-# ROS-free spaces/reward code) doesn't force this package to require ROS.
+# Deferred so importing e.g. rosnav_rl.observations.utils.types (a compat
+# shim for rosnav_rl.utils.observation_types, used by ROS-free spaces/
+# reward code) doesn't force this package to require ROS.
 _LAZY = {
     "ObservationManager": ".core",
     "ObservationPipeline": ".core",

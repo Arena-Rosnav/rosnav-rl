@@ -21,7 +21,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
 
     Schema-Based Requirements:
         'requires' is a mapping from logical input names (str) to schema-based type annotations
-        (see rosnav_rl.observations.utils.types). This enables schema-driven configuration,
+        (see rosnav_rl.utils.observation_types). This enables schema-driven configuration,
         validation, and documentation of reward unit dependencies.
 
         Example:

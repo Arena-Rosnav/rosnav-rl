@@ -8,7 +8,7 @@ from typing import Optional
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.utils.types import (
+from rosnav_rl.utils.observation_types import (
     CombinedLocalizationVector,
     FilteredOdometryVector,
     Pose2D,
