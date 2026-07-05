@@ -127,6 +127,12 @@ class StableBaselinesEnv:
         self._env = env
         self._norm_wrapper = get_vec_normalize(env)
         self._stack_wrapper = get_vec_framestack(env)
+        # stack() always reports no-episode-end (dones all False), so these
+        # are safe to reuse across calls instead of rebuilding every step —
+        # StackedObservations.update() only mutates an info dict when its
+        # corresponding done is True.
+        self._stack_dones = np.zeros(self._env.num_envs, dtype=bool)
+        self._stack_infos = [{}] * self._env.num_envs
 
     def save_normalization(self, path: Union[str, Path]) -> None:
         if self.has_norm_wrapper:
@@ -152,8 +158,8 @@ class StableBaselinesEnv:
 
         stacked, infos = self._stack_wrapper.stacked_obs.update(
             observations=batched,
-            dones=np.array([False] * self._env.num_envs),
-            infos=[{}] * self._env.num_envs,
+            dones=self._stack_dones,
+            infos=self._stack_infos,
         )
         # Remove batch dim: _predict_non_recurrent expects (stack_size, obs_dim) not (1, stack_size, obs_dim)
         if isinstance(stacked, dict):
