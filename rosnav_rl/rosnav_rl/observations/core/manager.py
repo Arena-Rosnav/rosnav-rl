@@ -65,7 +65,8 @@ class ObservationManager:
 
     Thread Safety:
         - Collector updates use locks for thread-safe message handling
-        - Generator computations are stateless (safe for parallel access)
+        - Generators may hold mutable internal state (e.g. TF buffers,
+          history) and are NOT guaranteed safe for concurrent access
         - Call `shutdown()` before destroying to clean up ROS resources
 
     Performance:
@@ -104,7 +105,7 @@ class ObservationManager:
             ped_locations = obs['arena_pedestrian_relative_locations']
 
             # Feed to RL agent
-            action = agent.act(obs)
+            action = agent.get_action(obs)
 
         # Clean up
         obs_manager.shutdown()
@@ -125,7 +126,7 @@ class ObservationManager:
         data_sources: Dict[str, DataSource],
         simulation_state_container: AgentParameters = None,
         wait_for_obs: bool = True,
-        qos_profile: Optional[QoSProfile] = 10,
+        qos_profile: Union[int, QoSProfile] = 10,
         enable_synchronization: bool = True,
         sync_tolerance_seconds: float = 0.1,
         buffer_size: int = 50,

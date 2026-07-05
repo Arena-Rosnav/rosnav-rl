@@ -344,7 +344,10 @@ class RewardFunction(ErrorReportingMixin):
         )
 
     def copy(self) -> "RewardFunction":
-        """Create a deep copy of the reward function.
+        """Create a shallow copy of the reward function.
+
+        The new instance shares its `function_dict`/`unit_kwargs` references
+        with this one — mutating those dicts in place affects both copies.
 
         Returns:
             A new RewardFunction with the same configuration.
