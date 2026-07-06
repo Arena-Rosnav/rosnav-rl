@@ -239,3 +239,37 @@ def context_pred_loss(
             return b.new_zeros(())
         return (err * pair_valid).sum() / denom
     return err.mean()
+
+
+def context_pred_floor(
+    pooled_future: torch.Tensor,
+    step_valid: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Zero-velocity persistence baseline for ``context_pred_loss``: the MSE of predicting
+    pooled_{t+1} = pooled_t, i.e. what the head achieves using no context at all.
+
+    Diagnostic only (never enters the loss). The logged gap ``floor - pred_loss`` is the
+    identifiability health check of §2.1: b earns its keep only by beating persistence, so a
+    vanishing gap is the early-warning signal for context collapse — the head has learned to
+    ignore b and coast on the fact that pooled crowd summaries barely move between steps. Uses
+    the exact masking semantics of ``context_pred_loss`` so the two numbers are comparable.
+
+    Args:
+        pooled_future: ``(B, M, F)`` pooled crowd summaries (``pool_step`` output).
+        step_valid:    Optional ``(B, M)`` bool/float; pairs whose *target* step is empty are
+                       excluded, matching ``context_pred_loss``.
+
+    Returns:
+        Scalar MSE of the persistence baseline. Returns 0 if M < 2 or no pair is valid.
+    """
+    if pooled_future.shape[1] < 2:
+        return pooled_future.new_zeros(())
+
+    err = (pooled_future[:, 1:] - pooled_future[:, :-1]).pow(2).mean(-1)  # (B, M-1)
+    if step_valid is not None:
+        pair_valid = step_valid[:, 1:].to(err.dtype)
+        denom = pair_valid.sum()
+        if denom < 1:
+            return pooled_future.new_zeros(())
+        return (err * pair_valid).sum() / denom
+    return err.mean()

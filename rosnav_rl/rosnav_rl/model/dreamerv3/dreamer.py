@@ -8,6 +8,7 @@ sys.path.append(str(pathlib.Path(__file__).parent))
 import gymnasium
 import numpy as np
 import torch
+import torch.distributions as torchd
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -206,9 +207,24 @@ class Dreamer(nn.Module):
             ctx_window, context_b = self._wm.step_social_context(
                 ctx_window, obs, obs["is_first"]
             )
-        latent, _ = self._wm.dynamics.obs_step(
+        latent, prior = self._wm.dynamics.obs_step(
             latent, action, embed, obs["is_first"], context=context_b
         )
+        # World-model surprise uₜ = KL(q(z|o) || p(z)): high when the observed crowd contradicts
+        # the model's own prediction. The prior is already computed inside obs_step, so capturing
+        # it is free; the KL is the only added op, gated so the baseline stays byte-identical.
+        kl_surprise = None
+        if self._config.model.behavior.expose_kl_surprise:
+            # Same distribution semantics as RSSM.kl_loss (networks.py): the discrete case
+            # KLs the Independent(OneHot) directly, the continuous case its wrapped ._dist;
+            # either way the result is already reduced over event dims -> shape (B,).
+            dyn = self._wm.dynamics
+            _d = (
+                (lambda s: dyn.get_dist(s))
+                if dyn._discrete
+                else (lambda s: dyn.get_dist(s)._dist)
+            )
+            kl_surprise = torchd.kl.kl_divergence(_d(latent), _d(prior))
         if self._config.model.behavior.eval_state_mean:
             latent["stoch"] = latent["mean"]
         # Actor expects the social-augmented feature (base_feat + GAT social code), the
@@ -237,6 +253,8 @@ class Dreamer(nn.Module):
                 ),
             )
         policy_output = {"action": action, "logprob": logprob}
+        if kl_surprise is not None:
+            policy_output["kl_surprise"] = kl_surprise
         state = (latent, action, ctx_window)
         return policy_output, state
 

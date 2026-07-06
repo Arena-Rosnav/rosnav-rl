@@ -307,3 +307,67 @@ class TestTSSM:
         assert torch.all(state["tssm_cache"] == 0)
         assert torch.all(state["tssm_cnt"] == 0)
         assert state["deter"].shape == (3, 16)
+
+
+# =====================================================================
+#  KL-surprise signal (Item 4a, safety layer H3): the per-step
+#  KL(q(z|o) || p(z)) computed at deployment from obs_step's outputs.
+# =====================================================================
+
+class TestKLSurprise:
+    def _make(self, num_actions=3, embed=10):
+        return TSSM(
+            stoch=4,
+            deter=16,
+            hidden=12,
+            discrete=4,
+            num_actions=num_actions,
+            embed=embed,
+            device="cpu",
+            transformer_ctx_len=4,
+            transformer_num_heads=2,
+            tssm_num_layers=1,
+        )
+
+    def _surprise(self, dyn, post, prior):
+        # Mirrors the dreamer.py _policy computation (expose_kl_surprise): same
+        # distribution semantics as RSSM.kl_loss -- discrete KLs the dist directly.
+        import torch.distributions as torchd
+
+        d = (
+            (lambda s: dyn.get_dist(s))
+            if dyn._discrete
+            else (lambda s: dyn.get_dist(s)._dist)
+        )
+        return torchd.kl.kl_divergence(d(post), d(prior))
+
+    def test_kl_from_obs_step_outputs_is_finite_and_nonneg(self):
+        torch.manual_seed(0)
+        dyn = self._make()
+        B = 2
+        state = dyn.initial(B)
+        action = torch.zeros(B, 3)
+        embed = torch.randn(B, 10)
+        is_first = torch.ones(B)
+
+        post, prior = dyn.obs_step(state, action, embed, is_first, sample=False)
+        kl = self._surprise(dyn, post, prior)
+
+        assert kl.shape == (B,)
+        assert torch.isfinite(kl).all()
+        assert (kl >= 0).all()
+
+    def test_matches_kl_loss_rep_value(self):
+        # The deploy-time surprise must be the same quantity the training objective
+        # calls the (unclipped) representation KL -- kl_loss's `value` output. Ties the
+        # safety signal to the exact statistics the world model is trained on.
+        torch.manual_seed(0)
+        dyn = self._make()
+        B = 3
+        post, prior = dyn.obs_step(
+            dyn.initial(B), torch.zeros(B, 3), torch.randn(B, 10), torch.ones(B),
+            sample=False,
+        )
+        kl = self._surprise(dyn, post, prior)
+        _, value, _, _ = dyn.kl_loss(post, prior, free=0.0, dyn_scale=0.0, rep_scale=1.0)
+        assert torch.allclose(kl, value, atol=1e-6)

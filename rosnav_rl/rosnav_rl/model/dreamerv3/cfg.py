@@ -271,6 +271,10 @@ class BehaviorCfg(BaseModel):
         imag_gradient_mix (float): Gradient mixing ratio.
         eval_state_mean (bool): Use mean state in evaluation.
         use_imagination_checkpointing (bool): Wrap img_step in gradient checkpointing to save VRAM. Default: False
+        expose_kl_surprise (bool): At inference, compute per-step KL(q(z|o) || p(z)) — the
+            world-model surprise signal uₜ — and attach it to the policy output. Off by default so
+            the deploy path stays byte-identical to baseline; the safety layer (H3) turns it on.
+            Default: False
     """
 
     discount: float = 0.997
@@ -280,6 +284,7 @@ class BehaviorCfg(BaseModel):
     imag_gradient_mix: float = 0.0
     eval_state_mean: bool = False
     use_imagination_checkpointing: bool = False
+    expose_kl_surprise: bool = False
 
 
 class SocialGATCfg(BaseModel):
@@ -320,8 +325,9 @@ class SocialDALICfg(BaseModel):
         enabled (bool): Whether DALI (d_t and L_dyn) is active. Default: False
         out_dim (int): Dimension of the dynamics context vector d_t. Default: 64
         hidden (int): Hidden dimension of the trajectory GRU. Default: 64
-        k_steps (int): Trajectory window length. FIXED at 40 (= 2 s at 20 Hz) so the GRU
-            sees a full SFM/HSFM avoidance cycle. Default: 40
+        k_steps (int): Trajectory window length. FIXED at 40 (= 4 s at the 10 Hz control
+            rate, kinematics_dt = 0.1) so the GRU sees a full SFM/HSFM avoidance cycle.
+            Default: 40
         lambda_dyn (float): Weight of the auxiliary forward-prediction loss in the ELBO. Default: 0.1
         imag_backprop_steps (int): Number of imagination steps over which L_dyn and the
             d_t->actor gradient through imagined peds are back-propagated. Beyond this, d_t is

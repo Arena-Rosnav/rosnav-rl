@@ -68,6 +68,11 @@ class DreamerV3Model(RL_Model):
     """Recurrent (latent, action, ctx_window) state carried across real-time
     ``get_action`` calls; cleared on :meth:`reset` (episode boundary)."""
 
+    last_step_info: dict = {}
+    """Per-step deploy diagnostics (e.g. ``kl_surprise``); populated by ``get_action`` only
+    when ``behavior.expose_kl_surprise`` is enabled. Consumers (safety layer) read, never
+    write. Empty dict when the flag is off — the deploy path stays byte-identical."""
+
     def __init__(
         self,
         rl_agent: "rosnav_rl.RL_Agent",
@@ -335,6 +340,12 @@ class DreamerV3Model(RL_Model):
                 training=False,
             )
             action = policy_output["action"].detach().cpu().numpy()
+            # Attribute side-channel for the safety layer: present only when
+            # behavior.expose_kl_surprise is on (see dreamer.py _policy).
+            if "kl_surprise" in policy_output:
+                self.last_step_info = {
+                    "kl_surprise": float(policy_output["kl_surprise"].reshape(-1)[0])
+                }
 
         return self._rl_agent.space_manager.decode_action(action.squeeze(axis=0))
 

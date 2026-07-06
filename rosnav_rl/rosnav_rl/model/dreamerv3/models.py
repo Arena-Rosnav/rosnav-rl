@@ -13,6 +13,7 @@ from ..dreamerv3.social.context import (
     SocialContextEncoder,
     context_infonce_loss as social_context_infonce_loss,
     context_kl_loss as social_context_kl_loss,
+    context_pred_floor as social_context_pred_floor,
     context_pred_loss as social_context_pred_loss,
 )
 
@@ -379,6 +380,11 @@ class WorldModel(nn.Module):
                 context_kl = embed.new_zeros(())
                 context_infonce = embed.new_zeros(())
                 context_pred = embed.new_zeros(())
+                # Diagnostics only (never added to the loss): unscaled prediction loss, its
+                # zero-velocity persistence floor, and the gap between them. A vanishing gap is
+                # the context-collapse early warning (§2.1 of the proposal).
+                context_pred_raw = embed.new_zeros(())
+                context_pred_floor = embed.new_zeros(())
                 if self._social_context is not None and "PedestrianNodeSetSpace" in data:
                     _ctx_cfg = _se2_cfg.context
                     N_c, F_c = _se2_cfg.max_peds, _se2_cfg.node_feat_dim
@@ -405,9 +411,14 @@ class WorldModel(nn.Module):
                             _fut_valid.reshape(B_c * M_c, N_c),
                         ).view(B_c, M_c, F_c)
                         _step_valid = _fut_valid.sum(-1) > 0  # (B, M)
-                        context_pred = _ctx_cfg.pred_scale * social_context_pred_loss(
+                        context_pred_raw = social_context_pred_loss(
                             self._social_context, context_b, _pooled_fut, _step_valid
                         )
+                        context_pred = _ctx_cfg.pred_scale * context_pred_raw
+                        with torch.no_grad():
+                            context_pred_floor = social_context_pred_floor(
+                                _pooled_fut, _step_valid
+                            )
 
                     # InfoNCE identifiability (secondary/ablation-only, see context.py):
                     # encode the two halves of the same window independently; same-sequence
@@ -529,6 +540,9 @@ class WorldModel(nn.Module):
         metrics["context_kl_loss"] = to_np(context_kl)
         metrics["context_infonce_loss"] = to_np(context_infonce)
         metrics["context_pred_loss"] = to_np(context_pred)
+        metrics["context_pred_raw"] = to_np(context_pred_raw)
+        metrics["context_pred_floor"] = to_np(context_pred_floor)
+        metrics["context_pred_gap"] = to_np(context_pred_floor - context_pred_raw)
         metrics["kl_free"] = kl_free
         metrics["dyn_scale"] = dyn_scale
         metrics["rep_scale"] = rep_scale
