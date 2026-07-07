@@ -439,8 +439,9 @@ class SocialCfg(BaseModel):
             before GAT/DALI, eliminating accumulating bias over imagination horizons. Default: False
         kinematics_dt (float): Control period in seconds (10 Hz → 0.1). Used by integrate_se2
             for imagination pose accumulation. Default: 0.1
-        se2_augment_prob (float): Probability of applying random SE(2) augmentation per batch
-            element during training. Default: 0.5
+        se2_augment_prob (float): Probability of randomizing the anchor gauge (the anchor
+            frame of the per-step relative poses P_k) per batch element during training.
+            Applied in P_k space only; observations are untouched. Default: 0.5
         action_scale_linear (float): Physical linear velocity range (m/s). Populated by
             arena_trainer from robot_description. Default: 1.0
         action_scale_angular (float): Physical angular velocity range (rad/s). Populated by

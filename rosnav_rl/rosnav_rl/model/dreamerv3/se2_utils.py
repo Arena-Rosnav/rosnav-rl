@@ -207,6 +207,11 @@ def apply_se2_to_peds_flat(
     vx,vy (dims 2-3) are velocity — rotated only (no translation).
     Remaining dims (including validity) are left unchanged.
 
+    Only valid rows (validity > 0.5) are transformed; padding rows pass
+    through unchanged so all-zero padding stays all-zero instead of being
+    moved to T's translation (which would supervise the decoder to emit
+    pose-dependent values in invalid slots).
+
     Args:
         T:          (B, 3) SE(2) transform
         peds_flat:  (B, N*(F+1))
@@ -219,6 +224,7 @@ def apply_se2_to_peds_flat(
     B = peds_flat.shape[0]
     N, FP1 = max_peds, node_feat_dim + 1
     peds = peds_flat.view(B, N, FP1)  # (B, N, F+1)
+    valid = peds[..., -1:] > 0.5  # (B, N, 1)
 
     # Position: dims 0-1
     # se2_transform_points expects T: (B, 3) and pts: (B, N, 2); it adds the N-dim
@@ -227,88 +233,56 @@ def apply_se2_to_peds_flat(
     xy_t = se2_transform_points(T, xy)  # (B, N, 2)
 
     out = peds.clone()
-    out[..., :2] = xy_t
+    out[..., :2] = torch.where(valid, xy_t, xy)
 
     # Velocity: dims 2-3 (if present)
     if node_feat_dim >= 4:
         vv = peds[..., 2:4]  # (B, N, 2)
         vv_t = se2_rotate_vectors(T, vv)
-        out[..., 2:4] = vv_t
+        out[..., 2:4] = torch.where(valid, vv_t, vv)
 
     return out.view(B, N * FP1)
 
 
 def augment_se2(
-    batch: dict,
-    max_peds: int,
-    node_feat_dim: int,
+    pose_rel: Tensor,
     max_translation: float = 2.0,
     p: float = 0.5,
-) -> dict:
-    """Apply a random SE(2) augmentation to training batch.
+) -> Tensor:
+    """Randomize the anchor frame of per-step relative poses P_k.
 
-    Transforms:
-      - data["PedestrianNodeSetSpace"] x, y positions and vx, vy velocities
-      - data["RobotPoseSpace"] world-frame robot poses (so computed P_k stays correct)
-    Does NOT transform:
-      - StackedLaserMapSpace (already egocentric per scan)
-      - DIST_ANGLE_TO_SUBGOAL (already robot-frame, recomputed from pose)
-      - is_first, reward, action (frame-invariant)
+    Replaces the anchor A with A∘T_g for a random SE(2) offset T_g:
+        P'_k = M_g^{-1} @ M_Pk = se2_compose(P_k, se2_inverse(T_g))
+
+    The decoder's anchor-frame ped targets are built downstream from P_k,
+    so randomizing P_k alone varies the anchor gauge the decoder must
+    generalize over — without touching any observations. Robot-frame ped
+    observations are invariant under a change of anchor, and P_k itself is
+    invariant under global world transforms, so transforming the batch dict
+    (the previous design) had no consistent geometric meaning.
 
     Args:
-        batch:            {key: Tensor (B, T, ...)} training batch dict
-        max_peds:         N
-        node_feat_dim:    F
-        max_translation:  uniform translation range (meters)
-        p:                augmentation probability per batch
+        pose_rel:        (B, T, 3) per-step anchor-relative poses.
+        max_translation: uniform translation range for T_g (meters).
+        p:               augmentation probability per batch element.
 
     Returns:
-        augmented batch (same dict, values may be modified in-place clones)
+        (B, T, 3) augmented pose_rel (input tensor not modified).
     """
-    if "RobotPoseSpace" not in batch or "PedestrianNodeSetSpace" not in batch:
-        return batch
+    B, T = pose_rel.shape[:2]
+    device = pose_rel.device
 
-    B, T = batch["RobotPoseSpace"].shape[:2]
-    device = batch["RobotPoseSpace"].device
-
-    # Sample per-batch-element mask
     mask = torch.rand(B, device=device) < p  # (B,)
     if not mask.any():
-        return batch
+        return pose_rel
 
-    # Sample random SE(2) per batch element
     tx = (torch.rand(B, device=device) * 2 - 1) * max_translation
     ty = (torch.rand(B, device=device) * 2 - 1) * max_translation
     theta = (torch.rand(B, device=device) * 2 - 1) * math.pi
-    T_aug = torch.stack([tx, ty, theta], dim=-1)  # (B, 3)
+    T_g_inv = se2_inverse(torch.stack([tx, ty, theta], dim=-1))  # (B, 3)
 
-    # Apply to robot poses: new_pose = se2_compose(T_aug, world_pose)
-    robot_poses = batch["RobotPoseSpace"].clone()  # (B, T, 3)
-    T_aug_exp = T_aug.unsqueeze(1).expand(-1, T, -1)  # (B, T, 3)
-    new_robot_poses = se2_compose(T_aug_exp, robot_poses)
-    # Apply mask (only augment selected batch elements)
-    mask_exp = mask.unsqueeze(1).unsqueeze(2).expand_as(robot_poses)
-    robot_poses = torch.where(mask_exp, new_robot_poses, robot_poses)
-
-    # Apply to ped observations (B, T, N*(F+1))
-    ped_obs = batch["PedestrianNodeSetSpace"].clone()  # (B, T, N*(F+1))
-    mask_bt = mask.unsqueeze(1).expand(-1, T)  # (B, T)
-    for t in range(T):
-        active = mask_bt[:, t]  # (B,)
-        if not active.any():
-            continue
-        T_t = T_aug  # same transform for all timesteps (global frame aug)
-        new_peds_t = apply_se2_to_peds_flat(T_t, ped_obs[:, t], max_peds, node_feat_dim)
-        ped_obs[:, t] = torch.where(
-            active.unsqueeze(-1).expand_as(ped_obs[:, t]),
-            new_peds_t,
-            ped_obs[:, t],
-        )
-
-    batch = dict(batch)  # shallow copy to avoid mutating caller's dict
-    batch["RobotPoseSpace"] = robot_poses
-    batch["PedestrianNodeSetSpace"] = ped_obs
-    return batch
+    augmented = se2_compose(pose_rel, T_g_inv.unsqueeze(1).expand(-1, T, -1))
+    return torch.where(mask.view(B, 1, 1), augmented, pose_rel)
 
 
 # ---------------------------------------------------------------------------

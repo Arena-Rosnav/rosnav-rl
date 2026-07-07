@@ -318,20 +318,9 @@ class WorldModel(nn.Module):
         # discount (batch_size, batch_length)
         data = self.preprocess(data)
 
-        # SE(2) global frame augmentation: random rotation + translation applied to
-        # both RobotPoseSpace and PedestrianNodeSetSpace, forcing decoder equivariance.
-        _se2_cfg = self._config.model.social
-        if _se2_cfg.use_se2_frame_canon and _se2_cfg.se2_augment_prob > 0:
-            from ..dreamerv3.se2_utils import augment_se2 as _augment_se2
-            data = _augment_se2(
-                data,
-                max_peds=_se2_cfg.max_peds,
-                node_feat_dim=_se2_cfg.node_feat_dim,
-                p=_se2_cfg.se2_augment_prob,
-            )
-
         # Invariant 5: compute per-step relative poses from anchor frame for SE(2)
         # frame canonicalization.  This is pure pose arithmetic — no grad needed.
+        _se2_cfg = self._config.model.social
         _pose_rel_bt = None
         if (
             _se2_cfg.use_se2_frame_canon
@@ -339,11 +328,21 @@ class WorldModel(nn.Module):
             and "RobotPoseSpace" in data
         ):
             with torch.no_grad():
-                from ..dreamerv3.se2_utils import compute_se2_relative_poses
+                from ..dreamerv3.se2_utils import (
+                    augment_se2,
+                    compute_se2_relative_poses,
+                )
 
                 _pose_rel_bt = compute_se2_relative_poses(
                     data["RobotPoseSpace"], data["is_first"]
                 )
+                # Anchor-gauge augmentation: randomize the anchor frame in P_k
+                # space only. Observations are untouched — they are invariant
+                # under a change of anchor.
+                if _se2_cfg.se2_augment_prob > 0:
+                    _pose_rel_bt = augment_se2(
+                        _pose_rel_bt, p=_se2_cfg.se2_augment_prob
+                    )
 
         with tools.RequiresGrad(self):
             with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=self._use_amp):
