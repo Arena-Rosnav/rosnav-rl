@@ -95,7 +95,8 @@ def se2_inverse(T: Tensor) -> Tensor:
 def se2_between(Ta: Tensor, Tb: Tensor) -> Tensor:
     """Relative pose of Tb expressed in Ta's frame.
 
-    se2_between(Ta, Tb) = se2_compose(se2_inverse(Ta), Tb)
+    As matrices: M_between = M_a^{-1} @ M_b. Under se2_compose's apply-T1-first
+    convention (M_composed = M_2 @ M_1) that is se2_compose(Tb, se2_inverse(Ta)).
 
     Useful for computing P_k = relative pose of robot at step k from anchor:
         P_k = se2_between(world_pose_anchor, world_pose_k)
@@ -107,7 +108,32 @@ def se2_between(Ta: Tensor, Tb: Tensor) -> Tensor:
     Returns:
         (..., 3) pose of Tb expressed in Ta's frame
     """
-    return se2_compose(se2_inverse(Ta), Tb)
+    return se2_compose(Tb, se2_inverse(Ta))
+
+
+def compute_se2_relative_poses(
+    world_poses: Tensor,
+    is_first: Tensor,
+) -> Tensor:
+    """Compute per-step SE(2) relative poses from the anchor frame.
+
+    Args:
+        world_poses: (B, T, 3) world-frame robot poses from RobotPoseSpace.
+        is_first:    (B, T)    True at episode-start steps.
+
+    Returns:
+        (B, T, 3)  P_k = se2_between(anchor_pose, world_pose_k) for each (b, t).
+        At t=0 (or any is_first step) the result is the identity (zero vector).
+    """
+    _, T, _ = world_poses.shape
+    result = torch.zeros_like(world_poses)
+    anchor = world_poses[:, 0].clone()   # (B, 3) — initialise to first pose
+    for t in range(T):
+        reset = is_first[:, t].bool()    # (B,)
+        # Update anchor where a new episode starts.
+        anchor = torch.where(reset.unsqueeze(-1), world_poses[:, t], anchor)
+        result[:, t] = se2_between(anchor, world_poses[:, t])
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -336,6 +362,7 @@ def integrate_se2(
     dy_body = vy * dt
     delta_body = torch.stack([dx_body, dy_body, dth], dim=-1)  # (B, 3)
 
-    # Compose: pose_accum is robot-in-anchor, delta_body is in current body frame
-    # se2_compose(pose_accum, delta_body) maps body-frame delta into anchor frame
-    return se2_compose(pose_accum, delta_body)
+    # Compose: pose_accum is robot-in-anchor, delta_body is in current body frame.
+    # Body-frame increments right-multiply: M_new = M_accum @ M_delta, which under
+    # se2_compose's apply-T1-first convention is se2_compose(delta_body, pose_accum).
+    return se2_compose(delta_body, pose_accum)

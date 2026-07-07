@@ -23,32 +23,6 @@ if TYPE_CHECKING:
     from ..dreamerv3 import cfg
 
 
-def _compute_se2_relative_poses(
-    world_poses: "torch.Tensor",
-    is_first: "torch.Tensor",
-) -> "torch.Tensor":
-    """Compute per-step SE(2) relative poses from the anchor frame.
-
-    Args:
-        world_poses: (B, T, 3) world-frame robot poses from RobotPoseSpace.
-        is_first:    (B, T)    True at episode-start steps.
-
-    Returns:
-        (B, T, 3)  P_k = se2_between(anchor_pose, world_pose_k) for each (b, t).
-        At t=0 (or any is_first step) the result is the identity (zero vector).
-    """
-    from ..dreamerv3.se2_utils import se2_between
-    B, T, _ = world_poses.shape
-    result = torch.zeros_like(world_poses)
-    anchor = world_poses[:, 0].clone()   # (B, 3) — initialise to first pose
-    for t in range(T):
-        reset = is_first[:, t].bool()    # (B,)
-        # Update anchor where a new episode starts.
-        anchor = torch.where(reset.unsqueeze(-1), world_poses[:, t], anchor)
-        result[:, t] = se2_between(anchor, world_poses[:, t])
-    return result
-    
-
 class RewardEMA:
     """Reward Exponential Moving Average (EMA) normalization class.
     
@@ -365,7 +339,9 @@ class WorldModel(nn.Module):
             and "RobotPoseSpace" in data
         ):
             with torch.no_grad():
-                _pose_rel_bt = _compute_se2_relative_poses(
+                from ..dreamerv3.se2_utils import compute_se2_relative_poses
+
+                _pose_rel_bt = compute_se2_relative_poses(
                     data["RobotPoseSpace"], data["is_first"]
                 )
 
