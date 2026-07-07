@@ -24,6 +24,7 @@ from std_msgs.msg import Int16
 
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.dreamerv3.safety import SafetyCalibration, attenuation_factor
+from rosnav_rl.model.model import RL_Model
 from rosnav_rl.observations import ObservationManager
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.utils.agent_paths import (
@@ -135,6 +136,13 @@ class ArenaInferenceNode:
         )
 
     def _load_safety_calibration(self) -> SafetyCalibration:
+        if type(self.agent.model).get_safety_signal is RL_Model.get_safety_signal:
+            raise RuntimeError(
+                f"rosnav_rl_inference: safety_layer_enabled=true but backend "
+                f"'{type(self.agent.model).__name__}' does not override get_safety_signal() "
+                "(SB3 backends never will; DreamerV3 needs behavior.expose_kl_surprise=true) "
+                "-- the safety layer would silently no-op, so refusing to start instead."
+            )
         path = self.node.get_parameter("safety_calibration_path").get_parameter_value().string_value
         if not path:
             raise RuntimeError(
@@ -145,16 +153,16 @@ class ArenaInferenceNode:
         return calib
 
     def _safety_gamma(self) -> float:
-        """EMA-smooth the deploy-time KL-surprise signal and convert it to a velocity scale.
+        """EMA-smooth the deploy-time uncertainty signal and convert it to a velocity scale.
 
-        No-op (returns 1.0) unless the safety layer is enabled and the loaded backend
-        actually populates ``last_step_info["kl_surprise"]`` (DreamerV3 only, and only
-        with ``behavior.expose_kl_surprise`` on) — SB3 agents fall through unaffected.
+        No-op (returns 1.0) unless the safety layer is enabled. Backend support for
+        ``get_safety_signal`` is verified once at load time (`_load_safety_calibration`),
+        so reaching here with it enabled means the signal is merely unavailable *this
+        step* (e.g. before the first ``get_action`` call), not unsupported.
         """
         if not self._safety_enabled:
             return 1.0
-        info = getattr(self.agent.model, "last_step_info", {})
-        u = info.get("kl_surprise")
+        u = self.agent.model.get_safety_signal()
         if u is None:
             return 1.0
         beta = self._safety_calib.ema_beta

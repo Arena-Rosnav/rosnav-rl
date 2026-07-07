@@ -111,6 +111,19 @@ class RL_Model(ABC):
     def transfer_weights(self, *args, **kwargs):
         raise NotImplementedError()
 
+    def get_safety_signal(self) -> Union[float, None]:
+        """Deploy-time uncertainty signal for the safety layer (see ``dreamerv3/safety.py``).
+
+        Default: unsupported. Subclasses override to expose a per-step scalar (e.g.
+        DreamerV3's KL-surprise ``u_t``) that the inference node calibrates a
+        velocity-attenuation factor against. ``None`` here means the backend cannot
+        produce this signal at all, not "no signal this step" — detect a non-overriding
+        (unsupported) backend via ``type(model).get_safety_signal is RL_Model.get_safety_signal``
+        rather than by calling this and checking for ``None``, since a supported backend
+        also legitimately returns ``None`` before its first ``get_action`` call.
+        """
+        return None
+
     @property
     def is_model_initialized(self):
         return self._model is not None

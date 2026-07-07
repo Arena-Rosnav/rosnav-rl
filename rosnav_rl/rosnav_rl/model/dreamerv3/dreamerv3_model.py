@@ -349,6 +349,13 @@ class DreamerV3Model(RL_Model):
 
         return self._rl_agent.space_manager.decode_action(action.squeeze(axis=0))
 
+    def get_safety_signal(self) -> float | None:
+        """Deploy-time KL-surprise ``u_t``, populated by ``get_action`` when
+        ``behavior.expose_kl_surprise`` is on. ``None`` before the first call or when
+        the flag is off (see :meth:`RL_Model.get_safety_signal` for the base contract).
+        """
+        return self.last_step_info.get("kl_surprise")
+
     def reset(self) -> None:
         """Clears recurrent state carried across ``get_action`` calls.
 
