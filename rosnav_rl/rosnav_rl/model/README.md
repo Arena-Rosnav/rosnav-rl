@@ -229,7 +229,10 @@ framework.  `DreamerV3Model` extends `RL_Model` and is registered with
 `ModelFactory` under `SupportedRLFrameworks.DREAMER_V3`.
 
 See [dreamerv3/package_description.md](dreamerv3/package_description.md) for
-architecture details.
+architecture details, including the
+[Social-Dreamer extensions](dreamerv3/package_description.md#social-dreamer-extensions)
+(social-GAT, dynamics context `d_t`, cSRSSM crowd-behavior context `b`, SE(2) frame
+canonicalization, calibrated safety layer, TSSM/transformer backbones).
 
 ---
 

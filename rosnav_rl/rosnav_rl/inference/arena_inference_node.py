@@ -23,6 +23,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Int16
 
 from rosnav_rl.cfg.parameters import AgentParameters
+from rosnav_rl.model.dreamerv3.safety import SafetyCalibration, attenuation_factor
 from rosnav_rl.observations import ObservationManager
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.utils.agent_paths import (
@@ -52,6 +53,10 @@ class ArenaInferenceNode:
         node.declare_parameter("lookahead_time", 1.5)
         node.declare_parameter("train_mode", False)
         node.declare_parameter("log_step_latency", False)
+        node.declare_parameter("safety_layer_enabled", False)
+        node.declare_parameter("safety_calibration_path", "")
+        node.declare_parameter("safety_lam", 1.0)
+        node.declare_parameter("safety_gamma_min", 0.3)
 
         self.agent_name = node.get_parameter("agent").get_parameter_value().string_value
         self.train_mode = bool(node.get_parameter("train_mode").get_parameter_value().bool_value)
@@ -66,6 +71,11 @@ class ArenaInferenceNode:
         self.lookahead_time = float(node.get_parameter("lookahead_time").get_parameter_value().double_value or 1.5)
         self._log_step_latency = bool(node.get_parameter("log_step_latency").get_parameter_value().bool_value)
         self._step_latencies: deque[float] = deque(maxlen=100)
+        self._safety_enabled = bool(node.get_parameter("safety_layer_enabled").get_parameter_value().bool_value)
+        self._safety_lam = float(node.get_parameter("safety_lam").get_parameter_value().double_value or 1.0)
+        self._safety_gamma_min = float(node.get_parameter("safety_gamma_min").get_parameter_value().double_value or 0.3)
+        self._safety_calib: SafetyCalibration | None = None
+        self._u_ema: float | None = None
 
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, node)
@@ -94,6 +104,8 @@ class ArenaInferenceNode:
             self.logger.info("[rosnav_rl] agent loaded")
             self.observation_manager = self._load_observation_manager()
             self.logger.info("[rosnav_rl] observation manager ready")
+            if self._safety_enabled:
+                self._safety_calib = self._load_safety_calibration()
         else:
             self.logger.info(
                 "[rosnav_rl] subgoal-only mode (train_mode=true); agent and cmd_vel publisher skipped"
@@ -122,12 +134,43 @@ class ArenaInferenceNode:
             wait_for_obs=False,
         )
 
+    def _load_safety_calibration(self) -> SafetyCalibration:
+        path = self.node.get_parameter("safety_calibration_path").get_parameter_value().string_value
+        if not path:
+            raise RuntimeError(
+                "rosnav_rl_inference: safety_layer_enabled=true requires 'safety_calibration_path'"
+            )
+        calib = SafetyCalibration.from_json(path)
+        self.logger.info(f"[rosnav_rl] safety layer enabled, deployed threshold={calib.deployed:.4f}")
+        return calib
+
+    def _safety_gamma(self) -> float:
+        """EMA-smooth the deploy-time KL-surprise signal and convert it to a velocity scale.
+
+        No-op (returns 1.0) unless the safety layer is enabled and the loaded backend
+        actually populates ``last_step_info["kl_surprise"]`` (DreamerV3 only, and only
+        with ``behavior.expose_kl_surprise`` on) — SB3 agents fall through unaffected.
+        """
+        if not self._safety_enabled:
+            return 1.0
+        info = getattr(self.agent.model, "last_step_info", {})
+        u = info.get("kl_surprise")
+        if u is None:
+            return 1.0
+        beta = self._safety_calib.ema_beta
+        u = float(u)
+        self._u_ema = u if self._u_ema is None else beta * u + (1.0 - beta) * self._u_ema
+        return attenuation_factor(
+            self._u_ema, self._safety_calib.deployed, lam=self._safety_lam, gamma_min=self._safety_gamma_min
+        )
+
     def _on_goal(self, msg: PoseStamped) -> None:
         self._goal = msg
 
     def _on_scenario_reset(self, _msg: Int16) -> None:
         self.agent.reset()
         self._last_speed = 0.0
+        self._u_ema = None
 
     def _step(self) -> None:
         if not self._log_step_latency:
@@ -189,7 +232,8 @@ class ArenaInferenceNode:
             self.logger.warn(f"[rosnav_rl] get_action failed: {type(exc).__name__}: {exc}")
             return
 
-        self._publish_cmd_vel(float(cmd[0]), float(cmd[1]), float(cmd[2]))
+        gamma = self._safety_gamma()
+        self._publish_cmd_vel(float(cmd[0]) * gamma, float(cmd[1]) * gamma, float(cmd[2]))
 
     def _lookup_robot_xy(self) -> tuple[float, float] | None:
         try:

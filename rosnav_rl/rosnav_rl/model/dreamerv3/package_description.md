@@ -9,6 +9,7 @@ A PyTorch-based implementation of DreamerV3 for robot navigation tasks integrate
 - [Architecture](#architecture)
 - [Custom Environments](#custom-environments)
 - [Observation Spaces](#observation-spaces)
+- [Social-Dreamer Extensions](#social-dreamer-extensions)
 - [Training](#training)
 - [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
@@ -205,6 +206,102 @@ class DreamerV3Model(RL_Model):
             "goal_max_dist": 10,
         }
 ```
+
+## Social-Dreamer Extensions
+
+Research extensions for crowd-navigation-aware world modeling, gated behind `SocialCfg`
+(`cfg.py`, `DreamerV3Cfg.social`). All disabled by default (`enabled=False` /
+`use_se2_frame_canon=False`) — the un-extended deploy path stays byte-identical to
+vanilla DreamerV3.
+
+### RSSM backbone options (`social.cell_type`)
+
+`"gru"` (default, unchanged RSSM) · `"transformer"` (`TransformerCell`, sliding-window
+causal attention over `transformer_ctx_len` steps, `transformer_num_heads` heads) ·
+`"tssm"` (STORM-style TSSM: obs-only posterior + one parallel causal block per
+imagination step, `tssm_num_layers` blocks, `tssm_ff_mult` MLP width multiplier).
+Backbone throughput (steps/sec, imagination memory vs. horizon) is benchmarked in
+[`benchmarks/backbone_throughput.py`](../../../benchmarks/backbone_throughput.py).
+
+### Social graph attention (`social.gat`, `SocialGATCfg`)
+
+Per-pedestrian node features (`node_feat_dim`: Dx, Dy, vx, vy, social_state) run through
+a graph attention encoder into a social context vector `c_t` (`out_dim`, default 64),
+concatenated onto `(stoch, deter)` before the actor/critic heads. `variant`: `"gat"`
+(shared-Q soft-blend, default) or `"height"` (HEIGHT-style heterogeneous edges).
+
+### Dynamics context `d_t` (`social.dali`, `SocialDALICfg`)
+
+DALI-inspired (not a port — see the note below) per-ped trajectory-window encoder
+producing a dynamics context vector `d_t` (`out_dim`, default 64) that conditions
+imagined-pedestrian rollouts. Gradient from `d_t` back through the actor is optional
+(config-gated).
+
+> **Not a faithful DALI port.** Unlike frankroeder/DALI, `d_t` here does not condition
+> the RSSM *transition* itself (`img_step`) — only downstream heads. The context that
+> does condition the transition is `b` (cSRSSM, next section). Cite as "DALI-inspired,"
+> not "DALI."
+
+### Contextual Social RSSM — crowd-behavior context `b` (`social.context`, `SocialContextCfg`)
+
+Casts social navigation as a contextual MDP: a slow, probabilistic crowd-behavior code
+`b` (`b_dim`, default 16) is inferred once per K-step window (`hidden`-width GRU reusing
+the DALI trajectory encoder) and conditions the RSSM **transition** directly
+(`img_step`) — this is what makes counterfactual social rollouts possible (swap `b`,
+hold state/actions fixed, observe the imagined pedestrian trajectory change). Trained
+with a VariBAD-style future-prediction loss (`context_pred_loss`: predict pooled crowd
+summary steps *beyond* the inference window) plus a KL information bottleneck
+(`social_context_kl`) so `b` can't just memorize the window. `master switch: enabled`;
+`0.0` disables `context_pred_loss` (ablation-only, known false-negative under domain
+randomization — see `social/context.py`).
+
+Two diagnostics turn the qualitative "does `b` carry real information" claim into a
+number:
+
+- **Counterfactual b-swap divergence** — [`social/counterfactual.py`](social/counterfactual.py)'s
+  `bswap_divergence`: swaps `b` mid-imagination with state/actions held fixed; a
+  collapsed prior should barely move the rollout, a live `b` should move it a lot.
+- **Driver-ID linear probe** — [`scripts/probe_context.py`](../../../scripts/probe_context.py)
+  (`python scripts/probe_context.py --codes context_codes.npz`): multinomial logistic
+  regression (single `torch.nn.Linear`, no sklearn dependency) predicting the active
+  pedestrian driver (ORCA/SFM/HSFM) from `b`, 5-fold CV. Phase-1 gate: accuracy well
+  above chance means `b` isn't collapsed; near-chance means the persistence-floor gap
+  caught the failure too late. Codes are dumped per-episode by
+  [`scripts/dump_context_codes.py`](../../../scripts/dump_context_codes.py) — **prerequisite**:
+  episodes must carry a `driver_id` key, not currently logged anywhere in the DreamerV3
+  episode store (`tools.py`'s `save_episodes`/`load_episodes` only carry
+  observation/action/reward); the script raises rather than silently no-ops until that
+  wiring exists.
+
+### SE(2) frame canonicalization (`social.use_se2_frame_canon`)
+
+Pedestrian positions are decoded in an anchor-relative SE(2) frame and exactly
+transformed back before GAT/DALI/`b`, eliminating the bias that would otherwise
+accumulate over the imagination horizon (`se2_utils.py`; `kinematics_dt` sets the
+control period used by `integrate_se2`). `se2_augment_prob` randomizes the anchor gauge
+(pure `P_k`-space augmentation — observations are never touched) as a regularizer
+against overfitting one anchor.
+
+> **Breaking change:** checkpoints trained before the 2026-07-07 composition-order fix
+> (`se2_between`, `integrate_se2`) or with nonzero `se2_augment_prob` under the old
+> augmentation design are invalidated by these fixes — retrain, do not resume.
+
+### Calibrated safety layer (`safety.py`, §2.4 stretch)
+
+Pure-math split-conformal calibration (`fit_conformal_threshold`, no ROS/torch
+dependency) turning the deploy-time KL-surprise signal
+`u_t = KL(q(z|o) || p(z))` into a calibrated velocity-attenuation factor: fit a
+per-driver conformal threshold on validation episodes, take the max across training
+drivers (the robot can't know the true driver at runtime), shrink commanded velocity
+once `u_t` exceeds it. This module provides the calibration math and serialization
+format only — running calibration against real validation episodes needs a trained
+checkpoint (Phase-4-gated).
+
+### Staged social-training curriculum (`social.curriculum`)
+
+Gated curriculum (`enabled`, default `False`): stages advance only when a gate metric is
+met, with a step cap as fallback (`warmup_steps`, `gat_steps`, ... additive). Default
+gates: `success_gate=0.0`, `ct_ablation_drop_gate=0.03`, `collision_gate=1.0`.
 
 ## Training
 
