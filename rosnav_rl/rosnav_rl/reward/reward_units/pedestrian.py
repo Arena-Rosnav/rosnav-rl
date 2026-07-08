@@ -1,5 +1,6 @@
 """Pedestrian-aware safety, collision, and social-proximity reward units."""
 
+import warnings
 from typing import Any, Dict
 
 import numpy as np
@@ -691,3 +692,119 @@ class RewardSocialPotential(RewardUnit):
     def reset(self):
         """Reset internal state for new episode."""
         self.last_phi = None
+
+
+@RewardUnitFactory.register("tgrf_discomfort")
+class RewardTGRFDiscomfort(RewardUnit):
+    """Reward unit for TGRF-style (Transformable Gaussian Reward Function) discomfort.
+
+    Peak-normalized Gaussian penalty on the nearest pedestrian's distance, following
+    Kim et al. 2024 (Sensors 24(14):4540, arXiv:2402.14569). Unlike `proxemic_intrusion`'s
+    anisotropic, heading-aware penalty summed over all pedestrians, TGRF is isotropic and
+    keyed only to the single nearest pedestrian, active only inside a fixed danger zone.
+    This is the literature-established composite term cited in the paper; kept separate
+    from and simpler than `proxemic_intrusion`/`social_potential` (both remain available
+    in the codebase but are dropped from the active composite to avoid double-counting
+    discomfort).
+
+    Technical Specifications:
+    - Peak-Normalized Gaussian: TGRF(w, mu, sigma; x) = w * N(x; mu, sigma) / max(N) =
+      w * exp(-0.5 * ((x - mu) / sigma)^2) with mu=0 — peak-normalization cancels the
+      1/(sigma*sqrt(2*pi)) constant, so `weight` alone sets the maximum magnitude.
+    - Danger Zone Gating: term is exactly zero once nearest-pedestrian distance
+      d_min >= danger_zone_m (paper: d_disc).
+    - Nearest-Pedestrian Selection: uses the minimum Euclidean distance across all
+      tracked pedestrians; no heading/velocity dependence (isotropic, unlike
+      `proxemic_intrusion`).
+
+    Configuration:
+        weight: Penalty scale at d_min=0 (paper: w_disc=0.25).
+        sigma: Gaussian spread in meters (paper: sigma_disc=0.2).
+        danger_zone_m: Distance in meters beyond which the term is exactly zero
+            (paper: d_disc=0.5).
+
+    Output Behavior: reward = -weight * exp(-0.5 * (d_min / sigma)^2) if
+    d_min < danger_zone_m else 0.0.
+
+    Applications: Literature-established discomfort composite for Social-Dreamer /
+    ICRA2027 experiments (citable, TGRF-style; Kim et al. 2024).
+    """
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+    }
+
+    @check_params
+    def __init__(
+        self,
+        reward_function: RewardFunction,
+        weight: float = DEFAULTS.TGRF_DISCOMFORT.WEIGHT,
+        sigma: float = DEFAULTS.TGRF_DISCOMFORT.SIGMA,
+        danger_zone_m: float = DEFAULTS.TGRF_DISCOMFORT.DANGER_ZONE_M,
+        _on_safe_dist_violation: bool = DEFAULTS.TGRF_DISCOMFORT._ON_SAFE_DIST_VIOLATION,
+        *args,
+        **kwargs,
+    ) -> None:
+        """Initialize the TGRF discomfort reward unit.
+
+        Args:
+            reward_function: The reward function object holding this unit
+            weight: Penalty scale at zero distance (paper: w_disc)
+            sigma: Gaussian spread in meters (paper: sigma_disc)
+            danger_zone_m: Distance beyond which the term is exactly zero (paper: d_disc)
+            _on_safe_dist_violation: Whether to apply penalty on safe distance violation
+            *args: Variable arguments
+            **kwargs: Keyword arguments
+        """
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+        self._weight = weight
+        self._sigma = sigma
+        self._danger_zone_m = danger_zone_m
+
+    def check_parameters(self, *args: Any, **kwargs: Any) -> None:
+        """Warn on non-positive scale parameters."""
+        if self._weight <= 0:
+            warn_msg = (
+                f"'tgrf_discomfort' weight ({self._weight}) should be positive; "
+                "it is negated internally to produce a penalty."
+            )
+            self._report_warning(warn_msg)
+            warnings.warn(warn_msg, UserWarning, stacklevel=2)
+        if self._sigma <= 0:
+            warn_msg = f"'tgrf_discomfort' sigma ({self._sigma}) must be positive."
+            self._report_warning(warn_msg)
+            warnings.warn(warn_msg, UserWarning, stacklevel=2)
+
+    def __call__(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Penalize the robot for the nearest pedestrian entering the danger zone.
+
+        Args:
+            pedestrian_relative_locations (PedestrianRelativeLocations): Pedestrian
+                positions in the robot frame
+                - Format: N×2 array of [x, y] positions in meters
+                - Source: pedestrian tracking system
+                - Example: [[2.0, 1.5], [-1.0, 0.5]]
+        """
+        if pedestrian_relative_locations is None or len(pedestrian_relative_locations) == 0:
+            return
+
+        d_min = np.min(
+            np.hypot(
+                pedestrian_relative_locations[:, 0],
+                pedestrian_relative_locations[:, 1],
+            )
+        )
+
+        if d_min >= self._danger_zone_m:
+            return
+
+        self.add_reward(-self._weight * np.exp(-0.5 * (d_min / self._sigma) ** 2))
+
+    def reset(self) -> None:
+        """Reset internal state for new episode."""
+        pass

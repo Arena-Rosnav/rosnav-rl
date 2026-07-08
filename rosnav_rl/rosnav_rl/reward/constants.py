@@ -101,3 +101,9 @@ class DEFAULTS:
         DISTANCE: float = 1.25
         FACTOR: float = -0.5
         _ON_SAFE_DIST_VIOLATION: bool = True
+
+    class TGRF_DISCOMFORT:
+        WEIGHT: float = 0.25
+        SIGMA: float = 0.2
+        DANGER_ZONE_M: float = 0.5
+        _ON_SAFE_DIST_VIOLATION: bool = True

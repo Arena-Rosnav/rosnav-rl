@@ -37,6 +37,7 @@ from rosnav_rl.reward.reward_units.reward_units import (
     RewardMaxStepsExceeded,
     RewardProxemicIntrusion,
     RewardSocialPotential,
+    RewardTGRFDiscomfort,
 )
 from rosnav_rl.reward.constants import DEFAULTS, DONE_REASONS
 
@@ -1217,3 +1218,61 @@ class TestRewardSocialPotential:
 
         unit.reset()
         assert unit.last_phi is None
+
+
+class TestRewardTGRFDiscomfort:
+    def _call(self, unit, ped_locations):
+        unit(pedestrian_relative_locations=np.array(ped_locations))
+
+    def test_peak_penalty_at_zero_distance(self, make_reward_function):
+        rf = make_reward_function()
+        unit = RewardTGRFDiscomfort(rf, weight=0.25, sigma=0.2, danger_zone_m=0.5)
+
+        self._call(unit, [[0.0, 0.0]])
+
+        assert total_reward(rf) == pytest.approx(-0.25)
+
+    def test_exact_zero_beyond_danger_zone(self, make_reward_function):
+        rf = make_reward_function()
+        unit = RewardTGRFDiscomfort(rf, weight=0.25, sigma=0.2, danger_zone_m=0.5)
+
+        self._call(unit, [[0.5, 0.0]])
+        self._call(unit, [[5.0, 0.0]])
+
+        assert total_reward(rf) == pytest.approx(0.0)
+
+    def test_penalty_decays_with_distance(self, make_reward_function):
+        rf_near = make_reward_function()
+        unit_near = RewardTGRFDiscomfort(rf_near, weight=0.25, sigma=0.2, danger_zone_m=0.5)
+        self._call(unit_near, [[0.1, 0.0]])
+
+        rf_far = make_reward_function()
+        unit_far = RewardTGRFDiscomfort(rf_far, weight=0.25, sigma=0.2, danger_zone_m=0.5)
+        self._call(unit_far, [[0.4, 0.0]])
+
+        assert total_reward(rf_near) < total_reward(rf_far) < 0.0
+
+    def test_nearest_pedestrian_selected(self, make_reward_function):
+        rf_nearest = make_reward_function()
+        unit_nearest = RewardTGRFDiscomfort(rf_nearest, weight=0.25, sigma=0.2, danger_zone_m=0.5)
+        self._call(unit_nearest, [[0.1, 0.0]])
+
+        rf_multi = make_reward_function()
+        unit_multi = RewardTGRFDiscomfort(rf_multi, weight=0.25, sigma=0.2, danger_zone_m=0.5)
+        self._call(unit_multi, [[0.1, 0.0], [5.0, 5.0]])
+
+        assert total_reward(rf_multi) == pytest.approx(total_reward(rf_nearest))
+
+    def test_no_pedestrians_no_op(self, make_reward_function):
+        rf = make_reward_function()
+        unit = RewardTGRFDiscomfort(rf)
+
+        self._call(unit, np.empty((0, 2)))
+
+        assert total_reward(rf) == pytest.approx(0.0)
+
+    def test_check_parameters_warns_on_non_positive_weight(self, make_reward_function):
+        rf = make_reward_function()
+
+        with pytest.warns(UserWarning):
+            RewardTGRFDiscomfort(rf, weight=-0.1)

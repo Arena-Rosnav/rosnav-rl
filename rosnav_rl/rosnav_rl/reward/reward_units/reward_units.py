@@ -8,6 +8,7 @@ from .pedestrian import (
     RewardPedTypeVelocityConstraint,
     RewardProxemicIntrusion,
     RewardSocialPotential,
+    RewardTGRFDiscomfort,
 )
 from .velocity import (
     RewardNoMovement,
