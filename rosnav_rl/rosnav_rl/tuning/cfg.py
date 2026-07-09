@@ -125,16 +125,16 @@ class TuningCfg(BaseModel):
         agents_dir: /tmp/tuning_agents
 
         search_space:
-          agent_cfg.framework.algorithm.parameters.learning_rate:
+          agent_config.framework.algorithm.parameters.learning_rate:
             type: float
             low: 1.0e-5
             high: 1.0e-3
             log: true
-          agent_cfg.framework.algorithm.parameters.gamma:
+          agent_config.framework.algorithm.parameters.gamma:
             type: float
             low: 0.9
             high: 0.9999
-          agent_cfg.framework.algorithm.parameters.n_steps:
+          agent_config.framework.algorithm.parameters.n_steps:
             type: int
             low: 128
             high: 4096

@@ -31,10 +31,10 @@ def suggest_params(trial: "optuna.trial.Trial", search_space: SearchSpace) -> Di
     Example::
 
         params = suggest_params(trial, {
-            "agent_cfg.framework.algorithm.parameters.learning_rate":
+            "agent_config.framework.algorithm.parameters.learning_rate":
                 FloatParam(low=1e-5, high=1e-3, log=True),
         })
-        # params == {"agent_cfg.framework.algorithm.parameters.learning_rate": 0.000342}
+        # params == {"agent_config.framework.algorithm.parameters.learning_rate": 0.000342}
     """
     params: Dict[str, Any] = {}
     for path, param in search_space.items():
@@ -81,7 +81,7 @@ def apply_params(config_dict: dict, params: Dict[str, Any]) -> dict:
 
         base = {"agent_cfg": {"framework": {"algorithm": {"parameters": {"learning_rate": 3e-4}}}}}
         updated = apply_params(base, {
-            "agent_cfg.framework.algorithm.parameters.learning_rate": 1e-4,
+            "agent_config.framework.algorithm.parameters.learning_rate": 1e-4,
         })
         # updated["agent_cfg"]["framework"]["algorithm"]["parameters"]["learning_rate"] == 1e-4
     """

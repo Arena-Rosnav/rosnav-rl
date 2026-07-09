@@ -46,16 +46,16 @@ from rosnav_rl.tuning.search_space import (
 @pytest.fixture
 def sample_search_space() -> SearchSpace:
     return {
-        "agent_cfg.framework.algorithm.parameters.learning_rate": FloatParam(
+        "agent_config.framework.algorithm.parameters.learning_rate": FloatParam(
             low=1e-5, high=1e-3, log=True
         ),
-        "agent_cfg.framework.algorithm.parameters.n_steps": IntParam(
+        "agent_config.framework.algorithm.parameters.n_steps": IntParam(
             low=128, high=4096, step=128
         ),
-        "agent_cfg.framework.algorithm.parameters.gamma": FloatParam(
+        "agent_config.framework.algorithm.parameters.gamma": FloatParam(
             low=0.9, high=0.9999
         ),
-        "agent_cfg.framework.algorithm.parameters.batch_size": CategoricalParam(
+        "agent_config.framework.algorithm.parameters.batch_size": CategoricalParam(
             choices=[64, 128, 256, 512]
         ),
     }
@@ -65,7 +65,7 @@ def sample_search_space() -> SearchSpace:
 def nested_config() -> dict:
     """A minimal nested config dict mimicking TrainingCfg.model_dump()."""
     return {
-        "agent_cfg": {
+        "agent_config": {
             "name": "test_agent",
             "framework": {
                 "algorithm": {
@@ -196,7 +196,7 @@ class TestTuningCfg:
             "study_name": "test",
             "n_trials": 10,
             "search_space": {
-                "agent_cfg.framework.algorithm.parameters.learning_rate": {
+                "agent_config.framework.algorithm.parameters.learning_rate": {
                     "type": "float",
                     "low": 1e-5,
                     "high": 1e-3,
@@ -207,7 +207,7 @@ class TestTuningCfg:
         cfg = TuningCfg.model_validate(data)
         assert cfg.n_trials == 10
         lr_param = cfg.search_space[
-            "agent_cfg.framework.algorithm.parameters.learning_rate"
+            "agent_config.framework.algorithm.parameters.learning_rate"
         ]
         assert isinstance(lr_param, FloatParam)
         assert lr_param.log is True
@@ -254,10 +254,10 @@ class TestSuggestParams:
 
     def test_basic_suggest(self, sample_search_space):
         expected = {
-            "agent_cfg.framework.algorithm.parameters.learning_rate": 1e-4,
-            "agent_cfg.framework.algorithm.parameters.n_steps": 512,
-            "agent_cfg.framework.algorithm.parameters.gamma": 0.995,
-            "agent_cfg.framework.algorithm.parameters.batch_size": 128,
+            "agent_config.framework.algorithm.parameters.learning_rate": 1e-4,
+            "agent_config.framework.algorithm.parameters.n_steps": 512,
+            "agent_config.framework.algorithm.parameters.gamma": 0.995,
+            "agent_config.framework.algorithm.parameters.batch_size": 128,
         }
         trial = self._make_mock_trial(expected)
         result = suggest_params(trial, sample_search_space)
@@ -291,18 +291,18 @@ class TestSuggestParams:
 class TestApplyParams:
     def test_basic_override(self, nested_config):
         params = {
-            "agent_cfg.framework.algorithm.parameters.learning_rate": 1e-4,
+            "agent_config.framework.algorithm.parameters.learning_rate": 1e-4,
         }
         result = apply_params(nested_config, params)
         assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"][
+            result["agent_config"]["framework"]["algorithm"]["parameters"][
                 "learning_rate"
             ]
             == 1e-4
         )
         # Original should be unchanged
         assert (
-            nested_config["agent_cfg"]["framework"]["algorithm"]["parameters"][
+            nested_config["agent_config"]["framework"]["algorithm"]["parameters"][
                 "learning_rate"
             ]
             == 3e-4
@@ -310,33 +310,33 @@ class TestApplyParams:
 
     def test_multiple_overrides(self, nested_config):
         params = {
-            "agent_cfg.framework.algorithm.parameters.learning_rate": 1e-4,
-            "agent_cfg.framework.algorithm.parameters.n_steps": 512,
-            "agent_cfg.framework.algorithm.parameters.gamma": 0.999,
+            "agent_config.framework.algorithm.parameters.learning_rate": 1e-4,
+            "agent_config.framework.algorithm.parameters.n_steps": 512,
+            "agent_config.framework.algorithm.parameters.gamma": 0.999,
         }
         result = apply_params(nested_config, params)
         assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"][
+            result["agent_config"]["framework"]["algorithm"]["parameters"][
                 "learning_rate"
             ]
             == 1e-4
         )
         assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_steps"]
+            result["agent_config"]["framework"]["algorithm"]["parameters"]["n_steps"]
             == 512
         )
         assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["gamma"]
+            result["agent_config"]["framework"]["algorithm"]["parameters"]["gamma"]
             == 0.999
         )
 
     def test_nested_reward_override(self, nested_config):
         params = {
-            "agent_cfg.reward.reward_function_dict.goal_reached.reward": 20.0,
+            "agent_config.reward.reward_function_dict.goal_reached.reward": 20.0,
         }
         result = apply_params(nested_config, params)
         assert (
-            result["agent_cfg"]["reward"]["reward_function_dict"]["goal_reached"][
+            result["agent_config"]["reward"]["reward_function_dict"]["goal_reached"][
                 "reward"
             ]
             == 20.0
@@ -345,7 +345,7 @@ class TestApplyParams:
     def test_deep_copy(self, nested_config):
         """Ensure apply_params does not mutate the original config."""
         original = copy.deepcopy(nested_config)
-        apply_params(nested_config, {"agent_cfg.name": "modified"})
+        apply_params(nested_config, {"agent_config.name": "modified"})
         assert nested_config == original
 
     def test_top_level_override(self, nested_config):
@@ -355,7 +355,7 @@ class TestApplyParams:
     def test_missing_intermediate_key_raises(self, nested_config):
         with pytest.raises(KeyError, match="nonexistent"):
             apply_params(
-                nested_config, {"agent_cfg.nonexistent.key": "value"}
+                nested_config, {"agent_config.nonexistent.key": "value"}
             )
 
     def test_missing_final_key_raises(self, nested_config):
@@ -363,7 +363,7 @@ class TestApplyParams:
             apply_params(
                 nested_config,
                 {
-                    "agent_cfg.framework.algorithm.parameters.nonexistent_param": 42
+                    "agent_config.framework.algorithm.parameters.nonexistent_param": 42
                 },
             )
 
@@ -374,12 +374,12 @@ class TestApplyParams:
     def test_override_preserves_siblings(self, nested_config):
         """Changing one param shouldn't affect sibling values."""
         params = {
-            "agent_cfg.framework.algorithm.parameters.learning_rate": 1e-4,
+            "agent_config.framework.algorithm.parameters.learning_rate": 1e-4,
         }
         result = apply_params(nested_config, params)
         # n_epochs should still be 10
         assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_epochs"]
+            result["agent_config"]["framework"]["algorithm"]["parameters"]["n_epochs"]
             == 10
         )
 
@@ -686,3 +686,145 @@ class TestDreamerV3TrialPruner:
         assert result is True
         # report called twice: once from after_eval_hook, once from check_and_report
         assert trial.report.call_count == 2
+
+
+class TestDreamerV3TrialPrunerConfigurableMetric:
+    """metric='success_composite' / 'context_pred_gap' (P7.3.2)."""
+
+    pytestmark = requires_optuna
+
+    def _make_trial(self, should_prune=False):
+        trial = MagicMock()
+        trial.number = 0
+        trial.should_prune.return_value = should_prune
+        return trial
+
+    def test_success_composite_formula(self):
+        import math
+
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(trial, metric="success_composite")
+
+        pruner.after_eval_hook({"eval_return": 25.0, "eval_success_rate": 0.6})
+        expected = 0.6 + 0.001 * math.tanh(25.0 / 50.0)
+        assert pruner.read_metric() == pytest.approx(expected)
+
+    def test_success_composite_zero_return_is_pure_success_rate(self):
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(trial, metric="success_composite")
+
+        pruner.after_eval_hook({"eval_return": 0.0, "eval_success_rate": 0.8})
+        assert pruner.read_metric() == pytest.approx(0.8)
+
+    def test_success_composite_return_term_bounded(self):
+        """The return term must never exceed +/-0.001 regardless of magnitude."""
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(trial, metric="success_composite")
+
+        pruner.after_eval_hook({"eval_return": 1e6, "eval_success_rate": 0.5})
+        assert pruner.read_metric() == pytest.approx(0.501, abs=1e-6)
+
+    def test_context_pred_gap_metric(self):
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(trial, metric="context_pred_gap")
+
+        pruner.after_eval_hook({"context_pred_gap": 0.42, "eval_return": 999.0})
+        assert pruner.read_metric() == 0.42
+
+    def test_unknown_metric_key_defaults_to_neg_inf(self):
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(trial, metric="nonexistent_key")
+
+        pruner.after_eval_hook({"eval_return": 1.0})
+        assert pruner.read_metric() == float("-inf")
+
+    def test_default_metric_is_back_compat_eval_return(self):
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(trial)
+
+        pruner.after_eval_hook({"eval_return": 7.0, "eval_success_rate": 1.0})
+        assert pruner.read_metric() == 7.0
+
+
+class TestDreamerV3TrialPrunerHealthPrune:
+    """Context-collapse health pruning (P7.3.3)."""
+
+    pytestmark = requires_optuna
+
+    def _make_trial(self, should_prune=False):
+        trial = MagicMock()
+        trial.number = 0
+        trial.should_prune.return_value = should_prune
+        return trial
+
+    def _hp(self, **overrides):
+        from rosnav_rl.tuning.cfg import HealthPruneCfg
+
+        defaults = dict(enabled=True, min_gap=0.0, after_steps=100, patience=2)
+        defaults.update(overrides)
+        return HealthPruneCfg(**defaults)
+
+    def test_noop_when_disabled(self):
+        from rosnav_rl.tuning.cfg import HealthPruneCfg
+
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(
+            trial,
+            health_prune=HealthPruneCfg(enabled=False),
+            social_context_enabled=True,
+        )
+        # Would trigger if enabled: collapsed gap, well past after_steps.
+        for _ in range(5):
+            pruner.after_eval_hook({"step": 1_000_000, "context_pred_gap": -1.0})
+        # No exception raised — health pruning never engaged.
+
+    def test_noop_when_social_context_disabled(self):
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(
+            trial, health_prune=self._hp(), social_context_enabled=False
+        )
+        for _ in range(5):
+            pruner.after_eval_hook({"step": 1_000_000, "context_pred_gap": -1.0})
+
+    def test_noop_before_after_steps(self):
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(
+            trial, health_prune=self._hp(), social_context_enabled=True
+        )
+        for _ in range(5):
+            pruner.after_eval_hook({"step": 50, "context_pred_gap": -1.0})
+
+    def test_prunes_after_patience_consecutive_collapsed_evals(self):
+        import optuna
+
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(
+            trial, health_prune=self._hp(patience=2), social_context_enabled=True
+        )
+        # First collapsed eval past after_steps — not pruned yet (patience=2).
+        pruner.after_eval_hook({"step": 100, "context_pred_gap": -0.1})
+        with pytest.raises(optuna.TrialPruned):
+            pruner.after_eval_hook({"step": 110, "context_pred_gap": -0.1})
+
+    def test_streak_resets_on_recovery(self):
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(
+            trial, health_prune=self._hp(patience=2), social_context_enabled=True
+        )
+        pruner.after_eval_hook({"step": 100, "context_pred_gap": -0.1})
+        # Recovers above min_gap — streak resets, must not prune next collapse.
+        pruner.after_eval_hook({"step": 110, "context_pred_gap": 0.5})
+        pruner.after_eval_hook({"step": 120, "context_pred_gap": -0.1})
+        # Only 1 consecutive collapsed eval since the recovery — no prune.
+
+    def test_gap_exactly_min_gap_counts_as_collapsed(self):
+        import optuna
+
+        trial = self._make_trial()
+        pruner = DreamerV3TrialPruner(
+            trial,
+            health_prune=self._hp(min_gap=0.0, patience=1),
+            social_context_enabled=True,
+        )
+        with pytest.raises(optuna.TrialPruned):
+            pruner.after_eval_hook({"step": 100, "context_pred_gap": 0.0})

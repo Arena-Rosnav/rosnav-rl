@@ -20,10 +20,11 @@ rosnav_rl/tuning/
 ├── cfg.py                TuningCfg — Pydantic model for the tuning YAML
 ├── search_space.py       FloatParam / IntParam / CategoricalParam
 ├── sampler.py            suggest_params(), apply_params()
-├── pruner_base.py        TrialPrunerBase — abstract, framework-agnostic
-├── sb3_pruner.py         SB3TrialPruner   — extends TrialPrunerBase + BaseCallback
-├── dreamerv3_pruner.py   DreamerV3TrialPruner — extends TrialPrunerBase
-└── callbacks.py          compatibility shim (deprecated, imports from sb3_pruner)
+└── pruner/
+    ├── __init__.py
+    ├── pruner_base.py    TrialPrunerBase — abstract, framework-agnostic
+    ├── sb3_pruner.py     SB3TrialPruner   — extends TrialPrunerBase + BaseCallback
+    └── dreamerv3_pruner.py  DreamerV3TrialPruner — extends TrialPrunerBase
 ```
 
 ### Class hierarchy
@@ -66,24 +67,24 @@ pruner:
   n_warmup_steps:   10
 
 search_space:
-  agent_cfg.framework.algorithm.parameters.learning_rate:
+  agent_config.framework.algorithm.parameters.learning_rate:
     type: float
     low:  1.0e-5
     high: 1.0e-3
     log:  true
 
-  agent_cfg.framework.algorithm.parameters.n_steps:
+  agent_config.framework.algorithm.parameters.n_steps:
     type: int
     low:  128
     high: 4096
     step: 128
 
-  agent_cfg.framework.algorithm.parameters.gamma:
+  agent_config.framework.algorithm.parameters.gamma:
     type: float
     low:  0.90
     high: 0.9999
 
-  agent_cfg.framework.algorithm.parameters.batch_size:
+  agent_config.framework.algorithm.parameters.batch_size:
     type: categorical
     choices: [64, 128, 256, 512]
 ```
@@ -120,17 +121,17 @@ pruner:
   n_warmup_steps:   5
 
 search_space:
-  agent_cfg.framework.training.batch_size:
+  agent_config.framework.training.batch_size:
     type: categorical
     choices: [8, 16, 32]
 
-  agent_cfg.framework.training.batch_length:
+  agent_config.framework.training.batch_length:
     type: int
     low:  16
     high: 64
     step: 16
 
-  agent_cfg.framework.world_model.model_lr:
+  agent_config.framework.world_model.model_lr:
     type: float
     low:  1.0e-5
     high: 1.0e-3

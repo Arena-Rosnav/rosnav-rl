@@ -68,8 +68,8 @@ SearchSpace = Dict[str, SearchParam]
 Example::
 
     {
-        "agent_cfg.framework.algorithm.parameters.learning_rate": FloatParam(low=1e-5, high=1e-3, log=True),
-        "agent_cfg.framework.algorithm.parameters.n_steps": IntParam(low=128, high=4096, step=128),
-        "agent_cfg.framework.algorithm.parameters.gamma": FloatParam(low=0.9, high=0.9999),
+        "agent_config.framework.algorithm.parameters.learning_rate": FloatParam(low=1e-5, high=1e-3, log=True),
+        "agent_config.framework.algorithm.parameters.n_steps": IntParam(low=128, high=4096, step=128),
+        "agent_config.framework.algorithm.parameters.gamma": FloatParam(low=0.9, high=0.9999),
     }
 """
