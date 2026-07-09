@@ -80,7 +80,14 @@ class Dreamer(nn.Module):
         self._metrics = {}
 
         # this is update step
-        self._step = logger.step // config.environment.action_repeat
+        # `logger` is None for inference-only construction (see
+        # dreamerv3_model.py's `inference_only` path); __call__ only reads
+        # `self._logger` under `if training:`, so step 0 is a safe default here.
+        self._step = (
+            logger.step // config.environment.action_repeat
+            if logger is not None
+            else 0
+        )
         self._update_count = 0
         self._dataset = dataset
         self._wm = models.WorldModel(obs_space, act_space, self._step, config)
