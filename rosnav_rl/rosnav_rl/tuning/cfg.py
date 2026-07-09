@@ -122,6 +122,18 @@ class TuningCfg(BaseModel):
             "If None, uses the value from the base config."
         ),
     )
+    trial_timeout_s: Optional[float] = Field(
+        None,
+        gt=0,
+        description=(
+            "Wall-clock budget per trial, in seconds. If a trial's training "
+            "loop is still running past this deadline, it is aborted (raises, "
+            "so Optuna records the trial FAILED, not COMPLETE) and the study "
+            "moves on to the next trial. Checked once per evaluation, not "
+            "preemptively — a single eval-to-eval interval can still overrun. "
+            "If None, trials never time out."
+        ),
+    )
 
     # ── Output ────────────────────────────────────────────────────────────
     agents_dir: Optional[Path] = Field(
