@@ -359,8 +359,18 @@ def train(
                 )
                 if after_eval_fn is not None:
                     after_eval_fn({
+                        "step": logger.step,
                         "eval_return": logger._scalars.get("eval_return", float("-inf")),
                         "eval_success_rate": logger._scalars.get("eval_success_rate", 0.0),
+                        # World-model diagnostics from the most recent training step.
+                        # Absent (default 0.0) when the corresponding head/module is
+                        # disabled in config (e.g. social.context, PedestrianNodeSetSpace).
+                        "context_pred_gap": logger._scalars.get("context_pred_gap", 0.0),
+                        "context_pred_floor": logger._scalars.get("context_pred_floor", 0.0),
+                        "context_kl_loss": logger._scalars.get("context_kl_loss", 0.0),
+                        "PedestrianNodeSetSpace_loss": logger._scalars.get(
+                            "PedestrianNodeSetSpace_loss", 0.0
+                        ),
                     })
 
             # Run training phase

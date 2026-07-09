@@ -46,6 +46,62 @@ class PrunerCfg(BaseModel):
     )
 
 
+class HealthPruneCfg(BaseModel):
+    """Context-collapse early-kill for Social-Dreamer tuning trials.
+
+    ``context_pred_gap`` (context_pred_floor - context_pred_raw) is the
+    early-warning signal for a collapsed social context bottleneck — once
+    it settles at or below zero, the trial is not going to recover a live,
+    identifiable context. This lets the pruner kill it without waiting for
+    the full trial budget.
+    """
+
+    enabled: bool = Field(
+        False,
+        description="Enable context-collapse health pruning (DreamerV3 + social.context only).",
+    )
+    min_gap: float = Field(
+        0.0,
+        description="context_pred_gap at or below this value counts as collapsed.",
+    )
+    after_steps: int = Field(
+        75_000,
+        ge=0,
+        description="Health pruning only kicks in once the trial has run this many env steps.",
+    )
+    patience: int = Field(
+        2,
+        ge=1,
+        description="Number of consecutive collapsed evals (after after_steps) before pruning.",
+    )
+
+
+class SamplerCfg(BaseModel):
+    """Configuration for the Optuna sampler."""
+
+    type: Literal["tpe"] = Field(
+        "tpe",
+        description="Sampler algorithm. Only TPE is currently supported.",
+    )
+    seed: Optional[int] = Field(
+        None,
+        description="Random seed for the sampler. If None, Optuna picks one.",
+    )
+    multivariate: bool = Field(
+        True,
+        description=(
+            "Model joint parameter dependencies instead of sampling each "
+            "independently. Recommended when parameters interact (e.g. lr "
+            "and train_ratio)."
+        ),
+    )
+    n_startup_trials: int = Field(
+        10,
+        ge=0,
+        description="Number of trials to sample randomly before TPE kicks in.",
+    )
+
+
 class TuningCfg(BaseModel):
     """Full configuration for an Optuna hyperparameter tuning run.
 
@@ -160,6 +216,16 @@ class TuningCfg(BaseModel):
     pruner: PrunerCfg = Field(
         default_factory=PrunerCfg,
         description="Early stopping / pruning configuration.",
+    )
+    health_prune: HealthPruneCfg = Field(
+        default_factory=HealthPruneCfg,
+        description="Context-collapse early-kill (DreamerV3 + social.context only).",
+    )
+
+    # ── Sampler ───────────────────────────────────────────────────────────
+    sampler: SamplerCfg = Field(
+        default_factory=SamplerCfg,
+        description="Optuna sampler configuration.",
     )
 
     # ── Search space ──────────────────────────────────────────────────────
