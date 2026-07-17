@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Literal
 
 from rosnav_rl.cfg.framework import FrameworkCfg
@@ -304,6 +304,12 @@ class SocialGATCfg(BaseModel):
             ObstacleNodeSetSpace observations. Default: False (obstacles stay in the laser CNN).
         max_obstacles (int): Fixed number of obstacle nodes O (padded/masked). Default: 8
         obstacle_radius_m (float): Distance threshold (meters) for obstacle-agent edges. Default: 3.0
+        condition_transition (bool): When True, the per-step GAT code c_t ALSO conditions
+            the RSSM transition (img_step input), not only the readout feature — c_t =
+            GAT(crowd_t, deter_t) conditions the transition out of step t (observed crowd
+            in training/deploy, decoded crowd in imagination). Default: False (byte-identical
+            baseline: c_t enters the feature only, matching the original realtime-budget
+            design). See docs/icra2027/FIX_PLAN.md Task 1 for the temporal-alignment contract.
     """
 
     out_dim: int = 64
@@ -316,6 +322,7 @@ class SocialGATCfg(BaseModel):
     obstacle_edges: bool = False
     max_obstacles: int = 8
     obstacle_radius_m: float = 3.0
+    condition_transition: bool = False
 
 
 class SocialDALICfg(BaseModel):
@@ -628,6 +635,32 @@ class DreamerV3Cfg(FrameworkCfg):
         },
         description="Shared kwargs passed to each observation space on construction.",
     )
+
+    @model_validator(mode="after")
+    def _validate_context_window(self) -> "DreamerV3Cfg":
+        """Fail fast when the cSRSSM prediction loss would be silently disabled.
+
+        ``_train`` gates the primary identifiability loss on ``T_c > K_c`` where
+        ``T_c = batch_length`` and ``K_c = min(window, T_c)`` (see models.py). If
+        ``window >= batch_length`` there are no out-of-window steps, so
+        ``context_pred_loss`` never fires despite ``pred_scale > 0`` — b then loses
+        its main gradient signal and silently collapses. Turn that into a config error.
+        """
+        ctx = self.model.social.context
+        if (
+            self.model.social.enabled
+            and ctx.enabled
+            and ctx.pred_scale > 0
+            and ctx.window >= self.training.batch_length
+        ):
+            raise ValueError(
+                f"social.context.window ({ctx.window}) must be < "
+                f"training.batch_length ({self.training.batch_length}) when "
+                f"pred_scale ({ctx.pred_scale}) > 0, else the prediction-based "
+                "identifiability loss has no out-of-window targets and is silently "
+                "disabled. Lower window or raise batch_length."
+            )
+        return self
 
     class Config:
         arbitrary_types_allowed = True

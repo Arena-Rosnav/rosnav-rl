@@ -21,7 +21,8 @@ Architecture (repurposes the DALI trajectory GRU, see ``social/dali.py``):
      future dynamics, counteracting the KL bottleneck's collapse pressure). Out-of-window
      targets force b to extrapolate the crowd regime rather than memorize the window.
 
-Realtime budget: one GRU pass over K<=8 window steps per training sequence (train), and one
+Realtime budget: one GRU pass over the K-step window per training sequence (K=16 in the
+production config, K<batch_length required so out-of-window prediction targets exist), and one
 amortized GRU step per deploy tick (b is only re-inferred when the window slides) — negligible
 next to the RSSM/GAT forward pass.
 """

@@ -130,6 +130,20 @@ class WorldModel(nn.Module):
             if config.model.social.enabled and config.model.social.context.enabled
             else 0
         )
+        # C1 Option A: when gat.condition_transition is on, the per-step GAT code c_t
+        # ALSO conditions the transition (widens img_step's input by gat.out_dim).
+        # 0 (default) keeps img_step byte-identical to baseline. See FIX_PLAN Task 1.
+        _gat_code_size = (
+            config.model.social.gat.out_dim
+            if config.model.social.enabled
+            and config.model.social.gat.condition_transition
+            else 0
+        )
+        if _gat_code_size and config.model.social.cell_type == "tssm":
+            raise NotImplementedError(
+                "gat.condition_transition is not supported with cell_type='tssm' "
+                "(the TSSM token path threads context differently); use gru/transformer."
+            )
         # TSSM (cell_type "tssm") is a subclass with a restructured observe()/img_step();
         # it takes two extra width knobs. GRU/TransformerCell go through plain RSSM.
         _dyn_cls = (
@@ -163,6 +177,7 @@ class WorldModel(nn.Module):
             transformer_ctx_len=config.model.social.transformer_ctx_len,
             transformer_num_heads=config.model.social.transformer_num_heads,
             context_size=_context_size,
+            gat_code_size=_gat_code_size,
             **_dyn_kwargs,
         )
         self.heads = nn.ModuleDict()
@@ -414,9 +429,42 @@ class WorldModel(nn.Module):
                             _b_cat, _ep_id
                         )
 
-                post, prior = self.dynamics.observe(
-                    embed, data["action"], data["is_first"], context=context_b
+                _gat_cond_transition = (
+                    self._social_gat is not None
+                    and self._config.model.social.gat.condition_transition
                 )
+                if _gat_cond_transition:
+                    # C1 Option A: c_{t-1} = GAT(observed crowd at t-1, deter_{t-1}) conditions
+                    # the transition into t. Observed node-sets are already per-step robot-frame,
+                    # so (unlike the decoded peds in _get_augmented_feat) no SE(2) canon is needed.
+                    _soc = self._config.model.social
+
+                    def _gat_code_fn(_peds_flat, _deter):
+                        return self._social_gat(
+                            _peds_flat,
+                            _deter,
+                            max_peds=_soc.max_peds,
+                            node_feat_dim=_soc.node_feat_dim,
+                        )
+
+                    # peds_prev[:, t] = observed node-set at t-1 (t=0 gets zeros; zeroed again on
+                    # is_first inside observe, so cross-episode carryover cannot leak).
+                    _peds_obs = data["PedestrianNodeSetSpace"]
+                    _peds_prev = torch.cat(
+                        [torch.zeros_like(_peds_obs[:, :1]), _peds_obs[:, :-1]], dim=1
+                    )
+                    post, prior = self.dynamics.observe(
+                        embed,
+                        data["action"],
+                        data["is_first"],
+                        context=context_b,
+                        gat_code_fn=_gat_code_fn,
+                        peds_prev=_peds_prev,
+                    )
+                else:
+                    post, prior = self.dynamics.observe(
+                        embed, data["action"], data["is_first"], context=context_b
+                    )
                 if context_b is not None:
                     # Broadcast the per-sequence b across T so it flattens correctly when
                     # `post` is later used as `start` for imagination (see ImagBehavior._imagine).
@@ -593,6 +641,7 @@ class WorldModel(nn.Module):
         ped_buf: "torch.Tensor | None" = None,
         pose_rel: "torch.Tensor | None" = None,
         _return_decoded_peds: bool = False,
+        _return_c_t: bool = False,
     ):
         """Compute ŝ_t = cat(base_feat, c_t [, d_t]) for reward/cont/actor heads.
 
@@ -621,9 +670,12 @@ class WorldModel(nn.Module):
         base_feat = self.dynamics.get_feat(state)    # (B, feat) or (B, T, feat)
 
         if self._social_gat is None:
+            _extra = []
             if _return_decoded_peds:
-                return base_feat, None
-            return base_feat
+                _extra.append(None)
+            if _return_c_t:
+                _extra.append(None)
+            return (base_feat, *_extra) if _extra else base_feat
 
         _social = self._config.model.social
         cap = _social.dali.imag_backprop_steps       # 5 by default
@@ -694,10 +746,18 @@ class WorldModel(nn.Module):
         if _needs_fold:
             aug_feat = aug_feat.reshape(_leading + (aug_feat.shape[-1],))
             decoded_peds = decoded_peds.reshape(_leading + (decoded_peds.shape[-1],))
+            if _return_c_t:
+                c_t = c_t.reshape(_leading + (c_t.shape[-1],))
 
+        # C1 Option A: the same c_t used for the readout conditions the transition out of this
+        # state in imagination — return it so _imagine can pass it to the next img_step (no
+        # second GAT forward). _extra keeps existing 1-/2-tuple return shapes byte-identical.
+        _extra = []
         if _return_decoded_peds:
-            return aug_feat, decoded_peds
-        return aug_feat
+            _extra.append(decoded_peds)
+        if _return_c_t:
+            _extra.append(c_t)
+        return (aug_feat, *_extra) if _extra else aug_feat
 
     def _shift_ped_buf(
         self,
@@ -1120,15 +1180,35 @@ class ImagBehavior(nn.Module):
             # Compute augmented feat.  When DALI buffer is active, also return decoded_peds
             # so _shift_ped_buf can reuse them without a second decoder forward pass.
             # Invariant 5: pass pose_accum (= P_k) so decoded peds are rotated to current frame.
+            # C1 Option A: when gat.condition_transition is on, also capture c_t (from the
+            # decoded crowd of THIS state) to condition the transition out of it — the same c_t
+            # already computed for the readout, so no second GAT forward. c_t stays attached
+            # (gradient through the imagined graph per imag_gradient=dynamics).
+            _cond_gat = (
+                wm._social_gat is not None
+                and wm._config.model.social.gat.condition_transition
+            )
+            _c_gat = None
             if _use_dali_buf:
-                feat, decoded_peds = wm._get_augmented_feat(
-                    state, imag_step=t, ped_buf=ped_buf, pose_rel=pose_accum,
-                    _return_decoded_peds=True
-                )
+                if _cond_gat:
+                    feat, decoded_peds, _c_gat = wm._get_augmented_feat(
+                        state, imag_step=t, ped_buf=ped_buf, pose_rel=pose_accum,
+                        _return_decoded_peds=True, _return_c_t=True,
+                    )
+                else:
+                    feat, decoded_peds = wm._get_augmented_feat(
+                        state, imag_step=t, ped_buf=ped_buf, pose_rel=pose_accum,
+                        _return_decoded_peds=True
+                    )
                 detach = int(t) > _cap
                 new_buf = wm._shift_ped_buf(decoded_peds, ped_buf, detach=detach)
             else:
-                feat = wm._get_augmented_feat(state, imag_step=t, pose_rel=pose_accum)
+                if _cond_gat:
+                    feat, _c_gat = wm._get_augmented_feat(
+                        state, imag_step=t, pose_rel=pose_accum, _return_c_t=True
+                    )
+                else:
+                    feat = wm._get_augmented_feat(state, imag_step=t, pose_rel=pose_accum)
 
             inp = feat.detach()
             action = policy(inp).sample()
@@ -1138,13 +1218,14 @@ class ImagBehavior(nn.Module):
                 state = {**state, **_tssm_box}
             if self._config.model.behavior.use_imagination_checkpointing:
                 succ = torch.utils.checkpoint.checkpoint(
-                    lambda s, a: dynamics.img_step(s, a, context=_context_b),
+                    lambda s, a, g: dynamics.img_step(s, a, context=_context_b, gat_code=g),
                     state,
                     action,
+                    _c_gat,
                     use_reentrant=False,
                 )
             else:
-                succ = dynamics.img_step(state, action, context=_context_b)
+                succ = dynamics.img_step(state, action, context=_context_b, gat_code=_c_gat)
             if _tssm_box is not None:
                 for _k in _tssm_keys:
                     _tssm_box[_k] = succ.pop(_k)

@@ -202,8 +202,11 @@ class Dreamer(nn.Module):
         """
         if state is None:
             latent = action = ctx_window = None
+            prev_peds = None
         else:
-            latent, action, ctx_window = state
+            # Tolerate the pre-Option-A 3-tuple so old caller/checkpoint states still load.
+            latent, action, ctx_window = state[:3]
+            prev_peds = state[3] if len(state) > 3 else None
         obs = self._wm.preprocess(obs)
         embed = self._wm.encoder(obs)
         # cSRSSM (Phase 1, realtime): deploy-time single rollout conditioned on b = mean of
@@ -214,8 +217,26 @@ class Dreamer(nn.Module):
             ctx_window, context_b = self._wm.step_social_context(
                 ctx_window, obs, obs["is_first"]
             )
+        # C1 Option A: condition the transition into this tick on c_{t-1} = GAT(crowd at the
+        # previous tick, deter_{t-1}). Matches the training convention (peds_prev, prev deter).
+        # None on the first tick / episode reset (no prior crowd) and when the flag is off.
+        gat_code = None
+        _cond_gat = (
+            self._wm._social_gat is not None
+            and self._config.model.social.gat.condition_transition
+        )
+        if _cond_gat and prev_peds is not None and latent is not None:
+            _soc = self._config.model.social
+            gat_code = self._wm._social_gat(
+                prev_peds,
+                latent["deter"],
+                max_peds=_soc.max_peds,
+                node_feat_dim=_soc.node_feat_dim,
+            )
+            _isf = obs["is_first"].reshape(gat_code.shape[0], 1).to(gat_code.dtype)
+            gat_code = gat_code * (1.0 - _isf)
         latent, prior = self._wm.dynamics.obs_step(
-            latent, action, embed, obs["is_first"], context=context_b
+            latent, action, embed, obs["is_first"], context=context_b, gat_code=gat_code
         )
         # World-model surprise uₜ = KL(q(z|o) || p(z)): high when the observed crowd contradicts
         # the model's own prediction. The prior is already computed inside obs_step, so capturing
@@ -262,7 +283,10 @@ class Dreamer(nn.Module):
         policy_output = {"action": action, "logprob": logprob}
         if kl_surprise is not None:
             policy_output["kl_surprise"] = kl_surprise
-        state = (latent, action, ctx_window)
+        # Cache this tick's observed crowd so the next tick can condition its transition on it
+        # (Option A: c_{t-1} = GAT(peds_{t-1}, deter_{t-1})). None when the flag is off.
+        cur_peds = obs["PedestrianNodeSetSpace"] if _cond_gat else None
+        state = (latent, action, ctx_window, cur_peds)
         return policy_output, state
 
     def _train(self, data):

@@ -96,6 +96,7 @@ class RSSM(nn.Module):
         transformer_ctx_len: int = 64,
         transformer_num_heads: int = 4,
         context_size: int = 0,
+        gat_code_size: int = 0,
     ):
         """Initialize the RSSM (Recurrent State-Space Model) class.
 
@@ -146,6 +147,9 @@ class RSSM(nn.Module):
         # cSRSSM: crowd-behavior context b concatenated into the transition input. 0 = disabled
         # (baseline byte-identical). Held fixed across the imagination horizon (see img_step).
         self._context_size = context_size
+        # C1 Option A: per-step GAT code c_t concatenated into the transition input. 0 = disabled
+        # (baseline byte-identical: c_t enters the feature only). See img_step and FIX_PLAN Task 1.
+        self._gat_code_size = gat_code_size
 
         inp_layers = []
         if self._discrete:
@@ -153,6 +157,7 @@ class RSSM(nn.Module):
         else:
             inp_dim = self._stoch + num_actions
         inp_dim += self._context_size
+        inp_dim += self._gat_code_size
         inp_layers.append(nn.Linear(inp_dim, self._hidden, bias=False))
         if norm:
             inp_layers.append(nn.LayerNorm(self._hidden, eps=1e-03))
@@ -263,7 +268,16 @@ class RSSM(nn.Module):
         else:
             raise NotImplementedError(self._initial)
 
-    def observe(self, embed, action, is_first, state=None, context=None):
+    def observe(
+        self,
+        embed,
+        action,
+        is_first,
+        state=None,
+        context=None,
+        gat_code_fn=None,
+        peds_prev=None,
+    ):
         """
         Processes a sequence of observations, actions, and state indicators to generate posterior and prior states.
 
@@ -289,13 +303,41 @@ class RSSM(nn.Module):
         # prev_state[0] means selecting posterior of return(posterior, prior) from obs_step
         # context (cSRSSM crowd-behavior code b) is inferred once per sequence and held fixed
         # across the scan, so it's closed over rather than passed as a per-step scanned input.
-        post, prior = tools.static_scan(
-            lambda prev_state, prev_act, embed, is_first: self.obs_step(
-                prev_state[0], prev_act, embed, is_first, context=context
-            ),
-            (action, embed, is_first),
-            (state, state),
-        )
+        if gat_code_fn is not None and peds_prev is not None:
+            # C1 Option A: per-step GAT code c_{t-1} = GAT(observed crowd at t-1, deter_{t-1})
+            # conditions the transition into t. deter_{t-1} = prev_state["deter"] is produced by
+            # the scan, so c must be computed INSIDE it (not precomputed). peds_prev[t] is the
+            # observed node-set at t-1 (shifted by the caller). Zeroed on is_first (no prior crowd).
+            peds_prev = swap(peds_prev)
+
+            def _obs_step_with_gat(prev_state, prev_act, embed, is_first, peds):
+                prev = prev_state[0]
+                if prev is None:
+                    # First scan step: no prior state/crowd yet. is_first is 1 here so the
+                    # code is zeroed regardless; use a zero code (deter is undefined).
+                    gc = torch.zeros(
+                        peds.shape[0], self._gat_code_size, device=peds.device
+                    )
+                else:
+                    gc = gat_code_fn(peds, prev["deter"])
+                gc = gc * (1.0 - is_first.unsqueeze(-1))
+                return self.obs_step(
+                    prev, prev_act, embed, is_first, context=context, gat_code=gc
+                )
+
+            post, prior = tools.static_scan(
+                _obs_step_with_gat,
+                (action, embed, is_first, peds_prev),
+                (state, state),
+            )
+        else:
+            post, prior = tools.static_scan(
+                lambda prev_state, prev_act, embed, is_first: self.obs_step(
+                    prev_state[0], prev_act, embed, is_first, context=context
+                ),
+                (action, embed, is_first),
+                (state, state),
+            )
 
         # (batch, time, stoch, discrete_num) -> (batch, time, stoch, discrete_num)
         post = {k: swap(v) for k, v in post.items()}
@@ -355,7 +397,9 @@ class RSSM(nn.Module):
             )
         return dist
 
-    def obs_step(self, prev_state, prev_action, embed, is_first, sample=True, context=None):
+    def obs_step(
+        self, prev_state, prev_action, embed, is_first, sample=True, context=None, gat_code=None
+    ):
         """
         Performs an observation step in the world model, updating the state based on previous state, action, and current embedding.
 
@@ -366,6 +410,9 @@ class RSSM(nn.Module):
             embed (torch.Tensor): Current observation embedding.
             is_first (torch.Tensor): Boolean tensor indicating first steps in batch sequences.
             sample (bool, optional): Whether to sample from the distribution or take the mode. Defaults to True.
+            context (torch.Tensor, optional): cSRSSM crowd-behavior code b, forwarded to img_step.
+            gat_code (torch.Tensor, optional): C1 Option A per-step GAT code c_t, forwarded to
+                img_step. The caller (observe) is responsible for zeroing it on is_first.
 
         Returns:
             tuple:
@@ -395,7 +442,7 @@ class RSSM(nn.Module):
                     val * (1.0 - is_first_r) + init_state[key] * is_first_r
                 )
 
-        prior = self.img_step(prev_state, prev_action, context=context)
+        prior = self.img_step(prev_state, prev_action, context=context, gat_code=gat_code)
         x = torch.cat([prior["deter"], embed], -1)
         # (batch_size, prior_deter + embed) -> (batch_size, hidden)
         x = self._obs_out_layers(x)
@@ -410,7 +457,7 @@ class RSSM(nn.Module):
             post["deter_seq"] = prior["deter_seq"]
         return post, prior
 
-    def img_step(self, prev_state, prev_action, sample=True, context=None):
+    def img_step(self, prev_state, prev_action, sample=True, context=None, gat_code=None):
         """
         Performs one step of the image transition model, computing the prior state distribution.
 
@@ -424,6 +471,11 @@ class RSSM(nn.Module):
             prev_action (torch.Tensor): Previous action taken
             sample (bool, optional): Whether to sample from the distribution or take the mode.
                                    Defaults to True.
+            context (torch.Tensor, optional): cSRSSM crowd-behavior code b (held fixed across
+                the horizon). Concatenated into the transition input when context_size > 0.
+            gat_code (torch.Tensor, optional): C1 Option A per-step GAT code c_t conditioning
+                the transition out of the previous state. Concatenated after `context` when
+                gat_code_size > 0. None (default) => baseline (c_t enters the feature only).
 
         Returns:
             dict: Prior state prediction containing:
@@ -437,12 +489,16 @@ class RSSM(nn.Module):
             shape = list(prev_stoch.shape[:-2]) + [self._stoch * self._discrete]
             # (batch, stoch, discrete_num) -> (batch, stoch * discrete_num)
             prev_stoch = prev_stoch.reshape(shape)
-        # (batch, stoch * discrete_num) -> (batch, stoch * discrete_num + action)
+        # (batch, stoch * discrete_num) -> (batch, stoch * discrete_num + action [+ b] [+ c_t]).
+        # Concat order MUST match the input-layer width (stoch, action, context, gat_code).
+        _parts = [prev_stoch, prev_action]
         if context is not None and self._context_size > 0:
             # cSRSSM: crowd-behavior context b held fixed across horizon, conditions transition
-            x = torch.cat([prev_stoch, prev_action, context], -1)
-        else:
-            x = torch.cat([prev_stoch, prev_action], -1)
+            _parts.append(context)
+        if gat_code is not None and self._gat_code_size > 0:
+            # C1 Option A: per-step GAT code c_t conditions the transition out of prev_state
+            _parts.append(gat_code)
+        x = torch.cat(_parts, -1)
         # (batch, stoch * discrete_num + action, embed) -> (batch, hidden)
         x = self._img_in_layers(x)
         _new_deter_seq = None
@@ -752,9 +808,13 @@ class TSSM(RSSM):
         transformer_ctx_len: int = 64,
         transformer_num_heads: int = 4,
         context_size: int = 0,
+        gat_code_size: int = 0,
         tssm_num_layers: int = 2,
         tssm_ff_mult: int = 2,
     ):
+        # gat.condition_transition is guarded against cell_type='tssm' in models.py, so
+        # gat_code_size is always 0 here; accept+forward it so the constructor signature
+        # matches RSSM's and tssm configs (which pass gat_code_size=0) don't TypeError.
         super().__init__(
             stoch,
             deter,
@@ -775,6 +835,7 @@ class TSSM(RSSM):
             transformer_ctx_len=transformer_ctx_len,
             transformer_num_heads=transformer_num_heads,
             context_size=context_size,
+            gat_code_size=gat_code_size,
         )
         self._ctx_len = transformer_ctx_len
         self._num_layers = tssm_num_layers
