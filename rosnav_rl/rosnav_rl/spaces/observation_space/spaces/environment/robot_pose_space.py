@@ -53,4 +53,12 @@ class RobotPoseSpace(BaseObservationSpace):
         *args,
         **kwargs,
     ) -> np.ndarray:
-        return np.asarray(robot_pose, dtype=np.float32)
+        pose = np.asarray(robot_pose)
+        if pose.dtype.names is not None:
+            # Structured (x, y, yaw) record (as delivered by the pose generator) —
+            # a direct float32 cast of a structured dtype raises, which previously
+            # nulled this observation on every step.
+            return np.array(
+                [pose["x"], pose["y"], pose["yaw"]], dtype=np.float32
+            ).reshape(3)
+        return pose.astype(np.float32)
