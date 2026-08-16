@@ -526,7 +526,7 @@ At inference time use `spec.parameters` directly, or
 ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=my_agent
 
 # Arena integration (automatic)
-arena launch local_planner:=rosnav_rl agent_name:=my_agent
+arena launch robot.mobile:=rosnav_rl robot.mobile.agent:=my_agent
 ```
 
 See [action_server/README.md](rosnav_rl/action_server/README.md) for implementation details.
@@ -670,7 +670,7 @@ See [model/README.md](rosnav_rl/model/README.md) for the complete reference.
 ros2 run rosnav_rl action_server.py --ros-args -p agent_name:=my_agent
 
 # Arena (automatic)
-arena launch local_planner:=rosnav_rl agent_name:=my_agent
+arena launch robot.mobile:=rosnav_rl robot.mobile.agent:=my_agent
 ```
 
 The server exposes `get_command` under the robot's namespace. Response contains `action_type` (e.g. `"differential_drive"`) and `action` (decoded command vector). On inference errors it returns empty `action[]` and logs a warning.

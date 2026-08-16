@@ -159,7 +159,7 @@ ros2 launch rosnav_rl action_server.launch.py agent_name:=my_ppo_agent
 
 When using Arena-Rosnav, the action server starts automatically:
 ```bash
-arena launch local_planner:=rosnav_rl agent_name:=my_ppo_agent
+arena launch robot.mobile:=rosnav_rl robot.mobile.agent:=my_ppo_agent
 ```
 
 ### Calling the Service
