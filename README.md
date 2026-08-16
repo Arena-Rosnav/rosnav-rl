@@ -197,12 +197,11 @@ agent.train(train_envs=train_envs, eval_envs=eval_envs)
 To swap to DreamerV3, replace `StableBaselinesCfg(...)` with `DreamerV3Cfg(...)` - everything else stays the same. With Arena:
 
 ```bash
-arena train sim:=gazebo local_planner:=rosnav_rl \
-    train_config:=sb_training_config.yaml
+arena train sim:=gazebo train_config:=sb_training_config.yaml
 ```
 
 Set the parallel-env count via `arena_cfg.general.n_envs` in the training
-YAML. The `env_n` launch arg is force-overridden to 0 in training mode.
+YAML.
 
 ### Swap the RL algorithm
 
