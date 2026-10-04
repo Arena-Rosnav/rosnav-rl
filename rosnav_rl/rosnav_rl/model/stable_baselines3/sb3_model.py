@@ -422,15 +422,9 @@ class StableBaselinesModel(RL_Model):
         import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
 
         config = load_yaml(source_dir / cfg_file_name)
-        try:
-            validated_algorithm_cfg = sb3_cfg.SBAlgorithmCfg.model_validate(
-                config["agent_cfg"]["framework"]["algorithm"]
-            )
-        except Exception as e:
-            print(f"Error validating algorithm configuration: {e}")
-            validated_algorithm_cfg = sb3_cfg.PPO_Cfg(
-                architecture_name="AGENT_1", parameters=sb3_cfg.PPO_Algorithm_Cfg()
-            )
+        validated_algorithm_cfg = sb3_cfg.StableBaselinesCfg.model_validate(
+            config["agent_config"]["framework"]
+        ).algorithm
 
         source_model = StableBaselinesModel(
             rl_agent=self._rl_agent, algorithm_cfg=validated_algorithm_cfg

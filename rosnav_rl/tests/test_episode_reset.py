@@ -3,15 +3,22 @@ from __future__ import annotations
 from typing import Type
 
 import numpy as np
+import pytest
 import torch.nn as nn
-from stable_baselines3 import PPO
+import yaml
+from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.base_class import BaseAlgorithm
 
 import rosnav_rl.spaces.observation_space.spaces as spaces
 from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
 from rosnav_rl.cfg.agent import AgentConfig
 from rosnav_rl.cfg.parameters import AgentParameters
-from rosnav_rl.model.stable_baselines3.cfg import PPO_Algorithm_Cfg, PPO_Cfg
+from rosnav_rl.model.stable_baselines3.cfg import (
+    A2C_Algorithm_Cfg,
+    A2C_Cfg,
+    PPO_Algorithm_Cfg,
+    PPO_Cfg,
+)
 from rosnav_rl.model.stable_baselines3.cfg.framework import StableBaselinesCfg
 from rosnav_rl.model.stable_baselines3.policy.agent_factory import AgentFactory
 from rosnav_rl.model.stable_baselines3.policy.base_policy import (
@@ -56,6 +63,17 @@ class _StackedLaserAgent(StableBaselinesPolicyDescription):
 class _FrameStackAgent(StableBaselinesPolicyDescription):
     algorithm_class: Type[BaseAlgorithm] = PPO
     stack_size = 3
+    observation_space_kwargs = _OBS_KWARGS
+    observation_spaces = _OBS_SPACES
+    features_extractor_class = EXTRACTOR_5
+    features_extractor_kwargs = dict(features_dim=64)
+    net_arch = dict(pi=[32], vf=[32])
+    activation_fn = nn.ReLU
+
+
+@AgentFactory.register("TEST_TRANSFER_A2C")
+class _TransferA2CAgent(StableBaselinesPolicyDescription):
+    algorithm_class: Type[BaseAlgorithm] = A2C
     observation_space_kwargs = _OBS_KWARGS
     observation_spaces = _OBS_SPACES
     features_extractor_class = EXTRACTOR_5
@@ -137,3 +155,31 @@ def test_reset_restarts_the_frame_stack_from_the_next_observation():
 
     np.testing.assert_allclose(agent.get_action(probe), fresh_action)
     assert not np.allclose(continued_action, fresh_action)
+
+
+def test_transfer_weights_loads_the_source_algorithm_from_its_training_config(tmp_path):
+    algorithm = A2C_Cfg(
+        architecture_name="TEST_TRANSFER_A2C",
+        parameters=A2C_Algorithm_Cfg(total_batch_size=64, batch_size=64),
+    )
+    source = _initialized_agent(_spec("transfer_source", algorithm))
+    source.model.model.save(tmp_path / "best_model")
+    (tmp_path / "training_config.yaml").write_text(
+        yaml.safe_dump({"agent_config": source.spec.model_dump(mode="json")})
+    )
+    target = _initialized_agent(_spec("transfer_target", algorithm))
+
+    target.model.transfer_weights(source_dir=tmp_path, source_checkpoint="best_model", include=[".*"])
+
+    source_state = source.model.model.policy.state_dict()
+    for key, value in target.model.model.policy.state_dict().items():
+        assert np.array_equal(value.cpu().numpy(), source_state[key].cpu().numpy()), key
+
+
+def test_transfer_weights_rejects_a_training_config_without_agent_config(tmp_path):
+    agent = _initialized_agent(_spec("transfer_missing_key", _ppo("AGENT_1")))
+    agent.model.model.save(tmp_path / "best_model")
+    (tmp_path / "training_config.yaml").write_text(yaml.safe_dump({"agent_cfg": {}}))
+
+    with pytest.raises(KeyError, match="agent_config"):
+        agent.model.transfer_weights(source_dir=tmp_path, source_checkpoint="best_model", include=[".*"])
