@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Union, Callable
+from collections.abc import Callable
 
 import gymnasium as gym
 import numpy as np
@@ -19,14 +19,14 @@ class RosnavEvalCallback(EvalCallback):
 
     def __init__(
         self,
-        eval_env: Union[gym.Env, VecEnv],
-        callback_on_eval_end: Optional[BaseCallback] = None,
-        callback_on_new_best: Optional[BaseCallback] = None,
-        callback_after_eval: Optional[BaseCallback] = None,
+        eval_env: gym.Env | VecEnv,
+        callback_on_eval_end: BaseCallback | None = None,
+        callback_on_new_best: BaseCallback | None = None,
+        callback_after_eval: BaseCallback | None = None,
         n_eval_episodes: int = 5,
         eval_freq: int = 10000,
-        log_path: Optional[str] = None,
-        best_model_save_path: Optional[str] = None,
+        log_path: str | None = None,
+        best_model_save_path: str | None = None,
         deterministic: bool = True,
         render: bool = False,
         verbose: int = 1,
@@ -113,7 +113,7 @@ class RosnavEvalCallback(EvalCallback):
             self.logger.record("eval/mean_ep_length", mean_ep_length)
 
             if len(self._is_success_buffer) > 0:
-                self.last_success_rate = np.mean(self._is_success_buffer)
+                self.last_success_rate = float(np.mean(self._is_success_buffer))
                 if self.verbose >= 1:
                     print(f"Success rate: {100 * self.last_success_rate:.2f}%")
                 self.logger.record("eval/success_rate", self.last_success_rate)
@@ -158,11 +158,11 @@ class RosnavEvalCallback(EvalCallback):
         return continue_training
 
     @property
-    def last_success_rate(self):
+    def last_success_rate(self) -> float:
         return self._last_success_rate
 
     @last_success_rate.setter
-    def last_success_rate(self, value):
+    def last_success_rate(self, value: float) -> None:
         self._last_success_rate = value
 
 

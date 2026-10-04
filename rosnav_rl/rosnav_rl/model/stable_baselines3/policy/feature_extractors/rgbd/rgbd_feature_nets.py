@@ -1,8 +1,11 @@
-from typing import Callable, List
+from collections.abc import Callable
+from typing import Any
 
 import gymnasium as gym
 import torch
 import torch.nn as nn
+from torch import Tensor
+
 from rosnav_rl.spaces.observation_space import (
     DistAngleToSubgoalSpace,
     LastActionSpace,
@@ -11,7 +14,6 @@ from rosnav_rl.spaces.observation_space import (
 from rosnav_rl.spaces.observation_space.observation_space_manager import (
     ObservationSpaceManager,
 )
-from torch import Tensor
 
 from ..base_extractor import RosnavBaseExtractor, TensorDict
 from .resnet import ResNet, RgbdPerceptionNet, resnet50_groupnorm
@@ -58,7 +60,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         rgbd_out_dim: int = 512,
         goal_out_dim: int = 32,
         last_action_out_dim: int = 32,
-        **kwargs
+        **kwargs: Any
     ):
         self._features_dim = features_dim
         self._rgbd_backbone = rgbd_backbone
@@ -72,7 +74,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         self._get_input_sizes()
 
-        super(RESNET_RGBD_FUSION_EXTRACTOR_1, self).__init__(
+        super().__init__(
             observation_space=observation_space,
             observation_space_manager=observation_space_manager,
             features_dim=features_dim,
@@ -88,7 +90,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         ].space.shape[-1]
         self._image_size = 4 * self._image_height * self._image_width
 
-    def _setup_network(self, *args, **kwargs):
+    def _setup_network(self, *args: Any, **kwargs: Any):
         # RGBD part
         self.visual_net = RgbdPerceptionNet(
             self._rgbd_out_dim, 4, self._rgbd_backbone, **kwargs
@@ -138,7 +140,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         return out
 
-    def _get_input(self, observations: dict) -> Tensor:
+    def _get_input(self, observations: TensorDict) -> tuple[Tensor, Tensor, Tensor]:
         image = observations[RGBDSpace.name]
         goal = observations[DistAngleToSubgoalSpace.name].squeeze(1)
         last_action = observations[LastActionSpace.name].squeeze(1)

@@ -7,7 +7,6 @@ Handles efficient waiting and polling for collector updates using ROS simulation
 from __future__ import annotations
 
 import time
-from typing import Dict, List
 
 from rclpy.node import Node
 
@@ -32,9 +31,9 @@ class WaitingStrategy:
         self._node = node
         self._logger = node.get_logger()
         # Tracks consecutive timeouts per collector name.
-        self._consecutive_failures: Dict[str, int] = {}
+        self._consecutive_failures: dict[str, int] = {}
 
-    def wait_for_collectors(self, collectors: List[str], collector_dict: dict) -> int:
+    def wait_for_collectors(self, collectors: list[str], collector_dict: dict[str, Collector]) -> int:
         """
         Wait for multiple collectors to update.
 
@@ -62,7 +61,7 @@ class WaitingStrategy:
         )
         return success_count
 
-    def _wait_for_observation(self, collector_name: str, collector_dict: dict) -> bool:
+    def _wait_for_observation(self, collector_name: str, collector_dict: dict[str, Collector]) -> bool:
         """
         Wait for a specific collector to receive new data using ROS simulation time.
 
@@ -78,14 +77,14 @@ class WaitingStrategy:
             return False
 
         collector = collector_dict[collector_name]
-        timeout = getattr(collector, "timeout", 0.1)
+        timeout = collector.timeout
 
         try:
             self._poll_for_update_with_timeout(collector, timeout)
             self._logger.debug(f"Collector '{collector_name}' updated successfully")
             self._consecutive_failures[collector_name] = 0
             return True
-        except TimeoutError:
+        except TimeoutError as err:
             n = self._consecutive_failures.get(collector_name, 0) + 1
             self._consecutive_failures[collector_name] = n
             self._logger.warn(
@@ -96,7 +95,7 @@ class WaitingStrategy:
                     f"Sensor stall: '{collector_name}' timed out {n} consecutive "
                     f"times. Worker will exit so the pool can respawn this env "
                     f"with a fresh Gazebo entity (GPU lidar re-initialisation)."
-                )
+                ) from err
             return False
         except Exception as e:
             self._logger.error(f"Exception while waiting for '{collector_name}': {e}")

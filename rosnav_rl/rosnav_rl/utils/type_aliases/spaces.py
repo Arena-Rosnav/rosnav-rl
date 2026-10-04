@@ -1,11 +1,9 @@
-from typing import Dict
-
 import numpy as np
 import torch as th
 
-TensorDict = Dict[str, th.Tensor]
+TensorDict = dict[str, th.Tensor]
 
 ObservationSpaceName = str
 ObservationEncoding = np.ndarray
 
-EncodedObservationDict = Dict[ObservationSpaceName, ObservationEncoding]
+EncodedObservationDict = dict[ObservationSpaceName, ObservationEncoding]

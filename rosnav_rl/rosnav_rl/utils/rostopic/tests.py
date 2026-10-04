@@ -1,5 +1,4 @@
-from . import Topic, Namespace
-
+from . import Namespace, Topic
 
 # Example usage
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from rosnav_rl.utils.type_aliases import ObservationDict
 
 
 class ObservationCollector(Protocol):
-    def get_observations(self, *args, **kwargs) -> ObservationDict: ...
+    def get_observations(self) -> ObservationDict: ...
 
 
 class ActionServer(ABC):
@@ -24,10 +24,10 @@ class ActionServer(ABC):
         observation_collector (ObservationCollector): The observation collector for gathering environment observations.
     """
 
-    agent: RL_Agent = None
-    observation_collector: ObservationCollector = None
+    agent: RL_Agent | None = None
+    observation_collector: ObservationCollector | None = None
 
-    def __init__(self, agent_name: str, namespace: str = "", node: Node = None) -> None:
+    def __init__(self, agent_name: str, namespace: str = "", node: Node | None = None) -> None:
         """
         Initializes the BaseServer.
 
@@ -77,7 +77,7 @@ class ActionServer(ABC):
 
     def __handle_next_action_srv(
         self, request: GetCommand.Request, response: GetCommand.Response
-    ):
+    ) -> GetCommand.Response:
         """
         Handles the service request to get the next action.
 

@@ -15,12 +15,7 @@ All spaces are automatically registered with SpaceFactory when imported.
 """
 
 # Import all categories to register spaces with SpaceFactory
-from . import localization
-from . import perception
-from . import navigation
-from . import dynamics
-from . import environment
-from . import meta
+from . import dynamics, environment, localization, meta, navigation, perception
 
 __all__ = [
     "localization",

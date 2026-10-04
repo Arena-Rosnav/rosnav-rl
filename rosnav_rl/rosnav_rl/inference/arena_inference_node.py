@@ -13,6 +13,7 @@ from __future__ import annotations
 import importlib.resources
 import math
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import rclpy
 import tf2_ros
@@ -30,6 +31,9 @@ from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.utils.agent_paths import resolve_agent_dir
 from rosnav_rl.utils.rostopic import Namespace
 from rosnav_rl.utils.utils import load_yaml
+
+if TYPE_CHECKING:
+    from rosnav_rl.observations.core.manager import ObservationManager
 
 
 _NODE_NAME = "rosnav_rl_inference"
@@ -115,7 +119,7 @@ class ArenaInferenceNode:
         agent.load_model(path=model_dir / "best_model.zip")
         return agent
 
-    def _load_observation_manager(self):
+    def _load_observation_manager(self) -> ObservationManager:
         agent_dir = resolve_agent_dir(self.agent_name)
         obs_config_path: Path | str = agent_dir / "observations.yaml"
         if not Path(obs_config_path).exists():
@@ -217,7 +221,7 @@ class ArenaInferenceNode:
         self._last_speed = math.hypot(vx, vy)
 
 
-def main(args=None):
+def main(args: list[str] | None = None) -> None:
     rclpy.init(args=args)
     node = rclpy.create_node(_NODE_NAME)
     try:

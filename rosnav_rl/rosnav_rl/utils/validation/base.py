@@ -5,11 +5,13 @@ This module contains the core validation infrastructure that can be extended
 for specific validation strategies.
 """
 
-from typing import Dict, Any, Type
 from difflib import get_close_matches
+from typing import Annotated, Any, get_args, get_origin
 
-from .protocols import RequiresProtocol
+import numpy as np
+
 from .exceptions import MissingObservationError
+from .protocols import RequiresProtocol
 
 try:
     from ...observations.utils.types import DataSpec
@@ -20,8 +22,15 @@ except ImportError:
     except ImportError:
         # Create a minimal DataSpec for standalone usage
         class DataSpec:
+            source: str | None = None
+            example: str | None = None
+
             def __init__(
-                self, description=None, shape=None, units=None, constraints=None
+                self,
+                description: str | None = None,
+                shape: str | None = None,
+                units: str | None = None,
+                constraints: str | None = None,
             ):
                 self.description = description
                 self.shape = shape
@@ -39,8 +48,8 @@ class BaseSchemaValidator:
 
     @staticmethod
     def validate_requirements(
-        observations: Dict[str, Any],
-        components: Dict[str, RequiresProtocol],
+        observations: dict[str, Any],
+        components: dict[str, RequiresProtocol],
         component_type: str = "component",
     ) -> None:
         """
@@ -60,9 +69,6 @@ class BaseSchemaValidator:
         all_missing = {}
 
         for comp_name, component in components.items():
-            if not hasattr(component, "requires"):
-                continue
-
             missing_keys = []
             for key in component.requires.keys():
                 if key not in observations:
@@ -85,8 +91,8 @@ class BaseSchemaValidator:
 
     @staticmethod
     def _format_error_message(
-        observations: Dict[str, Any],
-        missing_components: Dict[str, Dict],
+        observations: dict[str, Any],
+        missing_components: dict[str, dict[str, Any]],
         component_type: str,
     ) -> str:
         """Format a clean, readable error message with excellent information density."""
@@ -118,7 +124,7 @@ class BaseSchemaValidator:
 
             # Details for each missing key
             for i, key in enumerate(missing_keys):
-                if hasattr(component, "requires") and key in component.requires:
+                if key in component.requires:
                     obs_type = component.requires[key]
                     metadata = BaseSchemaValidator._extract_metadata(obs_type)
 
@@ -190,9 +196,8 @@ class BaseSchemaValidator:
             for key, value in observations.items():
                 obs_info = f"   ✅ '{key}'"
                 obs_info += f" (type: {type(value)})"
-                if hasattr(value, "shape"):
+                if isinstance(value, (np.ndarray, np.generic)):
                     obs_info += f" (shape: {value.shape})"
-                if hasattr(value, "dtype"):
                     obs_info += f" (dtype: {value.dtype})"
                 lines.append(obs_info)
         else:
@@ -212,9 +217,9 @@ class BaseSchemaValidator:
         return "\n".join(lines)
 
     @staticmethod
-    def _extract_metadata(obs_type: Type) -> Dict[str, Any]:
+    def _extract_metadata(obs_type: object) -> dict[str, Any]:
         """Extract metadata from observation type annotations."""
-        metadata = {
+        metadata: dict[str, Any] = {
             "description": None,
             "shape": None,
             "units": None,
@@ -225,61 +230,29 @@ class BaseSchemaValidator:
 
         try:
             # Handle typing.Annotated types (Python 3.9+)
-            if hasattr(obs_type, "__metadata__") and hasattr(obs_type, "__origin__"):
+            if get_origin(obs_type) is Annotated:
                 # This is an Annotated type, extract the metadata
-                for annotation in obs_type.__metadata__:
+                for annotation in get_args(obs_type)[1:]:
                     if isinstance(annotation, DataSpec):
                         metadata["description"] = annotation.description
-                        metadata["shape"] = getattr(annotation, "shape", None)
-                        metadata["units"] = getattr(annotation, "units", None)
-                        metadata["constraints"] = getattr(
-                            annotation, "constraints", None
-                        )
-                        metadata["source"] = getattr(annotation, "source", None)
-                        metadata["example"] = getattr(annotation, "example", None)
+                        metadata["shape"] = annotation.shape
+                        metadata["units"] = annotation.units
+                        metadata["constraints"] = annotation.constraints
+                        metadata["source"] = annotation.source
+                        metadata["example"] = annotation.example
                         break
 
                 # If no DataSpec found, try to get basic info from the origin type
-                if not metadata["description"] and hasattr(obs_type, "__origin__"):
-                    origin_type = obs_type.__origin__
-                    metadata["description"] = getattr(
-                        origin_type, "__doc__", str(origin_type)
-                    )
-
-            # Handle typing_extensions.Annotated (Python < 3.9)
-            elif hasattr(obs_type, "__args__") and hasattr(obs_type, "__metadata__"):
-                for annotation in obs_type.__metadata__:
-                    if isinstance(annotation, DataSpec):
-                        metadata["description"] = annotation.description
-                        metadata["shape"] = getattr(annotation, "shape", None)
-                        metadata["units"] = getattr(annotation, "units", None)
-                        metadata["constraints"] = getattr(
-                            annotation, "constraints", None
-                        )
-                        metadata["source"] = getattr(annotation, "source", None)
-                        metadata["example"] = getattr(annotation, "example", None)
-                        break
-
-            # Check if it's a DataSpec type with metadata directly
-            elif hasattr(obs_type, "__annotations__"):
-                # Try to get DataSpec metadata
-                spec = getattr(obs_type, "_spec", None)
-                if spec and isinstance(spec, DataSpec):
-                    metadata["description"] = spec.description
-                    metadata["shape"] = getattr(spec, "shape", None)
-                    metadata["units"] = getattr(spec, "units", None)
-                    metadata["constraints"] = getattr(spec, "constraints", None)
-                    metadata["source"] = getattr(spec, "source", None)
-                    metadata["example"] = getattr(spec, "example", None)
+                if not metadata["description"]:
+                    metadata["description"] = get_args(obs_type)[0].__doc__
 
             # Fallback to basic type information
             if not metadata["description"]:
                 # Try to get the actual type name instead of Annotated wrapper
-                if hasattr(obs_type, "__origin__"):
-                    type_name = getattr(
-                        obs_type.__origin__, "__name__", str(obs_type.__origin__)
-                    )
-                elif hasattr(obs_type, "__name__"):
+                origin = get_args(obs_type)[0] if get_origin(obs_type) is Annotated else get_origin(obs_type)
+                if origin is not None:
+                    type_name = origin.__name__ if isinstance(origin, type) else str(origin)
+                elif isinstance(obs_type, type):
                     type_name = obs_type.__name__
                 else:
                     type_name = str(obs_type)

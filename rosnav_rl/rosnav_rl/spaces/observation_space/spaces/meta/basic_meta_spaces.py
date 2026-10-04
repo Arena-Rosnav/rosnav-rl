@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
@@ -29,7 +31,7 @@ class IsFirstStepSpace(BaseObservationSpace):
         """
         return spaces.Discrete(2)
 
-    def encode_observation(self, is_first: int = 0, *args, **kwargs) -> int:
+    def encode_observation(self, is_first: IsFirst = False, *args: Any, **kwargs: Any) -> IsFirst:
         """
         Encodes the is_first observation.
 
@@ -62,7 +64,7 @@ class IsTerminalStepSpace(BaseObservationSpace):
         """
         return spaces.Discrete(2)
 
-    def encode_observation(self, is_terminal: int = 0, *args, **kwargs) -> int:
+    def encode_observation(self, is_terminal: IsTerminal = False, *args: Any, **kwargs: Any) -> IsTerminal:
         """
         Encodes the is_terminal observation.
 
@@ -86,7 +88,7 @@ class EpisodeStepSpace(BaseObservationSpace):
 
     name = "EpisodeStepSpace"
 
-    def __init__(self, max_episode_steps: int = 1000, *args, **kwargs):
+    def __init__(self, max_episode_steps: int = 1000, *args: Any, **kwargs: Any):
         """
         Initialize episode step space.
 
@@ -107,7 +109,7 @@ class EpisodeStepSpace(BaseObservationSpace):
             low=0, high=self.max_episode_steps, shape=(1,), dtype=np.int32
         )
 
-    def encode_observation(self, episode_step: int = 0, *args, **kwargs) -> np.ndarray:
+    def encode_observation(self, episode_step: int = 0, *args: Any, **kwargs: Any) -> np.ndarray:
         """
         Encodes the episode step observation.
 

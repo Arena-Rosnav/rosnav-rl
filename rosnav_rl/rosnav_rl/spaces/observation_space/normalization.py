@@ -1,7 +1,8 @@
 """Observation normalization functions and utilities."""
 
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Union
+from typing import Any
+
 import numpy as np
 
 
@@ -26,7 +27,7 @@ class Normalizer(ABC):
 class MaxAbsScaler(Normalizer):
     """Max absolute scaling normalizer: scales to [-1, 1] range."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         self._cached_denom = None
         self._cached_low = None
 
@@ -51,7 +52,7 @@ class MaxAbsScaler(Normalizer):
 class MinMaxScaler(Normalizer):
     """Min-max scaling normalizer: scales to [0, 1] range."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         self._cached_denom = None
         self._cached_low = None
 
@@ -75,7 +76,7 @@ class MinMaxScaler(Normalizer):
 class StandardScaler(Normalizer):
     """Standard scaling normalizer: zero mean, unit variance."""
 
-    def __init__(self, epsilon: float = 1e-8, **kwargs):
+    def __init__(self, epsilon: float = 1e-8, **kwargs: Any):
         self.epsilon = epsilon
         self._cached_mean = None
         self._cached_std = None
@@ -120,7 +121,7 @@ class IdentityNormalizer(Normalizer):
 
 # Registry of available normalizers — use callables so each space gets a fresh instance
 # that can cache its own bounds.
-NORMALIZERS: Dict[str, Union[Normalizer, Callable[[], Normalizer]]] = {
+NORMALIZERS: dict[str, Normalizer | type[Normalizer]] = {
     "max_abs": MaxAbsScaler,
     "min_max": MinMaxScaler,
     "standard": StandardScaler,  # Callable to allow epsilon configuration
@@ -129,7 +130,7 @@ NORMALIZERS: Dict[str, Union[Normalizer, Callable[[], Normalizer]]] = {
 }
 
 
-def get_normalizer(name: str, **kwargs) -> Normalizer:
+def get_normalizer(name: str, **kwargs: Any) -> Normalizer:
     """Get normalizer instance by name.
 
     Args:
@@ -149,7 +150,7 @@ def get_normalizer(name: str, **kwargs) -> Normalizer:
     normalizer = NORMALIZERS[name]
 
     # If it's a class/callable, instantiate it
-    if callable(normalizer) and not isinstance(normalizer, Normalizer):
+    if isinstance(normalizer, type):
         return normalizer(**kwargs)
 
     return normalizer

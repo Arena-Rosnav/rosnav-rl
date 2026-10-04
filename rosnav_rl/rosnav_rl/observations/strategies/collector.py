@@ -7,7 +7,7 @@ which ones need fresh data updates.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from rclpy.node import Node
 
@@ -32,8 +32,8 @@ class CollectorManager:
         self._waiting_strategy = WaitingStrategy(node)
 
     def collect_observations(
-        self, collectors: Dict[str, Collector], obs_dict: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, collectors: dict[str, Collector], obs_dict: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Collect observations from all collectors, waiting for required updates.
 
@@ -64,7 +64,7 @@ class CollectorManager:
 
         return obs_dict
 
-    def _invalidate_observations(self, collectors: Dict[str, Collector]) -> None:
+    def _invalidate_observations(self, collectors: dict[str, Collector]) -> None:
         """Mark all collectors as stale to ensure fresh data on next collection."""
         for collector in collectors.values():
             collector._stale = True

@@ -17,7 +17,7 @@ Usage::
     best = pruner.best_metric
 
 When the DreamerV3 ``helper.train()`` loop finishes an evaluation phase it
-calls ``after_eval_fn(eval_return)``.  ``after_eval_hook`` stores the value
+calls ``after_eval_fn(metrics)``.  ``after_eval_hook`` stores ``eval_return``
 and delegates to :meth:`TrialPrunerBase.report_metric` which handles Optuna
 reporting and pruning.
 
@@ -28,9 +28,12 @@ is always the one passed to ``after_eval_hook``.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from .pruner_base import TrialPrunerBase
+
+if TYPE_CHECKING:
+    import optuna
 
 logger = logging.getLogger(__name__)
 
@@ -53,16 +56,16 @@ class DreamerV3TrialPruner(TrialPrunerBase):
 
     def __init__(
         self,
-        trial: "optuna.trial.Trial",
+        trial: optuna.trial.Trial,
         metric: str = "eval_return",
         verbose: int = 0,
     ):
         super().__init__(trial=trial, metric=metric, verbose=verbose)
-        self._last_value: Optional[float] = None
+        self._last_value: float | None = None
 
     # ── TrialPrunerBase interface ─────────────────────────────────────────
 
-    def read_metric(self) -> Optional[float]:
+    def read_metric(self) -> float | None:
         """Return the last value received via :meth:`after_eval_hook`.
 
         Returns ``None`` before the first evaluation.
@@ -71,7 +74,7 @@ class DreamerV3TrialPruner(TrialPrunerBase):
 
     # ── DreamerV3 hook ────────────────────────────────────────────────────
 
-    def after_eval_hook(self, metrics: "Dict[str, float]") -> None:
+    def after_eval_hook(self, metrics: dict[str, float]) -> None:
         """Called by ``helper.train()`` after every evaluation phase.
 
         Stores the ``eval_return`` from *metrics* and immediately reports it

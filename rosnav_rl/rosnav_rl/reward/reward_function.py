@@ -1,9 +1,9 @@
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
-from rosnav_rl.cfg.reward import RewardFunctionDict
 from rosnav_rl.cfg.parameters import AgentParameters
+from rosnav_rl.cfg.reward import RewardFunctionDict
 from rosnav_rl.utils.logging import (
     ComponentType,
     ErrorReportingMixin,
@@ -15,6 +15,7 @@ _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .reward_units.base_reward_units import RewardUnit
+    from .reward_units.reward_unit_factory import RewardUnitFactory
 
 # Configuration constants
 ERROR_MESSAGE_SUFFIX = " ---> thus not applied (+/- 0.0)."
@@ -32,8 +33,8 @@ class RewardState:
     """
 
     current_reward: float = 0.0
-    info: Dict[str, Any] = field(default_factory=dict)
-    reward_overview: Dict[str, float] = field(default_factory=dict)
+    info: dict[str, Any] = field(default_factory=dict)
+    reward_overview: dict[str, float] = field(default_factory=dict)
 
 
 class RewardFunction(ErrorReportingMixin):
@@ -62,10 +63,10 @@ class RewardFunction(ErrorReportingMixin):
     def __init__(
         self,
         function_dict: RewardFunctionDict,
-        unit_kwargs: Optional[Dict[str, Any]] = None,
+        unit_kwargs: dict[str, Any] | None = None,
         enable_validation: bool = True,
         verbose: int = 0,
-        **kwargs,
+        **kwargs: Any,
     ):
         """Initialize the reward function.
 
@@ -90,12 +91,12 @@ class RewardFunction(ErrorReportingMixin):
         self._validate_units = enable_validation
 
         # Reusable kwargs dict to avoid per-step allocation
-        self._execution_kwargs: Dict[str, Any] = {}
+        self._execution_kwargs: dict[str, Any] = {}
 
         # Reward units
-        self._reward_units: List["RewardUnit"] = []
-        self._safe_dist_sensitive_units: List["RewardUnit"] = []
-        self._safe_dist_insensitive_units: List["RewardUnit"] = []
+        self._reward_units: list[RewardUnit] = []
+        self._safe_dist_sensitive_units: list[RewardUnit] = []
+        self._safe_dist_insensitive_units: list[RewardUnit] = []
 
         self._initialize_reward_units()
 
@@ -113,16 +114,13 @@ class RewardFunction(ErrorReportingMixin):
     def _categorize_units_by_safety_sensitivity(self) -> None:
         """Categorize units based on safe distance violation sensitivity."""
         for unit in self._reward_units:
-            if (
-                hasattr(unit, "_on_safe_dist_violation")
-                and unit._on_safe_dist_violation
-            ):
+            if unit._on_safe_dist_violation:
                 self._safe_dist_sensitive_units.append(unit)
             else:
                 self._safe_dist_insensitive_units.append(unit)
 
     def _create_reward_unit(
-        self, factory: Any, unit_name: str, params: Dict[str, Any]
+        self, factory: type["RewardUnitFactory"], unit_name: str, params: dict[str, Any]
     ) -> "RewardUnit":
         """Create a single reward unit instance with error handling.
 
@@ -142,7 +140,7 @@ class RewardFunction(ErrorReportingMixin):
         self,
         obs_dict: ObservationDict,
         simulation_state_container: AgentParameters,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Calculate rewards using all reward units with optional parallel processing.
 
@@ -177,7 +175,7 @@ class RewardFunction(ErrorReportingMixin):
                 # Disable after first successful validation — keys don't change at runtime
                 self._validate_units = False
 
-    def _get_eligible_units(self, obs_dict: ObservationDict) -> List["RewardUnit"]:
+    def _get_eligible_units(self, obs_dict: ObservationDict) -> list["RewardUnit"]:
         """Get eligible reward units based on current safety state from observations.
 
         Reads ``laser_safety_violation`` directly from the live observation
@@ -195,8 +193,8 @@ class RewardFunction(ErrorReportingMixin):
         self,
         obs_dict: ObservationDict,
         simulation_state_container: AgentParameters,
-        **kwargs,
-    ) -> Dict[str, Any]:
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """Prepare arguments for reward unit execution.
 
         Reuses a single mutable dict to avoid per-step allocation.
@@ -211,7 +209,7 @@ class RewardFunction(ErrorReportingMixin):
         return ek
 
     def _execute_reward_units(
-        self, units: List["RewardUnit"], kwargs: Dict[str, Any]
+        self, units: list["RewardUnit"], kwargs: dict[str, Any]
     ) -> None:
         """Execute reward units sequentially."""
         if len(units) == 1:
@@ -219,7 +217,7 @@ class RewardFunction(ErrorReportingMixin):
         else:
             self._calculate_reward_sequential(units, kwargs)
 
-    def _execute_single_unit(self, unit: "RewardUnit", kwargs: Dict[str, Any]) -> None:
+    def _execute_single_unit(self, unit: "RewardUnit", kwargs: dict[str, Any]) -> None:
         """Execute a single reward unit with optimized error handling."""
         try:
             unit(**kwargs)
@@ -235,7 +233,7 @@ class RewardFunction(ErrorReportingMixin):
             self._report_error(message=error_message, component_name=unit_name)
 
     def _calculate_reward_sequential(
-        self, reward_units: List["RewardUnit"], all_kwargs: Dict[str, Any]
+        self, reward_units: list["RewardUnit"], all_kwargs: dict[str, Any]
     ) -> None:
         """Calculate rewards sequentially with optimized error handling."""
         for reward_unit in reward_units:
@@ -248,8 +246,8 @@ class RewardFunction(ErrorReportingMixin):
         self,
         obs_dict: ObservationDict,
         simulation_state_container: AgentParameters,
-        **kwargs,
-    ) -> Tuple[float, Dict[str, Any]]:
+        **kwargs: Any,
+    ) -> tuple[float, dict[str, Any]]:
         """Calculate and return the current reward and information.
 
         Args:
@@ -268,28 +266,26 @@ class RewardFunction(ErrorReportingMixin):
 
         return self.state.current_reward, self.state.info
 
-    def add_reward(self, value: float, **kwargs) -> None:
+    def add_reward(self, value: float, called_by: str | None = None) -> None:
         """Add a reward value and track its source.
 
         Args:
             value: Reward value to add
-            **kwargs: Additional metadata about the reward
+            called_by: Name of the reward unit that produced the value
         """
-        called_by = kwargs.get("called_by")
-
         self.state.current_reward += value
         if called_by:
             self.state.reward_overview[called_by] = value
 
     def _update_reward_and_overview(
-        self, value: float, called_by: Optional[str]
+        self, value: float, called_by: str | None
     ) -> None:
         """Update current reward and overview tracking."""
         self.state.current_reward += value
         if called_by:
             self.state.reward_overview[called_by] = value
 
-    def add_info(self, info: Dict[str, Any]) -> None:
+    def add_info(self, info: dict[str, Any]) -> None:
         """Update the info dictionary.
 
         Args:
@@ -326,7 +322,7 @@ class RewardFunction(ErrorReportingMixin):
             _logger.debug(message)
 
     @property
-    def reward_units(self) -> List["RewardUnit"]:
+    def reward_units(self) -> list["RewardUnit"]:
         """Get the list of reward units."""
         return self._reward_units
 

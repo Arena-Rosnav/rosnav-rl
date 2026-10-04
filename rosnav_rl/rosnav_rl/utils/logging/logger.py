@@ -7,10 +7,15 @@ The system automatically detects the available logging infrastructure and
 provides a consistent interface across all components.
 """
 
-from abc import ABC, abstractmethod
-from typing import Optional, Any, Protocol
-from enum import Enum
+from __future__ import annotations
+
 import sys
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from rclpy.node import Node
 
 
 class LogLevel(Enum):
@@ -26,46 +31,46 @@ class LogLevel(Enum):
 class LoggerProtocol(Protocol):
     """Protocol defining the interface for logger implementations."""
 
-    def debug(self, message: str, **kwargs) -> None: ...
-    def info(self, message: str, **kwargs) -> None: ...
-    def warning(self, message: str, **kwargs) -> None: ...
-    def error(self, message: str, **kwargs) -> None: ...
-    def critical(self, message: str, **kwargs) -> None: ...
+    def debug(self, message: str, **kwargs: Any) -> None: ...
+    def info(self, message: str, **kwargs: Any) -> None: ...
+    def warning(self, message: str, **kwargs: Any) -> None: ...
+    def error(self, message: str, **kwargs: Any) -> None: ...
+    def critical(self, message: str, **kwargs: Any) -> None: ...
 
 
 class BaseLogger(ABC):
     """Abstract base class for all logger implementations."""
 
-    def __init__(self, name: str = "rosnav_rl", **kwargs):
+    def __init__(self, name: str = "rosnav_rl", **kwargs: Any):
         self.name = name
         self.enabled = True
 
     @abstractmethod
-    def debug(self, message: str, **kwargs) -> None:
+    def debug(self, message: str, **kwargs: Any) -> None:
         """Log a debug message."""
         pass
 
     @abstractmethod
-    def info(self, message: str, **kwargs) -> None:
+    def info(self, message: str, **kwargs: Any) -> None:
         """Log an info message."""
         pass
 
     @abstractmethod
-    def warning(self, message: str, **kwargs) -> None:
+    def warning(self, message: str, **kwargs: Any) -> None:
         """Log a warning message."""
         pass
 
     @abstractmethod
-    def error(self, message: str, **kwargs) -> None:
+    def error(self, message: str, **kwargs: Any) -> None:
         """Log an error message."""
         pass
 
     @abstractmethod
-    def critical(self, message: str, **kwargs) -> None:
+    def critical(self, message: str, **kwargs: Any) -> None:
         """Log a critical message."""
         pass
 
-    def log(self, level: LogLevel, message: str, **kwargs) -> None:
+    def log(self, level: LogLevel, message: str, **kwargs: Any) -> None:
         """Log a message at the specified level."""
         if not self.enabled:
             return
@@ -93,7 +98,7 @@ class BaseLogger(ABC):
 class ROS2Logger(BaseLogger):
     """ROS2 node-based logger implementation."""
 
-    def __init__(self, node: Any, name: str = "rosnav_rl", **kwargs):
+    def __init__(self, node: Node, name: str = "rosnav_rl", **kwargs: Any):
         """Initialize ROS2 logger with a ROS2 node.
 
         Args:
@@ -103,38 +108,30 @@ class ROS2Logger(BaseLogger):
         super().__init__(name, **kwargs)
         self.node = node
 
-        # Try to get the ROS2 logger from the node
-        if hasattr(node, "get_logger"):
-            self.ros_logger = node.get_logger()
-            # Use node name if available
-            if hasattr(node, "get_name"):
-                self.name = node.get_name()
-        else:
-            raise ValueError(
-                f"Provided node does not have get_logger() method: {type(node)}"
-            )
+        self.ros_logger = node.get_logger()
+        self.name = node.get_name()
 
-    def debug(self, message: str, **kwargs) -> None:
+    def debug(self, message: str, **kwargs: Any) -> None:
         """Log a debug message using ROS2 logger."""
-        if self.enabled and hasattr(self.ros_logger, "debug"):
+        if self.enabled:
             self.ros_logger.debug(message)
 
-    def info(self, message: str, **kwargs) -> None:
+    def info(self, message: str, **kwargs: Any) -> None:
         """Log an info message using ROS2 logger."""
         if self.enabled:
             self.ros_logger.info(message)
 
-    def warning(self, message: str, **kwargs) -> None:
+    def warning(self, message: str, **kwargs: Any) -> None:
         """Log a warning message using ROS2 logger."""
         if self.enabled:
             self.ros_logger.warning(message)
 
-    def error(self, message: str, **kwargs) -> None:
+    def error(self, message: str, **kwargs: Any) -> None:
         """Log an error message using ROS2 logger."""
         if self.enabled:
             self.ros_logger.error(message)
 
-    def critical(self, message: str, **kwargs) -> None:
+    def critical(self, message: str, **kwargs: Any) -> None:
         """Log a critical message using ROS2 logger."""
         if self.enabled:
             self.ros_logger.fatal(message)  # ROS2 uses 'fatal' for critical
@@ -143,7 +140,7 @@ class ROS2Logger(BaseLogger):
 class ROS1Logger(BaseLogger):
     """ROS1 rospy-based logger implementation."""
 
-    def __init__(self, name: str = "rosnav_rl", **kwargs):
+    def __init__(self, name: str = "rosnav_rl", **kwargs: Any):
         """Initialize ROS1 logger using rospy."""
         super().__init__(name, **kwargs)
 
@@ -151,30 +148,30 @@ class ROS1Logger(BaseLogger):
             import rospy
 
             self.rospy = rospy
-        except ImportError:
-            raise ImportError("rospy not available for ROS1Logger")
+        except ImportError as err:
+            raise ImportError("rospy not available for ROS1Logger") from err
 
-    def debug(self, message: str, **kwargs) -> None:
+    def debug(self, message: str, **kwargs: Any) -> None:
         """Log a debug message using rospy."""
         if self.enabled:
             self.rospy.logdebug(f"[{self.name}] {message}")
 
-    def info(self, message: str, **kwargs) -> None:
+    def info(self, message: str, **kwargs: Any) -> None:
         """Log an info message using rospy."""
         if self.enabled:
             self.rospy.loginfo(f"[{self.name}] {message}")
 
-    def warning(self, message: str, **kwargs) -> None:
+    def warning(self, message: str, **kwargs: Any) -> None:
         """Log a warning message using rospy."""
         if self.enabled:
             self.rospy.logwarn(f"[{self.name}] {message}")
 
-    def error(self, message: str, **kwargs) -> None:
+    def error(self, message: str, **kwargs: Any) -> None:
         """Log an error message using rospy."""
         if self.enabled:
             self.rospy.logerr(f"[{self.name}] {message}")
 
-    def critical(self, message: str, **kwargs) -> None:
+    def critical(self, message: str, **kwargs: Any) -> None:
         """Log a critical message using rospy."""
         if self.enabled:
             self.rospy.logfatal(f"[{self.name}] {message}")
@@ -194,7 +191,7 @@ class PythonLogger(BaseLogger):
     ``configure_rosnav_rl_logging()`` to take effect naturally.
     """
 
-    def __init__(self, name: str = "rosnav_rl", level: str = "INFO", **kwargs):
+    def __init__(self, name: str = "rosnav_rl", level: str = "INFO", **kwargs: Any):
         """Initialize Python logger adapter.
 
         Args:
@@ -213,23 +210,23 @@ class PythonLogger(BaseLogger):
         self.logger.setLevel(numeric_level)
         # No handler installed — let the application's logging configuration handle output.
 
-    def debug(self, message: str, **kwargs) -> None:
+    def debug(self, message: str, **kwargs: Any) -> None:
         if self.enabled:
             self.logger.debug(message)
 
-    def info(self, message: str, **kwargs) -> None:
+    def info(self, message: str, **kwargs: Any) -> None:
         if self.enabled:
             self.logger.info(message)
 
-    def warning(self, message: str, **kwargs) -> None:
+    def warning(self, message: str, **kwargs: Any) -> None:
         if self.enabled:
             self.logger.warning(message)
 
-    def error(self, message: str, **kwargs) -> None:
+    def error(self, message: str, **kwargs: Any) -> None:
         if self.enabled:
             self.logger.error(message)
 
-    def critical(self, message: str, **kwargs) -> None:
+    def critical(self, message: str, **kwargs: Any) -> None:
         if self.enabled:
             self.logger.critical(message)
 
@@ -237,7 +234,7 @@ class PythonLogger(BaseLogger):
 class ConsoleLogger(BaseLogger):
     """Simple console-based logger implementation."""
 
-    def __init__(self, name: str = "rosnav_rl", colored: bool = True, **kwargs):
+    def __init__(self, name: str = "rosnav_rl", colored: bool = True, **kwargs: Any):
         """Initialize console logger.
 
         Args:
@@ -270,27 +267,27 @@ class ConsoleLogger(BaseLogger):
         else:
             return f"[{level.value}] [{self.name}] {message}"
 
-    def debug(self, message: str, **kwargs) -> None:
+    def debug(self, message: str, **kwargs: Any) -> None:
         """Log a debug message to console."""
         if self.enabled:
             print(self._format_message(LogLevel.DEBUG, message))
 
-    def info(self, message: str, **kwargs) -> None:
+    def info(self, message: str, **kwargs: Any) -> None:
         """Log an info message to console."""
         if self.enabled:
             print(self._format_message(LogLevel.INFO, message))
 
-    def warning(self, message: str, **kwargs) -> None:
+    def warning(self, message: str, **kwargs: Any) -> None:
         """Log a warning message to console."""
         if self.enabled:
             print(self._format_message(LogLevel.WARNING, message))
 
-    def error(self, message: str, **kwargs) -> None:
+    def error(self, message: str, **kwargs: Any) -> None:
         """Log an error message to console."""
         if self.enabled:
             print(self._format_message(LogLevel.ERROR, message), file=sys.stderr)
 
-    def critical(self, message: str, **kwargs) -> None:
+    def critical(self, message: str, **kwargs: Any) -> None:
         """Log a critical message to console."""
         if self.enabled:
             print(self._format_message(LogLevel.CRITICAL, message), file=sys.stderr)
@@ -299,19 +296,19 @@ class ConsoleLogger(BaseLogger):
 class SilentLogger(BaseLogger):
     """Silent logger that doesn't output anything (useful for testing)."""
 
-    def debug(self, message: str, **kwargs) -> None:
+    def debug(self, message: str, **kwargs: Any) -> None:
         pass
 
-    def info(self, message: str, **kwargs) -> None:
+    def info(self, message: str, **kwargs: Any) -> None:
         pass
 
-    def warning(self, message: str, **kwargs) -> None:
+    def warning(self, message: str, **kwargs: Any) -> None:
         pass
 
-    def error(self, message: str, **kwargs) -> None:
+    def error(self, message: str, **kwargs: Any) -> None:
         pass
 
-    def critical(self, message: str, **kwargs) -> None:
+    def critical(self, message: str, **kwargs: Any) -> None:
         pass
 
 
@@ -321,9 +318,9 @@ class LoggerFactory:
     @staticmethod
     def create_logger(
         logger_type: str = "auto",
-        node: Optional[Any] = None,
+        node: Node | None = None,
         name: str = "rosnav_rl",
-        **kwargs,
+        **kwargs: Any,
     ) -> BaseLogger:
         """Create a logger instance based on the specified type.
 
@@ -357,7 +354,7 @@ class LoggerFactory:
             raise ValueError(f"Unknown logger type: {logger_type}")
 
     @staticmethod
-    def _create_auto_logger(node: Optional[Any], name: str, **kwargs) -> BaseLogger:
+    def _create_auto_logger(node: Node | None, name: str, **kwargs: Any) -> BaseLogger:
         """Automatically detect and create the best available logger."""
         # Try ROS2 first if node is provided
         if node is not None:
@@ -377,7 +374,7 @@ class LoggerFactory:
 
 
 # Global logger instance
-_global_logger: Optional[BaseLogger] = None
+_global_logger: BaseLogger | None = None
 
 
 def get_logger() -> BaseLogger:
@@ -396,9 +393,9 @@ def set_logger(logger: BaseLogger) -> None:
 
 def configure_logger(
     logger_type: str = "auto",
-    node: Optional[Any] = None,
+    node: Node | None = None,
     name: str = "rosnav_rl",
-    **kwargs,
+    **kwargs: Any,
 ) -> BaseLogger:
     """Configure and set the global logger."""
     logger = LoggerFactory.create_logger(logger_type, node, name, **kwargs)

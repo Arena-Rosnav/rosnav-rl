@@ -1,18 +1,16 @@
 import re
-from typing import List, Dict
+from pprint import pprint
 from warnings import warn
 
 import torch
-
 from stable_baselines3.common.policies import ActorCriticPolicy
-from pprint import pprint
 
 
 def transfer_weights(
     target_model: ActorCriticPolicy,
     source_model: ActorCriticPolicy,
-    include: List[str] = None,
-    exclude: List[str] = None,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
 ) -> ActorCriticPolicy:
     """
     Transfers weights from source_model to target_model based on specified inclusion and exclusion criteria.
@@ -30,13 +28,13 @@ def transfer_weights(
         UserWarning: If no include list is provided, a warning is issued and no weights are transferred.
     """
     if include is None:
-        warn("No include list provided. Skipping weight transfer.")
+        warn("No include list provided. Skipping weight transfer.", stacklevel=2)
         return target_model
 
     exclude = exclude or ["---"]
 
-    state_dict_target_model: Dict[str, torch.Tensor] = target_model.state_dict()
-    state_dict_source_model: Dict[str, torch.Tensor] = source_model.state_dict()
+    state_dict_target_model: dict[str, torch.Tensor] = target_model.state_dict()
+    state_dict_source_model: dict[str, torch.Tensor] = source_model.state_dict()
 
     layers_dict = {
         key: value

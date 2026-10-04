@@ -4,6 +4,7 @@ Standard dynamics-based observation spaces integrated into hierarchical architec
 """
 
 from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
@@ -13,6 +14,7 @@ from rosnav_rl.observations.utils.types import (
 )
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
+
 from ..base_observation_space import BaseObservationSpace
 
 
@@ -38,8 +40,8 @@ class LastActionSpace(BaseObservationSpace):
         max_angular_vel: float,
         min_translational_vel: float = 0.0,
         max_translational_vel: float = 0.0,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ) -> None:
         self._min_linear_vel = min_linear_vel
         self._max_linear_vel = max_linear_vel
@@ -86,7 +88,7 @@ class LastActionSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
-        self, last_action: RobotActionVector, *args, **kwargs
+        self, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> RobotActionVector:
         """
         Encodes the last action observation.
@@ -124,7 +126,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
         "subgoal_in_robot_frame": SubgoalRelativePosition,  # Subgoal position in robot's local coordinate frame
     }
 
-    def __init__(self, subgoal_max_dist: float = 5, *args, **kwargs) -> None:
+    def __init__(self, subgoal_max_dist: float = 5, *args: Any, **kwargs: Any) -> None:
         self._max_dist = subgoal_max_dist
         super().__init__(*args, **kwargs)
 
@@ -143,7 +145,7 @@ class SubgoalInRobotFrameSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
-        self, subgoal_in_robot_frame: SubgoalRelativePosition, *args, **kwargs
+        self, subgoal_in_robot_frame: SubgoalRelativePosition, *args: Any, **kwargs: Any
     ) -> SubgoalRelativePosition:
         """
         Encodes the subgoal observation in robot frame.

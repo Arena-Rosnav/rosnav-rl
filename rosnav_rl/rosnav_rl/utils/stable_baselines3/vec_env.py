@@ -1,6 +1,5 @@
-from typing import List
+from stable_baselines3.common.vec_env import VecEnv, VecEnvWrapper, VecNormalize
 
-from stable_baselines3.common.vec_env import VecEnv, VecNormalize
 import rosnav_rl.utils.stable_baselines3.vec_frame_stack as vec_frame_stack
 
 
@@ -12,7 +11,7 @@ def apply_vec_framestack(env: VecEnv, stack_size: int) -> VecEnv:
 
 def apply_vec_normalize(
     env: VecEnv,
-    path: str = None,
+    path: str | None = None,
     is_training: bool = True,
     norm_obs: bool = True,
     norm_reward: bool = True,
@@ -20,7 +19,7 @@ def apply_vec_normalize(
     clip_reward: float = 10.0,
     gamma: float = 0.99,
     epsilon: float = 1e-8,
-    norm_obs_key: List[str] = None,
+    norm_obs_key: list[str] | None = None,
 ) -> VecEnv:
     """
     Apply vector normalization to the environment.
@@ -55,23 +54,23 @@ def apply_vec_normalize(
     )
 
 
-def get_vec_normalize(env: VecEnv) -> VecNormalize:
+def get_vec_normalize(env: VecEnv) -> VecNormalize | None:
     if isinstance(env, VecNormalize):
         return env
 
     # Unwrap the environment until we find VecNormalize
-    if hasattr(env, "venv"):
+    if isinstance(env, VecEnvWrapper):
         return get_vec_normalize(env.venv)
 
     return None
 
 
-def get_vec_framestack(env: VecEnv) -> vec_frame_stack.VecFrameStack:
+def get_vec_framestack(env: VecEnv) -> vec_frame_stack.VecFrameStack | None:
     if isinstance(env, vec_frame_stack.VecFrameStack):
         return env
 
     # Unwrap the environment until we find VecFrameStack
-    if hasattr(env, "venv"):
+    if isinstance(env, VecEnvWrapper):
         return get_vec_framestack(env.venv)
 
     return None

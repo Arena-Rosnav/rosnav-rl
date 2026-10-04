@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import List, Optional, Union
 
 
 class Namespace:
@@ -17,14 +16,14 @@ class Namespace:
         __str__(self) -> str: Returns the string representation of the namespace.
         __repr__(self) -> str: Returns the string representation of the namespace for debugging purposes.
         __truediv__(self, other: Union[str, Namespace, Topic]) -> Topic: Implements the '/' operator for creating topics within the namespace.
-        __call__(self, *args: str) -> Topic: Implements the function call operator for creating topics within the namespace.
+        __call__(self, *args: str | Namespace) -> Topic: Implements the function call operator for creating topics within the namespace.
         __contains__(self, item: Union[str, Namespace]) -> bool: Implements the 'in' operator for checking if a topic or namespace is within the namespace.
         simulation_ns(self) -> Namespace: Returns the simulation namespace.
         robot_ns(self) -> Namespace: Returns the robot namespace.
     """
 
-    def __init__(self, name: Union[str, Namespace]):
-        self.name: List[str] = (
+    def __init__(self, name: str | Namespace):
+        self.name: list[str] = (
             name.name
             if isinstance(name, Namespace)
             else [ns for ns in name.split("/") if ns]
@@ -36,7 +35,7 @@ class Namespace:
     def __repr__(self) -> str:
         return f"Namespace['{self.name}']"
 
-    def __truediv__(self, other: Union[str, Namespace, Topic]) -> Topic:
+    def __truediv__(self, other: str | Namespace | Topic) -> Topic:
         if isinstance(other, str):
             return Topic(other, namespaces=[self])
         elif isinstance(other, Namespace):
@@ -46,10 +45,10 @@ class Namespace:
         else:
             raise TypeError(f"Unsupported operand type for /: '{type(other)}'")
 
-    def __call__(self, *args: str) -> Topic:
+    def __call__(self, *args: str | Namespace) -> Topic:
         return Topic("/".join(self.name + list(map(lambda x: str(x).strip("/"), args))))
 
-    def __contains__(self, item: Union[str, Namespace]) -> bool:
+    def __contains__(self, item: str | Namespace) -> bool:
         if isinstance(item, str):
             return item in self.name
         elif isinstance(item, Namespace):
@@ -72,7 +71,7 @@ class Namespace:
     def without_slashes(self) -> str:
         """Returns the string representation of the namespace without slashes."""
         return "".join(self.name)
-    
+
     def __getitem__(self, index: int) -> Namespace:
         if index < 0 or index >= len(self.name):
             raise IndexError(f"Namespace index {index} out of range")
@@ -98,15 +97,15 @@ class Topic:
     def __init__(
         self,
         name: str,
-        namespaces: Optional[Union[str, List[Union[str, Namespace]], Namespace]] = None,
+        namespaces: str | list[str | Namespace] | Namespace | None = None,
     ):
-        self.namespaces: List[Namespace] = self._process_namespaces(namespaces)
+        self.namespaces: list[Namespace] = self._process_namespaces(namespaces)
         self.name, additional_namespaces = self._process_name(str(name))
         self.namespaces.extend(additional_namespaces)
 
     def _process_namespaces(
-        self, namespaces: Optional[Union[str, List[Union[str, Namespace]], Namespace]]
-    ) -> List[Namespace]:
+        self, namespaces: str | list[str | Namespace] | Namespace | None
+    ) -> list[Namespace]:
         """
         Process the namespaces associated with the topic.
 
@@ -131,7 +130,7 @@ class Topic:
         else:
             raise TypeError(f"Unsupported type for 'namespaces': '{type(namespaces)}'")
 
-    def _process_name(self, name: str) -> tuple[str, List[Namespace]]:
+    def _process_name(self, name: str) -> tuple[str, list[Namespace]]:
         """
         Process the name of the topic.
 
@@ -153,7 +152,7 @@ class Topic:
     def __repr__(self) -> str:
         return f"Topic['{self.name}', namespace='{''.join(str(ns) for ns in self.namespaces)}']"
 
-    def __truediv__(self, other: Union[str, Namespace, Topic]) -> Topic:
+    def __truediv__(self, other: str | Namespace | Topic) -> Topic:
         if isinstance(other, str):
             new_name = f"{self.name}/{other}" if self.name else other
             return Topic(new_name, namespaces=self.namespaces)
@@ -168,7 +167,7 @@ class Topic:
         else:
             raise TypeError(f"Unsupported operand type for /: '{type(other)}'")
 
-    def __contains__(self, item: Union[str, Namespace]) -> bool:
+    def __contains__(self, item: str | Namespace) -> bool:
         if isinstance(item, str):
             return item in self.full_topic
         elif isinstance(item, Namespace):
@@ -176,7 +175,7 @@ class Topic:
         else:
             raise TypeError(f"Unsupported operand type for 'in': '{type(item)}'")
 
-    def prepend_namespace(self, namespace: Union[str, Namespace]) -> Topic:
+    def prepend_namespace(self, namespace: str | Namespace) -> Topic:
         if not isinstance(namespace, Namespace) or not isinstance(namespace, str):
             raise TypeError(
                 f"Unsupported operand type for prepend_namespace: '{type(namespace)}'"
@@ -210,4 +209,4 @@ class Topic:
 
 
 StringNamespace = str
-ListOfNamespaces = List[Union[str, Namespace]]
+ListOfNamespaces = list[str | Namespace]

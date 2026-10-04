@@ -3,8 +3,9 @@
 Demonstrates best practices for using MultiLaserFusionSpace in production environments.
 """
 
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any
 
 from rosnav_rl.spaces.observation_space.spaces.perception.laser import (
     MultiLaserFusionSpace,
@@ -15,7 +16,7 @@ class ProductionMultiLaserSetup:
     """Production-ready multi-laser configuration examples."""
 
     @staticmethod
-    def create_dual_laser_config() -> Dict[str, Any]:
+    def create_dual_laser_config() -> dict[str, Any]:
         """Standard dual-laser setup for robots with front/rear scanners.
 
         Returns:
@@ -38,7 +39,7 @@ class ProductionMultiLaserSetup:
         }
 
     @staticmethod
-    def create_quad_laser_config() -> Dict[str, Any]:
+    def create_quad_laser_config() -> dict[str, Any]:
         """Advanced quad-laser setup for high-reliability systems.
 
         Returns:
@@ -71,7 +72,7 @@ class ProductionMultiLaserSetup:
         }
 
     @staticmethod
-    def create_warehouse_config() -> Dict[str, Any]:
+    def create_warehouse_config() -> dict[str, Any]:
         """Configuration optimized for warehouse environments.
 
         Returns:
@@ -100,7 +101,7 @@ class MultiLaserProductionValidator:
     @staticmethod
     def validate_fusion_output(
         fused_scan: np.ndarray, expected_beams: int = 360
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate fused laser output for production use.
 
         Args:
@@ -154,7 +155,7 @@ class MultiLaserProductionValidator:
     @staticmethod
     def benchmark_fusion_performance(
         space: MultiLaserFusionSpace, num_samples: int = 1000
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Benchmark fusion performance.
 
         Args:
@@ -171,12 +172,12 @@ class MultiLaserProductionValidator:
 
         # Warm up
         for _ in range(10):
-            space.encode_observation(sample_obs)
+            space.encode_observation(laser_fusion=sample_obs["laser"])
 
         # Benchmark
         start_time = time.time()
         for _ in range(num_samples):
-            space.encode_observation(sample_obs)
+            space.encode_observation(laser_fusion=sample_obs["laser"])
         end_time = time.time()
 
         total_time = end_time - start_time
@@ -209,7 +210,7 @@ def demonstrate_production_usage():
     # 3. Test with sample data
     sample_observation = {"laser": np.random.uniform(0.5, 25.0, 360).astype(np.float32)}
 
-    fused_result = fusion_space.encode_observation(sample_observation)
+    fused_result = fusion_space.encode_observation(laser_fusion=sample_observation["laser"])
     print("3. Processed sample observation:")
     print(f"   Input shape: {sample_observation['laser'].shape}")
     print(f"   Output shape: {fused_result.shape}")

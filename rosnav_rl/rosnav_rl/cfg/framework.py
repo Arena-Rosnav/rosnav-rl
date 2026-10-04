@@ -1,7 +1,7 @@
-from typing import Union, ClassVar
 from abc import ABC
 
 from pydantic import BaseModel
+
 from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
 
 
@@ -14,7 +14,7 @@ class FrameworkCfg(BaseModel, ABC):
     configuration parameters.
 
     Attributes:
-        __name__ (ClassVar[Union[str, SupportedRLFrameworks]]): Class variable storing 
+        __name__ (ClassVar[Union[str, SupportedRLFrameworks]]): Class variable storing
             the name or enum value identifying the RL framework.
     """
-    name: Union[str, SupportedRLFrameworks] = ""
+    name: str | SupportedRLFrameworks = ""

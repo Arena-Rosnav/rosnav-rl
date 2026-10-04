@@ -2,13 +2,15 @@
 
 from typing import Any, Protocol, TypeVar
 
+__all__ = ["_Ros2Message", "_Ros2Message_T", "_Ros2ServiceType", "_Ros2ServiceType_T"]
+
 
 class _Ros2Message(Protocol):
     """Protocol representing any ROS2 message type."""
-    
-    def get_fields_and_field_types(self) -> dict:
+
+    def get_fields_and_field_types(self) -> dict[str, str]:
         """Get the message fields information.
-        
+
         Returns:
             dict: A dictionary of field names and their types
         """
@@ -21,7 +23,7 @@ _Ros2Message_T = TypeVar('_Ros2Message_T', bound=_Ros2Message)
 
 class _Ros2ServiceType(Protocol):
     """Protocol representing a ROS2 service type."""
-    
+
     Request: Any
     Response: Any
 

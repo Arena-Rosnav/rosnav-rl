@@ -8,8 +8,9 @@ including individual subscriptions and synchronized message filter subscriptions
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from functools import partial
-from typing import Dict, List
+from typing import Protocol
 
 import message_filters
 from rclpy.node import Node
@@ -17,7 +18,12 @@ from rclpy.qos import QoSProfile
 from rclpy.subscription import Subscription
 
 from rosnav_rl.utils.rostopic import Namespace
+
 from ..data_sources.base import Collector
+
+
+class _ObservationCallback(Protocol):
+    def __call__(self, msg: object, collector: Collector) -> None: ...
 
 
 class SubscriptionManager:
@@ -30,7 +36,7 @@ class SubscriptionManager:
         enable_synchronization: bool = True,
         sync_tolerance_seconds: float = 0.1,
         buffer_size: int = 50,
-        qos_profile: QoSProfile = 10,
+        qos_profile: QoSProfile | int = 10,
     ):
         """
         Initialize the subscription manager.
@@ -53,15 +59,15 @@ class SubscriptionManager:
         self._lock = threading.Lock()
 
         # Subscription tracking
-        self._subscribers: Dict[str, Subscription] = {}
+        self._subscribers: dict[str, Subscription] = {}
         self._message_filter_synchronizer = None
-        self._sync_collector_names: List[str] = []
+        self._sync_collector_names: list[str] = []
 
     def setup_collectors(
         self,
-        collectors: Dict[str, Collector],
-        observation_callback,
-        synchronized_callback,
+        collectors: dict[str, Collector],
+        observation_callback: _ObservationCallback,
+        synchronized_callback: Callable[..., None],
     ) -> None:
         """
         Set up ROS2 subscribers for all collectors.
@@ -97,7 +103,7 @@ class SubscriptionManager:
             self._setup_synchronized_collectors(sync_collectors, synchronized_callback)
 
     def _setup_individual_collector(
-        self, name: str, collector: Collector, observation_callback
+        self, name: str, collector: Collector, observation_callback: _ObservationCallback
     ) -> None:
         """Set up a single collector with its own subscription."""
         # Set QoS profile if the collector doesn't have one
@@ -121,7 +127,7 @@ class SubscriptionManager:
         self._logger.debug(f"Subscribed to {topic} for collector '{name}'")
 
     def _setup_synchronized_collectors(
-        self, sync_collectors: Dict[str, Collector], synchronized_callback
+        self, sync_collectors: dict[str, Collector], synchronized_callback: Callable[..., None]
     ) -> None:
         """Set up synchronized collectors using message_filters."""
         subscribers = []
@@ -155,12 +161,12 @@ class SubscriptionManager:
 
     def shutdown(self) -> None:
         """Clean up subscriptions and resources."""
-        for name, subscription in self._subscribers.items():
+        for subscription in self._subscribers.values():
             self._node.destroy_subscription(subscription)
         self._logger.info("SubscriptionManager shutdown complete")
 
     @property
-    def sync_collector_names(self) -> List[str]:
+    def sync_collector_names(self) -> list[str]:
         """Get the names of synchronized collectors."""
         return self._sync_collector_names.copy()
 

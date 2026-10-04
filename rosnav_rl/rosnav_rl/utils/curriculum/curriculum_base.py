@@ -39,16 +39,18 @@ Examples
 
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List, Callable, Union
 import time
-from rclpy.node import Node
-from rcl_interfaces.srv import SetParameters
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from typing import Any
+
 from rcl_interfaces.msg import Parameter, ParameterType
+from rcl_interfaces.srv import SetParameters
+from rclpy.client import Client
+from rclpy.node import Node
 from task_generator_msgs.srv import QueueEpisode
 
-
-StageInput = Union[Dict[str, List[Any]], List[Dict[str, Any]]]
+StageInput = dict[str, list[Any]] | list[dict[str, Any]]
 
 
 class CurriculumBase(ABC):
@@ -80,7 +82,7 @@ class CurriculumBase(ABC):
         upper_threshold: float,
         lower_threshold: float,
         num_envs: int,
-        parameter_node_template: Optional[str] = None,
+        parameter_node_template: str | None = None,
         parameter_service_name: str = "set_parameters",
         starting_stage: int = 0,
         verbose: int = 0,
@@ -105,7 +107,7 @@ class CurriculumBase(ABC):
         self.timeout = timeout
 
         # Normalized stages: list of dicts {param_name: value}
-        self._stages: List[Dict[str, Any]] = self._normalize_train_stages(train_stages)
+        self._stages: list[dict[str, Any]] = self._normalize_train_stages(train_stages)
         if not self._stages:
             raise ValueError("No curriculum stages provided")
 
@@ -119,19 +121,19 @@ class CurriculumBase(ABC):
         self.task_mode_clients = self._init_task_mode_clients()
 
         # Lifecycle hooks
-        self._on_apply: List[Callable[[int, Dict[str, Any]], None]] = []
-        self._on_advance: List[Callable[[int], None]] = []
-        self._on_retreat: List[Callable[[int], None]] = []
+        self._on_apply: list[Callable[[int, dict[str, Any]], None]] = []
+        self._on_advance: list[Callable[[int], None]] = []
+        self._on_retreat: list[Callable[[int], None]] = []
 
         # Nodes confirmed to lack config/queue_episode; task-prefixed params fall
         # back to SetParameters for these (same as legacy behaviour).
-        self._non_task_generator_nodes: set = set()
+        self._non_task_generator_nodes: set[str] = set()
 
         # Apply initial stage
         self._apply_curriculum()
 
     # ------------------------- Stage normalization -------------------------
-    def _normalize_train_stages(self, train_stages: StageInput) -> List[Dict[str, Any]]:
+    def _normalize_train_stages(self, train_stages: StageInput) -> list[dict[str, Any]]:
         """Convert accepted stage formats into a list of stage dicts.
 
         Accepts two formats:
@@ -156,7 +158,7 @@ class CurriculumBase(ABC):
                     "All parameter lists must be non-empty and the same length"
                 )
             n_stages = lengths[0]
-            stages: List[Dict[str, Any]] = []
+            stages: list[dict[str, Any]] = []
             for i in range(n_stages):
                 stage = {k: train_stages[k][i] for k in keys}
                 stages.append(stage)
@@ -172,7 +174,7 @@ class CurriculumBase(ABC):
         raise TypeError("train_stages must be dict or list of dicts")
 
     # ------------------------- Parameter client handling -------------------------
-    def _init_parameter_clients(self) -> Dict[str, Any]:
+    def _init_parameter_clients(self) -> dict[str, Client]:
         """Create ROS2 service clients for each task-generator node.
 
         The method uses `self.parameter_node_template` to format node names for
@@ -183,7 +185,7 @@ class CurriculumBase(ABC):
         Returns:
             Dict[node_name, client]
         """
-        clients: Dict[str, Any] = {}
+        clients: dict[str, Client] = {}
         for i in range(self.num_envs):
             if "{i}" in self.parameter_node_template:
                 node_name = self.parameter_node_template.format(i=i)
@@ -200,9 +202,9 @@ class CurriculumBase(ABC):
             print(f"[CURRICULUM_BASE] Created {len(clients)} parameter clients total")
         return clients
 
-    def _init_task_mode_clients(self) -> Dict[str, Any]:
+    def _init_task_mode_clients(self) -> dict[str, Client]:
         """Create ROS2 service clients for config/queue_episode on each node."""
-        clients: Dict[str, Any] = {}
+        clients: dict[str, Client] = {}
         for i in range(self.num_envs):
             if "{i}" in self.parameter_node_template:
                 node_name = self.parameter_node_template.format(i=i)
@@ -213,7 +215,7 @@ class CurriculumBase(ABC):
         return clients
 
     # ------------------------- Hooks API -------------------------
-    def register_on_apply(self, fn: Callable[[int, Dict[str, Any]], None]) -> None:
+    def register_on_apply(self, fn: Callable[[int, dict[str, Any]], None]) -> None:
         """Register a callback invoked after a stage is applied.
 
         The callback signature must be (stage_index: int, stage_dict: Dict[str, Any]).
@@ -236,7 +238,7 @@ class CurriculumBase(ABC):
         """
         self._on_retreat.append(fn)
 
-    def _call_hooks(self, hooks: List[Callable], *args, **kwargs):
+    def _call_hooks(self, hooks: list[Callable[..., None]], *args: Any, **kwargs: Any):
         """Safely call registered hooks.
 
         Any exception raised by a hook is caught and logged (when verbose>0).
@@ -250,7 +252,7 @@ class CurriculumBase(ABC):
                     print("Ignoring exception in hook", h)
 
     # ------------------------- Parameter conversion and setting -------------------------
-    def _param_to_rcl_param(self, name: str, value: Any) -> Parameter:
+    def _param_to_rcl_param(self, name: str, value: object) -> Parameter:
         param = Parameter()
         param.name = name
         if isinstance(value, int):
@@ -289,17 +291,17 @@ class CurriculumBase(ABC):
         return param
 
     def _split_task_mode_params(
-        self, param_dict: Dict[str, Any]
-    ) -> tuple:
+        self, param_dict: dict[str, Any]
+    ) -> tuple[list[Parameter], list[Parameter], dict[str, Any]]:
         """Partition param_dict into (obstacles_params, robots_params, plain_dict).
 
         Keys of the form ``task.<mode>.<leaf>`` are routed to obstacles_params
         with leaf ``<leaf>`` (the node prepends ``task.<active_mode>.`` at apply time).
         Robot-side curriculum keys are not currently produced by any config.
         """
-        obstacles: List[Parameter] = []
-        robots: List[Parameter] = []
-        plain: Dict[str, Any] = {}
+        obstacles: list[Parameter] = []
+        robots: list[Parameter] = []
+        plain: dict[str, Any] = {}
 
         for key, val in param_dict.items():
             parts = key.split(".", 2)
@@ -323,7 +325,7 @@ class CurriculumBase(ABC):
         return obstacles, robots, plain
 
     def _send_set_parameters(
-        self, node_name: str, params: List[Parameter]
+        self, node_name: str, params: list[Parameter]
     ) -> bool:
         """Send a SetParameters request for the given pre-built param list."""
         client = self.parameter_clients.get(node_name)
@@ -386,7 +388,7 @@ class CurriculumBase(ABC):
                 )
             return False
 
-    def _set_parameters_batch(self, node_name: str, param_dict: Dict[str, Any]) -> bool:
+    def _set_parameters_batch(self, node_name: str, param_dict: dict[str, Any]) -> bool:
         """Set parameters for a single node with detailed error reporting.
 
         Keys matching ``task.<mode>.<leaf>`` are routed through QueueEpisode
@@ -467,7 +469,7 @@ class CurriculumBase(ABC):
 
         # Plain (non-task-prefixed) parameters always go through SetParameters.
         if plain_dict:
-            params: List[Parameter] = []
+            params: list[Parameter] = []
             for pname, pval in plain_dict.items():
                 if isinstance(pval, list) and not pval:
                     continue
@@ -487,7 +489,7 @@ class CurriculumBase(ABC):
                 print(f"[CURRICULUM_BASE] No parameters to set for node {node_name}")
         return ok
 
-    def _set_parameters(self, param_dict: Dict[str, Any]) -> bool:
+    def _set_parameters(self, param_dict: dict[str, Any]) -> bool:
         if not self.parameter_clients:
             if self.verbose > 0:
                 print("[CURRICULUM_BASE] No parameter clients available")
@@ -520,7 +522,7 @@ class CurriculumBase(ABC):
     # ------------------------- Task-mode routing -------------------------
     _TASK_MODE_KEYS = frozenset({"tm_robots", "tm_obstacles", "tm_modules"})
 
-    def _queue_episode_batch(self, node_name: str, tm_dict: Dict[str, Any]) -> bool:
+    def _queue_episode_batch(self, node_name: str, tm_dict: dict[str, Any]) -> bool:
         """Route task-mode keys to config/queue_episode on a single node."""
         client = self.task_mode_clients.get(node_name)
         if client is None:
@@ -560,7 +562,7 @@ class CurriculumBase(ABC):
                 print(f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}")
             return False
 
-    def _queue_episode(self, tm_dict: Dict[str, Any]) -> bool:
+    def _queue_episode(self, tm_dict: dict[str, Any]) -> bool:
         success = True
         for node_name in list(self.task_mode_clients.keys()):
             if not self._queue_episode_batch(node_name, tm_dict):
@@ -630,7 +632,7 @@ class CurriculumBase(ABC):
 
     # ------------------------- Abstract methods to implement -------------------------
     @abstractmethod
-    def get_current_performance(self) -> Optional[float]:
+    def get_current_performance(self) -> float | None:
         """Return the current performance value used for thresholds.
 
         Return None when no reliable metric is available yet.
@@ -657,6 +659,6 @@ class CurriculumBase(ABC):
     def is_first_stage(self) -> bool:
         return self.curriculum_index == 0
 
-    def get_curriculum_stages(self) -> List[Dict[str, Any]]:
+    def get_curriculum_stages(self) -> list[dict[str, Any]]:
         """Return the normalized list of stages (stage dicts)."""
         return list(self._stages)

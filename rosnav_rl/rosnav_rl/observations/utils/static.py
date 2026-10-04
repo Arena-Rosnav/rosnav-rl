@@ -1,5 +1,5 @@
-from typing import ClassVar, Type
 import enum
+from typing import ClassVar
 
 
 class DONE_REASONS(enum.Enum):
@@ -10,4 +10,4 @@ class DONE_REASONS(enum.Enum):
 
 class IsDone:
     name: ClassVar[str] = "is_done"
-    data_class: Type[bool] = bool
+    data_class: type[bool] = bool

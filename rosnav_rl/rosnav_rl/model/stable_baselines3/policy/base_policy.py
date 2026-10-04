@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import List, Type
+from typing import TYPE_CHECKING, Any
 
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
-from rosnav_rl.utils.type_aliases import ObservationSpaceKwargs, ObservationSpaceList
+from .constants import BASE_AGENT_ATTR
 
-from .constants import BASE_AGENT_ATTR, POLICY_TYPE
+if TYPE_CHECKING:
+    from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
+        BaseObservationSpace,
+    )
 
 
 class StableBaselinesPolicyDescription(ABC):
@@ -28,7 +31,7 @@ class StableBaselinesPolicyDescription(ABC):
 
     @property
     @abstractmethod
-    def algorithm_class(self) -> Type[BaseAlgorithm]:
+    def algorithm_class(self) -> type[BaseAlgorithm]:
         """
         Get the algorithm class.
 
@@ -39,7 +42,7 @@ class StableBaselinesPolicyDescription(ABC):
 
     @property
     @abstractmethod
-    def observation_spaces(self) -> ObservationSpaceList:
+    def observation_spaces(self) -> list[type["BaseObservationSpace"]]:
         """
         Get the list of observation spaces.
 
@@ -49,7 +52,7 @@ class StableBaselinesPolicyDescription(ABC):
         return None
 
     @property
-    def observation_space_kwargs(self) -> ObservationSpaceKwargs:
+    def observation_space_kwargs(self) -> dict[str, Any]:
         """
         Get additional keyword arguments for the observation space.
 
@@ -60,7 +63,7 @@ class StableBaselinesPolicyDescription(ABC):
 
     @property
     @abstractmethod
-    def features_extractor_class(self) -> Type[BaseFeaturesExtractor]:
+    def features_extractor_class(self) -> type[BaseFeaturesExtractor]:
         """
         Get the class of the features extractor used by the agent.
 
@@ -71,7 +74,7 @@ class StableBaselinesPolicyDescription(ABC):
 
     @property
     @abstractmethod
-    def features_extractor_kwargs(self) -> dict:
+    def features_extractor_kwargs(self) -> dict[str, Any]:
         """
         Get additional keyword arguments for the features extractor.
 
@@ -82,7 +85,7 @@ class StableBaselinesPolicyDescription(ABC):
 
     @property
     @abstractmethod
-    def net_arch(self) -> List[dict]:
+    def net_arch(self) -> list[int] | dict[str, list[int]]:
         """
         Get the architecture of the neural network.
 
@@ -93,7 +96,7 @@ class StableBaselinesPolicyDescription(ABC):
 
     @property
     @abstractmethod
-    def activation_fn(self) -> Type[Module]:
+    def activation_fn(self) -> type[Module]:
         """
         Get the activation function used in the neural network.
 
@@ -106,7 +109,7 @@ class StableBaselinesPolicyDescription(ABC):
     def stack_size(self) -> int:
         return 1
 
-    def get_kwargs(self) -> dict:
+    def get_kwargs(self) -> dict[str, Any]:
         """
         Get the keyword arguments for the agent.
 

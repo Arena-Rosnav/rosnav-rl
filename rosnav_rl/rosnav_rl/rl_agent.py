@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, Union
+from typing import Any
 
 import numpy as np
 from gymnasium import spaces
 
 from rosnav_rl.cfg.agent import AgentConfig
-from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
-from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
 from rosnav_rl.utils.type_aliases import ObservationDict
@@ -77,8 +75,8 @@ class RL_Agent:
     """
 
     _name: str = ""
-    _model: Union[RL_Model, StableBaselinesModel, DreamerV3Model]
-    _reward_function: Optional[RewardFunction] = None
+    _model: RL_Model
+    _reward_function: RewardFunction | None = None
     _space_manager: BaseSpaceManager
 
     def __init__(self, spec: AgentConfig):
@@ -105,7 +103,7 @@ class RL_Agent:
                 verbose=spec.reward.verbose,
             )
 
-    def initialize_model(self, *args, **kwargs):
+    def initialize_model(self, *args: Any, **kwargs: Any):
         """
         Initialize the model for the reinforcement learning agent.
         This method sets up the model with the provided arguments and keyword arguments.
@@ -119,7 +117,7 @@ class RL_Agent:
         """
         self.model.setup_model(*args, **kwargs)
 
-    def load_model(self, *args, **kwargs):
+    def load_model(self, *args: Any, **kwargs: Any):
         """
         Loads a pre-trained model if it hasn't been initialized.
 
@@ -154,7 +152,7 @@ class RL_Agent:
     #         observation, simulation_state_container=self._simulation_state_container
     #     )
 
-    def train(self, *args, **kwargs):
+    def train(self, *args: Any, **kwargs: Any):
         """Train the reinforcement learning model.
 
         This method trains the underlying model with the provided arguments.
@@ -171,7 +169,7 @@ class RL_Agent:
         """
         self.model.train(*args, **kwargs)
 
-    def get_action(self, observation: ObservationDict, *args, **kwargs) -> np.ndarray:
+    def get_action(self, observation: ObservationDict, *args: Any, **kwargs: Any) -> np.ndarray:
         """
         Retrieves the action from the model based on the given observation.
 
@@ -187,7 +185,7 @@ class RL_Agent:
             This method serves as a wrapper around the model's get_action method,
             directly passing through all arguments and returning the model's action output.
         """
-        return self.model.get_action(observation=observation, *args, **kwargs)
+        return self.model.get_action(*args, observation=observation, **kwargs)
 
     def reset(self) -> None:
         """Reset the model and observation space state for a new episode."""
@@ -195,7 +193,7 @@ class RL_Agent:
         self._space_manager.reset_spaces()
 
     @property
-    def config(self) -> Dict[str, dict]:
+    def config(self) -> dict[str, dict[str, Any]]:
         """Configuration dictionary for the agent."""
         config_dict = {
             "spec": self._spec.to_dict(),
@@ -209,11 +207,11 @@ class RL_Agent:
         return self._spec
 
     @property
-    def model(self) -> Union[StableBaselinesModel, DreamerV3Model]:
+    def model(self) -> RL_Model:
         return self._model
 
     @property
-    def reward_function(self) -> Union[None, RewardFunction]:
+    def reward_function(self) -> RewardFunction | None:
         return self._reward_function
 
     @property
@@ -221,11 +219,11 @@ class RL_Agent:
         return self._space_manager
 
     @property
-    def observation_space(self) -> spaces.Dict:
+    def observation_space(self) -> spaces.Space:
         return self._space_manager.observation_space
 
     @property
-    def action_space(self) -> Union[spaces.Discrete, spaces.Box]:
+    def action_space(self) -> spaces.Space:
         return self._space_manager.action_space
 
     @property

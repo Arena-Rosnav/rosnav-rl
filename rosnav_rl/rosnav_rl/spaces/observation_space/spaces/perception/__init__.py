@@ -15,13 +15,12 @@ Basic Spaces:
 
 # Import from sub-packages
 from .laser import (
-    ReliableLaserSpace,
-    MultiRangeLaserSpace,
-    MultiLaserFusionSpace,
     LaserScanSpace,
+    MultiLaserFusionSpace,
+    MultiRangeLaserSpace,
     ReducedLaserScanSpace,
+    ReliableLaserSpace,
 )
-
 from .vision import RGBDSpace
 
 __all__ = [

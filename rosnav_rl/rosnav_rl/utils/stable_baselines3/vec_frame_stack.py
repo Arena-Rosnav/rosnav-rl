@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from collections.abc import Mapping
+from typing import Any
 
 import numpy as np
 from gymnasium import spaces
@@ -14,8 +15,8 @@ class UpdatedStackedObservations(StackedObservations):
         self,
         num_envs: int,
         n_stack: int,
-        observation_space: Union[spaces.Box, spaces.Dict],
-        channels_order: Optional[Union[str, Mapping[str, Optional[str]]]] = None,
+        observation_space: spaces.Box | spaces.Dict,
+        channels_order: str | Mapping[str, str | None] | None = None,
     ) -> None:
         self.n_stack = n_stack
         self.observation_space = observation_space
@@ -75,8 +76,8 @@ class UpdatedStackedObservations(StackedObservations):
         self,
         observations: TObs,
         dones: np.ndarray,
-        infos: List[Dict[str, Any]],
-    ) -> Tuple[TObs, List[Dict[str, Any]]]:
+        infos: list[dict[str, Any]],
+    ) -> tuple[TObs, list[dict[str, Any]]]:
         # Also expand time dimension on terminal_observation in infos,
         # otherwise SB3's np.concatenate(previous_stack_2D, terminal_obs_1D)
         # fails with a dimension mismatch.
@@ -147,7 +148,7 @@ class VecFrameStack(VecEnvWrapper):
         self,
         venv: VecEnv,
         n_stack: int,
-        channels_order: Optional[Union[str, Mapping[str, str]]] = None,
+        channels_order: str | Mapping[str, str] | None = None,
     ) -> None:
         assert isinstance(
             venv.observation_space, (spaces.Box, spaces.Dict)
@@ -161,17 +162,17 @@ class VecFrameStack(VecEnvWrapper):
 
     def step_wait(
         self,
-    ) -> Tuple[
-        Union[np.ndarray, Dict[str, np.ndarray]],
+    ) -> tuple[
+        np.ndarray | dict[str, np.ndarray],
         np.ndarray,
         np.ndarray,
-        List[Dict[str, Any]],
+        list[dict[str, Any]],
     ]:
         observations, rewards, dones, infos = self.venv.step_wait()
         observations, infos = self.stacked_obs.update(observations, dones, infos)  # type: ignore[arg-type]
         return observations, rewards, dones, infos
 
-    def reset(self) -> Union[np.ndarray, Dict[str, np.ndarray]]:
+    def reset(self) -> np.ndarray | dict[str, np.ndarray]:
         """
         Reset all environments
         """

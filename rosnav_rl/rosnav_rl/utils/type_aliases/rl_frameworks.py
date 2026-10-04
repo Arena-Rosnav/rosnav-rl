@@ -1,6 +1,6 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class SupportedRLFrameworks(str, Enum):
+class SupportedRLFrameworks(StrEnum):
     STABLE_BASELINES3 = "stable_baselines3"
     DREAMER_V3 = "dreamerv3"

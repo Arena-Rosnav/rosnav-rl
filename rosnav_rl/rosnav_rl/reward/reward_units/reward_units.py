@@ -1,21 +1,22 @@
 import random
-from typing import Any, Callable, Dict
-from warnings import warn
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 
+from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.observations.utils.types import (
     DistanceAngleMetrics,
     GoalRelativePosition,
     LidarRanges,
-    Pose2D,
     PedestrianRelativeLocations,
     PedestrianRelativeVelocities,
     PedestrianTypeMinDistances,
+    Pose2D,
     RobotActionVector,
     SafetyStatus,
     SubgoalRelativePosition,
 )
-from rosnav_rl.cfg.parameters import AgentParameters
 
 from ..constants import DEFAULTS, DONE_REASONS, REWARD_CONSTANTS
 from ..reward_function import RewardFunction
@@ -68,8 +69,8 @@ class RewardGoalReached(RewardUnit):
         reward: float = DEFAULTS.GOAL_REACHED.REWARD,
         _follow_subgoal: bool = False,
         _on_safe_dist_violation: bool = DEFAULTS.GOAL_REACHED._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Class for calculating the reward when the goal is reached.
 
@@ -86,7 +87,7 @@ class RewardGoalReached(RewardUnit):
         self._reward = reward
         self._follow_subgoal = _follow_subgoal
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         if self._reward < 0.0:
             warn_msg = (
                 f"Reconsider this reward. "
@@ -154,8 +155,8 @@ class RewardSafeDistance(RewardUnit):
         self,
         reward_function: RewardFunction,
         reward: float = DEFAULTS.SAFE_DISTANCE.REWARD,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize safe distance violation reward unit.
 
@@ -168,7 +169,7 @@ class RewardSafeDistance(RewardUnit):
         super().__init__(reward_function, True, *args, **kwargs)
         self._reward = reward
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         if self._reward > 0.0:
             warn_msg = (
                 f"Reconsider this reward. "
@@ -235,8 +236,8 @@ class RewardFactoredSafeDistance(RewardUnit):
         self,
         reward_function: RewardFunction,
         factor: float = -0.5,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize factored safe distance violation reward unit.
 
@@ -249,7 +250,7 @@ class RewardFactoredSafeDistance(RewardUnit):
         self._factor = factor
         super().__init__(reward_function, True, *args, **kwargs)
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         if self._factor >= 0.0:
             warn_msg = (
                 f"Reconsider this reward. "
@@ -338,8 +339,8 @@ class RewardNoMovement(RewardUnit):
         reward_function: RewardFunction,
         reward: float = DEFAULTS.NO_MOVEMENT.REWARD,
         _on_safe_dist_violation: bool = DEFAULTS.NO_MOVEMENT._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize no movement reward unit with motion detection parameters.
 
@@ -353,7 +354,7 @@ class RewardNoMovement(RewardUnit):
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._reward = reward
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         if self._reward > 0.0:
             warn_msg = (
                 f"Reconsider this reward. "
@@ -426,8 +427,8 @@ class RewardApproachGoal(RewardUnit):
         _goal_update_threshold: float = DEFAULTS.APPROACH_GOAL._GOAL_UPDATE_THRESHOLD,
         _follow_subgoal: bool = False,
         _on_safe_dist_violation: bool = DEFAULTS.APPROACH_GOAL._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize goal approach reward unit with distance-based parameters.
 
@@ -449,9 +450,9 @@ class RewardApproachGoal(RewardUnit):
 
         self.last_robot_pose = None
         self.last_goal_distance = None
-        self._last_goal_world: np.ndarray = None  # world-frame target for jump detection
+        self._last_goal_world: np.ndarray | None = None  # world-frame target for jump detection
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         if self._pos_factor < 0 or self._neg_factor < 0:
             warn_msg = (
                 f"Both factors should be positive. "
@@ -587,8 +588,8 @@ class RewardCollision(RewardUnit):
         reward_function: RewardFunction,
         reward: float = DEFAULTS.COLLISION.REWARD,
         bumper_zone: float = DEFAULTS.COLLISION.BUMPER_ZONE,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize collision detection reward unit with safety parameters.
 
@@ -607,7 +608,7 @@ class RewardCollision(RewardUnit):
         # never silently missed.
         self._collision_latched: bool = False
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         if self._reward > 0.0:
             warn_msg = (
                 f"Reconsider this reward. "
@@ -620,7 +621,7 @@ class RewardCollision(RewardUnit):
         self,
         front_laser: LidarRanges,
         simulation_state_container: AgentParameters,
-        collision_monitor: SafetyStatus = None,
+        collision_monitor: SafetyStatus | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -710,8 +711,8 @@ class RewardDistanceTravelled(RewardUnit):
         lin_vel_scalar: float = DEFAULTS.DISTANCE_TRAVELLED.LIN_VEL_SCALAR,
         ang_vel_scalar: float = DEFAULTS.DISTANCE_TRAVELLED.ANG_VEL_SCALAR,
         _on_safe_dist_violation: bool = DEFAULTS.DISTANCE_TRAVELLED._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize distance traveled reward unit with velocity scaling parameters.
 
@@ -794,10 +795,10 @@ class RewardReverseDrive(RewardUnit):
         self,
         reward_function: RewardFunction,
         reward: float = DEFAULTS.REVERSE_DRIVE.REWARD,
-        threshold: float = None,
+        threshold: float | None = None,
         _on_safe_dist_violation: bool = DEFAULTS.REVERSE_DRIVE._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize reverse drive penalty unit with velocity threshold parameters.
 
@@ -814,7 +815,7 @@ class RewardReverseDrive(RewardUnit):
         self._reward = reward
         self._threshold = threshold if threshold else 0.0
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         """Validate reward parameters and issue warnings for positive values."""
         if self._reward > 0.0:
             warn_msg = (
@@ -882,10 +883,10 @@ class RewardFactoredReverseDrive(RewardUnit):
         self,
         reward_function: RewardFunction,
         factor: float = -0.1,
-        threshold: float = None,
+        threshold: float | None = None,
         _on_safe_dist_violation: bool = DEFAULTS.REVERSE_DRIVE._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize factored reverse drive penalty unit with velocity scaling parameters.
 
@@ -902,7 +903,7 @@ class RewardFactoredReverseDrive(RewardUnit):
         self._factor = factor
         self._threshold = threshold if threshold else 0.0
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         """Validate factor parameters and issue warnings for positive values."""
         if self._factor > 0.0:
             warn_msg = (
@@ -969,10 +970,10 @@ class RewardAbruptVelocityChange(RewardUnit):
     def __init__(
         self,
         reward_function: RewardFunction,
-        vel_factors: Dict[str, float] = DEFAULTS.ABRUPT_VEL_CHANGE.VEL_FACTORS,
+        vel_factors: dict[str, float] = DEFAULTS.ABRUPT_VEL_CHANGE.VEL_FACTORS,
         _on_safe_dist_violation: bool = DEFAULTS.ABRUPT_VEL_CHANGE._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize abrupt velocity change penalty unit with dimensional weighting.
 
@@ -990,7 +991,7 @@ class RewardAbruptVelocityChange(RewardUnit):
 
         self._vel_change_fcts = self._get_vel_change_fcts()
 
-    def _get_vel_change_fcts(self):
+    def _get_vel_change_fcts(self) -> list[Callable[[np.ndarray], None]]:
         """Create velocity change penalty functions for each configured dimension."""
         return [
             self._prepare_reward_function(int(idx), factor)
@@ -1080,8 +1081,8 @@ class RewardRootVelocityDifference(RewardUnit):
         reward_function: RewardFunction,
         k: float = DEFAULTS.ROOT_VEL_DIFF.K,
         _on_safe_dist_violation: bool = DEFAULTS.ROOT_VEL_DIFF._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize root velocity difference reward unit with threshold.
 
@@ -1167,8 +1168,8 @@ class RewardTwoFactorVelocityDifference(RewardUnit):
         alpha: float = DEFAULTS.TWO_FACTOR_VEL_DIFF.ALPHA,
         beta: float = DEFAULTS.TWO_FACTOR_VEL_DIFF.BETA,
         _on_safe_dist_violation: bool = DEFAULTS.ROOT_VEL_DIFF._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize two-factor velocity difference penalty unit.
 
@@ -1266,8 +1267,8 @@ class RewardActiveHeadingDirection(RewardUnit):
         iters: int = 60,
         _following_subgoal: bool = False,
         _on_safe_dist_violation: bool = True,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize active heading direction reward unit.
 
@@ -1299,8 +1300,8 @@ class RewardActiveHeadingDirection(RewardUnit):
         pedestrian_relative_locations: PedestrianRelativeLocations,
         pedestrian_relative_velocities: PedestrianRelativeVelocities,
         simulation_state_container: AgentParameters,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Calculate reward based on active heading direction with velocity obstacle avoidance.
 
@@ -1371,8 +1372,8 @@ class RewardActiveHeadingDirection(RewardUnit):
                 free = True
 
                 # Check collision with each pedestrian using velocity obstacles
-                for i, (ped_location, ped_velocity) in enumerate(
-                    zip(pedestrian_relative_locations, pedestrian_relative_velocities)
+                for _i, (ped_location, ped_velocity) in enumerate(
+                    zip(pedestrian_relative_locations, pedestrian_relative_velocities, strict=False)
                 ):
                     p_x, p_y = ped_location[0], ped_location[1]
                     p_vx, p_vy = ped_velocity[0], ped_velocity[1]
@@ -1453,13 +1454,13 @@ class RewardPedTypeSafetyDistance(RewardUnit):
     def __init__(
         self,
         reward_function: RewardFunction,
-        type_reward_pairs: Dict[int, float] = None,
+        type_reward_pairs: dict[int, float] | None = None,
         ped_type: int = DEFAULTS.PED_TYPE_SPECIFIC_SAFETY_DISTANCE.TYPE,
         reward: float = DEFAULTS.PED_TYPE_SPECIFIC_SAFETY_DISTANCE.REWARD,
         safety_distance: float = DEFAULTS.PED_TYPE_SPECIFIC_SAFETY_DISTANCE.DISTANCE,
         _on_safe_dist_violation: bool = DEFAULTS.PED_TYPE_SPECIFIC_SAFETY_DISTANCE._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize pedestrian type-specific safety distance reward unit.
 
@@ -1503,7 +1504,7 @@ class RewardPedTypeSafetyDistance(RewardUnit):
                 - Example: {1: 2.5, 2: 4.1, 3: 1.8} (type-specific distance monitoring)
         """
         if not pedestrian_distances:
-            self._report_warning(f"No pedestrian type distances found.")
+            self._report_warning("No pedestrian type distances found.")
             return
 
         for ped_type, reward in self._type_reward_pairs.items():
@@ -1552,13 +1553,13 @@ class RewardPedTypeFactoredSafetyDistance(RewardUnit):
     def __init__(
         self,
         reward_function: RewardFunction,
-        type_factor_pairs: Dict[int, float] = None,
+        type_factor_pairs: dict[int, float] | None = None,
         ped_type: int = DEFAULTS.PED_TYPE_SPECIFICE_FACTORED_SAFETY_DISTANCE.TYPE,
         factor: float = DEFAULTS.PED_TYPE_SPECIFICE_FACTORED_SAFETY_DISTANCE.FACTOR,
         safety_distance: float = DEFAULTS.PED_TYPE_SPECIFICE_FACTORED_SAFETY_DISTANCE.DISTANCE,
         _on_safe_dist_violation: bool = DEFAULTS.PED_TYPE_SPECIFICE_FACTORED_SAFETY_DISTANCE._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize pedestrian type-specific factored safety distance reward unit.
 
@@ -1658,12 +1659,12 @@ class RewardPedTypeCollision(RewardUnit):
     def __init__(
         self,
         reward_function: RewardFunction,
-        type_reward_pairs: Dict[int, float] = None,
+        type_reward_pairs: dict[int, float] | None = None,
         ped_type: int = DEFAULTS.PED_TYPE_SPECIFIC_COLLISION.TYPE,
         reward: float = DEFAULTS.PED_TYPE_SPECIFIC_COLLISION.REWARD,
         bumper_zone: float = DEFAULTS.PED_TYPE_SPECIFIC_COLLISION.BUMPER_ZONE,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize pedestrian type-specific collision detection reward unit.
 
@@ -1768,8 +1769,8 @@ class RewardPedTypeVelocityConstraint(RewardUnit):
         penalty_factor: float = 0.05,
         active_distance: float = DEFAULTS.PED_TYPE_SPECIFIC_SAFETY_DISTANCE.DISTANCE,
         _on_safe_dist_violation: bool = DEFAULTS.PED_TYPE_SPECIFIC_SAFETY_DISTANCE._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize pedestrian type-specific velocity constraint reward unit.
 
@@ -1867,10 +1868,10 @@ class RewardAngularVelocityConstraint(RewardUnit):
         self,
         reward_function: RewardFunction,
         penalty_factor: float = -0.05,
-        threshold: float = None,
+        threshold: float | None = None,
         _on_safe_dist_violation: bool = True,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize angular velocity constraint reward unit.
 
@@ -1956,14 +1957,14 @@ class RewardMaxStepsExceeded(RewardUnit):
         reward_function: RewardFunction,
         penalty: float = 10,
         _on_safe_dist_violation: bool = True,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._penalty = penalty
         self._steps = 0
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self) -> None:
         if self._penalty < 0.0:
             warn_msg = (
                 f"Reconsider this reward. "
@@ -2028,10 +2029,10 @@ class RewardLinearVelBoost(RewardUnit):
         self,
         reward_function: RewardFunction,
         reward_factor: float = 0.05,
-        threshold: float = None,
+        threshold: float | None = None,
         _on_safe_dist_violation: bool = True,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize linear velocity boost reward unit.
 

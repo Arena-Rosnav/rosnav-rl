@@ -1,4 +1,5 @@
-from typing import Literal, Optional, Union
+from collections.abc import Callable
+from typing import Literal
 
 from sb3_contrib.crossq import CrossQ
 
@@ -22,17 +23,17 @@ class CrossQ_Algorithm_Cfg(OffPolicyParameters):
     algorithm_name = CrossQ.__name__
 
     # CrossQ defaults
-    learning_rate: Union[float, callable] = 1e-4
+    learning_rate: float | Callable[[float], float] = 1e-4
     batch_size: int = 256
     buffer_size: int = 1_000_000
     learning_starts: int = 100
     tau: float = 0.005
     gamma: float = 0.99
-    train_freq: Union[int, tuple] = 1
+    train_freq: int | tuple[int, str] = 1
     gradient_steps: int = 1
 
-    ent_coef: Union[str, float] = "auto"
-    target_entropy: Union[str, float] = "auto"
+    ent_coef: str | float = "auto"
+    target_entropy: str | float = "auto"
     policy_delay: int = 1
 
 

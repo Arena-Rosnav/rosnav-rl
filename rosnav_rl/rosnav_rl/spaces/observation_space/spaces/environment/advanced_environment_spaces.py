@@ -2,16 +2,18 @@
 Environmental context and obstacle information with reliable processing.
 """
 
-from typing import Dict, List, Any
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
 from rosnav_rl.observations.utils.types import (
-    LidarRanges,
     EnvironmentContextVector,
-    SpatialAwarenessVector,
+    LidarRanges,
     ObstacleProximityVector,
+    SpatialAwarenessVector,
 )
+
 from ...observation_space_factory import SpaceFactory
 from ...space_categories import SpaceCategory
 from ..base_observation_space import BaseObservationSpace
@@ -51,8 +53,8 @@ class EnvironmentContextSpace(BaseObservationSpace):
         max_range: float = 10.0,
         density_sectors: int = 8,
         obstacle_threshold: float = 0.5,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize environment context space.
 
@@ -79,7 +81,7 @@ class EnvironmentContextSpace(BaseObservationSpace):
             low=np.array([0.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
         )
 
-    def _analyze_laser_data(self, laser_data: np.ndarray) -> Dict[str, Any]:
+    def _analyze_laser_data(self, laser_data: np.ndarray) -> dict[str, Any]:
         """Analyze laser data for environment features."""
         # Filter valid readings
         valid_mask = (laser_data > 0.0) & (laser_data < self.max_range)
@@ -133,8 +135,8 @@ class EnvironmentContextSpace(BaseObservationSpace):
         }
 
     def encode_observation(
-        self, front_laser: LidarRanges, *args, **kwargs
-    ) -> ObstacleProximityVector:
+        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
+    ) -> EnvironmentContextVector:
         """Encode comprehensive environment context with obstacle density and clearance metrics.
 
         Processes preprocessed front-facing laser scan data to extract sector-wise obstacle densities,
@@ -207,8 +209,8 @@ class SpatialAwarenessSpace(BaseObservationSpace):
         max_range: float = 10.0,
         safety_distance: float = 0.8,
         corridor_width_threshold: float = 1.5,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize spatial awareness space.
 
@@ -235,7 +237,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
 
     def _compute_directional_clearance(
         self, laser_data: np.ndarray
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Compute clearance in cardinal directions."""
         n_rays = len(laser_data)
 
@@ -283,7 +285,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
                 [np.arange(start_idx, n_rays), np.arange(0, end_idx + 1)]
             )
 
-    def _detect_corridor(self, laser_data: np.ndarray) -> tuple:
+    def _detect_corridor(self, laser_data: np.ndarray) -> tuple[float, float]:
         """Detect corridor and its direction.
 
         Returns:
@@ -323,7 +325,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
 
         return (0.0, 0.5)  # No corridor detected
 
-    def _compute_spatial_constraint(self, clearances: Dict[str, float]) -> float:
+    def _compute_spatial_constraint(self, clearances: dict[str, float]) -> float:
         """Compute overall spatial constraint level."""
         # Constraint based on how restricted the space is
         min_clearance = min(clearances.values())
@@ -334,7 +336,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
         return np.clip(constraint, 0.0, 1.0)
 
     def encode_observation(
-        self, front_laser: LidarRanges, *args, **kwargs
+        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
     ) -> SpatialAwarenessVector:
         """Encode comprehensive spatial awareness with directional clearance and corridor detection.
 
@@ -411,11 +413,11 @@ class ObstacleProximitySpace(BaseObservationSpace):
 
     def __init__(
         self,
-        proximity_zones: List[float] = None,
+        proximity_zones: list[float] | None = None,
         max_range: float = 10.0,
         risk_threshold: float = 1.0,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize obstacle proximity space.
 
@@ -441,7 +443,9 @@ class ObstacleProximitySpace(BaseObservationSpace):
             low=np.array([0.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
         )
 
-    def encode_observation(self, front_laser: LidarRanges, *args, **kwargs) -> Any:
+    def encode_observation(
+        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
+    ) -> ObstacleProximityVector:
         """Encode advanced obstacle proximity with multi-zone detection and risk assessment.
 
         Processes preprocessed front-facing laser scan data to compute zone occupancies, closest obstacle

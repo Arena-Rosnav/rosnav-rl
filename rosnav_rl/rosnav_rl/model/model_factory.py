@@ -1,13 +1,14 @@
 """Model Factory for creating RL models dynamically based on configuration."""
 
-from typing import TYPE_CHECKING, Callable, Dict, Type
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from rosnav_rl.cfg.framework import FrameworkCfg
 from rosnav_rl.utils.type_aliases import SupportedRLFrameworks
 
 if TYPE_CHECKING:
-    from rosnav_rl.rl_agent import RL_Agent
     from rosnav_rl.model.model import RL_Model
+    from rosnav_rl.rl_agent import RL_Agent
 
 
 class ModelFactory:
@@ -23,10 +24,12 @@ class ModelFactory:
             pass
     """
 
-    _model_registry: Dict[SupportedRLFrameworks, Type["RL_Model"]] = {}
+    _model_registry: dict[SupportedRLFrameworks, type["RL_Model"]] = {}
 
     @classmethod
-    def register(cls, framework: SupportedRLFrameworks) -> Callable:
+    def register(
+        cls, framework: SupportedRLFrameworks
+    ) -> Callable[[type["RL_Model"]], type["RL_Model"]]:
         """Decorator to register a model class for a specific framework.
 
         Args:
@@ -41,7 +44,7 @@ class ModelFactory:
                 pass
         """
 
-        def decorator(model_class: Type["RL_Model"]) -> Type["RL_Model"]:
+        def decorator(model_class: type["RL_Model"]) -> type["RL_Model"]:
             cls._model_registry[framework] = model_class
             return model_class
 
@@ -49,7 +52,7 @@ class ModelFactory:
 
     @classmethod
     def register_model(
-        cls, framework: SupportedRLFrameworks, model_class: Type["RL_Model"]
+        cls, framework: SupportedRLFrameworks, model_class: type["RL_Model"]
     ) -> None:
         """Register a model class for a specific framework (programmatic registration).
 
@@ -106,8 +109,8 @@ class ModelFactory:
 # Register the available models
 def _register_models():
     """Register all available model implementations."""
-    from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
     from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
+    from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
 
     ModelFactory.register_model(
         SupportedRLFrameworks.STABLE_BASELINES3, StableBaselinesModel

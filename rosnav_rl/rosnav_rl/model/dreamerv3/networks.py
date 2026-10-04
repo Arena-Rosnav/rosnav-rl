@@ -1,6 +1,6 @@
 import math
 import re
-from typing import Dict
+from collections.abc import Callable
 
 import numpy as np
 import torch
@@ -8,10 +8,24 @@ import torch.nn.functional as F
 from torch import distributions as torchd
 from torch import nn
 
+from rosnav_rl.utils.type_aliases.spaces import TensorDict
+
 from ..dreamerv3 import tools
 
+RSSMState = TensorDict
+HeadDist = (
+    tools.SampleDist
+    | tools.ContDist
+    | tools.OneHotDist
+    | tools.Bernoulli
+    | tools.DiscDist
+    | tools.SymlogDist
+)
 
-def add_batch_dim(shape: tuple, is_channels_first: bool = False):
+
+def add_batch_dim(
+    shape: tuple[int, ...], is_channels_first: bool = False
+) -> tuple[int, ...]:
     if len(shape) == 3:
         return shape
 
@@ -27,12 +41,14 @@ def add_batch_dim(shape: tuple, is_channels_first: bool = False):
 
 
 def add_batch_dim_to_cnn_shapes(
-    cnn_shapes: Dict[str, tuple], is_channels_first: bool = False
-):
+    cnn_shapes: dict[str, tuple[int, ...]], is_channels_first: bool = False
+) -> dict[str, tuple[int, ...]]:
     return {k: add_batch_dim(v, is_channels_first) for k, v in cnn_shapes.items()}
 
 
-def translate_to_channels_last(shapes):
+def translate_to_channels_last(
+    shapes: dict[str, tuple[int, ...]],
+) -> dict[str, tuple[int, ...]]:
     translated_shapes = {}
     for key, shape in shapes.items():
         if len(shape) < 4:
@@ -77,21 +93,21 @@ class RSSM(nn.Module):
     """
     def __init__(
         self,
-        stoch=30,
-        deter=200,
-        hidden=200,
-        rec_depth=1,
-        discrete=False,
-        act="SiLU",
-        norm=True,
-        mean_act="none",
-        std_act="softplus",
-        min_std=0.1,
-        unimix_ratio=0.01,
-        initial="learned",
-        num_actions=None,
-        embed=None,
-        device=None,
+        stoch: int = 30,
+        deter: int = 200,
+        hidden: int = 200,
+        rec_depth: int = 1,
+        discrete: int = 0,
+        act: str = "SiLU",
+        norm: bool = True,
+        mean_act: str = "none",
+        std_act: str = "softplus",
+        min_std: float = 0.1,
+        unimix_ratio: float = 0.01,
+        initial: str = "learned",
+        num_actions: int | None = None,
+        embed: int | None = None,
+        device: str | None = None,
     ):
         """Initialize the RSSM (Recurrent State-Space Model) class.
 
@@ -124,7 +140,7 @@ class RSSM(nn.Module):
             - Output layers for image and observation predictions
             - Separate stat layers for discrete/continuous state spaces
         """
-        super(RSSM, self).__init__()
+        super().__init__()
         self._stoch = stoch
         self._deter = deter
         self._hidden = hidden
@@ -191,7 +207,7 @@ class RSSM(nn.Module):
                 requires_grad=True,
             )
 
-    def initial(self, batch_size):
+    def initial(self, batch_size: int) -> RSSMState:
         deter = torch.zeros(batch_size, self._deter, device=self._device)
         if self._discrete:
             state = dict(
@@ -219,7 +235,13 @@ class RSSM(nn.Module):
         else:
             raise NotImplementedError(self._initial)
 
-    def observe(self, embed, action, is_first, state=None):
+    def observe(
+        self,
+        embed: torch.Tensor,
+        action: torch.Tensor,
+        is_first: torch.Tensor,
+        state: RSSMState | None = None,
+    ) -> tuple[RSSMState, RSSMState]:
         """
         Processes a sequence of observations, actions, and state indicators to generate posterior and prior states.
 
@@ -256,7 +278,9 @@ class RSSM(nn.Module):
         prior = {k: swap(v) for k, v in prior.items()}
         return post, prior
 
-    def imagine_with_action(self, action, state):
+    def imagine_with_action(
+        self, action: torch.Tensor, state: RSSMState
+    ) -> RSSMState:
         """
         Imagine future states given an action sequence and initial state.
 
@@ -284,14 +308,16 @@ class RSSM(nn.Module):
         prior = {k: swap(v) for k, v in prior.items()}
         return prior
 
-    def get_feat(self, state):
+    def get_feat(self, state: RSSMState) -> torch.Tensor:
         stoch = state["stoch"]
         if self._discrete:
             shape = list(stoch.shape[:-2]) + [self._stoch * self._discrete]
             stoch = stoch.reshape(shape)
         return torch.cat([stoch, state["deter"]], -1)
 
-    def get_dist(self, state, dtype=None):
+    def get_dist(
+        self, state: RSSMState, dtype: torch.dtype | None = None
+    ) -> torchd.Independent | tools.ContDist:
         if self._discrete:
             logit = state["logit"]
             dist = torchd.independent.Independent(
@@ -304,7 +330,14 @@ class RSSM(nn.Module):
             )
         return dist
 
-    def obs_step(self, prev_state, prev_action, embed, is_first, sample=True):
+    def obs_step(
+        self,
+        prev_state: RSSMState | None,
+        prev_action: torch.Tensor | None,
+        embed: torch.Tensor,
+        is_first: torch.Tensor,
+        sample: bool = True,
+    ) -> tuple[RSSMState, RSSMState]:
         """
         Performs an observation step in the world model, updating the state based on previous state, action, and current embedding.
 
@@ -325,7 +358,7 @@ class RSSM(nn.Module):
                 - prior (dict): Prior state prediction before observation
         """
         # initialize all prev_state
-        if prev_state == None or torch.sum(is_first) == len(is_first):
+        if prev_state is None or torch.sum(is_first) == len(is_first):
             prev_state = self.initial(len(is_first))
             prev_action = torch.zeros(
                 (len(is_first), self._num_actions), device=self._device
@@ -357,7 +390,9 @@ class RSSM(nn.Module):
         post = {"stoch": stoch, "deter": prior["deter"], **stats}
         return post, prior
 
-    def img_step(self, prev_state, prev_action, sample=True):
+    def img_step(
+        self, prev_state: RSSMState, prev_action: torch.Tensor, sample: bool = True
+    ) -> RSSMState:
         """
         Performs one step of the image transition model, computing the prior state distribution.
 
@@ -404,11 +439,11 @@ class RSSM(nn.Module):
         prior = {"stoch": stoch, "deter": deter, **stats}
         return prior
 
-    def get_stoch(self, deter):
+    def get_stoch(self, deter: torch.Tensor) -> torch.Tensor:
         """
         Generates stochastic part of latent state from deterministic part.
 
-        This method processes the deterministic latent state through the image output layers and 
+        This method processes the deterministic latent state through the image output layers and
         statistical layers to produce parameters for a distribution. It then returns the mode
         of this distribution as the stochastic part of the latent state.
 
@@ -423,15 +458,15 @@ class RSSM(nn.Module):
         dist = self.get_dist(stats)
         return dist.mode()
 
-    def _suff_stats_layer(self, name, x):
+    def _suff_stats_layer(self, name: str, x: torch.Tensor) -> RSSMState:
         """Calculate sufficient statistics for a given layer.
-        
+
         This method computes the distribution parameters for either discrete or continuous latent variables.
-        
+
         Args:
             name (str): The name of the layer, either "ims" for image statistics or "obs" for observation statistics.
             x (torch.Tensor): The input tensor to transform.
-        
+
         Returns:
             dict: For discrete distributions, returns a dictionary with 'logit' key containing the logits.
                   For continuous distributions, returns a dictionary with 'mean' and 'std' keys.
@@ -439,10 +474,10 @@ class RSSM(nn.Module):
                   - For continuous case:
                       - mean is transformed according to self._mean_act
                       - std is transformed according to self._std_act and has minimum value added
-        
+
         Raises:
             NotImplementedError: If the name is neither "ims" nor "obs".
-            
+
         Note:
             - mean is transformed according to self._mean_act which can be either:
                 - "none": No transformation
@@ -454,7 +489,7 @@ class RSSM(nn.Module):
                 - "sigmoid2": Apply sigmoid and multiply by 2
             - std has minimum value added from self._min_std
         """
-        
+
         if self._discrete:
             if name == "ims":
                 x = self._imgs_stat_layer(x)
@@ -485,23 +520,30 @@ class RSSM(nn.Module):
             std = std + self._min_std
             return {"mean": mean, "std": std}
 
-    def kl_loss(self, post, prior, free, dyn_scale, rep_scale):
+    def kl_loss(
+        self,
+        post: RSSMState,
+        prior: RSSMState,
+        free: float,
+        dyn_scale: float,
+        rep_scale: float,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Calculate Kullback-Leibler divergence loss between posterior and prior distributions.
-        
+
         This method computes two components of KL divergence:
         1. Representation loss: KL divergence from posterior to prior (with prior gradients detached)
         2. Dynamics loss: KL divergence from posterior (with gradients detached) to prior
-        
+
         Both losses are clipped to a minimum value of 'free' and then combined with scaling factors.
-        
+
         Args:
             post (dict): Posterior distribution parameters
             prior (dict): Prior distribution parameters
             free (float): Minimum value for KL divergence (free bits)
             dyn_scale (float): Scaling factor for dynamics loss
             rep_scale (float): Scaling factor for representation loss
-            
+
         Returns:
             tuple:
                 - loss (Tensor): Combined KL divergence loss
@@ -531,9 +573,9 @@ class RSSM(nn.Module):
 
 class MultiEncoder(nn.Module):
     """A flexible multi-modal encoder combining CNN and MLP networks for processing different observation types.
-    
+
     This encoder handles both image-like (CNN-compatible) and vector (MLP-compatible) inputs, routing them
-    through appropriate neural network architectures and concatenating their features. It automatically 
+    through appropriate neural network architectures and concatenating their features. It automatically
     determines which inputs should go to CNN vs MLP based on input shapes and regex patterns.
         shapes (dict): Dictionary mapping observation keys to their shapes.
 
@@ -543,28 +585,28 @@ class MultiEncoder(nn.Module):
         outdim (int): Total output dimension of the combined encoder.
         _cnn (ConvEncoder, optional): CNN encoder network if CNN inputs are present.
         _mlp (MLP, optional): MLP encoder network if MLP inputs are present.
-    
+
     Notes:
         - The encoder automatically filters out excluded keys like 'is_first', 'is_terminal', etc.
         - The output dimension is the sum of CNN and MLP output dimensions.
         - For CNN inputs, all observations are stacked along the channel dimension.
     """
-    
+
     def __init__(
         self,
-        shapes,
-        mlp_keys,
-        cnn_keys,
-        act,
-        norm,
-        cnn_depth,
-        kernel_size,
-        minres,
-        mlp_layers,
-        mlp_units,
-        symlog_inputs,
-        is_channels_first=False,
-        device="cuda",
+        shapes: dict[str, tuple[int, ...]],
+        mlp_keys: str,
+        cnn_keys: str,
+        act: str,
+        norm: bool,
+        cnn_depth: int,
+        kernel_size: int,
+        minres: int,
+        mlp_layers: int,
+        mlp_units: int,
+        symlog_inputs: bool,
+        is_channels_first: bool = False,
+        device: str = "cuda",
     ):
         """Initialize MultiEncoder.
 
@@ -597,7 +639,7 @@ class MultiEncoder(nn.Module):
             - Automatically handles channel order conversion if needed
             - Combines both CNN and MLP features into a single output representation
         """
-        super(MultiEncoder, self).__init__()
+        super().__init__()
         excluded = ("is_first", "is_last", "is_terminal", "reward")
 
         shapes = {
@@ -650,7 +692,7 @@ class MultiEncoder(nn.Module):
             )
             self.outdim += mlp_units
 
-    def forward(self, obs):
+    def forward(self, obs: dict[str, torch.Tensor]) -> torch.Tensor:
         """Forward pass through the encoder network.
 
         Takes a dictionary of observations and processes them through CNN and MLP networks depending on
@@ -706,30 +748,30 @@ class MultiDecoder(nn.Module):
             image_dist="normal",
             vector_dist="normal",
             outscale=1.0
-        
+
         features = torch.randn(32, 128)  # Batch size 32, feature size 128
         distributions = decoder(features)
         ```
     """
     def __init__(
         self,
-        feat_size,
-        shapes,
-        mlp_keys,
-        cnn_keys,
-        act,
-        norm,
-        cnn_depth,
-        kernel_size,
-        minres,
-        mlp_layers,
-        mlp_units,
-        cnn_sigmoid,
-        image_dist,
-        vector_dist,
-        outscale,
-        is_channels_first=False,
-        device="cuda",
+        feat_size: int,
+        shapes: dict[str, tuple[int, ...]],
+        mlp_keys: str,
+        cnn_keys: str,
+        act: str,
+        norm: bool,
+        cnn_depth: int,
+        kernel_size: int,
+        minres: int,
+        mlp_layers: int,
+        mlp_units: int,
+        cnn_sigmoid: bool,
+        image_dist: str,
+        vector_dist: str,
+        outscale: float,
+        is_channels_first: bool = False,
+        device: str = "cuda",
     ):
         """Initialize the MultiDecoder.
 
@@ -763,7 +805,7 @@ class MultiDecoder(nn.Module):
             - Supports channel-first to channel-last conversion
             - Excludes certain keys ('is_first', 'is_last', 'is_terminal') from processing
         """
-        super(MultiDecoder, self).__init__()
+        super().__init__()
         excluded = ("is_first", "is_last", "is_terminal")
         shapes = {k: v for k, v in shapes.items() if k not in excluded}
         self.cnn_shapes = {
@@ -817,7 +859,9 @@ class MultiDecoder(nn.Module):
             )
         self._image_dist = image_dist
 
-    def forward(self, features):
+    def forward(
+        self, features: torch.Tensor
+    ) -> dict[str, HeadDist | tools.MSEDist]:
         """Forward pass through the decoder network.
 
         This method processes input features through CNN and MLP networks to generate
@@ -841,14 +885,14 @@ class MultiDecoder(nn.Module):
             dists.update(
                 {
                     key: self._make_image_dist(output)
-                    for key, output in zip(self.cnn_shapes.keys(), outputs)
+                    for key, output in zip(self.cnn_shapes.keys(), outputs, strict=True)
                 }
             )
         if self.mlp_shapes:
             dists.update(self._mlp(features))
         return dists
 
-    def _make_image_dist(self, mean):
+    def _make_image_dist(self, mean: torch.Tensor) -> tools.ContDist | tools.MSEDist:
         if self._image_dist == "normal":
             return tools.ContDist(
                 torchd.independent.Independent(torchd.normal.Normal(mean, 1), 3)
@@ -861,12 +905,12 @@ class MultiDecoder(nn.Module):
 class ConvEncoder(nn.Module):
     def __init__(
         self,
-        input_shape,
-        depth=32,
-        act="SiLU",
-        norm=True,
-        kernel_size=4,
-        minres=4,
+        input_shape: tuple[int, ...],
+        depth: int = 32,
+        act: str = "SiLU",
+        norm: bool = True,
+        kernel_size: int = 4,
+        minres: int = 4,
     ):
         """Initialize the ConvEncoder.
 
@@ -885,14 +929,14 @@ class ConvEncoder(nn.Module):
             outdim (int): Dimension of flattened output.
             layers (nn.Sequential): Sequential container of encoder layers.
         """
-        super(ConvEncoder, self).__init__()
+        super().__init__()
         act = getattr(torch.nn, act)
         h, w, input_ch = input_shape
         stages = int(np.log2(h) - np.log2(minres))
         in_dim = input_ch
         out_dim = depth
         layers = []
-        for i in range(stages):
+        for _i in range(stages):
             layers.append(
                 Conv2dSamePad(
                     in_channels=in_dim,
@@ -913,7 +957,7 @@ class ConvEncoder(nn.Module):
         self.layers = nn.Sequential(*layers)
         self.layers.apply(tools.weight_init)
 
-    def forward(self, obs):
+    def forward(self, obs: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the neural network.
 
@@ -950,15 +994,15 @@ class ConvEncoder(nn.Module):
 class ConvDecoder(nn.Module):
     def __init__(
         self,
-        feat_size,
-        shape=(3, 64, 64),
-        depth=32,
-        act=nn.ELU,
-        norm=True,
-        kernel_size=4,
-        minres=4,
-        outscale=1.0,
-        cnn_sigmoid=False,
+        feat_size: int,
+        shape: tuple[int, ...] = (3, 64, 64),
+        depth: int = 32,
+        act: str = "ELU",
+        norm: bool = True,
+        kernel_size: int = 4,
+        minres: int = 4,
+        outscale: float = 1.0,
+        cnn_sigmoid: bool = False,
     ):
         """Initialize the Convolutional Decoder network.
 
@@ -983,7 +1027,7 @@ class ConvDecoder(nn.Module):
             _embed_size (int): Size of the embedding
             layers (nn.Sequential): Sequential container of decoder layers
         """
-        super(ConvDecoder, self).__init__()
+        super().__init__()
         act = getattr(torch.nn, act)
         self._shape = shape
         self._cnn_sigmoid = cnn_sigmoid
@@ -1034,7 +1078,7 @@ class ConvDecoder(nn.Module):
         layers[-1].apply(tools.uniform_weight_init(outscale))
         self.layers = nn.Sequential(*layers)
 
-    def calc_same_pad(self, k, s, d):
+    def calc_same_pad(self, k: int, s: int, d: int) -> tuple[int, int]:
         """
         Calculate padding values for 'SAME' padding in convolution/deconvolution operations.
 
@@ -1056,7 +1100,9 @@ class ConvDecoder(nn.Module):
         outpad = pad * 2 - val
         return pad, outpad
 
-    def forward(self, features, dtype=None):
+    def forward(
+        self, features: torch.Tensor, dtype: torch.dtype | None = None
+    ) -> torch.Tensor:
         """Forward pass of the decoder network.
 
         This method transforms the input features through a series of deconvolutional layers
@@ -1104,25 +1150,25 @@ class ConvDecoder(nn.Module):
 class MLP(nn.Module):
     def __init__(
         self,
-        inp_dim,
-        shape,
-        layers,
-        units,
-        act="SiLU",
-        norm=True,
-        dist="normal",
-        std=1.0,
-        min_std=0.1,
-        max_std=1.0,
-        absmax=None,
-        temp=0.1,
-        unimix_ratio=0.01,
-        outscale=1.0,
-        symlog_inputs=False,
-        device="cuda",
-        name="NoName",
+        inp_dim: int,
+        shape: int | tuple[int, ...] | dict[str, tuple[int, ...]] | None,
+        layers: int,
+        units: int,
+        act: str = "SiLU",
+        norm: bool = True,
+        dist: str = "normal",
+        std: float | str = 1.0,
+        min_std: float = 0.1,
+        max_std: float = 1.0,
+        absmax: float | None = None,
+        temp: float = 0.1,
+        unimix_ratio: float = 0.01,
+        outscale: float = 1.0,
+        symlog_inputs: bool = False,
+        device: str = "cuda",
+        name: str = "NoName",
     ):
-        super(MLP, self).__init__()
+        super().__init__()
         self._shape = (shape,) if isinstance(shape, int) else shape
         if self._shape is not None and len(self._shape) == 0:
             self._shape = (1,)
@@ -1170,7 +1216,9 @@ class MLP(nn.Module):
                 self.std_layer = nn.Linear(units, np.prod(self._shape))
                 self.std_layer.apply(tools.uniform_weight_init(outscale))
 
-    def forward(self, features, dtype=None):
+    def forward(
+        self, features: torch.Tensor, dtype: torch.dtype | None = None
+    ) -> torch.Tensor | HeadDist | dict[str, HeadDist]:
         x = features
         if self._symlog_inputs:
             x = tools.symlog(x)
@@ -1196,7 +1244,13 @@ class MLP(nn.Module):
                 std = self._std
             return self.dist(self._dist, mean, std, self._shape)
 
-    def dist(self, dist, mean, std, shape):
+    def dist(
+        self,
+        dist: str,
+        mean: torch.Tensor,
+        std: torch.Tensor,
+        shape: tuple[int, ...],
+    ) -> HeadDist:
         if dist == "tanh_normal":
             mean = torch.tanh(mean)
             std = F.softplus(std) + self._min_std
@@ -1237,8 +1291,8 @@ class MLP(nn.Module):
                 torchd.independent.Independent(
                     tools.UnnormalizedHuber(mean, std, 1.0),
                     len(shape),
-                    absmax=self._absmax,
-                )
+                ),
+                absmax=self._absmax,
             )
         elif dist == "binary":
             dist = tools.Bernoulli(
@@ -1256,7 +1310,14 @@ class MLP(nn.Module):
 
 
 class GRUCell(nn.Module):
-    def __init__(self, inp_size, size, norm=True, act=torch.tanh, update_bias=-1):
+    def __init__(
+        self,
+        inp_size: int,
+        size: int,
+        norm: bool = True,
+        act: Callable[[torch.Tensor], torch.Tensor] = torch.tanh,
+        update_bias: float = -1,
+    ):
         """Initialize GRUCell layer.
 
         A Gated Recurrent Unit (GRU) cell that transforms input features through a gated mechanism.
@@ -1274,7 +1335,7 @@ class GRUCell(nn.Module):
             - Optionally applies layer normalization
 
         """
-        super(GRUCell, self).__init__()
+        super().__init__()
         self._inp_size = inp_size
         self._size = size
         self._act = act
@@ -1287,10 +1348,12 @@ class GRUCell(nn.Module):
             self.layers.add_module("GRU_norm", nn.LayerNorm(3 * size, eps=1e-03))
 
     @property
-    def state_size(self):
+    def state_size(self) -> int:
         return self._size
 
-    def forward(self, inputs, state):
+    def forward(
+        self, inputs: torch.Tensor, state: list[torch.Tensor]
+    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
         """Forward pass for a custom GRU-like cell.
 
         Args:
@@ -1343,10 +1406,10 @@ class Conv2dSamePad(torch.nn.Conv2d):
         forward: Applies padding and performs the convolution operation
     """
 
-    def calc_same_pad(self, i, k, s, d):
+    def calc_same_pad(self, i: int, k: int, s: int, d: int) -> int:
         return max((math.ceil(i / s) - 1) * s + (k - 1) * d + 1 - i, 0)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Performs forward pass through the convolutional layer with 'SAME' padding.
 
         This method ensures that the output has the same spatial dimensions as the input by
@@ -1408,11 +1471,11 @@ class ImgChLayerNorm(nn.Module):
         applies layer normalization, and then permutes back to BCHW format.
     """
 
-    def __init__(self, ch, eps=1e-03):
-        super(ImgChLayerNorm, self).__init__()
+    def __init__(self, ch: int, eps: float = 1e-03):
+        super().__init__()
         self.norm = torch.nn.LayerNorm(ch, eps=eps)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Applies layer normalization to the input tensor with a specific permutation pattern.
 

@@ -1,13 +1,22 @@
+from __future__ import annotations
+
 import atexit
 import enum
 import os
 import sys
 import time
 import traceback
+from collections.abc import Callable, Sequence
 from functools import partial as bind
-from typing import Any, Callable, Collection
+from typing import TYPE_CHECKING, Any, Literal
 
 import cloudpickle
+
+if TYPE_CHECKING:
+    from multiprocessing.connection import Connection
+
+    from ...utils.type_aliases import EncodedObservationDict
+    from .envs.wrappers import DreamerEnv, StepResult
 
 
 class CloudpickleWrapper:
@@ -17,18 +26,18 @@ class CloudpickleWrapper:
     :param var: the variable you wish to wrap for pickling with cloudpickle
     """
 
-    def __init__(self, var: Any):
+    def __init__(self, var: object):
         self.var = var
 
-    def __getstate__(self) -> Any:
+    def __getstate__(self) -> bytes:
         return cloudpickle.dumps(self.var)
 
-    def __setstate__(self, var: Any) -> None:
+    def __setstate__(self, var: bytes) -> None:
         self.var = cloudpickle.loads(var)
 
 
 class Parallel:
-    def __init__(self, ctor, strategy):
+    def __init__(self, ctor: Callable[[], DreamerEnv], strategy: Literal["process", "daemon"]):
         """
         Initialize the parallel execution class.
 
@@ -46,7 +55,7 @@ class Parallel:
         self.callables = {}
         self.__ctor = None
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         """
         Override attribute access for the worker proxy to handle remote method calls and attribute reads.
 
@@ -79,17 +88,24 @@ class Parallel:
                 return bind(self.worker, PMessage.CALL, name)
             else:
                 return self.worker(PMessage.READ, name)()
-        except AttributeError:
-            raise ValueError(name)
+        except AttributeError as err:
+            raise ValueError(name) from err
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.worker(PMessage.CALL, "__len__")()
 
     def close(self):
         self.worker.close()
 
     @staticmethod
-    def _respond(ctor, state, message, name, *args, **kwargs):
+    def _respond(
+        ctor: Callable[[], DreamerEnv],
+        state: DreamerEnv | None,
+        message: PMessage,
+        name: str,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[DreamerEnv, Any]:
         """Process messages related to instance methods and attributes.
 
         Args:
@@ -145,7 +161,9 @@ class PMessage(enum.Enum):
 class Worker:
     initializers = []
 
-    def __init__(self, fn, strategy="thread", state=False):
+    def __init__(
+        self, fn: Callable[..., object], strategy: Literal["process", "daemon"], state: bool = False
+    ):
         """
         Initialize a parallel worker.
 
@@ -153,8 +171,7 @@ class Worker:
 
         Args:
             fn (callable): The function to run in parallel.
-            strategy (str, optional): The parallelization strategy. Can be "process", "daemon", or "thread".
-                                      Defaults to "thread".
+            strategy (str): The parallelization strategy. Can be "process" or "daemon".
             state (bool, optional): If True, the function should accept state as its first argument.
                                    If False, the function will be wrapped to accept and return state.
                                    Defaults to False.
@@ -173,7 +190,7 @@ class Worker:
         }[strategy](fn)
         self.promise = None
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any) -> Future:
         """
         Call method for handling promise-based asynchronous operations.
 
@@ -196,7 +213,7 @@ class Worker:
         self.promise = self.impl(*args, **kwargs)
         return self.promise
 
-    def wait(self):
+    def wait(self) -> None:
         return self.impl.wait()
 
     def close(self):
@@ -204,7 +221,12 @@ class Worker:
 
 
 class ProcessPipeWorker:
-    def __init__(self, fn, initializers=(), daemon=False):
+    def __init__(
+        self,
+        fn: Callable[..., tuple[object, object]],
+        initializers: Sequence[Callable[[], object]] = (),
+        daemon: bool = False,
+    ):
         """Initialize a parallel process for executing functions.
 
         This constructor sets up a parallel processing environment using multiprocessing,
@@ -254,7 +276,7 @@ class ProcessPipeWorker:
         assert self._submit(Message.OK)()
         atexit.register(self.close)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any) -> Future:
         """
         Call the wrapped function with the provided arguments.
 
@@ -281,7 +303,7 @@ class ProcessPipeWorker:
         try:
             self._pipe.send((Message.STOP, self._nextid, None))
             self._pipe.close()
-        except (AttributeError, IOError):
+        except (OSError, AttributeError):
             pass  # The connection was already closed.
         try:
             self._process.join(0.1)
@@ -294,7 +316,7 @@ class ProcessPipeWorker:
         except (AttributeError, AssertionError):
             pass
 
-    def _submit(self, message, payload=None):
+    def _submit(self, message: Message, payload: object = None) -> Future:
         """
         Submit a message to the pipe with an optional payload and return a Future object.
 
@@ -320,12 +342,12 @@ class ProcessPipeWorker:
         self._pipe.send((message, callid, payload))
         return Future(self._receive, callid)
 
-    def _receive(self, callid):
+    def _receive(self, callid: int) -> Any:  # noqa: ANN401
         while callid not in self._results:
             try:
                 message, callid, payload = self._pipe.recv()
-            except (OSError, EOFError):
-                raise RuntimeError("Lost connection to worker.")
+            except (OSError, EOFError) as err:
+                raise RuntimeError("Lost connection to worker.") from err
             if message == Message.ERROR:
                 raise Exception(payload)
             assert message == Message.RESULT, message
@@ -333,7 +355,7 @@ class ProcessPipeWorker:
         return self._results.pop(callid)
 
     @staticmethod
-    def _loop(pipe, function, initializers):
+    def _loop(pipe: Connection, function: bytes, initializers: bytes):
         """
         Internal worker loop for parallel processing that handles message-based communication.
 
@@ -419,7 +441,7 @@ class Message(enum.Enum):
 
 
 class Future:
-    def __init__(self, receive, callid):
+    def __init__(self, receive: Callable[[int], Any], callid: int):
         """Initialize an asynchronous result object.
 
         Args:
@@ -437,7 +459,7 @@ class Future:
         self._result = None
         self._complete = False
 
-    def __call__(self):
+    def __call__(self) -> Any:  # noqa: ANN401
         """
         Retrieves and returns the result of a remote procedure call.
 
@@ -478,14 +500,14 @@ class Damy:
         >>> result = step_fn()  # Actually executes the step
     """
 
-    def __init__(self, env):
+    def __init__(self, env: DreamerEnv):
         self._env = env
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         return getattr(self._env, name)
 
-    def step(self, action):
+    def step(self, action: object) -> Callable[[], StepResult]:
         return lambda: self._env.step(action)
 
-    def reset(self):
+    def reset(self) -> Callable[[], EncodedObservationDict]:
         return lambda: self._env.reset()

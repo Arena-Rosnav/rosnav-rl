@@ -4,10 +4,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ruamel.yaml.comments import CommentedMap
+
     from rosnav_rl.cfg.agent import AgentConfig
 
 
-def agent_config_to_commented_map(agent_cfg: "AgentConfig"):
+def agent_config_to_commented_map(agent_cfg: AgentConfig) -> CommentedMap:
     """Build a structured ``ruamel.yaml`` :class:`CommentedMap` for an :class:`AgentConfig`.
 
     Extracted here so both :meth:`AgentConfig.to_yaml` and

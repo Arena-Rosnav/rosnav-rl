@@ -1,4 +1,5 @@
-from typing import Dict, Any, List
+from typing import Any
+
 from ..data_sources.base import Collector, Generator
 
 
@@ -12,7 +13,7 @@ class DependencyResolver:
     """Handles dependency resolution and execution ordering for generators."""
 
     def __init__(
-        self, generators: Dict[str, Generator], collectors: Dict[str, Collector]
+        self, generators: dict[str, Generator], collectors: dict[str, Collector]
     ):
         self.generators = generators
         self.collectors = collectors
@@ -20,7 +21,7 @@ class DependencyResolver:
         self._validate_configuration()
         self.execution_order = self._resolve_dependencies()
 
-    def get_dependency_info(self) -> Dict[str, Any]:
+    def get_dependency_info(self) -> dict[str, Any]:
         """Get debugging information about dependencies."""
         info = {
             "execution_order": self.execution_order,
@@ -42,7 +43,7 @@ class DependencyResolver:
 
         return info
 
-    def _resolve_dependencies(self) -> List[str]:
+    def _resolve_dependencies(self) -> list[str]:
         """Resolve generator dependencies using topological sorting."""
         # Build dependency graph: generator_name -> set of generators it depends on
         dependencies = {name: set() for name in self.generators.keys()}

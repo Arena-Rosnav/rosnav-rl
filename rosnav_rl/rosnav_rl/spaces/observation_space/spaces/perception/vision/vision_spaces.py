@@ -3,14 +3,16 @@
 RGBD and vision-based perception spaces integrated into hierarchical architecture.
 """
 
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
-
+from rosnav_rl.observations.utils.types import ImageData
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
+
 from ...base_observation_space import BaseObservationSpace
-from rosnav_rl.observations.utils.types import ImageData
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
@@ -34,7 +36,7 @@ class RGBDSpace(BaseObservationSpace):
     }
 
     def __init__(
-        self, rgbd_image_height: int, rgbd_image_width: int, *args, **kwargs
+        self, rgbd_image_height: int, rgbd_image_width: int, *args: Any, **kwargs: Any
     ) -> None:
         self._image_height = rgbd_image_height
         self._image_width = rgbd_image_width
@@ -59,7 +61,7 @@ class RGBDSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
-        self, color_image: ImageData, depth_image: ImageData, *args, **kwargs
+        self, color_image: ImageData, depth_image: ImageData, *args: Any, **kwargs: Any
     ) -> ImageData:
         """
         Encodes RGBD observation by combining color and depth images.

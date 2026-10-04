@@ -6,7 +6,7 @@ Provides a clean, composable interface for the observation workflow.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from ..data_sources.base import Collector, Generator
 from ..strategies.collector import CollectorManager
@@ -33,10 +33,10 @@ class ObservationPipeline:
 
     def forward(
         self,
-        collectors: Dict[str, Collector],
-        generators: Dict[str, Generator],
-        extra_observations: Dict[str, Any] = None,
-    ) -> Dict[str, Any]:
+        collectors: dict[str, Collector],
+        generators: dict[str, Generator],
+        extra_observations: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Execute the complete observation pipeline.
 

@@ -12,9 +12,9 @@ Legacy Spaces: (Currently none in base localization)
 
 # Advanced spaces
 from .advanced_localization_spaces import (
-    RobustOdometrySpace,
-    PoseStabilizedSpace,
     LocalizationCombinedSpace,
+    PoseStabilizedSpace,
+    RobustOdometrySpace,
 )
 
 __all__ = ["RobustOdometrySpace", "PoseStabilizedSpace", "LocalizationCombinedSpace"]

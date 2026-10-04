@@ -1,10 +1,11 @@
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
 import logging
+from abc import ABC, abstractmethod
+from typing import Any
+
 import numpy as np
 
+from rosnav_rl.utils.logging import ComponentType, ErrorReportingMixin
 from rosnav_rl.utils.validation import RequiresProtocol
-from rosnav_rl.utils.logging import ErrorReportingMixin, ComponentType
 
 from ..reward_function import RewardFunction
 
@@ -40,14 +41,14 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
     """
 
     # Schema-based requirements - subclasses must override
-    requires: Dict[str, Any] = {}
+    requires: dict[str, Any] = {}
 
     def __init__(
         self,
         reward_function: RewardFunction,
         _on_safe_dist_violation: bool = True,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize the RewardUnit with enhanced validation and caching.
 
@@ -62,15 +63,15 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
             ValueError: If initialization parameters are invalid
         """
         super().__init__(
+            *args,
             component_type=ComponentType.REWARD_UNIT,
             component_name=self.__class__.__name__,
-            *args,
             **kwargs,
         )
 
         self._reward_function = reward_function
         self._on_safe_dist_violation = _on_safe_dist_violation
-        self._cached_requirements: Optional[set] = None
+        self._cached_requirements: set[str] | None = None
 
         # Enhanced validation with better error messages
         self._validate_schema_definition()
@@ -80,12 +81,6 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
 
         Uses unified error reporting instead of raising exceptions directly.
         """
-        if not hasattr(self, "requires"):
-            self._report_critical(
-                "Must define 'requires' attribute. See RequiresProtocol documentation for examples."
-            )
-            return
-
         if not isinstance(self.requires, dict):
             self._report_critical(
                 f"'requires' must be a dictionary, got {type(self.requires)}"
@@ -96,7 +91,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
         self._cached_requirements = set(self.requires.keys())
 
         # Validate requirement entries
-        for key, value in self.requires.items():
+        for key, _value in self.requires.items():
             if not isinstance(key, str):
                 self._report_error(
                     f"Requirement key '{key}' must be a string, got {type(key)}"
@@ -132,7 +127,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
 
         self._reward_function.add_reward(value=value, called_by=self.__class__.__name__)
 
-    def add_info(self, info: Dict[str, Any]) -> None:
+    def add_info(self, info: dict[str, Any]) -> None:
         """Add information to episode info dict with validation.
 
         Args:
@@ -146,24 +141,12 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
 
         self._reward_function.add_info(info=info)
 
-    def check_parameters(self, *args: Any, **kwargs: Any) -> None:
+    def check_parameters(self) -> None:
         """Enhanced parameter validation with specific checks.
 
         Override this method in subclasses to implement unit-specific validation logic.
         Base implementation provides common validation patterns.
-
-        Args:
-            *args: Variable length argument list
-            **kwargs: Arbitrary keyword arguments
         """
-        # Common parameter checks
-        if hasattr(self, "_reward_value"):
-            reward = getattr(self, "_reward_value", None)
-            if reward is not None and abs(reward) > 100:
-                self._report_warning(
-                    f"Has large reward magnitude: {reward}. "
-                    "Consider scaling rewards for better training stability."
-                )
 
     def reset(self) -> None:
         """Reset unit state with enhanced cleanup.
@@ -176,7 +159,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
         pass
 
     @abstractmethod
-    def __call__(self, **kwargs: Any) -> Any:
+    def __call__(self, **kwargs: Any) -> None:
         """Process observations and update rewards with schema-based arguments.
 
         Subclasses must implement this method with explicit, schema-typed keyword arguments

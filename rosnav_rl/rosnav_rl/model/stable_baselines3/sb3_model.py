@@ -1,9 +1,11 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Self
 
 import gymnasium as gym
 import numpy as np
 import torch as th
+from sb3_contrib.common.recurrent.policies import RecurrentActorCriticPolicy
+from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import (
     VecEnv,
@@ -23,6 +25,7 @@ from rosnav_rl.utils.stable_baselines3.vec_env import (
     get_vec_normalize,
 )
 from rosnav_rl.utils.type_aliases import (
+    EncodedObservationDict,
     ObservationDict,
     _SupportedStableBaselinesModels,
 )
@@ -30,7 +33,8 @@ from rosnav_rl.utils.utils import load_yaml, make_mock_env
 
 from ..model import RL_Model
 from .policy.agent_factory import AgentFactory
-from .policy.base_policy import POLICY_TYPE, StableBaselinesPolicyDescription
+from .policy.base_policy import StableBaselinesPolicyDescription
+from .policy.constants import POLICY_TYPE
 
 if TYPE_CHECKING:
     from rosnav_rl.model.stable_baselines3 import cfg as sb3_cfg
@@ -63,7 +67,7 @@ class StableBaselinesModelState:
 
     last_action: np.ndarray = np.ndarray([0, 0, 0])
     _reset_state: bool = True
-    model_state: Tuple[np.ndarray, ...] = None
+    model_state: tuple[np.ndarray, ...] | None = None
 
     def reset(self):
         self.reset_state = True
@@ -71,7 +75,7 @@ class StableBaselinesModelState:
         self.last_action = np.ndarray([0, 0, 0])
 
     @property
-    def reset_state(self):
+    def reset_state(self) -> bool:
         if self._reset_state:
             self._reset_state = False
             return True
@@ -108,30 +112,34 @@ class StableBaselinesEnv:
     """
 
     _env: VecEnv
-    _norm_wrapper: Union[None, VecNormalize] = None
-    _stack_wrapper: Union[None, VecFrameStack] = None
+    _norm_wrapper: VecNormalize | None = None
+    _stack_wrapper: VecFrameStack | None = None
 
     def __init__(self, env: VecEnv):
         self._env = env
         self._norm_wrapper = get_vec_normalize(env)
         self._stack_wrapper = get_vec_framestack(env)
 
-    def save_normalization(self, path: Union[str, Path]) -> None:
+    def save_normalization(self, path: str | Path) -> None:
         if self.has_norm_wrapper:
             self._norm_wrapper.save(path)
 
-    def load_normalization(self, path: Union[str, Path]) -> None:
+    def load_normalization(self, path: str | Path) -> None:
         if self.has_norm_wrapper:
             self._norm_wrapper.load(path)
         else:
             raise ValueError("Normalization wrapper not found.")
 
-    def normalize(self, observation: np.ndarray) -> np.ndarray:
+    def normalize(
+        self, observation: EncodedObservationDict | np.ndarray
+    ) -> EncodedObservationDict | np.ndarray:
         if self._norm_wrapper is None:
             raise ValueError("Normalization wrapper not found.")
         return self._norm_wrapper.normalize_obs(observation)
 
-    def stack(self, observation: np.ndarray) -> np.ndarray:
+    def stack(
+        self, observation: EncodedObservationDict | np.ndarray
+    ) -> tuple[EncodedObservationDict | np.ndarray, list[dict[str, Any]]]:
         # encode_observation returns unbatched obs; VecFrameStack expects (n_envs, ...)
         if isinstance(observation, dict):
             batched = {k: np.asarray(v)[np.newaxis] for k, v in observation.items()}
@@ -148,7 +156,9 @@ class StableBaselinesEnv:
             return {k: v[0] for k, v in stacked.items()}, infos
         return stacked[0], infos
 
-    def reset(self, observation: np.ndarray) -> np.ndarray:
+    def reset(
+        self, observation: EncodedObservationDict | np.ndarray
+    ) -> EncodedObservationDict | np.ndarray:
         if isinstance(observation, dict):
             batched = {k: np.asarray(v)[np.newaxis] for k, v in observation.items()}
         else:
@@ -196,9 +206,9 @@ class StableBaselinesModel(RL_Model):
         model: The underlying SB3 model instance.
     """
 
-    _model: _SupportedStableBaselinesModels = None
-    _algorithm_cfg: "sb3_cfg.SBAlgorithmCfg" = None
-    __env: StableBaselinesEnv = None
+    _model: _SupportedStableBaselinesModels | None = None
+    _algorithm_cfg: "sb3_cfg.SBAlgorithmCfg | None" = None
+    __env: StableBaselinesEnv | None = None
     __state: StableBaselinesModelState = StableBaselinesModelState()
 
     def __init__(self, rl_agent: "RL_Agent", algorithm_cfg: "sb3_cfg.SBAlgorithmCfg"):
@@ -220,15 +230,21 @@ class StableBaselinesModel(RL_Model):
         self.__setup_agent_factory_and_policy_description()
 
     @classmethod
-    def from_framework_cfg(cls, rl_agent, framework_cfg, *args, **kwargs):
+    def from_framework_cfg(
+        cls,
+        rl_agent: "RL_Agent",
+        framework_cfg: "sb3_cfg.StableBaselinesCfg",
+        *args: Any,
+        **kwargs: Any,
+    ) -> Self:
         """Create a :class:`StableBaselinesModel` from a framework config.
 
         Extracts the ``algorithm`` sub-config from the SB3 framework envelope.
         """
         return cls(
+            *args,
             rl_agent=rl_agent,
             algorithm_cfg=framework_cfg.algorithm,
-            *args,
             **kwargs,
         )
 
@@ -244,19 +260,19 @@ class StableBaselinesModel(RL_Model):
             self._agent_factory (AgentFactory): The factory responsible for creating agent instances.
             self._policy_description (StableBaselinesPolicyDescription): The policy description instantiated by the agent factory.
         """
-        self._agent_factory: AgentFactory = AgentFactory
-        self._policy_description: StableBaselinesPolicyDescription = (
+        self._agent_factory: type[AgentFactory] = AgentFactory
+        self._policy_description: StableBaselinesPolicyDescription | type[BasePolicy] = (
             self._agent_factory.instantiate(self.algorithm_cfg.architecture_name)
         )
 
     def setup_model(
         self,
-        env: Union[VecEnv, gym.Env],
-        no_gpu: Optional[bool] = False,
-        tensorboard_log_path: Optional[str] = None,
-        checkpoint_path: Optional[str] = None,
-        *args,
-        **kwargs,
+        env: VecEnv | gym.Env,
+        no_gpu: bool = False,
+        tensorboard_log_path: str | Path | None = None,
+        checkpoint_path: str | Path | None = None,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Set up the RL model based on the specified environment and configuration.
 
@@ -289,7 +305,7 @@ class StableBaselinesModel(RL_Model):
         else:
             self._initialize_model(algorithm_args)
 
-    def save(self, dirpath: str, file_name: str) -> None:
+    def save(self, dirpath: str | Path, file_name: str) -> None:
         """
         Save the model and environment normalization to the specified directory.
 
@@ -301,7 +317,7 @@ class StableBaselinesModel(RL_Model):
         self._model.save(model_path)
         self.__env.save_normalization(Path(dirpath) / f"vec_normalize_{file_name}.pkl")
 
-    def load(self, path: str, env: VecEnv = None) -> None:
+    def load(self, path: str | Path, env: VecEnv | gym.Env | None = None) -> None:
         """
         Load a pre-trained model from the specified path.
 
@@ -316,8 +332,8 @@ class StableBaselinesModel(RL_Model):
         observation: ObservationDict,
         deterministic: bool = True,
         is_first_observation: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> np.ndarray:
         """Processes the observation and returns an action using the trained model.
 
@@ -377,7 +393,7 @@ class StableBaselinesModel(RL_Model):
         self.__state.last_action = self._rl_agent.space_manager.decode_action(action)
         return self.__state.last_action
 
-    def train(self, *args, **kwargs) -> bool:
+    def train(self, *args: Any, **kwargs: Any) -> bool:
         """
         Train the model using the provided arguments.
 
@@ -400,11 +416,11 @@ class StableBaselinesModel(RL_Model):
 
     def transfer_weights(
         self,
-        source_dir: Union[str, Path],
+        source_dir: str | Path,
         source_checkpoint: str,
-        include: List[str] = None,
-        exclude: List[str] = None,
-        cfg_file_name: Optional[str] = "training_config.yaml",
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
+        cfg_file_name: str = "training_config.yaml",
     ) -> None:
         """
         Transfers weights from a source model checkpoint to the current model.
@@ -421,7 +437,7 @@ class StableBaselinesModel(RL_Model):
         """
         import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
 
-        config = load_yaml(source_dir / cfg_file_name)
+        config = load_yaml(Path(source_dir) / cfg_file_name)
         validated_algorithm_cfg = sb3_cfg.StableBaselinesCfg.model_validate(
             config["agent_config"]["framework"]
         ).algorithm
@@ -438,7 +454,7 @@ class StableBaselinesModel(RL_Model):
         )
 
     def setup_environment(
-        self, env: VecEnv, is_training: bool = True, *args, **kwargs
+        self, env: VecEnv, is_training: bool = True, *args: Any, **kwargs: Any
     ) -> VecEnv:
         """
         Set up the environment for training or evaluation.
@@ -469,10 +485,10 @@ class StableBaselinesModel(RL_Model):
     def _setup_algorithm_arguments(
         self,
         parameters: "sb3_cfg.SBAlgorithmParameters",
-        env: Union[VecEnv, gym.Env],
+        env: VecEnv | gym.Env,
         no_gpu: bool,
-        tensorboard_log_path: Optional[str],
-    ) -> Dict[str, Any]:
+        tensorboard_log_path: str | Path | None,
+    ) -> dict[str, Any]:
         """
         Set up the arguments required for initializing the Stable Baselines 3 algorithm.
 
@@ -542,7 +558,7 @@ class StableBaselinesModel(RL_Model):
         return {**base_kwargs, **filtered_config}
 
 
-    def _initialize_model(self, algorithm_parameters: Dict[str, Any]) -> None:
+    def _initialize_model(self, algorithm_parameters: dict[str, Any]) -> None:
         """
         Initializes the model using the provided algorithm parameters.
 
@@ -557,9 +573,9 @@ class StableBaselinesModel(RL_Model):
 
     def _load_model(
         self,
-        path: str,
-        env: Optional[VecEnv] = None,
-        algorithm_args: Optional[dict] = None,
+        path: str | Path,
+        env: VecEnv | gym.Env | None = None,
+        algorithm_args: dict[str, Any] | None = None,
     ) -> _SupportedStableBaselinesModels:
         """
         Load a pre-trained model from the specified path.
@@ -588,7 +604,7 @@ class StableBaselinesModel(RL_Model):
         _orig_th_load = _th.load
         _orig_sb3_load = _sb3_save_util.th.load
 
-        def _robust_load(*args, **kwargs):
+        def _robust_load(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
             if kwargs.get("weights_only", False):
                 try:
                     return _orig_th_load(*args, **kwargs)
@@ -609,24 +625,19 @@ class StableBaselinesModel(RL_Model):
 
     @property
     def _is_recurrent(self) -> bool:
-        """Check whether the current model uses a recurrent policy.
-
-        The check is structural (``lstm_actor`` attribute on the policy)
-        rather than based on ``isinstance`` so it remains valid for any
-        future recurrent algorithm without code changes.
-        """
+        """Check whether the current model uses a recurrent policy."""
         return (
             self._model is not None
-            and hasattr(self._model.policy, "lstm_actor")
+            and isinstance(self._model.policy, RecurrentActorCriticPolicy)
         )
 
     def _predict(
         self,
-        observation: Union[np.ndarray, Dict[str, np.ndarray]],
-        state: Optional[Tuple[np.ndarray, ...]] = None,
-        episode_start: Optional[np.ndarray] = None,
+        observation: np.ndarray | dict[str, np.ndarray],
+        state: tuple[np.ndarray, ...] | None = None,
+        episode_start: np.ndarray | None = None,
         deterministic: bool = True,
-    ):
+    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
         """Predict the action to take given an observation.
 
         Dispatches to the recurrent or non-recurrent prediction path based
@@ -651,11 +662,11 @@ class StableBaselinesModel(RL_Model):
 
     def _predict_recurrent(
         self,
-        observation: np.ndarray,
-        state: Tuple[np.ndarray, ...],
-        episode_start: Optional[np.ndarray] = None,
-        deterministic: Optional[bool] = True,
-    ):
+        observation: np.ndarray | dict[str, np.ndarray],
+        state: tuple[np.ndarray, ...] | None,
+        episode_start: np.ndarray | None = None,
+        deterministic: bool = True,
+    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
         """Predict the next action using a recurrent policy.
 
         Args:
@@ -673,11 +684,11 @@ class StableBaselinesModel(RL_Model):
 
     def _predict_non_recurrent(
         self,
-        observation: Union[np.ndarray, Dict[str, np.ndarray]],
-        state: Optional[Tuple[np.ndarray, ...]] = None,
-        episode_start: Optional[np.ndarray] = None,
+        observation: np.ndarray | dict[str, np.ndarray],
+        state: tuple[np.ndarray, ...] | None = None,
+        episode_start: np.ndarray | None = None,
         deterministic: bool = True,
-    ):
+    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
         """
         Predict actions for a given observation using a non-recurrent policy.
 
@@ -694,8 +705,10 @@ class StableBaselinesModel(RL_Model):
             We reimplement the predict function for non recurrent models because of issues with stacked
             observations with the official implementation.
         """
+        observation_space = self.model.observation_space
+        assert isinstance(observation_space, gym.spaces.Dict)
         for key, value in observation.items():
-            if value.ndim == 2:
+            if value.shape == observation_space[key].shape:
                 observation[key] = np.expand_dims(value, axis=0)
 
         with th.no_grad():
@@ -718,7 +731,7 @@ class StableBaselinesModel(RL_Model):
         self.__state.reset()
 
     @property
-    def observation_space_list(self) -> List["BaseObservationSpace"]:
+    def observation_space_list(self) -> list[type["BaseObservationSpace"]]:
         """
         Returns a list of observation spaces defined in the policy description.
 
@@ -728,7 +741,7 @@ class StableBaselinesModel(RL_Model):
         return self._policy_description.observation_spaces
 
     @property
-    def observation_space_kwargs(self) -> dict:
+    def observation_space_kwargs(self) -> dict[str, Any]:
         return self._policy_description.observation_space_kwargs
 
     @property
@@ -740,7 +753,7 @@ class StableBaselinesModel(RL_Model):
         return sum(p.numel() for p in self.model.policy.parameters())
 
     @property
-    def config(self):
+    def config(self) -> dict[str, Any]:
         return {
             "algorithm_cfg": (
                 self.algorithm_cfg.model_dump() if self.algorithm_cfg else {}
@@ -748,7 +761,7 @@ class StableBaselinesModel(RL_Model):
         }
 
     @property
-    def environment(self) -> StableBaselinesEnv:
+    def environment(self) -> StableBaselinesEnv | None:
         """
         Returns the StableBaselinesEnv environment instance.
 

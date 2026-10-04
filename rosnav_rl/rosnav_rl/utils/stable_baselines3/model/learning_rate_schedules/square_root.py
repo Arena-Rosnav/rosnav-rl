@@ -1,4 +1,4 @@
-from typing import Callable
+from collections.abc import Callable
 
 
 def square_root_decay(

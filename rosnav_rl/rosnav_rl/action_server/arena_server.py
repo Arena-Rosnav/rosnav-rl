@@ -4,11 +4,11 @@ from pathlib import Path
 
 import yaml
 
+from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.observations.factory.factory import (
     create_observation_manager_from_config,
 )
 from rosnav_rl.rl_agent import RL_Agent
-from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.utils.utils import load_yaml
 
 from .base_server import ActionServer, ObservationCollector
@@ -122,7 +122,7 @@ class ArenaActionServer(ActionServer):
                 / "observations.yaml"
             )
 
-        with open(obs_config_path, "r") as f:
+        with open(obs_config_path) as f:
             config = yaml.safe_load(f)
 
         obs_manager = create_observation_manager_from_config(

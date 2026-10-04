@@ -16,22 +16,19 @@ Feature Map Spaces:
     - PedestrianTypeSpace: Pedestrian type feature map
 """
 
-# Feature map spaces
+from .advanced_environment_spaces import (
+    EnvironmentContextSpace,
+    ObstacleProximitySpace,
+    SpatialAwarenessSpace,
+)
 from .feature_map_spaces import (
-    PedestrianVelXSpace,
-    PedestrianVelYSpace,
-    StackedLaserMapSpace,
     LaserCartesianMapSpace,
     PedestrianLocationSpace,
     PedestrianSocialStateSpace,
     PedestrianTypeSpace,
-)
-
-# Advanced environment spaces
-from .advanced_environment_spaces import (
-    EnvironmentContextSpace,
-    SpatialAwarenessSpace,
-    ObstacleProximitySpace,
+    PedestrianVelXSpace,
+    PedestrianVelYSpace,
+    StackedLaserMapSpace,
 )
 
 __all__ = [

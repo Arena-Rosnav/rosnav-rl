@@ -22,7 +22,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -135,47 +135,58 @@ class TestFindAgentsDir:
 ros2 = pytest.mark.skipif(not _ros_running(), reason="ROS2 not available")
 
 
-class MockAgent:
-    """Minimal RL_Agent stand-in that returns predictable velocities."""
-
-    def get_action(self, observation: Dict[str, Any]) -> np.ndarray:
-        return np.array([0.5, 0.0, 0.3], dtype=np.float64)
-
-    @property
-    def model(self):
-        m = MagicMock()
-        m.reset = MagicMock()
-        return m
+_NUM_BEAMS = 360
 
 
-class MockObsCollector:
-    """Returns an empty observation dict (enough for MockAgent)."""
+def _raw_observation() -> Dict[str, Any]:
+    return {
+        "front_laser": np.full(_NUM_BEAMS, 2.0, dtype=np.float32),
+        "dist_angle_to_subgoal": np.array([3.0, 0.3], dtype=np.float32),
+        "last_action": np.zeros(3, dtype=np.float32),
+        "is_terminal": False,
+    }
 
+
+def _agent_1():
+    from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
+    from rosnav_rl.cfg.agent import AgentConfig
+    from rosnav_rl.cfg.parameters import AgentParameters
+    from rosnav_rl.model.stable_baselines3.cfg import PPO_Algorithm_Cfg, PPO_Cfg
+    from rosnav_rl.model.stable_baselines3.cfg.framework import StableBaselinesCfg
+    from rosnav_rl.rl_agent import RL_Agent
+    from rosnav_rl.utils.utils import make_mock_env
+
+    agent = RL_Agent(
+        AgentConfig(
+            name="action_server_agent",
+            action_space=DifferentialDriveActionSpace(linear_range=(-0.5, 0.5), angular_range=(-1.0, 1.0)),
+            parameters=AgentParameters(laser_num_beams=_NUM_BEAMS, laser_max_range=30.0, normalize=True),
+            framework=StableBaselinesCfg(
+                algorithm=PPO_Cfg(
+                    architecture_name="AGENT_1",
+                    parameters=PPO_Algorithm_Cfg(total_batch_size=64, batch_size=64),
+                )
+            ),
+        )
+    )
+    agent.initialize_model(
+        make_mock_env(
+            ns="",
+            space_manager=agent.space_manager,
+            stack_size=agent.model._policy_description.stack_size,
+        )
+    )
+    return agent
+
+
+class FixedObservationCollector:
     def get_observations(self) -> Dict[str, Any]:
-        return {}
-
-
-class ConcreteActionServer:
-    """Minimal concrete ActionServer for testing (skips agent loading)."""
-
-    def __new__(cls, *a, **kw):
-        from rosnav_rl.action_server.base_server import ActionServer  # noqa
-
-        # Build a concrete subclass inline so we don't need to import ActionServer
-        # directly as a superclass inside the test module.
-        class _Concrete(ActionServer):
-            def _initialize_agent(self_inner):
-                return MockAgent()
-
-            def _initialize_observation_collector(self_inner):
-                return MockObsCollector()
-
-        return _Concrete(*a, **kw)
+        return _raw_observation()
 
 
 @ros2
 class TestGetCommandService:
-    """Integration tests for the GetCommand ROS2 service using a mock agent."""
+    """Integration tests for the GetCommand ROS2 service using a real AGENT_1 policy."""
 
     @pytest.fixture(autouse=True)
     def _spin(self):
@@ -183,76 +194,71 @@ class TestGetCommandService:
         import rclpy
         from rosnav_rl.action_server.base_server import ActionServer
 
+        agent = _agent_1()
+
         class ConcreteServer(ActionServer):
             def _initialize_agent(self_inner):
-                return MockAgent()
+                return agent
 
             def _initialize_observation_collector(self_inner):
-                return MockObsCollector()
+                return FixedObservationCollector()
 
         if not rclpy.ok():
             rclpy.init()
 
         self.server = ConcreteServer(
-            agent_name="mock_agent", namespace="test_ns"
+            agent_name="action_server_agent", namespace="test_ns"
         )
 
-        # Start the server (calls _initialize_ros, then spins)
         self._spin_thread = threading.Thread(
             target=self.server.start, daemon=True
         )
         self._spin_thread.start()
-        time.sleep(0.5)  # let the node fully spin up
+        time.sleep(0.5)
         yield
 
-        # Teardown
         self.server.node.destroy_node()
 
-    def test_get_command_returns_twist(self):
-        """Calling GetCommand must return the decoded action with correct values."""
+    def test_get_command_returns_the_decoded_agent_action(self):
         import rclpy
+        from rclpy.executors import SingleThreadedExecutor
         from rosnav_rl_msgs.srv import GetCommand
 
         client_node = rclpy.create_node("test_client")
         client = client_node.create_client(
             GetCommand, "/test_ns/get_command"
         )
+        executor = SingleThreadedExecutor()
+        executor.add_node(client_node)
 
         assert client.wait_for_service(timeout_sec=5.0), \
             "GetCommand service not available within 5 s"
 
         future = client.call_async(GetCommand.Request())
-        rclpy.spin_until_future_complete(client_node, future, timeout_sec=5.0)
+        executor.spin_until_future_complete(future, timeout_sec=5.0)
 
         response = future.result()
         assert response is not None, "Service call timed out"
-        assert len(response.action) == 3
-        assert abs(response.action[0] - 0.5) < 1e-6
-        assert abs(response.action[1] - 0.0) < 1e-6
-        assert abs(response.action[2] - 0.3) < 1e-6
+        expected = self.server.agent.get_action(_raw_observation())
+        assert list(response.action) == pytest.approx(expected.tolist())
+        assert response.action_type == self.server.agent.space_manager.action_space_manager.spec.type
 
+        executor.shutdown()
         client_node.destroy_node()
 
-    def test_get_command_before_agent_init_returns_zero_twist(self):
-        """If agent is None the handler must return an empty action list.
-
-        Tested by calling the method directly (no separate ROS2 node needed).
-        """
+    def test_get_command_before_agent_init_returns_empty_action(self):
         from rosnav_rl_msgs.srv import GetCommand
 
-        # Temporarily clear the agent
         saved_agent = self.server.agent
         self.server.agent = None
 
         request = GetCommand.Request()
         response = GetCommand.Response()
-        # Access the name-mangled handler
         result = self.server._ActionServer__handle_next_action_srv(request, response)
 
-        assert result.action == []
+        assert list(result.action) == []
         assert result.action_type == ""
 
-        # Restore
         self.server.agent = saved_agent
 
 

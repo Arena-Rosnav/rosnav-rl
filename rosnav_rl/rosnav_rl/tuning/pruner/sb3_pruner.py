@@ -16,11 +16,14 @@ Usage::
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from stable_baselines3.common.callbacks import BaseCallback
 
 from .pruner_base import TrialPrunerBase
+
+if TYPE_CHECKING:
+    import optuna
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +64,7 @@ class SB3TrialPruner(TrialPrunerBase, BaseCallback):
 
     def __init__(
         self,
-        trial: "optuna.trial.Trial",
+        trial: optuna.trial.Trial,
         metric: str = "mean_reward",
         report_freq: int = 0,
         verbose: int = 0,
@@ -72,7 +75,7 @@ class SB3TrialPruner(TrialPrunerBase, BaseCallback):
 
     # ── TrialPrunerBase interface ─────────────────────────────────────────
 
-    def read_metric(self) -> Optional[float]:
+    def read_metric(self) -> float | None:
         """Extract the metric from the SB3 logger.
 
         Searches ``model.logger.name_to_value`` with common prefixes

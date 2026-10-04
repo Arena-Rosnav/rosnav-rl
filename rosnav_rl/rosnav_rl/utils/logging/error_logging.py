@@ -6,16 +6,13 @@ prevents log spam by collecting errors from all components (observation spaces,
 generators, reward units) and logging them in an organized way once per iteration.
 """
 
-from typing import Dict, Optional
-from dataclasses import dataclass
-from enum import Enum
 import json
 import logging
 import os
 import threading
 from collections import defaultdict
-
-from .logger import get_logger, LogLevel
+from dataclasses import dataclass
+from enum import Enum
 
 
 class ErrorSeverity(Enum):
@@ -47,14 +44,14 @@ class ErrorMessage:
     component_name: str
     severity: ErrorSeverity
     message: str
-    error_type: Optional[str] = None
+    error_type: str | None = None
     count: int = 1
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         """Make ErrorMessage hashable for deduplication."""
         return hash((self.component_type, self.component_name, self.message))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         """Check equality for deduplication."""
         if not isinstance(other, ErrorMessage):
             return False
@@ -83,7 +80,7 @@ class ErrorCollector:
     }
 
     def __init__(self):
-        self._errors: Dict[ErrorMessage, int] = {}
+        self._errors: dict[ErrorMessage, int] = {}
         self._lock = threading.Lock()
         self._enabled = True
         self._min_severity: ErrorSeverity = ErrorSeverity.INFO
@@ -111,7 +108,7 @@ class ErrorCollector:
         component_name: str,
         severity: ErrorSeverity,
         message: str,
-        error_type: Optional[str] = None,
+        error_type: str | None = None,
     ) -> None:
         """Add an error to the collector.
 
@@ -160,7 +157,7 @@ class ErrorCollector:
 
         self._log_organized_errors(errors_copy)
 
-    def _log_organized_errors(self, errors: Dict[ErrorMessage, int]) -> None:
+    def _log_organized_errors(self, errors: dict[ErrorMessage, int]) -> None:
         """Log errors in an organized format."""
         if not errors:
             return
@@ -374,7 +371,7 @@ def collect_error(
     component_name: str,
     severity: ErrorSeverity,
     message: str,
-    error_type: Optional[str] = None,
+    error_type: str | None = None,
 ) -> None:
     """Convenience function to collect an error.
 

@@ -38,8 +38,8 @@ dreamerv3_pruner
 from .cfg import TuningCfg
 from .pruner.dreamerv3_pruner import DreamerV3TrialPruner
 from .pruner.pruner_base import TrialPrunerBase
-from .sampler import apply_params, suggest_params
 from .pruner.sb3_pruner import SB3TrialPruner
+from .sampler import apply_params, suggest_params
 from .search_space import CategoricalParam, FloatParam, IntParam, SearchParam
 
 __all__ = [

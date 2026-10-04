@@ -5,7 +5,7 @@ type annotations and schema-based requirements.
 """
 
 from abc import abstractmethod
-from typing import ClassVar, Union
+from typing import Any, ClassVar
 
 import numpy as np
 from gymnasium import spaces
@@ -20,7 +20,6 @@ from rosnav_rl.observations.utils.types import (
     PedestrianSocialStates,
     PedestrianTypeArray,
     PedestrianTypeFeatureMap,
-    SemanticFeatureMap,
     SocialStateFeatureMap,
 )
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
@@ -54,8 +53,8 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         feature_map_size: int = 80,
         roi_in_m: float = 20.0,
         flatten: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize the BaseFeatureMapSpace.
 
@@ -70,7 +69,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
         # Pre-compute grid constants for vectorized coordinate conversion
         self._grid_resolution = roi_in_m / feature_map_size
-        self._inv_grid_resolution = feature_map_size / roi_in_m 
+        self._inv_grid_resolution = feature_map_size / roi_in_m
         self._grid_center = feature_map_size // 2
 
         # Pre-allocate reusable feature map buffer
@@ -87,7 +86,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         """Get the size of the feature map."""
         return self._feature_map_size
 
-    def _get_map_index(self, position: Union[tuple, np.ndarray]) -> tuple:
+    def _get_map_index(self, position: tuple[float, float] | np.ndarray) -> tuple[int, int]:
         """Convert real-world coordinates to feature map indices.
 
         Args:
@@ -103,7 +102,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
     def _get_map_indices_vectorized(
         self, positions: np.ndarray
-    ) -> tuple:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Convert multiple real-world coordinates to grid indices (vectorized).
 
         Args:
@@ -131,7 +130,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         self._feature_map_buffer[:] = self.background_value
         return self._feature_map_buffer
 
-    def _get_feature_map_shape(self) -> tuple:
+    def _get_feature_map_shape(self) -> tuple[int, ...]:
         """Get the shape for the feature map."""
         if self._flatten:
             return (self._feature_map_size * self._feature_map_size,)
@@ -145,8 +144,8 @@ class BaseFeatureMapSpace(BaseObservationSpace):
 
     @abstractmethod
     def encode_observation(
-        self, *args, **kwargs
-    ) -> Union[PedestrianFeatureMap, LaserFeatureMap, SemanticFeatureMap]:
+        self, *args: Any, **kwargs: Any
+    ) -> np.ndarray:
         """Encode observation into feature map."""
         raise NotImplementedError
 
@@ -183,16 +182,16 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         feature_map_size: int = 80,
         roi_in_m: float = 20.0,
         flatten: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         self._ped_min_speed_x = ped_min_speed_x
         self._ped_max_speed_x = ped_max_speed_x
         super().__init__(
+            *args,
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
             flatten=flatten,
-            *args,
             **kwargs,
         )
 
@@ -209,8 +208,8 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
         self,
         pedestrian_relative_locations: PedestrianRelativeLocations,
         pedestrian_vel_x: PedestrianRelativeVelocities,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> PedestrianFeatureMap:
         """Encodes the pedestrian x-velocity feature map observation.
 
@@ -284,16 +283,16 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         feature_map_size: int = 80,
         roi_in_m: float = 20.0,
         flatten: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         self._ped_min_speed_y = ped_min_speed_y
         self._ped_max_speed_y = ped_max_speed_y
         super().__init__(
+            *args,
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
             flatten=flatten,
-            *args,
             **kwargs,
         )
 
@@ -310,8 +309,8 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
         self,
         pedestrian_relative_locations: PedestrianRelativeLocations,
         pedestrian_vel_y: PedestrianRelativeVelocities,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> PedestrianFeatureMap:
         """Encodes the pedestrian y-velocity feature map observation.
 
@@ -380,8 +379,8 @@ class StackedLaserMapSpace(BaseObservationSpace):
         laser_max_range: float = 30.0,
         laser_num_beams: int = 720,
         flatten: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         self._laser_stack_size = laser_stack_size
         self._feature_map_size = feature_map_size
@@ -417,7 +416,7 @@ class StackedLaserMapSpace(BaseObservationSpace):
         return spaces.Box(low=-1.0, high=1.0, shape=shape, dtype=np.float32)
 
     def encode_observation(
-        self, front_laser: LidarRanges, is_terminal: IsTerminal, *args, **kwargs
+        self, front_laser: LidarRanges, is_terminal: IsTerminal, *args: Any, **kwargs: Any
     ) -> LaserFeatureMap:
         """Build the stacked laser map and normalize to [-1, 1].
 
@@ -525,8 +524,8 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
     def encode_observation(
         self,
         pedestrian_relative_locations: PedestrianRelativeLocations,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> PedestrianFeatureMap:
         """Encodes the pedestrian location observation.
 
@@ -591,15 +590,15 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         feature_map_size: int = 80,
         roi_in_m: float = 20.0,
         flatten: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         self._social_state_num = ped_social_state_num
         super().__init__(
+            *args,
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
             flatten=flatten,
-            *args,
             **kwargs,
         )
 
@@ -616,8 +615,8 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
         self,
         pedestrian_relative_locations: PedestrianRelativeLocations,
         pedestrian_social_states: PedestrianSocialStates,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> SocialStateFeatureMap:
         """Encodes the pedestrian social state observation.
 
@@ -693,15 +692,15 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         feature_map_size: int = 80,
         roi_in_m: float = 20.0,
         flatten: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         self._num_ped_types = ped_num_types
         super().__init__(
+            *args,
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
             flatten=flatten,
-            *args,
             **kwargs,
         )
 
@@ -718,8 +717,8 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
         self,
         pedestrian_relative_locations: PedestrianRelativeLocations,
         pedestrian_types: PedestrianTypeArray,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> PedestrianTypeFeatureMap:
         """Encodes the pedestrian type observation.
 
@@ -794,8 +793,8 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
         feature_map_size: int = 80,
         roi_in_m: float = 20.0,
         flatten: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize the LaserCartesianMapSpace.
 
@@ -822,10 +821,10 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
         self._sin_a = np.sin(angles)
 
         super().__init__(
+            *args,
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
             flatten=flatten,
-            *args,
             **kwargs,
         )
 
@@ -836,7 +835,7 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
         )
 
     def encode_observation(
-        self, front_laser: LidarRanges, *args, **kwargs
+        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
     ) -> LaserFeatureMap:
         """Project laser beam endpoints to a robot-centric Cartesian grid.
 

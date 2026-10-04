@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Union, ClassVar
+from typing import Any, ClassVar
 
 import torch as th
 from gymnasium import spaces
 from stable_baselines3.common.policies import BaseFeaturesExtractor
 
-from rosnav_rl.utils.type_aliases import TensorDict, ObservationSpaceList
+from rosnav_rl.utils.type_aliases import ObservationSpaceList, TensorDict
 
 
 class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
@@ -16,8 +16,8 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
         observation_space: spaces.Dict,
         features_dim: int,
         stack_size: int,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """
         Initialize the base feature extractor.
@@ -30,7 +30,7 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
         """
         self._stack_size = stack_size
 
-        super(RosnavBaseExtractor, self).__init__(
+        super().__init__(
             observation_space=observation_space,
             features_dim=features_dim,
         )
@@ -38,14 +38,14 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
         self._setup_network(**kwargs)
 
     @abstractmethod
-    def _setup_network(self, *args, **kwargs):
+    def _setup_network(self, *args: Any, **kwargs: Any):
         """
         Set up the network architecture for feature extraction.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def forward(self, observations: Union[th.Tensor, TensorDict]) -> th.Tensor:
+    def forward(self, observations: th.Tensor | TensorDict) -> th.Tensor:
         """
                 Forward pass of the feature extractor.
 

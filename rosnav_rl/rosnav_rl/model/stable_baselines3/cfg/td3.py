@@ -1,4 +1,5 @@
-from typing import Literal, Optional, Union
+from collections.abc import Callable
+from typing import Literal
 
 from stable_baselines3.td3 import TD3
 
@@ -21,13 +22,13 @@ class TD3_Algorithm_Cfg(OffPolicyParameters):
     algorithm_name = TD3.__name__
 
     # TD3 defaults
-    learning_rate: Union[float, callable] = 1e-3
+    learning_rate: float | Callable[[float], float] = 1e-3
     batch_size: int = 256  # lowered bar for robots
     buffer_size: int = 1_000_000
     learning_starts: int = 100
     tau: float = 0.005
     gamma: float = 0.99
-    train_freq: Union[int, tuple] = 1
+    train_freq: int | tuple[int, str] = 1
     gradient_steps: int = 1
 
     policy_delay: int = 2

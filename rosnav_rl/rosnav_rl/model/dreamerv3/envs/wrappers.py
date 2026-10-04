@@ -1,7 +1,25 @@
+from __future__ import annotations
+
 import datetime
+import uuid
+from typing import TYPE_CHECKING, Any, Protocol
+
 import gymnasium as gym
 import numpy as np
-import uuid
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from ....utils.type_aliases import EncodedObservationDict
+
+    StepResult = tuple[EncodedObservationDict, float, bool, dict[str, object]]
+    ResetResult = tuple[EncodedObservationDict, dict[str, object]]
+
+
+class DreamerEnv(Protocol):
+    def step(self, action: object) -> StepResult: ...
+
+    def reset(self) -> EncodedObservationDict: ...
 
 
 class _GymDelegatingWrapper(gym.Wrapper):
@@ -11,7 +29,7 @@ class _GymDelegatingWrapper(gym.Wrapper):
     that attributes like `id` (set by UUID) are visible on all outer wrappers.
     """
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         # Avoid infinite recursion if self.env is not yet set
         if name == "env":
             raise AttributeError("env not set")
@@ -37,12 +55,12 @@ class TimeLimit(_GymDelegatingWrapper):
         env = TimeLimit(gym.make('CartPole-v1'), duration=500)
     """
 
-    def __init__(self, env, duration):
+    def __init__(self, env: gym.Env, duration: int):
         super().__init__(env)
         self._duration = duration
         self._step = None
 
-    def step(self, action):
+    def step(self, action: object) -> StepResult:
         # assert self._step is not None, "Must reset environment."
         if self._step is None:
             raise AssertionError("Must reset environment.")
@@ -55,7 +73,7 @@ class TimeLimit(_GymDelegatingWrapper):
             self._step = None
         return obs, reward, done, info
 
-    def reset(self, **kwargs):
+    def reset(self, **kwargs: Any) -> ResetResult:
         self._step = 0
         return self.env.reset(**kwargs)
 
@@ -81,7 +99,7 @@ class NormalizeActions(_GymDelegatingWrapper):
         >>> normalized_action = env.action_space.sample()  # Will be in [-1, 1]
     """
 
-    def __init__(self, env):
+    def __init__(self, env: gym.Env):
         super().__init__(env)
         self._mask = np.logical_and(
             np.isfinite(env.action_space.low), np.isfinite(env.action_space.high)
@@ -92,7 +110,7 @@ class NormalizeActions(_GymDelegatingWrapper):
         high = np.where(self._mask, np.ones_like(self._low), self._high)
         self.action_space = gym.spaces.Box(low, high, dtype=np.float32)
 
-    def step(self, action):
+    def step(self, action: np.ndarray) -> StepResult:
         original = (action + 1) / 2 * (self._high - self._low) + self._low
         original = np.where(self._mask, original, action)
         return self.env.step(original)
@@ -122,7 +140,7 @@ class OneHotAction(_GymDelegatingWrapper):
         ValueError: If the provided action is not a valid one-hot vector.
     """
 
-    def __init__(self, env):
+    def __init__(self, env: gym.Env):
         assert isinstance(env.action_space, gym.spaces.Discrete)
         super().__init__(env)
         self._random = np.random.RandomState()
@@ -131,7 +149,7 @@ class OneHotAction(_GymDelegatingWrapper):
         space.discrete = True
         self.action_space = space
 
-    def step(self, action):
+    def step(self, action: np.ndarray) -> StepResult:
         index = np.argmax(action).astype(int)
         reference = np.zeros_like(action)
         reference[index] = 1
@@ -139,10 +157,10 @@ class OneHotAction(_GymDelegatingWrapper):
             raise ValueError(f"Invalid one-hot action:\n{action}")
         return self.env.step(index)
 
-    def reset(self, **kwargs):
+    def reset(self, **kwargs: Any) -> ResetResult:
         return self.env.reset(**kwargs)
 
-    def _sample_action(self):
+    def _sample_action(self) -> np.ndarray:
         actions = self.env.action_space.n
         index = self._random.randint(0, actions)
         reference = np.zeros(actions, dtype=np.float32)
@@ -166,7 +184,7 @@ class RewardObs(_GymDelegatingWrapper):
         of shape (1,). For the initial reset, the reward is set to 0.0.
     """
 
-    def __init__(self, env):
+    def __init__(self, env: gym.Env):
         super().__init__(env)
         spaces = self.env.observation_space.spaces
         if "obs_reward" not in spaces:
@@ -175,13 +193,13 @@ class RewardObs(_GymDelegatingWrapper):
             )
         self.observation_space = gym.spaces.Dict(spaces)
 
-    def step(self, action):
+    def step(self, action: object) -> StepResult:
         obs, reward, done, info = self.env.step(action)
         if "obs_reward" not in obs:
             obs["obs_reward"] = np.array([reward], dtype=np.float32)
         return obs, reward, done, info
 
-    def reset(self, **kwargs):
+    def reset(self, **kwargs: Any) -> EncodedObservationDict:
         obs = self.env.reset(**kwargs)
         if "obs_reward" not in obs:
             obs["obs_reward"] = np.array([0.0], dtype=np.float32)
@@ -207,11 +225,11 @@ class SelectAction(_GymDelegatingWrapper):
         # Only [1,2,3] will be passed to the underlying environment
     """
 
-    def __init__(self, env, key):
+    def __init__(self, env: gym.Env, key: str):
         super().__init__(env)
         self._key = key
 
-    def step(self, action):
+    def step(self, action: Mapping[str, object]) -> StepResult:
         return self.env.step(action[self._key])
 
 
@@ -229,12 +247,12 @@ class UUID(_GymDelegatingWrapper):
         id (str): A unique identifier string in the format 'YYYYMMDDTHHMMSS-uuid'.
     """
 
-    def __init__(self, env):
+    def __init__(self, env: gym.Env):
         super().__init__(env)
         timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
         self.id = f"{timestamp}-{str(uuid.uuid4().hex)}"
 
-    def reset(self, **kwargs):
+    def reset(self, **kwargs: Any) -> ResetResult:
         timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
         self.id = f"{timestamp}-{str(uuid.uuid4().hex)}"
         return self.env.reset(**kwargs)
@@ -258,7 +276,7 @@ class ResetWoInfo(_GymDelegatingWrapper):
         obs = env.reset()  # Returns only the observation
     """
 
-    def reset(self, **kwargs):
+    def reset(self, **kwargs: Any) -> EncodedObservationDict:
         return self.env.reset(**kwargs)[0]
 
 
@@ -271,7 +289,7 @@ class ChannelFirsttoLast(_GymDelegatingWrapper):
     """
 
     @staticmethod
-    def _transform(obs: dict) -> dict:
+    def _transform(obs: EncodedObservationDict) -> EncodedObservationDict:
         updated = {}
         for k, v in obs.items():
             if not isinstance(v, np.ndarray):
@@ -285,17 +303,17 @@ class ChannelFirsttoLast(_GymDelegatingWrapper):
         obs.update(updated)
         return obs
 
-    def step(self, action):
+    def step(self, action: object) -> StepResult:
         obs, reward, done, info = self.env.step(action)
         return self._transform(obs), reward, done, info
 
-    def reset(self, **kwargs):
-        obs: dict = self.env.reset(**kwargs)
+    def reset(self, **kwargs: Any) -> EncodedObservationDict:
+        obs = self.env.reset(**kwargs)
         return self._transform(obs)
 
 
 class WoTruncatedFlag(_GymDelegatingWrapper):
-    def step(self, action):
+    def step(self, action: object) -> StepResult:
         obs, reward, done, _, info = self.env.step(action)
         return obs, reward, done, info
 
@@ -320,16 +338,16 @@ class RenameObsForDreamer(_GymDelegatingWrapper):
     """
 
     @staticmethod
-    def _remap(obs: dict) -> dict:
+    def _remap(obs: EncodedObservationDict) -> EncodedObservationDict:
         for old, new in _DREAMER_KEY_REMAP.items():
             if old in obs:
                 obs[new] = obs.pop(old)
         return obs
 
-    def reset(self, **kwargs):
+    def reset(self, **kwargs: Any) -> EncodedObservationDict:
         obs = self.env.reset(**kwargs)
         return self._remap(obs)
 
-    def step(self, action):
+    def step(self, action: object) -> StepResult:
         obs, reward, done, info = self.env.step(action)
         return self._remap(obs), reward, done, info

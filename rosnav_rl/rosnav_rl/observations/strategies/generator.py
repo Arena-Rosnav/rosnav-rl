@@ -6,7 +6,7 @@ Handles the execution and validation of generators with proper dependency orderi
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from rclpy.node import Node
 
@@ -45,7 +45,7 @@ class GeneratorManager:
         self._validate_generators = validate_generators
 
     def generate_observations(
-        self, generators: Dict[str, Generator], obs_dict: Dict[str, Any]
+        self, generators: dict[str, Generator], obs_dict: dict[str, Any]
     ) -> None:
         """
         Generate derived observations from collected data with optional validation.
@@ -75,7 +75,7 @@ class GeneratorManager:
                 obs_dict[name] = None
 
     def _validate_root_generators(
-        self, obs_dict: Dict[str, Any], generators: Dict[str, Generator]
+        self, obs_dict: dict[str, Any], generators: dict[str, Generator]
     ) -> None:
         """Validate root generators that only depend on collectors."""
         try:
@@ -85,7 +85,7 @@ class GeneratorManager:
             # Continue execution - validation is advisory
 
     def _execute_generator(
-        self, name: str, generator: Generator, obs_dict: Dict[str, Any]
+        self, name: str, generator: Generator, obs_dict: dict[str, Any]
     ) -> None:
         """
         Execute a single generator with proper error handling.

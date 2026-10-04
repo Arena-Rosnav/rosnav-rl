@@ -1,14 +1,15 @@
-from typing import Tuple, Union
+from typing import Any
 
 import gymnasium as gym
+import torch as th
+from torch import nn
+
+from rosnav_rl.spaces.observation_space.spaces.dynamics import LastActionSpace
+from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
 from rosnav_rl.spaces.observation_space.spaces.perception import (
     LaserScanSpace,
     ReducedLaserScanSpace,
 )
-from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
-from rosnav_rl.spaces.observation_space.spaces.dynamics import LastActionSpace
-import torch as th
-from torch import nn
 
 from .base_extractor import RosnavBaseExtractor, TensorDict
 
@@ -31,8 +32,8 @@ class EXTRACTOR_1(RosnavBaseExtractor):
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
         stack_size: int = 1,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         self._laser_key = (
             LaserScanSpace.name
@@ -47,7 +48,7 @@ class EXTRACTOR_1(RosnavBaseExtractor):
 
         self._stack_size = stack_size
 
-        super(EXTRACTOR_1, self).__init__(
+        super().__init__(
             observation_space=observation_space,
             features_dim=features_dim,
             stack_size=stack_size,
@@ -76,8 +77,8 @@ class EXTRACTOR_1(RosnavBaseExtractor):
         )
 
     def get_input(
-        self, observations: Union[th.Tensor, TensorDict]
-    ) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+        self, observations: th.Tensor | TensorDict
+    ) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
         if isinstance(observations, th.Tensor):
             raise NotImplementedError("Not implemented for th.Tensor.")
             # if observations.dim() == 2:
@@ -107,15 +108,15 @@ class EXTRACTOR_1(RosnavBaseExtractor):
 
         return laser_scan, goal, last_action
 
-    def process_input(self, *observations):
-        def add_time_dimension(obs: th.Tensor):
+    def process_input(self, *observations: th.Tensor) -> tuple[th.Tensor, ...]:
+        def add_time_dimension(obs: th.Tensor) -> th.Tensor:
             if self._stack_size == 1:
                 return obs.unsqueeze(1)
             return obs
 
         return tuple([add_time_dimension(obs) for obs in observations])
 
-    def forward(self, observations: Union[th.Tensor, TensorDict]) -> th.Tensor:
+    def forward(self, observations: th.Tensor | TensorDict) -> th.Tensor:
         """
         Forward pass of the feature extractor.
 
@@ -154,8 +155,8 @@ class EXTRACTOR_2(EXTRACTOR_1):
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
         stack_size: int = 1,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,
@@ -194,8 +195,8 @@ class EXTRACTOR_3(EXTRACTOR_1):
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
         stack_size: int = 1,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,
@@ -248,8 +249,8 @@ class EXTRACTOR_4(EXTRACTOR_1):
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
         stack_size: int = 1,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,
@@ -292,8 +293,8 @@ class EXTRACTOR_5(EXTRACTOR_1):
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
         stack_size: int = 1,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,
@@ -336,8 +337,8 @@ class EXTRACTOR_5_extended(EXTRACTOR_1):
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
         stack_size: int = 1,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,
@@ -379,9 +380,9 @@ class EXTRACTOR_6(EXTRACTOR_1):
         self,
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
-        stack_size: bool = False,
-        *args,
-        **kwargs
+        stack_size: int = 1,
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,
@@ -435,9 +436,9 @@ class EXTRACTOR_7(EXTRACTOR_1):
         self,
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
-        stack_size: bool = False,
-        *args,
-        **kwargs
+        stack_size: int = 1,
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,
@@ -496,9 +497,9 @@ class EXTRACTOR_8(EXTRACTOR_1):
         self,
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
-        stack_size: bool = False,
-        *args,
-        **kwargs
+        stack_size: int = 1,
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,
@@ -559,9 +560,9 @@ class EXTRACTOR_9(EXTRACTOR_1):
         self,
         observation_space: gym.spaces.Dict,
         features_dim: int = 128,
-        stack_size: bool = False,
-        *args,
-        **kwargs
+        stack_size: int = 1,
+        *args: Any,
+        **kwargs: Any
     ):
         super().__init__(
             observation_space=observation_space,

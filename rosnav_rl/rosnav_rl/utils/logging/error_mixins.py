@@ -5,8 +5,9 @@ This module provides mixins that components can inherit from to easily
 integrate with the unified error logging system.
 """
 
-from typing import Optional
+from collections.abc import Callable
 from contextlib import contextmanager
+from typing import Any
 
 from .error_logging import (
     ComponentType,
@@ -21,22 +22,22 @@ class ErrorReportingMixin:
 
     def __init__(
         self,
-        component_type: Optional[ComponentType] = None,
-        component_name: Optional[str] = None,
-        *args,
-        **kwargs,
+        component_type: ComponentType | None = None,
+        component_name: str | None = None,
+        *args: Any,
+        **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
         # These should be set by the inheriting class
-        self._component_type: Optional[ComponentType] = component_type
-        self._component_name: Optional[str] = component_name
+        self._component_type: ComponentType | None = component_type
+        self._component_name: str | None = component_name
 
     def _report_error(
         self,
         message: str,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
-        component_name: Optional[str] = None,
-        error_type: Optional[str] = None,
+        component_name: str | None = None,
+        error_type: str | None = None,
     ) -> None:
         """Report an error to the unified logging system.
 
@@ -70,7 +71,7 @@ class ErrorReportingMixin:
         """Report a debug message (only collected when verbose=2 / DEBUG level)."""
         self._report_error(message, severity=ErrorSeverity.DEBUG)
 
-    def _report_critical(self, message: str, error_type: Optional[str] = None) -> None:
+    def _report_critical(self, message: str, error_type: str | None = None) -> None:
         """Report a critical error."""
         self._report_error(
             message, severity=ErrorSeverity.CRITICAL, error_type=error_type
@@ -98,7 +99,7 @@ class ErrorReportingMixin:
             raise
 
 
-def flush_errors_decorator(func):
+def flush_errors_decorator[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     """Decorator to flush errors after function execution.
 
     Use this decorator on methods that should trigger error flushing,
@@ -111,7 +112,7 @@ def flush_errors_decorator(func):
             pass
     """
 
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         try:
             return func(*args, **kwargs)
         finally:

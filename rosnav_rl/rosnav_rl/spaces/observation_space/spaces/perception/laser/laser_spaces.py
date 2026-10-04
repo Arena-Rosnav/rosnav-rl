@@ -3,6 +3,8 @@
 Enhanced laser processing with proven, reliable features for production use.
 """
 
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 from numpy.lib.stride_tricks import sliding_window_view
@@ -12,7 +14,6 @@ from rosnav_rl.observations.utils.types import LidarRanges
 from ....observation_space_factory import SpaceFactory
 from ....space_categories import SpaceCategory
 from ...base_observation_space import BaseObservationSpace
-
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
@@ -51,11 +52,11 @@ class ReliableLaserSpace(BaseObservationSpace):
         laser_num_beams: int = 360,
         laser_max_range: float = 30.0,
         min_range: float = 0.1,
-        reduced_beams: int = None,
+        reduced_beams: int | None = None,
         enable_median_filter: bool = False,
         filter_window: int = 3,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize reliable laser space.
 
@@ -150,7 +151,7 @@ class ReliableLaserSpace(BaseObservationSpace):
             )
 
     def encode_observation(
-        self, front_laser: LidarRanges, *args, **kwargs
+        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
     ) -> np.ndarray:
         """Encode robust laser scan with validation, filtering, and beam reduction.
 
@@ -210,11 +211,11 @@ class MultiRangeLaserSpace(BaseObservationSpace):
     def __init__(
         self,
         laser_num_beams: int = 360,
-        range_scales: list = None,
+        range_scales: list[float] | None = None,
         laser_max_range: float = 30.0,
         min_range: float = 0.1,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize multi-range laser space.
 
@@ -255,7 +256,7 @@ class MultiRangeLaserSpace(BaseObservationSpace):
         )
 
     def encode_observation(
-        self, front_laser: LidarRanges, *args, **kwargs
+        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
     ) -> np.ndarray:
         """Encode multi-scale laser scan with configurable range sensitivities.
 
@@ -330,14 +331,14 @@ class MultiLaserFusionSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        laser_configs: list = None,
+        laser_configs: list[dict[str, Any]] | None = None,
         fusion_method: str = "weighted_average",
         confidence_threshold: float = 0.8,
         overlap_resolution: str = "min_distance",
         enable_failure_detection: bool = True,
         outlier_threshold: float = 3.0,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize multi-laser fusion space.
 
@@ -453,7 +454,7 @@ class MultiLaserFusionSpace(BaseObservationSpace):
 
         return outliers
 
-    def _fuse_laser_data(self, laser_data_list: list) -> np.ndarray:
+    def _fuse_laser_data(self, laser_data_list: list[tuple[np.ndarray, float, dict[str, Any]]]) -> np.ndarray:
         """Fuse multiple laser scans into unified representation.
 
         Args:
@@ -517,7 +518,7 @@ class MultiLaserFusionSpace(BaseObservationSpace):
         return normalized_scan
 
     def encode_observation(
-        self, laser_fusion: LidarRanges, *args, **kwargs
+        self, laser_fusion: LidarRanges, *args: Any, **kwargs: Any
     ) -> np.ndarray:
         """Encode fused multi-laser scan with robust sensor integration and normalization.
 

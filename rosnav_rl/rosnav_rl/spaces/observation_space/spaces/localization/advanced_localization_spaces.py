@@ -3,7 +3,7 @@
 Reliable localization spaces with proven odometry and pose processing.
 """
 
-from typing import Optional
+from typing import Any
 
 import numpy as np
 from gymnasium import spaces
@@ -60,8 +60,8 @@ class RobustOdometrySpace(BaseObservationSpace):
         max_angular_vel: float = 2.0,
         velocity_filter_alpha: float = 0.8,
         include_acceleration: bool = False,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize robust odometry space.
 
@@ -101,7 +101,7 @@ class RobustOdometrySpace(BaseObservationSpace):
             low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
         )
 
-    def _filter_velocity(self, linear_vel: float, angular_vel: float) -> tuple:
+    def _filter_velocity(self, linear_vel: float, angular_vel: float) -> tuple[float, float]:
         """Apply exponential moving average filtering to velocities."""
         if self.filtered_linear_vel is None:
             # Initialize filters
@@ -119,7 +119,7 @@ class RobustOdometrySpace(BaseObservationSpace):
 
         return self.filtered_linear_vel, self.filtered_angular_vel
 
-    def _compute_acceleration(self, current_velocities: tuple) -> Optional[tuple]:
+    def _compute_acceleration(self, current_velocities: tuple[float, float]) -> tuple[float, float]:
         """Compute simple acceleration estimate."""
         if self.last_velocities is None:
             acceleration = (0.0, 0.0)
@@ -142,7 +142,7 @@ class RobustOdometrySpace(BaseObservationSpace):
         return acceleration
 
     def encode_observation(
-        self, last_action: RobotActionVector, *args, **kwargs
+        self, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> FilteredOdometryVector:
         """Encode robust odometry data with advanced filtering and normalization processing.
 
@@ -253,8 +253,8 @@ class PoseStabilizedSpace(BaseObservationSpace):
         position_scale: float = 10.0,
         use_relative_coords: bool = False,
         include_confidence: bool = False,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize pose stabilized space.
 
@@ -297,7 +297,7 @@ class PoseStabilizedSpace(BaseObservationSpace):
             }
 
     def encode_observation(
-        self, robot_pose: Pose2D, *args, **kwargs
+        self, robot_pose: Pose2D, *args: Any, **kwargs: Any
     ) -> StabilizedPoseVector:
         """Encode pose data with advanced stabilization and trigonometric orientation representation.
 
@@ -412,8 +412,8 @@ class LocalizationCombinedSpace(BaseObservationSpace):
         max_linear_vel: float = 2.0,
         max_angular_vel: float = 2.0,
         velocity_filter_alpha: float = 0.8,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize combined localization space.
 
@@ -453,7 +453,7 @@ class LocalizationCombinedSpace(BaseObservationSpace):
         )
 
     def encode_observation(
-        self, robot_pose: Pose2D, last_action: RobotActionVector, *args, **kwargs
+        self, robot_pose: Pose2D, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> CombinedLocalizationVector:
         """Encode comprehensive localization data through integrated pose and velocity processing.
 

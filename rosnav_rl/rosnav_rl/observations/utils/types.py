@@ -9,12 +9,12 @@ to improve developer experience and documentation.
 
 from __future__ import annotations
 
-from typing import Annotated, Dict, Union
 from dataclasses import dataclass
+from typing import Annotated
 
+import arena_people_msgs.msg as arena_people_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
-import arena_people_msgs.msg as arena_people_msgs
 
 
 # Schema-based data requirement specification (inspired by Albumentations)
@@ -231,7 +231,7 @@ PedestrianRelativeVelocities = Annotated[
 
 # Pedestrian analysis and social navigation data types
 PedestrianTypeMinDistances = Annotated[
-    Dict[Union[str, int], float],
+    dict[str | int, float],
     DataSpec(
         description="Minimum distances to pedestrians grouped by type/group ID",
         units="meters",
@@ -241,7 +241,7 @@ PedestrianTypeMinDistances = Annotated[
 ]
 
 PedestrianDistances = Annotated[
-    Dict[Union[str, int], float],
+    dict[str | int, float],
     DataSpec(
         description="Minimum distances to pedestrians keyed by pedestrian ID",
         units="meters",

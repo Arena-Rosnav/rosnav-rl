@@ -44,10 +44,16 @@ build-backend = "setuptools.build_meta"
 package = true
 
 [tool.ruff]
+target-version = "py312"
 line-length = 120
+extend-exclude = ["launch", "scripts", "setup.py"]
 
 [tool.ruff.lint]
-ignore = []
-select = ["E", "F"]
-mccabe = { max-complexity = 10 }
-per-file-ignores = {}
+exclude = ["tests/**"]
+select = ["E", "F", "W", "I", "UP", "B", "ANN", "PYI"]
+ignore = ["E501", "E731"]
+
+[tool.ruff.lint.flake8-annotations]
+suppress-none-returning = true
+mypy-init-return = true
+allow-star-arg-any = true

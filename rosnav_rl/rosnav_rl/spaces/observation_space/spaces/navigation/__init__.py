@@ -12,15 +12,12 @@ Legacy Spaces:
     - DistAngleToSubgoalSpace: Original distance/angle to subgoal
 """
 
-# Basic spaces
-from .basic_navigation_spaces import DistAngleToGoalSpace, DistAngleToSubgoalSpace
-
-# Advanced spaces
 from .advanced_navigation_spaces import (
-    RobustGoalSpace,
     MultiScaleGoalSpace,
+    RobustGoalSpace,
     SubgoalContextSpace,
 )
+from .basic_navigation_spaces import DistAngleToGoalSpace, DistAngleToSubgoalSpace
 
 __all__ = [
     "DistAngleToGoalSpace",

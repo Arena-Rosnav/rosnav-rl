@@ -11,12 +11,15 @@ Two complementary functions:
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from .search_space import CategoricalParam, FloatParam, IntParam, SearchSpace
 
+if TYPE_CHECKING:
+    import optuna
 
-def suggest_params(trial: "optuna.trial.Trial", search_space: SearchSpace) -> Dict[str, Any]:
+
+def suggest_params(trial: optuna.trial.Trial, search_space: SearchSpace) -> dict[str, Any]:
     """Sample hyperparameters from *search_space* using an Optuna trial.
 
     Args:
@@ -36,7 +39,7 @@ def suggest_params(trial: "optuna.trial.Trial", search_space: SearchSpace) -> Di
         })
         # params == {"agent_cfg.framework.algorithm.parameters.learning_rate": 0.000342}
     """
-    params: Dict[str, Any] = {}
+    params: dict[str, Any] = {}
     for path, param in search_space.items():
         if isinstance(param, FloatParam):
             value = trial.suggest_float(
@@ -62,7 +65,7 @@ def suggest_params(trial: "optuna.trial.Trial", search_space: SearchSpace) -> Di
     return params
 
 
-def apply_params(config_dict: dict, params: Dict[str, Any]) -> dict:
+def apply_params(config_dict: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
     """Deep-copy *config_dict* and set values at dot-notation paths.
 
     Args:

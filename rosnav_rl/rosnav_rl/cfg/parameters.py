@@ -25,7 +25,7 @@ Usage::
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -291,7 +291,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
 
-    def observation_kwargs(self) -> dict:
+    def observation_kwargs(self) -> dict[str, Any]:
         """Return the subset of fields required by observation space constructors.
 
         Excludes fields tagged ``json_schema_extra={"group": "reward"}`` —
@@ -318,7 +318,7 @@ class AgentParameters(BaseModel, frozen=True):
         }
 
     @classmethod
-    def from_spec(cls, spec: "AgentConfig") -> "AgentParameters":
+    def from_spec(cls, spec: AgentConfig) -> AgentParameters:
         """Return the parameters from a saved :class:`~rosnav_rl.cfg.agent.AgentConfig`.
 
         Convenience method for inference-time reconstruction::

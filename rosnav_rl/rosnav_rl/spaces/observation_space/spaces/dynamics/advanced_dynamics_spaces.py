@@ -3,6 +3,8 @@
 Robot dynamics and motion-related spaces with proven features.
 """
 
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
@@ -50,8 +52,8 @@ class MotionStateSpace(BaseObservationSpace):
         max_velocity: float = 2.0,
         stability_window: int = 5,
         include_acceleration: bool = False,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize motion state space.
 
@@ -86,7 +88,7 @@ class MotionStateSpace(BaseObservationSpace):
             low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
         )
 
-    def _compute_stability(self, current_velocity: tuple) -> float:
+    def _compute_stability(self, current_velocity: tuple[float, float]) -> float:
         """Compute motion stability metric."""
         # Add current velocity to history
         self.velocity_history.append(current_velocity)
@@ -111,7 +113,7 @@ class MotionStateSpace(BaseObservationSpace):
 
         return 0.0
 
-    def _compute_acceleration_magnitude(self, current_velocity: tuple) -> float:
+    def _compute_acceleration_magnitude(self, current_velocity: tuple[float, float]) -> float:
         """Compute acceleration magnitude."""
         if self.last_velocity is None:
             acceleration_magnitude = 0.0
@@ -127,7 +129,7 @@ class MotionStateSpace(BaseObservationSpace):
         return acceleration_magnitude
 
     def encode_observation(
-        self, last_action: RobotActionVector, *args, **kwargs
+        self, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> MotionStateVector:
         """Encode comprehensive motion state from robot action commands.
 
@@ -216,8 +218,8 @@ class KinematicStateSpace(BaseObservationSpace):
         max_velocity: float = 2.0,
         position_scale: float = 10.0,
         include_motion_alignment: bool = True,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize kinematic state space.
 
@@ -273,7 +275,7 @@ class KinematicStateSpace(BaseObservationSpace):
         return alignment
 
     def encode_observation(
-        self, robot_pose: Pose2D, last_action: RobotActionVector, *args, **kwargs
+        self, robot_pose: Pose2D, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> KinematicStateVector:
         """Encode integrated kinematic state combining pose and motion dynamics.
 
@@ -403,8 +405,8 @@ class TrajectoryStateSpace(BaseObservationSpace):
         history_length: int = 3,
         max_velocity: float = 2.0,
         position_scale: float = 5.0,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize trajectory state space.
 
@@ -440,7 +442,7 @@ class TrajectoryStateSpace(BaseObservationSpace):
             low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
         )
 
-    def _update_history(self, pose: tuple, velocity: tuple):
+    def _update_history(self, pose: tuple[float, float, float], velocity: tuple[float, float]):
         """Update pose and velocity history."""
         self.pose_history.append(pose)
         self.velocity_history.append(velocity)
@@ -450,7 +452,7 @@ class TrajectoryStateSpace(BaseObservationSpace):
             self.pose_history.pop(0)
             self.velocity_history.pop(0)
 
-    def _compute_trajectory_features(self) -> tuple:
+    def _compute_trajectory_features(self) -> tuple[float, float, float]:
         """Compute trajectory features from history.
 
         Returns:
@@ -491,7 +493,7 @@ class TrajectoryStateSpace(BaseObservationSpace):
         return (normalized_path_length, normalized_curvature, speed_consistency)
 
     def encode_observation(
-        self, robot_pose: Pose2D, last_action: RobotActionVector, *args, **kwargs
+        self, robot_pose: Pose2D, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> TrajectoryStateVector:
         """Encode comprehensive trajectory state with temporal motion history analysis.
 

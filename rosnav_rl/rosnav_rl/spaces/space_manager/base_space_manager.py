@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from gymnasium import spaces
+
+from rosnav_rl.utils.type_aliases import ObservationDict
 
 from ...spaces import (
     ActionSpaceManager,
@@ -15,10 +17,6 @@ from ...spaces.observation_space.spaces.base_observation_space import (
 
 if TYPE_CHECKING:
     from rosnav_rl.cfg.agent import AgentConfig
-
-EncodedObservationDict = Dict[str, np.ndarray]
-ObservationDict = Dict[str, Any]
-ObservationSpaceList = List[BaseObservationSpace]
 
 
 class BaseSpaceManager:
@@ -36,8 +34,8 @@ class BaseSpaceManager:
     def __init__(
         self,
         spec: AgentConfig,
-        observation_space_list: ObservationSpaceList,
-        observation_space_kwargs: Optional[Dict[str, Any]] = None,
+        observation_space_list: list[type[BaseObservationSpace]],
+        observation_space_kwargs: dict[str, Any] | None = None,
     ):
         self._spec = spec
         self._action_space_manager = ActionSpaceManager(spec.action_space)
@@ -56,7 +54,9 @@ class BaseSpaceManager:
 
     # -- encode / decode ---------------------------------------------------
 
-    def encode_observation(self, obs_dict: ObservationDict) -> EncodedObservationDict:
+    def encode_observation(
+        self, obs_dict: ObservationDict
+    ) -> np.ndarray | bool | dict[str, np.ndarray] | dict[str, np.ndarray | bool | dict[str, np.ndarray]]:
         return self._observation_space_manager.encode_observation(obs_dict)
 
     def decode_action(self, action: np.ndarray) -> np.ndarray:
@@ -77,19 +77,19 @@ class BaseSpaceManager:
         return self._observation_space_manager
 
     @property
-    def observation_space(self) -> spaces.Dict:
+    def observation_space(self) -> spaces.Space:
         return self._observation_space_manager.observation_space
 
     @property
-    def observation_space_list(self) -> List[BaseObservationSpace]:
+    def observation_space_list(self) -> list[BaseObservationSpace]:
         return self._observation_space_manager.space_list
 
     @property
-    def action_space(self) -> Union[spaces.Dict, spaces.Box]:
+    def action_space(self) -> spaces.Space:
         return self._action_space_manager.action_space
 
     @property
-    def config(self):
+    def config(self) -> dict[str, dict[str, Any]]:
         return {
             "observation": self._observation_space_manager.config,
             "action": self._action_space_manager.config,

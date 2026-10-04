@@ -5,7 +5,7 @@ No bloat, just essential functionality.
 """
 
 from collections import OrderedDict
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 from gymnasium import spaces
@@ -22,8 +22,8 @@ class ObservationSpaceManager:
 
     def __init__(
         self,
-        validate_observations=True,
-        **kwargs,
+        validate_observations: bool = True,
+        **kwargs: Any,
     ):
         """Initialize simple observation space manager.
 
@@ -38,9 +38,11 @@ class ObservationSpaceManager:
         self.space_factory = SpaceFactory
 
         # Performance optimization: cache required keys per space
-        self._space_required_keys: Dict[str, List[str]] = {}
+        self._space_required_keys: dict[str, list[str]] = {}
 
-    def _auto_load_spacefactory(self, auto_load_spaces=True):
+    def _auto_load_spacefactory(
+        self, auto_load_spaces: bool = True
+    ) -> type[SpaceFactory] | None:
         """Automatically load SpaceFactory and register all spaces."""
         try:
 
@@ -69,7 +71,7 @@ class ObservationSpaceManager:
             )
             return None
 
-    def load_configuration(self, config: Dict[str, Dict[str, Any]]):
+    def load_configuration(self, config: dict[str, dict[str, Any]]):
         """Load configuration and instantiate spaces using SpaceFactory.
 
         Args:
@@ -94,19 +96,21 @@ class ObservationSpaceManager:
 
         print(f"Loaded {len(self.spaces)} spaces: {list(self.spaces.keys())}")
 
-    def get_available_spaces(self) -> List[str]:
+    def get_available_spaces(self) -> list[str]:
         """Get list of all available spaces from SpaceFactory registry."""
         if self.space_factory is None:
             return []
         return list(self.space_factory.registry.keys())
 
-    def get_available_spaces_by_category(self) -> Dict[str, List[str]]:
+    def get_available_spaces_by_category(self) -> dict[str, list[str]]:
         """Get available spaces organized by category from SpaceFactory."""
         if self.space_factory is None:
             return {}
         return self.space_factory.get_spaces_by_category()
 
-    def encode_observation(self, observations: ObservationDict) -> Dict[str, Any]:
+    def encode_observation(
+        self, observations: ObservationDict
+    ) -> np.ndarray | bool | dict[str, np.ndarray] | dict[str, np.ndarray | bool | dict[str, np.ndarray]]:
         """Encode observations for all loaded spaces with optional validation.
 
         Args:
@@ -131,7 +135,7 @@ class ObservationSpaceManager:
 
     def _extract_space_args(
         self, space_name: str, observations: ObservationDict
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Extract required arguments for a specific space from observations.
 
         Args:
@@ -143,7 +147,9 @@ class ObservationSpaceManager:
         """
         return {key: observations[key] for key in self._space_required_keys[space_name]}
 
-    def _encode_sequential(self, observations: ObservationDict) -> Dict[str, Any]:
+    def _encode_sequential(
+        self, observations: ObservationDict
+    ) -> np.ndarray | bool | dict[str, np.ndarray] | dict[str, np.ndarray | bool | dict[str, np.ndarray]]:
         """Encode observations sequentially using new space interface.
 
         Args:
@@ -171,7 +177,7 @@ class ObservationSpaceManager:
         return dict(encoded)
 
     @property
-    def space_list(self) -> List[BaseObservationSpace]:
+    def space_list(self) -> list[BaseObservationSpace]:
         """Return the list of observation spaces."""
         return list(self.spaces.values())
 
@@ -197,6 +203,6 @@ class ObservationSpaceManager:
             return spaces.Dict(space_dict)
 
     @property
-    def required_observations(self) -> Dict[str, List[str]]:
+    def required_observations(self) -> dict[str, list[str]]:
         """Return required keys for each space."""
         return self._space_required_keys

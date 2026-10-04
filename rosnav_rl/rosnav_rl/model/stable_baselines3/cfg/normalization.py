@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import Optional
 
 
 class NormalizationCfg(BaseModel):
@@ -23,10 +22,10 @@ class NormalizationCfg(BaseModel):
                                   Default: 1e-8.
     """
 
-    load_from: Optional[str] = None
-    norm_obs: Optional[bool] = False
-    norm_reward: Optional[bool] = False
-    clip_obs: Optional[float] = 30.0
-    clip_reward: Optional[float] = 30.0
-    gamma: Optional[float] = 0.99
-    epsilon: Optional[float] = 1e-8
+    load_from: str | None = None
+    norm_obs: bool = False
+    norm_reward: bool = False
+    clip_obs: float = 30.0
+    clip_reward: float = 30.0
+    gamma: float = 0.99
+    epsilon: float = 1e-8

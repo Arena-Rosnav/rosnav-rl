@@ -1,4 +1,5 @@
-from typing import Callable, Dict, Type, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 from .base_reward_units import RewardUnit
 
@@ -18,10 +19,10 @@ class RewardUnitFactory:
         registry (Dict[str, Type[RewardUnit]]): Dictionary mapping unit names to their classes.
     """
 
-    registry: Dict[str, Type[RewardUnit]] = {}
+    registry: dict[str, type[RewardUnit]] = {}
 
     @classmethod
-    def register(cls, name: str) -> Callable[[Type[T]], Type[T]]:
+    def register(cls, name: str) -> Callable[[type[T]], type[T]]:
         """
         Register a reward unit class with a given name.
 
@@ -37,7 +38,7 @@ class RewardUnitFactory:
                 ...
         """
 
-        def inner_wrapper(wrapped_class: Type[T]) -> Type[T]:
+        def inner_wrapper(wrapped_class: type[T]) -> type[T]:
             if name in cls.registry:
                 raise ValueError(f"RewardUnit '{name}' already exists!")
 
@@ -52,7 +53,7 @@ class RewardUnitFactory:
         return inner_wrapper
 
     @classmethod
-    def instantiate(cls, name: str) -> Type[RewardUnit]:
+    def instantiate(cls, name: str) -> type[RewardUnit]:
         """
         Get the reward unit class registered under the given name.
 

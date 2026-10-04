@@ -1,8 +1,9 @@
 import pathlib
-from collections import OrderedDict
+from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Union
+from typing import TYPE_CHECKING, Any
 
+import numpy as np
 import torch
 
 import rosnav_rl.spaces.observation_space.spaces as spaces
@@ -10,10 +11,11 @@ import rosnav_rl.spaces.observation_space.spaces as spaces
 from ...spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
-from ...utils.type_aliases.spaces import EncodedObservationDict
+from ...utils.type_aliases.observation import ObservationDict
 from ..dreamerv3 import tools
 from ..model import RL_Model
-from .dreamer import Dreamer
+from .dreamer import Dreamer, PolicyState
+from .envs.wrappers import ChannelFirsttoLast, RenameObsForDreamer
 from .helper import (
     create_agent,
     load_episodes,
@@ -31,8 +33,6 @@ if TYPE_CHECKING:
     import rosnav_rl
 
     from .cfg import DreamerV3Cfg
-
-DreamerEnvWrapper = Union[Parallel, Damy]
 
 
 class DreamerV3Model(RL_Model):
@@ -61,16 +61,17 @@ class DreamerV3Model(RL_Model):
         observation_space_kwargs: Configuration for observation spaces
     """
 
-    _model: Dreamer = None
-    _logger: tools.Logger = None
-    _logdir: pathlib.Path = None
+    _model: Dreamer | None = None
+    _logger: tools.Logger
+    _logdir: pathlib.Path
+    _policy_state: PolicyState | None = None
 
     def __init__(
         self,
         rl_agent: "rosnav_rl.RL_Agent",
         algorithm_cfg: "DreamerV3Cfg",
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Initialize the DreamerV3 Model.
@@ -94,7 +95,12 @@ class DreamerV3Model(RL_Model):
         self._logdir = prepare_config(algorithm_cfg)
         self._logger = prepare_logger(algorithm_cfg, self._logdir)
 
-    def setup_model(self, train_dataset: OrderedDict = None, *args, **kwargs):
+    def setup_model(
+        self,
+        train_dataset: Generator[dict[str, np.ndarray], None, None] | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ):
         """
         Initialize the DreamerV3 agent model.
 
@@ -122,11 +128,11 @@ class DreamerV3Model(RL_Model):
 
     def train(
         self,
-        train_envs: DreamerEnvWrapper,
-        eval_envs: DreamerEnvWrapper,
-        *args,
-        after_eval_fn=None,
-        **kwargs,
+        train_envs: list[Parallel | Damy],
+        eval_envs: list[Parallel | Damy],
+        *args: Any,
+        after_eval_fn: Callable[[dict[str, float]], None] | None = None,
+        **kwargs: Any,
     ):
         """
         Train the DreamerV3 model using the provided simulation state container.
@@ -197,7 +203,7 @@ class DreamerV3Model(RL_Model):
             after_eval_fn=after_eval_fn,
         )
 
-    def save(self, file_name: str, *args, **kwargs):
+    def save(self, file_name: str, *args: Any, **kwargs: Any):
         """
         Save the model's state dictionary and optimizer state dictionaries to a file.
 
@@ -223,7 +229,7 @@ class DreamerV3Model(RL_Model):
         }
         torch.save(items_to_save, self._logdir / f"{file_name}.pt")
 
-    def load(self, file_name: str, *args, **kwargs):
+    def load(self, file_name: str, *args: Any, **kwargs: Any):
         """
         Load a pre-trained model from a checkpoint file.
 
@@ -249,25 +255,28 @@ class DreamerV3Model(RL_Model):
             )
             self._model._should_pretrain._once = False
 
-    def get_action(self, observation: "EncodedObservationDict", *args, **kwargs):
-        """
-        Extracts an action from the model's output given an observation.
+    def get_action(self, observation: ObservationDict, *args: Any, **kwargs: Any) -> np.ndarray:
+        """Encode one raw observation like the training env does and return the decoded action."""
+        is_first = self._policy_state is None
+        encoded = self._rl_agent.space_manager.encode_observation(
+            {**observation, "is_first": is_first, "is_terminal": False}
+        )
+        obs = RenameObsForDreamer._remap(ChannelFirsttoLast._transform(dict(encoded)))
+        batch = {key: np.asarray(value)[np.newaxis] for key, value in obs.items()}
+        policy_output, self._policy_state = self._model(
+            batch, np.array([is_first]), self._policy_state, training=False
+        )
+        return self._rl_agent.space_manager.decode_action(policy_output["action"][0].cpu().numpy())
 
-        Args:
-            observation (EncodedObservationDict): The encoded observation dictionary.
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+    def reset(self) -> None:
+        """Drop the latent state so the next action starts a new episode."""
+        self._policy_state = None
 
-        Returns:
-            The action from the model's output for the given observation.
-        """
-        return self._model(observation)[0]["action"]
-
-    def transfer_weights(self, *args, **kwargs):
+    def transfer_weights(self, *args: Any, **kwargs: Any):
         raise NotImplementedError()
 
     @property
-    def observation_space_list(self) -> List["BaseObservationSpace"]:
+    def observation_space_list(self) -> list[type[BaseObservationSpace]]:
         """
         Returns the list of observation spaces used by the model.
 
@@ -292,14 +301,11 @@ class DreamerV3Model(RL_Model):
         ]
 
     @property
-    def observation_space_kwargs(self) -> Dict[str, Any]:
+    def observation_space_kwargs(self) -> dict[str, Any]:
         return {
             "reduced_num_beams": 72,  # 720 beams / 10 = 3.75° angular resolution
             "normalize": True,
             "goal_max_dist": 10,
-            # Kwargs for feature-map spaces (PedestrianVel/Type/SocialState).
-            # These are collected but NOT encoded (not in mlp_keys/cnn_keys);
-            # they just need to init without errors.
             "roi_in_m": 40,
             "feature_map_size": 80,
             "laser_stack_size": 10,

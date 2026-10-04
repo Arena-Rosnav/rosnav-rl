@@ -1,18 +1,22 @@
+from typing import Any
+
 import wandb
 
 
 class WandbLogger:
-    def __init__(self, project_name):
+    def __init__(self, project_name: str):
         self.project_name = project_name
         wandb.init(project=project_name)
 
-    def update_hyperparameters(self, hyper_params, robot_params, robot):
+    def update_hyperparameters(
+        self, hyper_params: dict[str, Any], robot_params: dict[str, Any], robot: str
+    ):
         for key, value in hyper_params.items():
             wandb.config[f"{robot}/{key}"] = value
         for key, value in robot_params.items():
             wandb.config[f"{robot}/{key}"] = value
 
-    def log(self, title: str, dict_to_log: dict, step: int):
+    def log(self, title: str, dict_to_log: dict[str, float], step: int):
         """Create log entry for ``title``.
         Args:
             title (str): title of the log entry/ chart
@@ -27,7 +31,7 @@ class WandbLogger:
         }
         wandb.log(formatted_dict, step=int(step))  # , commit=True)
 
-    def log_batch(self, dict_to_log: dict, step: int):
+    def log_batch(self, dict_to_log: dict[str, Any], step: int):
         """Create log entry for ``title``.
         Args:
             dict_to_log (dict): the dictionary that is to be logged. \

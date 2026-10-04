@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 # conftest.py ensures ROS stubs are available before importing rosnav_rl
 from conftest import SimulationStateContainerStub, make_pose2d
 
+from rosnav_rl.utils.logging import ErrorSeverity, get_error_collector
 from rosnav_rl.reward.reward_units.reward_units import (
     RewardGoalReached,
     RewardSafeDistance,
@@ -120,10 +121,15 @@ class TestRewardGoalReached:
         assert total_reward(rf) == 0.0
         assert info(rf)["is_done"] is False
 
-    def test_check_parameters_warns_on_negative_reward(self, make_reward_function):
-        rf = make_reward_function()
-        with pytest.warns(UserWarning):
-            RewardGoalReached(rf, reward=-5.0)
+    def test_check_parameters_reports_warning_on_negative_reward(self, make_reward_function):
+        collector = get_error_collector()
+        collector.clear()
+
+        RewardGoalReached(make_reward_function(), reward=-5.0)
+
+        reported = [(msg.component_name, msg.severity) for msg in collector._errors]
+        collector.clear()
+        assert reported == [("RewardGoalReached", ErrorSeverity.WARNING)]
 
 
 # =====================================================================

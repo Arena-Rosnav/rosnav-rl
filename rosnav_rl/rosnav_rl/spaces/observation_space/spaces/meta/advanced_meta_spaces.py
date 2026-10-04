@@ -3,6 +3,8 @@
 Meta-information and high-level context spaces with reliable features.
 """
 
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
@@ -14,6 +16,7 @@ from rosnav_rl.observations.utils.types import (
     RobotActionVector,
     SafetyContextVector,
 )
+
 from ...observation_space_factory import SpaceFactory
 from ...space_categories import SpaceCategory
 from ..base_observation_space import BaseObservationSpace
@@ -56,9 +59,9 @@ class MissionContextSpace(BaseObservationSpace):
         self,
         max_mission_time: float = 300.0,  # 5 minutes
         progress_smoothing: float = 0.9,
-        phase_distance_thresholds: list = None,
-        *args,
-        **kwargs
+        phase_distance_thresholds: list[float] | None = None,
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize mission context space.
 
@@ -149,7 +152,7 @@ class MissionContextSpace(BaseObservationSpace):
         return urgency
 
     def encode_observation(
-        self, dist_angle_to_goal: DistanceAngleMetrics, *args, **kwargs
+        self, dist_angle_to_goal: DistanceAngleMetrics, *args: Any, **kwargs: Any
     ) -> MissionContextVector:
         """Encode comprehensive mission context with progress tracking and temporal awareness.
 
@@ -247,7 +250,7 @@ class PerformanceContextSpace(BaseObservationSpace):
     }
 
     def __init__(
-        self, efficiency_window: int = 50, max_velocity: float = 2.0, *args, **kwargs
+        self, efficiency_window: int = 50, max_velocity: float = 2.0, *args: Any, **kwargs: Any
     ):
         """Initialize performance context space.
 
@@ -284,7 +287,7 @@ class PerformanceContextSpace(BaseObservationSpace):
             dtype=np.float32,
         )
 
-    def _update_tracking(self, goal_distance: float, velocity: tuple):
+    def _update_tracking(self, goal_distance: float, velocity: tuple[float, float]):
         """Update performance tracking."""
         # Track goal distance
         self.distance_history.append(goal_distance)
@@ -365,8 +368,8 @@ class PerformanceContextSpace(BaseObservationSpace):
         self,
         dist_angle_to_goal: DistanceAngleMetrics,
         last_action: RobotActionVector,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ) -> PerformanceContextVector:
         """Encode comprehensive performance context with efficiency analysis and smoothness assessment.
 
@@ -460,8 +463,8 @@ class SafetyContextSpace(BaseObservationSpace):
         safety_distance: float = 1.0,
         critical_distance: float = 0.3,
         risk_history_length: int = 20,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
     ):
         """Initialize safety context space.
 
@@ -498,7 +501,7 @@ class SafetyContextSpace(BaseObservationSpace):
             dtype=np.float32,
         )
 
-    def _compute_collision_risk(self, laser_data: np.ndarray, velocity: tuple) -> float:
+    def _compute_collision_risk(self, laser_data: np.ndarray, velocity: tuple[float, float]) -> float:
         """Compute current collision risk."""
         # Filter valid laser readings
         valid_mask = laser_data > 0.0
@@ -542,7 +545,7 @@ class SafetyContextSpace(BaseObservationSpace):
         if current_risk > 0.7:  # Threshold for violation
             self.violation_count += 1
 
-    def _compute_safety_metrics(self, current_risk: float):
+    def _compute_safety_metrics(self, current_risk: float) -> dict[str, float]:
         """Compute safety metrics."""
         # Average risk
         if len(self.risk_history) > 0:
@@ -565,7 +568,7 @@ class SafetyContextSpace(BaseObservationSpace):
     @BaseObservationSpace.apply_normalization
     @BaseObservationSpace.check_dtype
     def encode_observation(
-        self, front_laser: LidarRanges, last_action: RobotActionVector, *args, **kwargs
+        self, front_laser: LidarRanges, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> SafetyContextVector:
         """Encode comprehensive safety context with collision risk assessment and violation tracking.
 

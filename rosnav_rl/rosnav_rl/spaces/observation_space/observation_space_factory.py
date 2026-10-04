@@ -1,25 +1,26 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, Union
 import logging
-
-_logger = logging.getLogger(__name__)
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from .space_categories import SpaceCategory
 
 if TYPE_CHECKING:
     from .spaces.base_observation_space import BaseObservationSpace
 
+_logger = logging.getLogger(__name__)
+
 
 class SpaceFactory:
-    registry: Dict[str, Dict[str, Any]] = {}
+    registry: dict[str, dict[str, Any]] = {}
 
     @classmethod
-    def register(
+    def register[T: type[BaseObservationSpace]](
         cls,
-        name: str = None,
-        category: Union[str, SpaceCategory] = SpaceCategory.UNCATEGORIZED,
+        name: str | None = None,
+        category: str | SpaceCategory = SpaceCategory.UNCATEGORIZED,
         auto_name: bool = False,
-        aliases: list = None,
-    ) -> Callable:
+        aliases: list[str] | None = None,
+    ) -> Callable[[T], T]:
         """Register a space with flexible naming options.
 
         Args:
@@ -40,7 +41,7 @@ class SpaceFactory:
         if isinstance(category, str):
             category = SpaceCategory.from_string(category)
 
-        def inner_wrapper(wrapped_class) -> Callable:
+        def inner_wrapper(wrapped_class: T) -> T:
             # Determine the primary registration name and aliases
             primary_name = name
             auto_aliases = []
@@ -104,7 +105,7 @@ class SpaceFactory:
         return inner_wrapper
 
     @classmethod
-    def instantiate(cls, name: str, **kwargs) -> "BaseObservationSpace":
+    def instantiate(cls, name: str, **kwargs: Any) -> "BaseObservationSpace":
         """Instantiate a registered space by name."""
         assert name in cls.registry, f"ObservationSpace '{name}' is not registered!"
         space_info = cls.registry[name]
@@ -113,7 +114,7 @@ class SpaceFactory:
         return space_class(**kwargs)
 
     @classmethod
-    def get_spaces_by_category(cls) -> Dict[str, list]:
+    def get_spaces_by_category(cls) -> dict[str, list[str]]:
         """Get all registered spaces organized by category."""
         categories = {}
         for space_name, space_info in cls.registry.items():
@@ -142,7 +143,7 @@ class SpaceFactory:
         return cls.registry[name]["class_name"]
 
     @classmethod
-    def list_aliases(cls, primary_name: str) -> list:
+    def list_aliases(cls, primary_name: str) -> list[str]:
         """List all aliases for a given space (including the primary name)."""
         if primary_name not in cls.registry:
             return []
@@ -157,7 +158,7 @@ class SpaceFactory:
         return aliases
 
     @classmethod
-    def find_space_by_class_name(cls, class_name: str) -> list:
+    def find_space_by_class_name(cls, class_name: str) -> list[str]:
         """Find all registration names for a given class name."""
         matches = []
         for reg_name, space_info in cls.registry.items():

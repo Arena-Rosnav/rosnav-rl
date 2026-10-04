@@ -15,28 +15,30 @@ Details:
         batch normalization operations, followed by fusion and goal networks to extract features.
 """
 
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Callable, List, Tuple
+from typing import Any
 
 import gymnasium as gym
-from rosnav_rl.spaces.observation_space.spaces.environment import (
-    StackedLaserMapSpace,
-    PedestrianVelXSpace,
-    PedestrianVelYSpace,
-    PedestrianTypeSpace,
-    PedestrianSocialStateSpace,
-)
-from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
+import torch
+import torch.nn as nn
+
 from rosnav_rl.spaces.observation_space.spaces.dynamics import (
     LastActionSpace,
     SubgoalInRobotFrameSpace,
 )
-import torch
-import torch.nn as nn
+from rosnav_rl.spaces.observation_space.spaces.environment import (
+    PedestrianSocialStateSpace,
+    PedestrianTypeSpace,
+    PedestrianVelXSpace,
+    PedestrianVelYSpace,
+    StackedLaserMapSpace,
+)
+from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
 
 from ..base_extractor import RosnavBaseExtractor, TensorDict
 from .bottleneck import Bottleneck
-from .utils import conv1x1, conv3x3
+from .utils import conv1x1
 
 __all__ = [
     "RESNET_MID_FUSION_EXTRACTOR_1",
@@ -95,16 +97,18 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         observation_space: gym.spaces.Dict,
         features_dim: int = 256,
         stack_size: int = 1,
-        block: nn.Module = Bottleneck,
-        layers: list = [2, 1, 1],
+        block: type[Bottleneck] = Bottleneck,
+        layers: list[int] | None = None,
         zero_init_residual: bool = True,
         groups: int = 1,
         width_per_group: int = 64,
-        replace_stride_with_dilation: List[bool] = None,
-        norm_layer: nn.Module = nn.BatchNorm2d,
-        *arg,
-        **kwargs,
+        replace_stride_with_dilation: list[bool] | None = None,
+        norm_layer: Callable[..., nn.Module] = nn.BatchNorm2d,
+        *arg: Any,
+        **kwargs: Any,
     ):
+        if layers is None:
+            layers = [2, 1, 1]
         self._block = block
         self._groups = groups
         self._layers = layers
@@ -118,7 +122,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         self._num_pedestrian_feature_maps = self._get_num_pedestrian_feature_maps()
         self._get_input_sizes()
 
-        super(RESNET_MID_FUSION_EXTRACTOR_1, self).__init__(
+        super().__init__(
             observation_space=observation_space,
             features_dim=features_dim,
             stack_size=stack_size,
@@ -126,7 +130,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         self._init_layer_weights()
 
-    def _get_num_pedestrian_feature_maps(self):
+    def _get_num_pedestrian_feature_maps(self) -> int:
         num_pedestrian_feature_maps = 0
         for space in self._observation_space:
             if "pedestrian" in space.lower():
@@ -135,7 +139,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         return num_pedestrian_feature_maps
 
     @property
-    def num_pedestrian_feature_maps(self):
+    def num_pedestrian_feature_maps(self) -> int:
         """
         Returns the number of pedestrian feature maps.
 
@@ -348,12 +352,12 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
     def _make_layer(
         self,
-        block: Bottleneck,
+        block: type[Bottleneck],
         planes: int,
         blocks: int,
         stride: int = 1,
         dilate: bool = False,
-    ):
+    ) -> nn.Sequential:
         """
         Constructs a layer using the specified block type and parameters.
 
@@ -409,10 +413,10 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
     def _forward_impl(
         self,
-        ped_map: torch.Tensor,
+        ped_map: torch.Tensor | None,
         scan: torch.Tensor,
         goal: torch.Tensor,
-        last_action: torch.Tensor = None,
+        last_action: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Implements the forward pass for the feature extractor.
@@ -476,7 +480,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
     def _get_input(
         self, observations: TensorDict
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> dict[str, torch.Tensor | None]:
         laser_map = observations[StackedLaserMapSpace.name]  # (num_envs, 1, 80, 80)
 
         goal_key = (
@@ -765,10 +769,10 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
 
     def _forward_impl(
         self,
-        ped_map: torch.Tensor,
+        ped_map: torch.Tensor | None,
         scan: torch.Tensor,
         goal: torch.Tensor,
-        last_action: torch.Tensor = None,
+        last_action: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Implements the forward pass for the feature extractor.
@@ -907,10 +911,10 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
 
     def _forward_impl(
         self,
-        ped_map: torch.Tensor,
+        ped_map: torch.Tensor | None,
         scan: torch.Tensor,
         goal: torch.Tensor,
-        last_action: torch.Tensor = None,
+        last_action: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Implements the forward pass for the feature extractor.
@@ -1028,10 +1032,10 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
 
     def _forward_impl(
         self,
-        ped_map: torch.Tensor,
+        ped_map: torch.Tensor | None,
         scan: torch.Tensor,
         goal: torch.Tensor,
-        last_action: torch.Tensor = None,
+        last_action: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Implements the forward pass for the feature extractor.
@@ -1291,10 +1295,10 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
 
     def _forward_impl(
         self,
-        ped_map: torch.Tensor,
+        ped_map: torch.Tensor | None,
         scan: torch.Tensor,
         goal: torch.Tensor,
-        last_action: torch.Tensor = None,
+        last_action: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Implements the forward pass for the feature extractor.
@@ -1372,7 +1376,7 @@ class _LaserTest(RESNET_MID_FUSION_EXTRACTOR_1):
     ]
 
     def _forward_impl(
-        self, scan: torch.Tensor, goal: torch.Tensor, *args, **kwargs
+        self, scan: torch.Tensor, goal: torch.Tensor, *args: Any, **kwargs: Any
     ) -> torch.Tensor:
         """
         Implements the forward pass for the feature extractor.
@@ -1444,8 +1448,8 @@ class _LaserTest_deep(DRL_VO_NAV_EXTRACTOR_TEST):
         self,
         scan: torch.Tensor,
         goal: torch.Tensor,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> torch.Tensor:
         """
         Implements the forward pass for the feature extractor.

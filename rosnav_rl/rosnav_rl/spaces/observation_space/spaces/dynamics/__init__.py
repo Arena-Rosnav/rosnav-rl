@@ -12,15 +12,12 @@ Legacy Spaces:
     - SubgoalInRobotFrameSpace: Subgoal in robot frame
 """
 
-# Basic spaces
-from .basic_dynamics_spaces import LastActionSpace, SubgoalInRobotFrameSpace
-
-# Advanced spaces
 from .advanced_dynamics_spaces import (
-    MotionStateSpace,
     KinematicStateSpace,
+    MotionStateSpace,
     TrajectoryStateSpace,
 )
+from .basic_dynamics_spaces import LastActionSpace, SubgoalInRobotFrameSpace
 
 __all__ = [
     "LastActionSpace",

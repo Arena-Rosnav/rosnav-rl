@@ -17,11 +17,11 @@ Or via dict round-trip::
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Annotated, Any, Self
 
 from pydantic import BaseModel, Discriminator, Field, PrivateAttr, model_validator
-from typing_extensions import Annotated
 
 from rosnav_rl.utils.name_generator import generate_agent_name
 
@@ -30,6 +30,9 @@ from ..model.stable_baselines3.cfg import StableBaselinesCfg
 from .action_spaces import ActionSpaceSpec, DiscretizationCfg
 from .parameters import AgentParameters
 from .reward import RewardCfg
+
+if TYPE_CHECKING:
+    from ruamel.yaml.comments import CommentedMap
 
 
 class AgentConfig(BaseModel):
@@ -57,16 +60,16 @@ class AgentConfig(BaseModel):
         reward: Reward function definition (optional, training only).
     """
 
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None, description="Agent identifier. Auto-generated if omitted."
     )
-    robot: Optional[str] = Field(
+    robot: str | None = Field(
         None, description="Robot model name (e.g. 'jackal', 'turtlebot3'). Derived from arena_robots at training time."
     )
-    observations_config: Optional[str] = Field(
+    observations_config: str | None = Field(
         None, description="Path to observations YAML config (relative to training config file, or absolute)."
     )
-    discretization: Optional[DiscretizationCfg] = Field(
+    discretization: DiscretizationCfg | None = Field(
         None,
         description=(
             "Discrete-action strategy. Transferred onto action_space by the trainer at startup. "
@@ -74,30 +77,30 @@ class AgentConfig(BaseModel):
         ),
     )
 
-    action_space: Optional[ActionSpaceSpec] = Field(
+    action_space: ActionSpaceSpec | None = Field(
         None, description="Typed action space. Derived from robot description at training time."
     )
     parameters: AgentParameters = AgentParameters()
 
     framework: Annotated[
-        Union[StableBaselinesCfg, DreamerV3Cfg],
+        StableBaselinesCfg | DreamerV3Cfg,
         Discriminator(discriminator="name"),
     ]
-    reward: Optional[RewardCfg] = None
+    reward: RewardCfg | None = None
 
     # True when the name was auto-generated (not user-supplied).
     # Used by model_copy to know whether to refresh the name when robot changes.
     _name_is_auto: bool = PrivateAttr(default=True)
 
     @model_validator(mode="after")
-    def _auto_name(self):
+    def _auto_name(self) -> Self:
         if self.name is None:
             self.name = generate_agent_name(self.framework, robot=self.robot)
         else:
             self._name_is_auto = False
         return self
 
-    def model_copy(self, *, update: dict | None = None, deep: bool = False) -> "AgentConfig":
+    def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
         """Copy with automatic name refresh when ``robot`` is updated.
 
         If the caller supplies an explicit ``"name"`` key in *update* it is
@@ -119,7 +122,7 @@ class AgentConfig(BaseModel):
     # ------------------------------------------------------------------ #
 
     @classmethod
-    def from_yaml(cls, path: Union[str, Path]) -> AgentConfig:
+    def from_yaml(cls, path: str | Path) -> Self:
         """Load from a YAML file."""
         import yaml
 
@@ -127,13 +130,13 @@ class AgentConfig(BaseModel):
             data = yaml.safe_load(f)
         return cls.model_validate(data)
 
-    def _to_commented_map(self):
+    def _to_commented_map(self) -> CommentedMap:
         """Delegates to :func:`rosnav_rl.utils.yaml_utils.agent_config_to_commented_map`."""
         from rosnav_rl.utils.yaml_utils import agent_config_to_commented_map
 
         return agent_config_to_commented_map(self)
 
-    def to_yaml(self, path: Union[str, Path]) -> None:
+    def to_yaml(self, path: str | Path) -> None:
         """Save to a structured YAML file with section comments."""
         from ruamel.yaml import YAML
 
@@ -145,10 +148,10 @@ class AgentConfig(BaseModel):
             ry.dump(self._to_commented_map(), f)
 
     @classmethod
-    def from_dict(cls, data: dict) -> AgentConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Construct from a plain dictionary."""
         return cls.model_validate(data)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain dictionary."""
         return self.model_dump()

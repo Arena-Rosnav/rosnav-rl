@@ -3,12 +3,15 @@
 Goal and navigation spaces with only proven, reliable features.
 """
 
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
 from rosnav_rl.observations.utils.types import (
     DistanceAngleMetrics,
 )
+
 from ...observation_space_factory import SpaceFactory
 from ...space_categories import SpaceCategory
 from ..base_observation_space import BaseObservationSpace
@@ -47,8 +50,8 @@ class RobustGoalSpace(BaseObservationSpace):
         goal_max_dist: float = 50.0,
         include_progress: bool = True,
         distance_scaling: str = "tanh",  # "tanh", "linear", or "log"
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize robust goal space.
 
@@ -109,7 +112,7 @@ class RobustGoalSpace(BaseObservationSpace):
         return progress
 
     def encode_observation(
-        self, dist_angle_to_goal: DistanceAngleMetrics, *args, **kwargs
+        self, dist_angle_to_goal: DistanceAngleMetrics, *args: Any, **kwargs: Any
     ) -> DistanceAngleMetrics:
         """Encode robust navigation goal with configurable normalization and progress tracking.
 
@@ -174,7 +177,7 @@ class MultiScaleGoalSpace(BaseObservationSpace):
     }
 
     def __init__(
-        self, distance_scales: list = None, goal_max_dist: float = 50.0, *args, **kwargs
+        self, distance_scales: list[float] | None = None, goal_max_dist: float = 50.0, *args: Any, **kwargs: Any
     ):
         """Initialize multi-scale goal space.
 
@@ -201,7 +204,7 @@ class MultiScaleGoalSpace(BaseObservationSpace):
         )
 
     def encode_observation(
-        self, dist_angle_to_goal: DistanceAngleMetrics, *args, **kwargs
+        self, dist_angle_to_goal: DistanceAngleMetrics, *args: Any, **kwargs: Any
     ) -> DistanceAngleMetrics:
         """Encode navigation goal at multiple distance scales for curriculum learning.
 
@@ -273,8 +276,8 @@ class SubgoalContextSpace(BaseObservationSpace):
         self,
         subgoal_max_dist: float = 30.0,
         include_goal_subgoal_relation: bool = True,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize subgoal context space.
 
@@ -306,8 +309,8 @@ class SubgoalContextSpace(BaseObservationSpace):
         self,
         dist_angle_to_subgoal: DistanceAngleMetrics,
         dist_angle_to_goal: DistanceAngleMetrics,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> DistanceAngleMetrics:
         """Encode subgoal context with hierarchical goal-subgoal relationship features.
 

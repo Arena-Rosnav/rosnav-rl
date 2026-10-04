@@ -14,10 +14,9 @@ YAML / JSON configs use a ``type`` field to select the variant::
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
-from typing_extensions import Annotated
 
 
 class FloatParam(BaseModel):
@@ -30,7 +29,7 @@ class FloatParam(BaseModel):
     low: float
     high: float
     log: bool = False
-    step: Optional[float] = None
+    step: float | None = None
 
 
 class IntParam(BaseModel):
@@ -53,16 +52,16 @@ class CategoricalParam(BaseModel):
     """
 
     type: Literal["categorical"] = "categorical"
-    choices: List[Any]
+    choices: list[Any]
 
 
 SearchParam = Annotated[
-    Union[FloatParam, IntParam, CategoricalParam],
+    FloatParam | IntParam | CategoricalParam,
     Field(discriminator="type"),
 ]
 """Discriminated union of all search-space parameter types."""
 
-SearchSpace = Dict[str, SearchParam]
+SearchSpace = dict[str, SearchParam]
 """Mapping from dot-notation config paths to search-space parameters.
 
 Example::

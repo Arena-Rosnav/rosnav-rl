@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Generator, OrderedDict
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -32,8 +33,8 @@ def count_steps(folder: Path) -> int:
 
 
 def make_dataset(
-    episodes: OrderedDict[str, np.ndarray], config: "cfg.DreamerV3Cfg"
-) -> Generator[Dict[str, np.ndarray], None, None]:
+    episodes: tools._Cache, config: "cfg.DreamerV3Cfg"
+) -> Generator[dict[str, np.ndarray], None, None]:
     """Creates a dataset from a collection of episodes.
 
     This function converts episodic data into a dataset format suitable for training.

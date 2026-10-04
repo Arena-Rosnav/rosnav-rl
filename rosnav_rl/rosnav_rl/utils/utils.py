@@ -1,7 +1,7 @@
 import json
 import os
 import random
-from typing import Tuple
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
@@ -14,12 +14,12 @@ from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
 from rosnav_rl.utils.stable_baselines3.vec_frame_stack import VecFrameStack
 
 
-def load_json(file_path: str) -> dict:
+def load_json(file_path: str) -> dict[str, Any]:
     with open(file_path) as file:
         return json.load(file)
 
 
-def load_yaml(file_path: str) -> dict:
+def load_yaml(file_path: str) -> dict[str, Any]:
     with open(file_path) as file:
         return yaml.load(file, Loader=yaml.FullLoader)
 
@@ -37,17 +37,21 @@ class _SpaceManagerEnv(gym.Env):
         self.observation_space = space_manager.observation_space
         self.action_space = space_manager.action_space
 
-    def reset(self, *, seed=None, options=None):
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[np.ndarray | dict[str, np.ndarray], dict[str, Any]]:
         return self.observation_space.sample(), {}
 
-    def step(self, action):
+    def step(
+        self, action: np.ndarray
+    ) -> tuple[np.ndarray | dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         obs = self.observation_space.sample()
         return obs, 0.0, False, False, {}
 
 
 def make_mock_env(
     ns: str, space_manager: BaseSpaceManager, stack_size: int = 1
-) -> DummyVecEnv:
+) -> VecEnv:
     """Create a minimal DummyVecEnv from a SpaceManager for inference-time
     stacking and normalization support.
 
@@ -72,11 +76,11 @@ def wrap_vec_framestack(env: DummyVecEnv, stack_size: int) -> VecFrameStack:
     return VecFrameStack(env, n_stack=stack_size, channels_order="first")
 
 
-def load_vec_normalize(path: str, venv: VecEnv = None) -> VecNormalize:
+def load_vec_normalize(path: str, venv: VecEnv | None = None) -> VecNormalize:
     return VecNormalize.load(path, venv)
 
 
-def set_seed(seed):
+def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True

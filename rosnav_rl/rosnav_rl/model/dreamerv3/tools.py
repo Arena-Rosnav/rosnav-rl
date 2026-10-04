@@ -1,30 +1,34 @@
+from __future__ import annotations
+
 import collections
-import datetime
 import io
 import json
 import os
 import pathlib
 import random
-import re
 import time
-from typing import Any, Dict, Generator, List, Tuple
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike
 from torch import distributions as torchd
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.tensorboard import SummaryWriter
 
+if TYPE_CHECKING:
+    from .parallel import Damy, Parallel
+
 to_np = lambda x: x.detach().cpu().float().numpy()
 
 
-def symlog(x):
+def symlog(x: torch.Tensor) -> torch.Tensor:
     return torch.sign(x) * torch.log(torch.abs(x) + 1.0)
 
 
-def symexp(x):
+def symexp(x: torch.Tensor) -> torch.Tensor:
     return torch.sign(x) * (torch.exp(torch.abs(x)) - 1.0)
 
 
@@ -35,7 +39,7 @@ class RequiresGrad:
     def __enter__(self):
         self._model.requires_grad_(requires_grad=True)
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: object):
         self._model.requires_grad_(requires_grad=False)
 
 
@@ -60,7 +64,7 @@ class TimeRecording:
         - Requires PyTorch and CUDA to be available.
     """
 
-    def __init__(self, comment):
+    def __init__(self, comment: str):
         self._comment = comment
 
     def __enter__(self):
@@ -68,7 +72,7 @@ class TimeRecording:
         self._nd = torch.cuda.Event(enable_timing=True)
         self._st.record()
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: object):
         self._nd.record()
         torch.cuda.synchronize()
         print(self._comment, self._st.elapsed_time(self._nd) / 1000)
@@ -96,13 +100,13 @@ class Logger:
         scalar(name, value): Log a scalar value.
         image(name, value): Log an image.
         video(name, value): Log a video.
-        write(fps=False, step=False): Write all logged data to disk.
+        write(fps=False, step=0): Write all logged data to disk.
         _compute_fps(step): Calculate frames per second between steps.
         offline_scalar(name, value, step): Log a scalar value without buffering.
         offline_video(name, value, step): Log a video without buffering.
     """
 
-    def __init__(self, logdir, step):
+    def __init__(self, logdir: pathlib.Path, step: int):
         self._logdir = logdir
         self._writer = SummaryWriter(log_dir=str(logdir), max_queue=1000)
         self._last_step = None
@@ -112,16 +116,16 @@ class Logger:
         self._videos = {}
         self.step = step
 
-    def scalar(self, name, value):
+    def scalar(self, name: str, value: float):
         self._scalars[name] = float(value)
 
-    def image(self, name, value):
+    def image(self, name: str, value: np.ndarray):
         self._images[name] = np.array(value)
 
-    def video(self, name, value):
+    def video(self, name: str, value: np.ndarray):
         self._videos[name] = np.array(value)
 
-    def write(self, fps=False, step=False):
+    def write(self, fps: bool = False, step: int = 0):
         if not step:
             step = self.step
         scalars = list(self._scalars.items())
@@ -178,7 +182,7 @@ class Logger:
         self._images = {}
         self._videos = {}
 
-    def _compute_fps(self, step):
+    def _compute_fps(self, step: int) -> float:
         if self._last_step is None:
             self._last_time = time.time()
             self._last_step = step
@@ -189,10 +193,10 @@ class Logger:
         self._last_step = step
         return steps / duration
 
-    def offline_scalar(self, name, value, step):
+    def offline_scalar(self, name: str, value: float, step: int):
         self._writer.add_scalar("scalars/" + name, value, step)
 
-    def offline_video(self, name, value, step):
+    def offline_video(self, name: str, value: np.ndarray, step: int):
         if np.issubdtype(value.dtype, np.floating):
             value = np.clip(255 * value, 0, 255).astype(np.uint8)
         B, T, H, W, C = value.shape
@@ -200,21 +204,27 @@ class Logger:
         self._writer.add_video(name, value, step, 16)
 
 
-_State = Tuple[int, int, np.ndarray, np.ndarray, List[np.ndarray], Any, List[float]]
+_State = tuple[int, int, np.ndarray, np.ndarray, list[dict[str, np.ndarray] | None], Any, list[float]]
+_Episode = dict[str, np.ndarray | list[np.ndarray]]
+_Cache = collections.OrderedDict[str, _Episode]
+_SampleShape = torch.Size | list[int] | tuple[int, ...]
+_ScanState = (
+    dict[str, torch.Tensor] | Sequence[dict[str, torch.Tensor] | torch.Tensor | None]
+)
 
 
 def simulate(
-    agent,
-    envs,
-    cache,
-    directory,
-    logger,
-    is_eval=False,
-    limit=None,
-    steps=0,
-    episodes=0,
-    state=None,
-    no_image_key=False,
+    agent: Callable[[dict[str, np.ndarray], np.ndarray, Any], tuple[dict[str, torch.Tensor] | np.ndarray, Any]],
+    envs: Sequence[Parallel | Damy],
+    cache: _Cache,
+    directory: str | pathlib.Path,
+    logger: Logger,
+    is_eval: bool = False,
+    limit: int | None = None,
+    steps: int = 0,
+    episodes: int = 0,
+    state: _State | None = None,
+    no_image_key: bool = False,
 ) -> _State:
     """Simulates the interaction between an agent and environments, collecting transitions and logging metrics.
 
@@ -251,7 +261,7 @@ def simulate(
     def reset_envs():
         results = [env.reset() for env in envs]
         results = [r() for r in results]
-    
+
     first_iter = True
     # Resolve pause callable once — Parallel.__getattr__ re-raises remote
     # AttributeError as a plain Exception, so getattr(..., None) is not enough.
@@ -279,7 +289,7 @@ def simulate(
             indices = [index for index, d in enumerate(done) if d]
             results = [envs[i].reset() for i in indices]
             results = [r() for r in results]
-            for index, result in zip(indices, results):
+            for index, result in zip(indices, results, strict=True):
                 t = result.copy()
                 t = {k: convert(v) for k, v in t.items()}
                 # action will be added to transition in add_to_cache
@@ -305,9 +315,9 @@ def simulate(
             action = np.array(action)
         assert len(action) == len(envs)
         # step envs
-        results = [e.step(a) for e, a in zip(envs, action)]
+        results = [e.step(a) for e, a in zip(envs, action, strict=True)]
         results = [r() for r in results]
-        obs, reward, done = zip(*[p[:3] for p in results])
+        obs, reward, done = zip(*[p[:3] for p in results], strict=True)
         obs = list(obs)
         reward = list(reward)
         done = np.stack(done)
@@ -316,8 +326,8 @@ def simulate(
         step += len(envs)
         length *= 1 - done
         # add to cache; capture terminal success flag for eval success-rate tracking
-        _done_successes: dict = {}
-        for a, result, env in zip(action, results, envs):
+        _done_successes: dict[str, int] = {}
+        for a, result, env in zip(action, results, envs, strict=True):
             o, r, d, info = result
             o = {k: convert(v) for k, v in o.items()}
             transition = o.copy()
@@ -338,11 +348,11 @@ def simulate(
             # Save all done episodes BEFORE erasing any of them from cache.
             # Calling erase_over_episodes inside the loop can delete a later
             # done-env's episode before it is saved, causing a KeyError.
-            for i, eid in zip(indices, done_ids):
+            for eid in done_ids:
                 save_episodes(directory, {eid: cache[eid]})
 
-            for i, eid in zip(indices, done_ids):
-                length = len(cache[eid]["reward"]) - 1
+            for eid in done_ids:
+                ep_length = len(cache[eid]["reward"]) - 1
                 score = float(np.array(cache[eid]["reward"]).sum())
                 if not no_image_key:
                     video = cache[eid]["image"]
@@ -356,37 +366,37 @@ def simulate(
                         cache[eid].pop(key)
 
                 if not is_eval:
-                    logger.scalar(f"train_return", score)
-                    logger.scalar(f"train_length", length)
+                    logger.scalar("train_return", score)
+                    logger.scalar("train_length", ep_length)
                 else:
-                    if not "eval_lengths" in locals():
+                    if "eval_lengths" not in locals():
                         eval_lengths = []
                         eval_scores = []
                         eval_successes = []
                         eval_done = False
                     # start counting scores for evaluation
                     eval_scores.append(score)
-                    eval_lengths.append(length)
+                    eval_lengths.append(ep_length)
                     eval_successes.append(_done_successes.get(eid, 0))
 
                     score = sum(eval_scores) / len(eval_scores)
-                    length = sum(eval_lengths) / len(eval_lengths)
+                    ep_length = sum(eval_lengths) / len(eval_lengths)
                     if not no_image_key:
-                        logger.video(f"eval_policy", np.array(video)[None])
+                        logger.video("eval_policy", np.array(video)[None])
 
                     if len(eval_scores) >= episodes and not eval_done:
-                        logger.scalar(f"eval_return", score)
-                        logger.scalar(f"eval_length", length)
-                        logger.scalar(f"eval_episodes", len(eval_scores))
-                        logger.scalar(f"eval_success_rate", sum(eval_successes) / len(eval_successes))
+                        logger.scalar("eval_return", score)
+                        logger.scalar("eval_length", ep_length)
+                        logger.scalar("eval_episodes", len(eval_scores))
+                        logger.scalar("eval_success_rate", sum(eval_successes) / len(eval_successes))
                         logger.write(step=logger.step)
                         eval_done = True
 
             if not is_eval:
                 # Erase once after all done episodes are saved
                 step_in_dataset = erase_over_episodes(cache, limit)
-                logger.scalar(f"dataset_size", step_in_dataset)
-                logger.scalar(f"train_episodes", len(cache))
+                logger.scalar("dataset_size", step_in_dataset)
+                logger.scalar("train_episodes", len(cache))
                 logger.write(step=logger.step)
     if is_eval:
         # keep only last item for saving memory. this cache is used for video_pred later
@@ -396,7 +406,9 @@ def simulate(
     return (step - steps, episode - episodes, done, length, obs, agent_state, reward)
 
 
-def add_to_cache(cache, id, transition):
+def add_to_cache(
+    cache: dict[str, _Episode], id: str, transition: Mapping[str, ArrayLike]
+):
     """Add a transition to a cache dictionary using an ID as key.
 
     This function adds transition data to a cache dictionary, organizing it by ID. If the ID
@@ -426,7 +438,7 @@ def add_to_cache(cache, id, transition):
                 cache[id][key].append(convert(val))
 
 
-def erase_over_episodes(cache, dataset_size):
+def erase_over_episodes(cache: dict[str, _Episode], dataset_size: int | None) -> int:
     """
     Erase episodes from cache to maintain dataset size limit.
 
@@ -462,7 +474,7 @@ def erase_over_episodes(cache, dataset_size):
     return step_in_dataset
 
 
-def convert(value, precision=32):
+def convert(value: ArrayLike, precision: int = 32) -> np.ndarray:
     """Convert numpy array to specified precision.
 
     This function converts a numpy array to a specified numerical precision while preserving
@@ -497,7 +509,9 @@ def convert(value, precision=32):
     return value.astype(dtype)
 
 
-def save_episodes(directory, episodes):
+def save_episodes(
+    directory: str | pathlib.Path, episodes: Mapping[str, _Episode]
+) -> bool:
     """Save episodes data to compressed NPZ files in the specified directory.
 
     This function saves episode data in NPZ format, where each episode file is named with
@@ -535,8 +549,8 @@ def save_episodes(directory, episodes):
 
 
 def from_generator(
-    generator: Generator[Dict[str, NDArray], None, None], batch_size: int
-) -> Generator[Dict[str, NDArray], None, None]:
+    generator: Generator[_Episode, None, None], batch_size: int
+) -> Generator[dict[str, np.ndarray], None, None]:
     """Convert a generator of dictionaries into a generator of batched dictionaries.
 
     This function takes a generator that yields dictionaries containing numpy arrays and
@@ -569,7 +583,9 @@ def from_generator(
         yield data
 
 
-def sample_episodes(episodes, length, seed=0):
+def sample_episodes(
+    episodes: Mapping[str, _Episode], length: int, seed: int = 0
+) -> Generator[_Episode, None, None]:
     """
     Sample fixed-length sequences from a collection of episodes.
 
@@ -635,7 +651,9 @@ def sample_episodes(episodes, length, seed=0):
         yield ret
 
 
-def load_episodes(directory, limit=None, reverse=True):
+def load_episodes(
+    directory: str | pathlib.Path, limit: int | None = None, reverse: bool = True
+) -> _Cache:
     """Load episode data from a directory containing .npz files.
 
     This function loads episode data stored in .npz files from a specified directory. Each episode
@@ -718,27 +736,27 @@ class SampleDist:
         object through __getattr__.
     """
 
-    def __init__(self, dist, samples=100):
+    def __init__(self, dist: torchd.Distribution, samples: int = 100):
         self._dist = dist
         self._samples = samples
 
     @property
-    def name(self):
+    def name(self) -> str:
         return "SampleDist"
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         return getattr(self._dist, name)
 
-    def mean(self):
+    def mean(self) -> torch.Tensor:
         samples = self._dist.sample(self._samples)
         return torch.mean(samples, 0)
 
-    def mode(self):
+    def mode(self) -> torch.Tensor:
         sample = self._dist.sample(self._samples)
         logprob = self._dist.log_prob(sample)
         return sample[torch.argmax(logprob)][0]
 
-    def entropy(self):
+    def entropy(self) -> torch.Tensor:
         sample = self._dist.sample(self._samples)
         logprob = self.log_prob(sample)
         return -torch.mean(logprob, 0)
@@ -769,7 +787,12 @@ class OneHotDist(torchd.one_hot_categorical.OneHotCategorical):
         pass as continuous.
     """
 
-    def __init__(self, logits=None, probs=None, unimix_ratio=0.0):
+    def __init__(
+        self,
+        logits: torch.Tensor | None = None,
+        probs: torch.Tensor | None = None,
+        unimix_ratio: float = 0.0,
+    ):
         if logits is not None and unimix_ratio > 0.0:
             probs = F.softmax(logits, dim=-1)
             probs = probs * (1.0 - unimix_ratio) + unimix_ratio / probs.shape[-1]
@@ -778,13 +801,15 @@ class OneHotDist(torchd.one_hot_categorical.OneHotCategorical):
         else:
             super().__init__(logits=logits, probs=probs)
 
-    def mode(self):
+    def mode(self) -> torch.Tensor:
         _mode = F.one_hot(
             torch.argmax(super().logits, axis=-1), super().logits.shape[-1]
         )
         return _mode.detach() + super().logits - super().logits.detach()
 
-    def sample(self, sample_shape=(), seed=None):
+    def sample(
+        self, sample_shape: _SampleShape = (), seed: int | None = None
+    ) -> torch.Tensor:
         if seed is not None:
             raise ValueError("need to check")
         sample = super().sample(sample_shape).detach()
@@ -831,12 +856,12 @@ class DiscDist:
 
     def __init__(
         self,
-        logits,
-        low=-20.0,
-        high=20.0,
-        transfwd=symlog,
-        transbwd=symexp,
-        device="cuda",
+        logits: torch.Tensor,
+        low: float = -20.0,
+        high: float = 20.0,
+        transfwd: Callable[[torch.Tensor], torch.Tensor] = symlog,
+        transbwd: Callable[[torch.Tensor], torch.Tensor] = symexp,
+        device: str | torch.device = "cuda",
     ):
         self.logits = logits
         self.probs = torch.softmax(logits, -1)
@@ -845,16 +870,16 @@ class DiscDist:
         self.transfwd = transfwd
         self.transbwd = transbwd
 
-    def mean(self):
+    def mean(self) -> torch.Tensor:
         _mean = self.probs * self.buckets
         return self.transbwd(torch.sum(_mean, dim=-1, keepdim=True))
 
-    def mode(self):
+    def mode(self) -> torch.Tensor:
         _mode = self.probs * self.buckets
         return self.transbwd(torch.sum(_mode, dim=-1, keepdim=True))
 
     # Inside OneHotCategorical, log_prob is calculated using only max element in targets
-    def log_prob(self, x):
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         x = self.transfwd(x)
         # x(time, batch, 1)
         below = torch.sum((self.buckets <= x[..., None]).to(torch.int32), dim=-1) - 1
@@ -880,7 +905,7 @@ class DiscDist:
 
         return (target * log_pred).sum(-1)
 
-    def log_prob_target(self, target):
+    def log_prob_target(self, target: torch.Tensor) -> torch.Tensor:
         log_pred = super().logits - torch.logsumexp(super().logits, -1, keepdim=True)
         return (target * log_pred).sum(-1)
 
@@ -910,17 +935,17 @@ class MSEDist:
         AssertionError: If shapes of mode and value tensors don't match.
     """
 
-    def __init__(self, mode, agg="sum"):
+    def __init__(self, mode: torch.Tensor, agg: str = "sum"):
         self._mode = mode
         self._agg = agg
 
-    def mode(self):
+    def mode(self) -> torch.Tensor:
         return self._mode
 
-    def mean(self):
+    def mean(self) -> torch.Tensor:
         return self._mode
 
-    def log_prob(self, value):
+    def log_prob(self, value: torch.Tensor) -> torch.Tensor:
         assert self._mode.shape == value.shape, (self._mode.shape, value.shape)
         distance = (self._mode - value) ** 2
         if self._agg == "mean":
@@ -960,19 +985,21 @@ class SymlogDist:
         symmetric logarithmic transformations.
     """
 
-    def __init__(self, mode, dist="mse", agg="sum", tol=1e-8):
+    def __init__(
+        self, mode: torch.Tensor, dist: str = "mse", agg: str = "sum", tol: float = 1e-8
+    ):
         self._mode = mode
         self._dist = dist
         self._agg = agg
         self._tol = tol
 
-    def mode(self):
+    def mode(self) -> torch.Tensor:
         return symexp(self._mode)
 
-    def mean(self):
+    def mean(self) -> torch.Tensor:
         return symexp(self._mode)
 
-    def log_prob(self, value):
+    def log_prob(self, value: torch.Tensor) -> torch.Tensor:
         assert self._mode.shape == value.shape
         if self._dist == "mse":
             distance = (self._mode - symlog(value)) ** 2.0
@@ -1016,31 +1043,33 @@ class ContDist:
         to the range [-absmax, absmax] while preserving the direction of the vectors.
     """
 
-    def __init__(self, dist=None, absmax=None):
+    def __init__(
+        self, dist: torchd.Distribution, absmax: float | None = None
+    ):
         super().__init__()
         self._dist = dist
         self.mean = dist.mean
         self.absmax = absmax
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         return getattr(self._dist, name)
 
-    def entropy(self):
+    def entropy(self) -> torch.Tensor:
         return self._dist.entropy()
 
-    def mode(self):
+    def mode(self) -> torch.Tensor:
         out = self._dist.mean
         if self.absmax is not None:
             out *= (self.absmax / torch.clip(torch.abs(out), min=self.absmax)).detach()
         return out
 
-    def sample(self, sample_shape=()):
+    def sample(self, sample_shape: _SampleShape = ()) -> torch.Tensor:
         out = self._dist.rsample(sample_shape)
         if self.absmax is not None:
             out *= (self.absmax / torch.clip(torch.abs(out), min=self.absmax)).detach()
         return out
 
-    def log_prob(self, x):
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         return self._dist.log_prob(x)
 
 
@@ -1067,25 +1096,25 @@ class Bernoulli:
         A Bernoulli distribution wrapper object
     """
 
-    def __init__(self, dist=None):
+    def __init__(self, dist: torchd.Independent):
         super().__init__()
         self._dist = dist
         self.mean = dist.mean
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         return getattr(self._dist, name)
 
-    def entropy(self):
+    def entropy(self) -> torch.Tensor:
         return self._dist.entropy()
 
-    def mode(self):
+    def mode(self) -> torch.Tensor:
         _mode = torch.round(self._dist.mean)
         return _mode.detach() + self._dist.mean - self._dist.mean.detach()
 
-    def sample(self, sample_shape=()):
+    def sample(self, sample_shape: _SampleShape = ()) -> torch.Tensor:
         return self._dist.rsample(sample_shape)
 
-    def log_prob(self, x):
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         _logits = self._dist.base_dist.logits
         log_probs0 = -F.softplus(_logits)
         log_probs1 = -F.softplus(-_logits)
@@ -1114,16 +1143,22 @@ class UnnormalizedHuber(torchd.normal.Normal):
         and is therefore unnormalized.
     """
 
-    def __init__(self, loc, scale, threshold=1, **kwargs):
-        super().__init__(loc, scale, **kwargs)
+    def __init__(
+        self,
+        loc: torch.Tensor | float,
+        scale: torch.Tensor | float,
+        threshold: float = 1,
+        validate_args: bool | None = None,
+    ):
+        super().__init__(loc, scale, validate_args=validate_args)
         self._threshold = threshold
 
-    def log_prob(self, event):
+    def log_prob(self, event: torch.Tensor) -> torch.Tensor:
         return -(
             torch.sqrt((event - self.mean) ** 2 + self._threshold**2) - self._threshold
         )
 
-    def mode(self):
+    def mode(self) -> torch.Tensor:
         return self.mean
 
 
@@ -1150,14 +1185,22 @@ class SafeTruncatedNormal(torchd.normal.Normal):
         while enforcing the bounds through soft clipping.
     """
 
-    def __init__(self, loc, scale, low, high, clip=1e-6, mult=1):
+    def __init__(
+        self,
+        loc: torch.Tensor | float,
+        scale: torch.Tensor | float,
+        low: float,
+        high: float,
+        clip: float = 1e-6,
+        mult: float = 1,
+    ):
         super().__init__(loc, scale)
         self._low = low
         self._high = high
         self._clip = clip
         self._mult = mult
 
-    def sample(self, sample_shape):
+    def sample(self, sample_shape: _SampleShape) -> torch.Tensor:
         event = super().sample(sample_shape)
         if self._clip:
             clipped = torch.clip(event, self._low + self._clip, self._high - self._clip)
@@ -1188,25 +1231,29 @@ class TanhBijector(torchd.Transform):
         they are within [-1, 1] to prevent numerical instabilities near the boundaries.
     """
 
-    def __init__(self, validate_args=False, name="tanh"):
+    def __init__(self, validate_args: bool = False, name: str = "tanh"):
         super().__init__()
 
-    def _forward(self, x):
+    def _forward(self, x: torch.Tensor) -> torch.Tensor:
         return torch.tanh(x)
 
-    def _inverse(self, y):
+    def _inverse(self, y: torch.Tensor) -> torch.Tensor:
         y = torch.where(
             (torch.abs(y) <= 1.0), torch.clamp(y, -0.99999997, 0.99999997), y
         )
         y = torch.atanh(y)
         return y
 
-    def _forward_log_det_jacobian(self, x):
+    def _forward_log_det_jacobian(self, x: torch.Tensor) -> torch.Tensor:
         log2 = torch.math.log(2.0)
         return 2.0 * (log2 - x - torch.softplus(-2.0 * x))
 
 
-def static_scan_for_lambda_return(fn, inputs, start):
+def static_scan_for_lambda_return(
+    fn: Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
+    inputs: Sequence[torch.Tensor],
+    start: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
     """
     Recursively compute lambda returns for a given sequence using reverse scanning.
 
@@ -1249,7 +1296,14 @@ def static_scan_for_lambda_return(fn, inputs, start):
     return outputs
 
 
-def lambda_return(reward, value, pcont, bootstrap, lambda_, axis):
+def lambda_return(
+    reward: torch.Tensor,
+    value: torch.Tensor,
+    pcont: float | torch.Tensor,
+    bootstrap: torch.Tensor | None,
+    lambda_: float,
+    axis: int,
+) -> tuple[torch.Tensor, ...]:
     """Calculate lambda returns for temporal difference learning.
 
     This function computes a mixture of n-step returns using the lambda parameter for
@@ -1307,15 +1361,15 @@ def lambda_return(reward, value, pcont, bootstrap, lambda_, axis):
 class Optimizer:
     def __init__(
         self,
-        name,
-        parameters,
-        lr,
-        eps=1e-4,
-        clip=None,
-        wd=None,
-        wd_pattern=r".*",
-        opt="adam",
-        use_amp=False,
+        name: str,
+        parameters: Iterable[nn.Parameter],
+        lr: float,
+        eps: float = 1e-4,
+        clip: float | None = None,
+        wd: float = 0.0,
+        wd_pattern: str = r".*",
+        opt: str = "adam",
+        use_amp: bool = False,
     ):
         """Initialize an Optimizer wrapper.
 
@@ -1352,7 +1406,12 @@ class Optimizer:
         }[opt]()
         self._scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
-    def __call__(self, loss, params, retain_graph=True):
+    def __call__(
+        self,
+        loss: torch.Tensor,
+        params: Iterable[nn.Parameter],
+        retain_graph: bool = True,
+    ) -> dict[str, np.ndarray]:
         """Update optimizer parameters based on computed loss.
 
         Args:
@@ -1385,7 +1444,7 @@ class Optimizer:
         metrics[f"{self._name}_grad_norm"] = to_np(norm)
         return metrics
 
-    def _apply_weight_decay(self, varibs):
+    def _apply_weight_decay(self, varibs: Iterable[nn.Parameter]):
         """Apply weight decay to a list of variables.
 
         This method implements weight decay by scaling the variables by (1 - weight_decay_rate).
@@ -1405,7 +1464,7 @@ class Optimizer:
             var.data = (1 - self._wd) * var.data
 
 
-def args_type(default):
+def args_type(default: object) -> Callable[[object], object]:
     """Parse and convert arguments to their appropriate type based on a default value.
 
     This function returns a lambda function that can parse both string and non-string inputs
@@ -1430,7 +1489,7 @@ def args_type(default):
         >>> parser("1,2,3")  # Returns (1, 2, 3)
     """
 
-    def parse_string(x):
+    def parse_string(x: str) -> object:
         if default is None:
             return x
         if isinstance(default, bool):
@@ -1441,7 +1500,7 @@ def args_type(default):
             return tuple(args_type(default[0])(y) for y in x.split(","))
         return type(default)(x)
 
-    def parse_object(x):
+    def parse_object(x: object) -> object:
         if isinstance(default, (list, tuple)):
             return tuple(x)
         return x
@@ -1449,7 +1508,11 @@ def args_type(default):
     return lambda x: parse_string(x) if isinstance(x, str) else parse_object(x)
 
 
-def static_scan(fn, inputs, start):
+def static_scan(
+    fn: Callable[..., _ScanState],
+    inputs: Sequence[torch.Tensor],
+    start: _ScanState,
+) -> list[dict[str, torch.Tensor] | torch.Tensor]:
     """
     A function that performs a static scan operation over input tensors.
 
@@ -1478,14 +1541,14 @@ def static_scan(fn, inputs, start):
         inp = lambda x: (_input[x] for _input in inputs)
         last = fn(last, *inp(index))
         if flag:
-            if type(last) == type({}):
+            if type(last) is dict:
                 outputs = {
                     key: value.clone().unsqueeze(0) for key, value in last.items()
                 }
             else:
                 outputs = []
                 for _last in last:
-                    if type(_last) == type({}):
+                    if type(_last) is dict:
                         outputs.append(
                             {
                                 key: value.clone().unsqueeze(0)
@@ -1496,14 +1559,14 @@ def static_scan(fn, inputs, start):
                         outputs.append(_last.clone().unsqueeze(0))
             flag = False
         else:
-            if type(last) == type({}):
+            if type(last) is dict:
                 for key in last.keys():
                     outputs[key] = torch.cat(
                         [outputs[key], last[key].unsqueeze(0)], dim=0
                     )
             else:
                 for j in range(len(outputs)):
-                    if type(last[j]) == type({}):
+                    if type(last[j]) is dict:
                         for key in last[j].keys():
                             outputs[j][key] = torch.cat(
                                 [outputs[j][key], last[j][key].unsqueeze(0)], dim=0
@@ -1512,7 +1575,7 @@ def static_scan(fn, inputs, start):
                         outputs[j] = torch.cat(
                             [outputs[j], last[j].unsqueeze(0)], dim=0
                         )
-    if type(last) == type({}):
+    if type(last) is dict:
         outputs = [outputs]
     return outputs
 
@@ -1543,11 +1606,11 @@ class Every:
         0
     """
 
-    def __init__(self, every):
+    def __init__(self, every: float | None):
         self._every = every
         self._last = None
 
-    def __call__(self, step):
+    def __call__(self, step: int) -> int:
         if not self._every:
             return 0
         if self._last is None:
@@ -1562,7 +1625,7 @@ class Once:
     def __init__(self):
         self._once = True
 
-    def __call__(self):
+    def __call__(self) -> bool:
         if self._once:
             self._once = False
             return True
@@ -1593,16 +1656,16 @@ class Until:
         True
     """
 
-    def __init__(self, until):
+    def __init__(self, until: int | None):
         self._until = until
 
-    def __call__(self, step):
+    def __call__(self, step: int) -> bool:
         if not self._until:
             return True
         return step < self._until
 
 
-def weight_init(m):
+def weight_init(m: nn.Module):
     """Initialize weights for neural network layers using specific initialization schemes.
 
     This function applies custom weight initialization to Linear, Conv2d, ConvTranspose2d
@@ -1635,7 +1698,7 @@ def weight_init(m):
         nn.init.trunc_normal_(
             m.weight.data, mean=0.0, std=std, a=-2.0 * std, b=2.0 * std
         )
-        if hasattr(m.bias, "data"):
+        if m.bias is not None:
             m.bias.data.fill_(0.0)
     elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
         space = m.kernel_size[0] * m.kernel_size[1]
@@ -1647,15 +1710,15 @@ def weight_init(m):
         nn.init.trunc_normal_(
             m.weight.data, mean=0.0, std=std, a=-2.0 * std, b=2.0 * std
         )
-        if hasattr(m.bias, "data"):
+        if m.bias is not None:
             m.bias.data.fill_(0.0)
     elif isinstance(m, nn.LayerNorm):
         m.weight.data.fill_(1.0)
-        if hasattr(m.bias, "data"):
+        if m.bias is not None:
             m.bias.data.fill_(0.0)
 
 
-def uniform_weight_init(given_scale):
+def uniform_weight_init(given_scale: float) -> Callable[[nn.Module], None]:
     """Initialize network weights using uniform distribution.
 
     This function returns a weight initialization function that can be applied to neural network modules.
@@ -1678,7 +1741,7 @@ def uniform_weight_init(given_scale):
         - Biases are initialized to 0 if present
     """
 
-    def f(m):
+    def f(m: nn.Module):
         if isinstance(m, nn.Linear):
             in_num = m.in_features
             out_num = m.out_features
@@ -1686,7 +1749,7 @@ def uniform_weight_init(given_scale):
             scale = given_scale / denoms
             limit = np.sqrt(3 * scale)
             nn.init.uniform_(m.weight.data, a=-limit, b=limit)
-            if hasattr(m.bias, "data"):
+            if m.bias is not None:
                 m.bias.data.fill_(0.0)
         elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
             space = m.kernel_size[0] * m.kernel_size[1]
@@ -1696,17 +1759,19 @@ def uniform_weight_init(given_scale):
             scale = given_scale / denoms
             limit = np.sqrt(3 * scale)
             nn.init.uniform_(m.weight.data, a=-limit, b=limit)
-            if hasattr(m.bias, "data"):
+            if m.bias is not None:
                 m.bias.data.fill_(0.0)
         elif isinstance(m, nn.LayerNorm):
             m.weight.data.fill_(1.0)
-            if hasattr(m.bias, "data"):
+            if m.bias is not None:
                 m.bias.data.fill_(0.0)
 
     return f
 
 
-def tensorstats(tensor, prefix=None):
+def tensorstats(
+    tensor: torch.Tensor, prefix: str | None = None
+) -> dict[str, np.ndarray]:
     metrics = {
         "mean": to_np(torch.mean(tensor)),
         "std": to_np(torch.std(tensor)),
@@ -1718,7 +1783,7 @@ def tensorstats(tensor, prefix=None):
     return metrics
 
 
-def set_seed_everywhere(seed):
+def set_seed_everywhere(seed: int):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
@@ -1733,8 +1798,11 @@ def enable_deterministic_run():
 
 
 def recursively_collect_optim_state_dict(
-    obj, path="", optimizers_state_dicts=None, visited=None
-):
+    obj: object,
+    path: str = "",
+    optimizers_state_dicts: dict[str, dict[str, Any]] | None = None,
+    visited: set[int] | None = None,
+) -> dict[str, dict[str, Any]]:
     """Recursively collects optimizer state dictionaries from a given object and its attributes.
 
     This function traverses through an object's attributes and nested modules to find all
@@ -1786,7 +1854,9 @@ def recursively_collect_optim_state_dict(
     return optimizers_state_dicts
 
 
-def recursively_load_optim_state_dict(obj, optimizers_state_dicts):
+def recursively_load_optim_state_dict(
+    obj: object, optimizers_state_dicts: Mapping[str, dict[str, Any]]
+):
     """
     Recursively loads optimizer state dictionaries into nested objects.
 

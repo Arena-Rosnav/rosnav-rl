@@ -1,14 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Union
+from typing import TYPE_CHECKING, Any, Self
 
+import numpy as np
 from pydantic import BaseModel
 
 from ..utils.type_aliases import (
-    EncodedObservationDict,
+    ObservationDict,
     _SupportedRosnavRLModels,
 )
 
 if TYPE_CHECKING:
+    from ..cfg.framework import FrameworkCfg
     from ..rl_agent import RL_Agent
     from ..spaces.observation_space.spaces.base_observation_space import (
         BaseObservationSpace,
@@ -43,20 +45,20 @@ class RL_Model(ABC):
         config: Property that returns the model configuration (default: empty dict).
     """
 
-    _model: ...
+    _model: _SupportedRosnavRLModels | None
     _algorithm_cfg: BaseModel
     _rl_agent: "RL_Agent"
 
     def __init__(
-        self, rl_agent: "RL_Agent", algorithm_cfg: BaseModel, *args, **kwargs
+        self, rl_agent: "RL_Agent", algorithm_cfg: BaseModel, *args: Any, **kwargs: Any
     ) -> None:
         self._rl_agent = rl_agent
         self._algorithm_cfg = algorithm_cfg
 
     @classmethod
     def from_framework_cfg(
-        cls, rl_agent: "RL_Agent", framework_cfg, *args, **kwargs
-    ) -> "RL_Model":
+        cls, rl_agent: "RL_Agent", framework_cfg: "FrameworkCfg", *args: Any, **kwargs: Any
+    ) -> Self:
         """Construct a model from a :class:`FrameworkCfg` envelope.
 
         Subclasses may override this to extract the relevant portion of the
@@ -64,33 +66,37 @@ class RL_Model(ABC):
         implementation passes the entire ``framework_cfg`` as the algorithm
         config.
         """
-        return cls(rl_agent=rl_agent, algorithm_cfg=framework_cfg, *args, **kwargs)
+        return cls(*args, rl_agent=rl_agent, algorithm_cfg=framework_cfg, **kwargs)
 
     @abstractmethod
-    def setup_model(self, *args, **kwargs):
+    def setup_model(self, *args: Any, **kwargs: Any):
         pass
 
     @abstractmethod
-    def train(self, *args, **kwargs):
+    def train(self, *args: Any, **kwargs: Any):
         raise NotImplementedError()
 
     @abstractmethod
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any):
         pass
 
     @abstractmethod
-    def load(self, *args, **kwargs):
+    def load(self, *args: Any, **kwargs: Any):
         pass
 
     @abstractmethod
-    def get_action(self, observation: "EncodedObservationDict", *args, **kwargs):
+    def get_action(self, observation: ObservationDict, *args: Any, **kwargs: Any) -> np.ndarray:
         pass
 
-    def transfer_weights(self, *args, **kwargs):
+    @abstractmethod
+    def reset(self) -> None:
+        pass
+
+    def transfer_weights(self, *args: Any, **kwargs: Any):
         raise NotImplementedError()
 
     @property
-    def is_model_initialized(self):
+    def is_model_initialized(self) -> bool:
         return self._model is not None
 
     @property
@@ -100,7 +106,7 @@ class RL_Model(ABC):
         return self._model
 
     @model.setter
-    def model(self, model):
+    def model(self, model: _SupportedRosnavRLModels):
         self._model = model
 
     @property
@@ -108,11 +114,11 @@ class RL_Model(ABC):
         return self._algorithm_cfg
 
     @property
-    def observation_space_list(self) -> List["BaseObservationSpace"]:
+    def observation_space_list(self) -> list[type["BaseObservationSpace"]]:
         raise NotImplementedError()
 
     @property
-    def observation_space_kwargs(self) -> Dict[str, Any]:
+    def observation_space_kwargs(self) -> dict[str, Any]:
         raise NotImplementedError()
 
     @property
@@ -124,5 +130,5 @@ class RL_Model(ABC):
         raise NotImplementedError()
 
     @property
-    def config(self) -> Dict[str, Any]:
+    def config(self) -> dict[str, Any]:
         return {}
