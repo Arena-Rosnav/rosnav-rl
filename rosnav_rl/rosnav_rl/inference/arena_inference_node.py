@@ -44,6 +44,7 @@ class ArenaInferenceNode:
 
         node.declare_parameter("agent", "")
         node.declare_parameter("namespace", "")
+        node.declare_parameter("task_generator_node", "")
         node.declare_parameter("frame", "map")
         node.declare_parameter("base_frame", "base_link")
         node.declare_parameter("control_rate", 10.0)
@@ -56,6 +57,9 @@ class ArenaInferenceNode:
         self.train_mode = bool(node.get_parameter("train_mode").get_parameter_value().bool_value)
         if not self.agent_name and not self.train_mode:
             raise RuntimeError("rosnav_rl_inference: parameter 'agent' is required")
+        self.task_generator_node = node.get_parameter("task_generator_node").get_parameter_value().string_value
+        if not self.task_generator_node and not self.train_mode:
+            raise RuntimeError("rosnav_rl_inference: parameter 'task_generator_node' is required")
         self.namespace = Namespace(node.get_parameter("namespace").get_parameter_value().string_value)
         self.frame = node.get_parameter("frame").get_parameter_value().string_value or "map"
         self.base_frame = node.get_parameter("base_frame").get_parameter_value().string_value or "base_link"
@@ -82,8 +86,8 @@ class ArenaInferenceNode:
             self._cmd_vel_pub = node.create_publisher(TwistStamped, "cmd_vel", 1)
             self._reset_sub = node.create_subscription(
                 Int16,
-                "/scenario_reset",
-                self._on_scenario_reset,
+                f"{self.task_generator_node}/task_reset",
+                self._on_task_reset,
                 QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE),
             )
             self.logger.info(f"[rosnav_rl] loading agent '{self.agent_name}'")
@@ -131,8 +135,8 @@ class ArenaInferenceNode:
     def _on_goal(self, msg: PoseStamped) -> None:
         self._goal = msg
 
-    def _on_scenario_reset(self, _msg: Int16) -> None:
-        self.agent.model.reset()
+    def _on_task_reset(self, _msg: Int16) -> None:
+        self.agent.reset()
         self._last_speed = 0.0
 
     def _step(self) -> None:

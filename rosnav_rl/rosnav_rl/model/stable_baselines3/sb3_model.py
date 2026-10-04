@@ -51,7 +51,6 @@ class StableBaselinesModelState:
     tracking observations, actions, and reset status.
 
     Attributes:
-        last_observation (np.ndarray): The most recent observation from the environment. Default is None.
         last_action (np.ndarray): The most recent action taken by the model. Default is [0, 0, 0].
         _reset_state (bool): Internal flag indicating if the state should be reset. Default is True.
         model_state (Tuple[np.ndarray, ...]): The internal state of the model. Default is None.
@@ -62,7 +61,6 @@ class StableBaselinesModelState:
         reset_state (setter): Sets the internal reset state flag.
     """
 
-    last_observation: np.ndarray = None
     last_action: np.ndarray = np.ndarray([0, 0, 0])
     _reset_state: bool = True
     model_state: Tuple[np.ndarray, ...] = None
@@ -155,7 +153,10 @@ class StableBaselinesEnv:
             batched = {k: np.asarray(v)[np.newaxis] for k, v in observation.items()}
         else:
             batched = np.asarray(observation)[np.newaxis]
-        return self._stack_wrapper.stacked_obs.reset(observation=batched)
+        stacked = self._stack_wrapper.stacked_obs.reset(observation=batched)
+        if isinstance(stacked, dict):
+            return {k: v[0] for k, v in stacked.items()}
+        return stacked[0]
 
     @property
     def has_norm_wrapper(self) -> bool:
@@ -351,13 +352,16 @@ class StableBaselinesModel(RL_Model):
                 )
             )
 
+        episode_start = self.__state.reset_state
+
         if self.__env.has_stack_wrapper:
-            observation, _ = self.__env.stack(observation)
+            if episode_start:
+                observation = self.__env.reset(observation)
+            else:
+                observation, _ = self.__env.stack(observation)
 
         if self.__env.has_norm_wrapper:
             observation = self.__env.normalize(observation)
-
-        self.__state.last_observation = observation
 
         action, self.__state.model_state = self._predict(
             observation=observation,
@@ -365,7 +369,7 @@ class StableBaselinesModel(RL_Model):
             state=self.__state.model_state,
             episode_start=(
                 np.array([True] * self.__env.env.num_envs)
-                if self.__state.reset_state
+                if episode_start
                 else None
             ),
         )
@@ -716,15 +720,8 @@ class StableBaselinesModel(RL_Model):
         return actions.squeeze(axis=0), state
 
     def reset(self) -> None:
-        """
-        Resets the internal state of the model and the environment if necessary.
-
-        This method resets the internal state of the model. If the environment has a stack wrapper and there is a
-        last observation available in the state, it also resets the environment with the last observation.
-        """
+        """Reset the model state so the next observation starts a fresh frame stack."""
         self.__state.reset()
-        if self.__env is not None and self.__env.has_stack_wrapper and self.__state.last_observation:
-            self.__env.reset(self.__state.last_observation)
 
     @property
     def observation_space_list(self) -> List["BaseObservationSpace"]:

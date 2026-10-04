@@ -514,7 +514,7 @@ At inference time use `spec.parameters` directly, or
   - `action` layout: `[vx, wz]` for diff-drive; `[vx, vy, wz]` for omni; `[j1..jN]` for manipulators
 - **Protocol**: `ObservationCollector` — duck-typed, any object with `get_observations() → ObservationDict`
 - **Error handling**: logs warnings, returns empty `action[]` on transient failures
-- **Scene reset**: subscribes to `/scenario_reset` and calls `agent.model.reset()`
+- **Scene reset**: subscribes to `/scenario_reset` and calls `agent.reset()`
 
 **`ArenaActionServer`** — Arena-specific implementation:
 - Resolves agent directory via `ROSNAV_AGENTS_DIR`, `ament_index`, or path search

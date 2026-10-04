@@ -189,6 +189,11 @@ class RL_Agent:
         """
         return self.model.get_action(observation=observation, *args, **kwargs)
 
+    def reset(self) -> None:
+        """Reset the model and observation space state for a new episode."""
+        self.model.reset()
+        self._space_manager.reset_spaces()
+
     @property
     def config(self) -> Dict[str, dict]:
         """Configuration dictionary for the agent."""
