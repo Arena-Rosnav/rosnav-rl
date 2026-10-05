@@ -692,3 +692,25 @@ class TestDreamerV3TrialPruner:
         assert result is True
         # report called twice: once from after_eval_hook, once from check_and_report
         assert trial.report.call_count == 2
+
+    @requires_optuna
+    def test_after_eval_hook_reports_configured_metric(self):
+        import optuna
+
+        study = optuna.create_study(direction="maximize")
+        pruner = DreamerV3TrialPruner(study.ask(), metric="eval_success_rate")
+
+        pruner.after_eval_hook({"eval_return": 42.0, "eval_success_rate": 0.75})
+
+        assert pruner.read_metric() == 0.75
+        assert pruner.best_metric == 0.75
+        assert study.trials[0].intermediate_values == {0: 0.75}
+
+    @requires_optuna
+    def test_after_eval_hook_raises_on_missing_metric(self):
+        import optuna
+
+        pruner = DreamerV3TrialPruner(optuna.create_study().ask(), metric="eval_success_rate")
+
+        with pytest.raises(KeyError):
+            pruner.after_eval_hook({"eval_return": 42.0})

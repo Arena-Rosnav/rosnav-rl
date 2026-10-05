@@ -499,3 +499,14 @@ class TestSB3DictParsing:
         assert agent.model is not None
         assert agent.space_manager is not None
 
+
+class TestSB3ModelStateIsolation:
+    def test_state_is_not_shared_between_instances(self, agent_state):
+        agent_a = RL_Agent(agent_state.model_copy(update={"name": "state_isolation_a"}))
+        agent_b = RL_Agent(agent_state.model_copy(update={"name": "state_isolation_b"}))
+        state_a = agent_a.model._StableBaselinesModel__state
+        state_b = agent_b.model._StableBaselinesModel__state
+
+        assert state_a is not state_b
+        assert state_a.reset_state is True
+        assert state_b.reset_state is True

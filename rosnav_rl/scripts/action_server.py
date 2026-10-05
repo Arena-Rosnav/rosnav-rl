@@ -26,9 +26,13 @@ def main(args=None):
 
     param_node.declare_parameter("agent_name", "")
     param_node.declare_parameter("namespace", "")
+    param_node.declare_parameter("frame", "")
+    param_node.declare_parameter("base_frame", "base_link")
 
     agent_name = param_node.get_parameter("agent_name").get_parameter_value().string_value
     namespace = param_node.get_parameter("namespace").get_parameter_value().string_value
+    robot_frame = param_node.get_parameter("frame").get_parameter_value().string_value
+    base_frame = param_node.get_parameter("base_frame").get_parameter_value().string_value
 
     param_node.destroy_node()
 
@@ -46,6 +50,8 @@ def main(args=None):
     action_server = ArenaActionServer(
         agent_name=agent_name,
         namespace=namespace,
+        robot_frame=robot_frame,
+        base_frame=base_frame,
     )
 
     try:

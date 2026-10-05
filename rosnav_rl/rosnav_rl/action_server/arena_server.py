@@ -1,4 +1,3 @@
-import importlib.resources
 import os
 from pathlib import Path
 
@@ -7,8 +6,10 @@ import yaml
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.observations.factory.factory import (
     create_observation_manager_from_config,
+    set_robot_pose_frames,
 )
 from rosnav_rl.rl_agent import RL_Agent
+from rosnav_rl.utils.agent_paths import resolve_observations_config_path
 from rosnav_rl.utils.utils import load_yaml
 
 from .base_server import ActionServer, ObservationCollector
@@ -78,6 +79,11 @@ def _resolve_agent_dir(agent_name: str) -> Path:
 
 
 class ArenaActionServer(ActionServer):
+    def __init__(self, agent_name: str, namespace: str = "", robot_frame: str = "", base_frame: str = "base_link") -> None:
+        super().__init__(agent_name, namespace)
+        self.robot_frame = robot_frame
+        self.base_frame = base_frame
+
     def _initialize_agent(self) -> RL_Agent:
         """Initialize and return an RL_Agent from a saved training config.
 
@@ -94,6 +100,7 @@ class ArenaActionServer(ActionServer):
         )
 
         spec = training_cfg.agent_config
+        self._agent_spec = spec
         self.agent_parameters: AgentParameters = spec.parameters
 
         agent = RL_Agent(spec)
@@ -104,26 +111,18 @@ class ArenaActionServer(ActionServer):
         """
         Initializes and returns an ObservationCollector instance.
 
-        Uses the ObservationManager.from_config() factory with the bundled
-        observations.yaml config to set up ROS2 topic subscribers for
+        Uses the ObservationManager.from_config() factory with the observations
+        config the agent was trained with to set up ROS2 topic subscribers for
         collecting sensor data needed by the RL agent.
 
         Returns:
             ObservationCollector: Configured ObservationManager instance.
         """
-        # Try to use agent-specific observation config if saved, otherwise use default
-        agent_dir = _resolve_agent_dir(self.agent_name)
-        obs_config_path = agent_dir / "observations.yaml"
-
-        if not obs_config_path.exists():
-            obs_config_path = str(
-                importlib.resources.files("rosnav_rl")
-                / "observations"
-                / "observations.yaml"
-            )
+        obs_config_path = resolve_observations_config_path(self._agent_spec)
 
         with open(obs_config_path) as f:
             config = yaml.safe_load(f)
+        set_robot_pose_frames(config, self.robot_frame, self.base_frame)
 
         obs_manager = create_observation_manager_from_config(
             config=config,

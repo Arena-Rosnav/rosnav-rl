@@ -8,6 +8,7 @@ configuration and instantiated data sources.
 
 from __future__ import annotations
 
+import posixpath
 from typing import TYPE_CHECKING, Any
 
 from ..data_sources.base import Collector, DataSource, Generator
@@ -194,6 +195,15 @@ class ObservationFactory:
             "collectors": self._collectors.copy(),
             "generators": self._generators.copy(),
         }
+
+
+def set_robot_pose_frames(config: dict[str, Any], robot_frame: str, base_frame: str) -> None:
+    """Point every RobotPoseTFGenerator in *config* at the robot's base and odom frames under *robot_frame*."""
+    for ds in config.get("datasources", {}).values():
+        if ds.get("type") == "RobotPoseTFGenerator":
+            params = ds.setdefault("params", {})
+            params["source_frame"] = posixpath.join(robot_frame, base_frame)
+            params["target_frame"] = posixpath.join(robot_frame, "odom")
 
 
 def create_observation_manager_from_config(

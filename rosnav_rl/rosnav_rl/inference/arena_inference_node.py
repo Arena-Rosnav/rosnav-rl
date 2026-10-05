@@ -2,7 +2,7 @@
 
 Runs the policy at a fixed rate, publishes `subgoal` (lookahead along the
 straight robot→goal line) for the observation pipeline, and emits the
-decoded command as `TwistStamped` on `~/cmd_vel`.
+decoded command as `Twist` on `~/cmd_vel`.
 
 When `train_mode=true`, only the subgoal pipeline runs; the agent, ObservationManager,
 and cmd_vel publisher are skipped — the training loop owns the policy in that case.
@@ -10,15 +10,14 @@ and cmd_vel publisher are skipped — the training loop owns the policy in that 
 
 from __future__ import annotations
 
-import importlib.resources
 import math
-from pathlib import Path
+import posixpath
 from typing import TYPE_CHECKING
 
 import rclpy
 import tf2_ros
 import yaml
-from geometry_msgs.msg import PoseStamped, TwistStamped
+from geometry_msgs.msg import PoseStamped, Twist
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Int16
@@ -26,9 +25,10 @@ from std_msgs.msg import Int16
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.observations.factory.factory import (
     create_observation_manager_from_config,
+    set_robot_pose_frames,
 )
 from rosnav_rl.rl_agent import RL_Agent
-from rosnav_rl.utils.agent_paths import resolve_agent_dir
+from rosnav_rl.utils.agent_paths import resolve_agent_dir, resolve_observations_config_path
 from rosnav_rl.utils.rostopic import Namespace
 from rosnav_rl.utils.utils import load_yaml
 
@@ -49,7 +49,7 @@ class ArenaInferenceNode:
         node.declare_parameter("agent", "")
         node.declare_parameter("namespace", "")
         node.declare_parameter("task_generator_node", "")
-        node.declare_parameter("frame", "map")
+        node.declare_parameter("frame", "")
         node.declare_parameter("base_frame", "base_link")
         node.declare_parameter("control_rate", 10.0)
         node.declare_parameter("min_lookahead_dist", 0.5)
@@ -65,7 +65,7 @@ class ArenaInferenceNode:
         if not self.task_generator_node and not self.train_mode:
             raise RuntimeError("rosnav_rl_inference: parameter 'task_generator_node' is required")
         self.namespace = Namespace(node.get_parameter("namespace").get_parameter_value().string_value)
-        self.frame = node.get_parameter("frame").get_parameter_value().string_value or "map"
+        self.frame = node.get_parameter("frame").get_parameter_value().string_value
         self.base_frame = node.get_parameter("base_frame").get_parameter_value().string_value or "base_link"
         self.control_rate = float(node.get_parameter("control_rate").get_parameter_value().double_value or 10.0)
         self.min_lookahead = float(node.get_parameter("min_lookahead_dist").get_parameter_value().double_value or 0.5)
@@ -87,7 +87,7 @@ class ArenaInferenceNode:
         )
 
         if not self.train_mode:
-            self._cmd_vel_pub = node.create_publisher(TwistStamped, "cmd_vel", 1)
+            self._cmd_vel_pub = node.create_publisher(Twist, "cmd_vel", 1)
             self._reset_sub = node.create_subscription(
                 Int16,
                 f"{self.task_generator_node}/task_reset",
@@ -114,20 +114,17 @@ class ArenaInferenceNode:
         model_dir = resolve_agent_dir(self.agent_name)
         training_cfg = TrainingCfg.model_validate(load_yaml(model_dir / "training_config.yaml"))
         spec = training_cfg.agent_config
+        self._agent_spec = spec
         self._agent_parameters: AgentParameters = spec.parameters
         agent = RL_Agent(spec)
         agent.load_model(path=model_dir / "best_model.zip")
         return agent
 
     def _load_observation_manager(self) -> ObservationManager:
-        agent_dir = resolve_agent_dir(self.agent_name)
-        obs_config_path: Path | str = agent_dir / "observations.yaml"
-        if not Path(obs_config_path).exists():
-            obs_config_path = str(
-                importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml"
-            )
+        obs_config_path = resolve_observations_config_path(self._agent_spec)
         with open(obs_config_path) as f:
             config = yaml.safe_load(f)
+        set_robot_pose_frames(config, self.frame, self.base_frame)
         return create_observation_manager_from_config(
             config=config,
             node=self.node,
@@ -166,15 +163,9 @@ class ArenaInferenceNode:
             return
 
         try:
-            raw_action = self.agent.get_action(observations)
+            cmd = self.agent.get_action(observations)
         except Exception as exc:
             self.logger.warn(f"[rosnav_rl] get_action failed: {type(exc).__name__}: {exc}")
-            return
-
-        try:
-            cmd = self.agent.space_manager.action_space_manager.decode_action(raw_action)
-        except Exception as exc:
-            self.logger.warn(f"[rosnav_rl] decode_action failed: {type(exc).__name__}: {exc}")
             return
 
         self._publish_cmd_vel(float(cmd[0]), float(cmd[1]), float(cmd[2]))
@@ -182,8 +173,8 @@ class ArenaInferenceNode:
     def _lookup_robot_xy(self) -> tuple[float, float] | None:
         try:
             tf = self._tf_buffer.lookup_transform(
-                self.frame,
-                self.base_frame,
+                self._goal.header.frame_id,
+                posixpath.join(self.frame, self.base_frame),
                 rclpy.time.Time(),
             )
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
@@ -203,7 +194,7 @@ class ArenaInferenceNode:
             sy = robot_xy[1] + dy * scale
 
         msg = PoseStamped()
-        msg.header.frame_id = self.frame
+        msg.header.frame_id = self._goal.header.frame_id
         msg.header.stamp = self.node.get_clock().now().to_msg()
         msg.pose.position.x = sx
         msg.pose.position.y = sy
@@ -211,12 +202,10 @@ class ArenaInferenceNode:
         self._subgoal_pub.publish(msg)
 
     def _publish_cmd_vel(self, vx: float, vy: float, wz: float) -> None:
-        msg = TwistStamped()
-        msg.header.stamp = self.node.get_clock().now().to_msg()
-        msg.header.frame_id = self.base_frame
-        msg.twist.linear.x = vx
-        msg.twist.linear.y = vy
-        msg.twist.angular.z = wz
+        msg = Twist()
+        msg.linear.x = vx
+        msg.linear.y = vy
+        msg.angular.z = wz
         self._cmd_vel_pub.publish(msg)
         self._last_speed = math.hypot(vx, vy)
 

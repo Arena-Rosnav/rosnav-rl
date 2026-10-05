@@ -83,6 +83,26 @@ def test_dreamer_builds_plan2explore_exploration(tmp_path):
     assert agent.get_action(_raw_observation(2.0)).shape == (3,)
 
 
+def test_dreamer_load_raises_on_missing_checkpoint(tmp_path):
+    agent = _dreamer_agent(tmp_path)
+
+    with pytest.raises(FileNotFoundError):
+        agent.model.load("missing_checkpoint")
+
+
+def test_dreamer_load_skips_missing_checkpoint_when_missing_ok(tmp_path):
+    agent = _dreamer_agent(tmp_path)
+
+    agent.model.load("missing_checkpoint", missing_ok=True)
+
+
+def test_dreamer_load_restores_saved_checkpoint(tmp_path):
+    agent = _dreamer_agent(tmp_path)
+    agent.model.save("saved_checkpoint")
+
+    agent.model.load("saved_checkpoint")
+
+
 def test_dreamer_agent_config_without_name_gets_generated_name():
     spec = AgentConfig(
         action_space=DifferentialDriveActionSpace(linear_range=(-0.5, 0.5), angular_range=(-1.0, 1.0)),

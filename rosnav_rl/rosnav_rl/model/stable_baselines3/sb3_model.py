@@ -209,7 +209,7 @@ class StableBaselinesModel(RL_Model):
     _model: _SupportedStableBaselinesModels | None = None
     _algorithm_cfg: "sb3_cfg.SBAlgorithmCfg | None" = None
     __env: StableBaselinesEnv | None = None
-    __state: StableBaselinesModelState = StableBaselinesModelState()
+    __state: StableBaselinesModelState
 
     def __init__(self, rl_agent: "RL_Agent", algorithm_cfg: "sb3_cfg.SBAlgorithmCfg"):
         """
@@ -227,6 +227,7 @@ class StableBaselinesModel(RL_Model):
             normalization (Optional[NormalizationCfg]): The configuration for normalization.
         """
         super().__init__(rl_agent, algorithm_cfg)
+        self.__state = StableBaselinesModelState()
         self.__setup_agent_factory_and_policy_description()
 
     @classmethod

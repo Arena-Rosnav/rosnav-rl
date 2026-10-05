@@ -198,7 +198,7 @@ class StopTrainingOnRewardThreshold(BaseCallback):
         # Convert np.bool_ to bool, otherwise callback() is False won't work
         continue_training = bool(
             self.parent.best_mean_reward < self.reward_threshold
-            and not self.is_last_state_getter()
+            or not self.is_last_state_getter()
         )
         if self.verbose >= 1 and not continue_training:
             print(
@@ -240,7 +240,7 @@ class StopTrainingOnSuccessThreshold(BaseCallback):
         # Convert np.bool_ to bool, otherwise callback() is False won't work
         continue_training = bool(
             self.parent.last_success_rate < self.success_threshold
-            and not self.last_state_getter()
+            or not self.last_state_getter()
         )
         if self.verbose >= 1 and not continue_training:
             print(

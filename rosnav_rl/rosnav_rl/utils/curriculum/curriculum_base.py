@@ -70,6 +70,7 @@ class CurriculumBase(ABC):
         starting_stage: initial curriculum stage index (default 0)
         verbose: verbosity level (0 quiet, >0 prints/logs)
         timeout: service call timeout in seconds
+        tm_dict: task modes queued before the initial stage is applied
 
     Hooks (callable signature): on_apply(stage_index, stage_dict), on_advance(idx), on_retreat(idx)
     """
@@ -87,6 +88,7 @@ class CurriculumBase(ABC):
         starting_stage: int = 0,
         verbose: int = 0,
         timeout: float = 10.0,
+        tm_dict: dict[str, Any] | None = None,
     ):
         self.node = node
         self.threshold_type = threshold_type
@@ -128,6 +130,9 @@ class CurriculumBase(ABC):
         # Nodes confirmed to lack config/queue_episode; task-prefixed params fall
         # back to SetParameters for these (same as legacy behaviour).
         self._non_task_generator_nodes: set[str] = set()
+
+        if tm_dict:
+            self._queue_episode(tm_dict)
 
         # Apply initial stage
         self._apply_curriculum()
