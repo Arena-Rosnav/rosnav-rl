@@ -35,6 +35,9 @@ aliases:
   # Social navigation - pedestrian data
   people_data: people_detections          # Raw pedestrian detections (people_msgs)
   arena_people_data: arena_pedestrian_detections  # Arena pedestrian detections (arena_people_msgs)
+  pedestrian_relative_locations: arena_pedestrian_relative_locations
+  pedestrian_relative_velocities: arena_pedestrian_relative_velocities
+  pedestrian_social_states: arena_pedestrian_states
 
 datasources:
   # ---------------------------------------------------------------------------
@@ -91,11 +94,11 @@ datasources:
   #     up_to_date_required: true
 
   # Arena pedestrian detection (arena_people_msgs)
-  # arena_pedestrian_detections:
-  #   type: arena_people_msgs/Pedestrians  # → ArenaPedestrianDetections
-  #   params:
-  #     topic: "/task_generator_node/arena_peds"  # Arena pedestrian simulator output
-  #     up_to_date_required: true
+  arena_pedestrian_detections:
+    type: arena_people_msgs/Pedestrians  # → ArenaPedestrianDetections
+    params:
+      topic: "arena_peds"              # Rebased onto the env namespace at load
+      up_to_date_required: false
 
   collision_monitor:
     type: nav2_msgs/CollisionMonitorState  # → SafetyStatus
@@ -193,11 +196,11 @@ datasources:
   # pedestrian_relative_velocities:
   #   type: PedestrianRelativeVelGenerator         # Computes pedestrian velocities in robot frame
 
-  # pedestrian_vel_x:
-  #   type: PedestrianRelativeVelXGenerator        # Forward/backward velocity component
+  pedestrian_vel_x:
+    type: PedestrianRelativeVelXGenerator        # Forward/backward velocity component
 
-  # pedestrian_vel_y:
-  #   type: PedestrianRelativeVelYGenerator        # Left/right velocity component  
+  pedestrian_vel_y:
+    type: PedestrianRelativeVelYGenerator        # Left/right velocity component  
 
   # # Social navigation metrics
   # pedestrian_distances:
@@ -217,23 +220,29 @@ datasources:
   # twist, and animation state information from the Arena simulator.
   
   # Arena pedestrian position processing
-  # arena_pedestrian_relative_locations:
-  #   type: ArenaPedestrianRelativeLocationGenerator  # Transforms Arena pedestrian positions to robot frame
+  arena_pedestrian_relative_locations:
+    type: ArenaPedestrianRelativeLocationGenerator  # Transforms Arena pedestrian positions to robot frame
 
   # arena_pedestrian_world_locations:
   #   type: ArenaPedestrianLocationGenerator          # Extracts world coordinates of Arena pedestrians
 
   # # Arena pedestrian motion analysis
-  # arena_pedestrian_relative_velocities:
-  #   type: ArenaPedestrianRelativeVelGenerator       # Computes Arena pedestrian velocities in robot frame
+  arena_pedestrian_relative_velocities:
+    type: ArenaPedestrianRelativeVelGenerator       # Computes Arena pedestrian velocities in robot frame
 
   # # Arena pedestrian metrics
   # arena_pedestrian_distances:
   #   type: ArenaPedestrianDistanceGenerator          # Minimum distances to each Arena pedestrian by ID
 
+  pedestrian_distances:
+    type: ArenaPedestrianTypeDistanceGenerator      # Minimum distance per pedestrian type
+
+  pedestrian_types:
+    type: ArenaPedestrianTypeGenerator              # Type code per Arena pedestrian
+
   # # Arena pedestrian animation/behavior states
-  # arena_pedestrian_states:
-  #   type: ArenaPedestrianStateGenerator    # Extracts animation states (IDLE, WALKING, RUNNING, etc.)
+  arena_pedestrian_states:
+    type: ArenaPedestrianStateGenerator    # Extracts animation states (IDLE, WALKING, RUNNING, etc.)
 
 # =============================================================================
 # CONFIGURATION EXAMPLES & USAGE PATTERNS

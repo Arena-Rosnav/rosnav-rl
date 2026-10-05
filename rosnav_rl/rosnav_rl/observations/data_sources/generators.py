@@ -1156,3 +1156,39 @@ class ArenaPedestrianStateGenerator(Generator[ArenaPedestrianStates]):
             self._animation_states_buffer[i] = p.animation_state
 
         return self._animation_states_buffer
+
+
+class ArenaPedestrianTypeGenerator(Generator[PedestrianTypeArray]):
+    """Type code per Arena pedestrian, all of type 0."""
+
+    requires = {
+        "arena_people_data": ArenaPedestrianDetections,
+    }
+
+    def _generate(
+        self,
+        arena_people_data: arena_people_msgs.Pedestrians,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> PedestrianTypeArray:
+        if not arena_people_data:
+            return np.array([], dtype=np.int32)
+        return np.zeros(len(arena_people_data.pedestrians), dtype=np.int32)
+
+
+class ArenaPedestrianTypeDistanceGenerator(Generator[PedestrianTypeMinDistances]):
+    """Minimum distance to the Arena pedestrians, keyed by their type 0."""
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+    }
+
+    def _generate(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> PedestrianTypeMinDistances:
+        if len(pedestrian_relative_locations) == 0:
+            return {}
+        return {0: float(np.linalg.norm(pedestrian_relative_locations, axis=1).min())}

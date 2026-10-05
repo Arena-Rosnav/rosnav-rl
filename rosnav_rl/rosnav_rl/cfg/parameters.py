@@ -186,7 +186,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     ped_social_state_num: int = Field(
-        5,
+        6,
         description=(
             "Number of social-state categories for pedestrian modelling. "
             "Used by: SocialStateFeaturesSpace."

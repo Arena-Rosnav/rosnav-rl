@@ -6,6 +6,7 @@ import yaml
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.observations.factory.factory import (
     create_observation_manager_from_config,
+    set_pedestrians_topic,
     set_robot_pose_frames,
 )
 from rosnav_rl.rl_agent import RL_Agent
@@ -123,6 +124,7 @@ class ArenaActionServer(ActionServer):
         with open(obs_config_path) as f:
             config = yaml.safe_load(f)
         set_robot_pose_frames(config, self.robot_frame, self.base_frame)
+        set_pedestrians_topic(config, str(self.namespace))
 
         obs_manager = create_observation_manager_from_config(
             config=config,

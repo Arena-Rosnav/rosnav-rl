@@ -206,6 +206,13 @@ def set_robot_pose_frames(config: dict[str, Any], robot_frame: str, base_frame: 
             params["target_frame"] = posixpath.join(robot_frame, "odom")
 
 
+def set_pedestrians_topic(config: dict[str, Any], robot_ns: str) -> None:
+    """Point every Arena pedestrian collector in *config* at the arena_peds topic of the env that owns *robot_ns*."""
+    for ds in config.get("datasources", {}).values():
+        if ds.get("type") in ("arena_people_msgs/Pedestrians", "ArenaPedestrianCollector"):
+            ds.setdefault("params", {})["topic"] = posixpath.join(posixpath.dirname(posixpath.dirname(robot_ns)), "arena_peds")
+
+
 def create_observation_manager_from_config(
     config: dict[str, Any],
     node: Node,
