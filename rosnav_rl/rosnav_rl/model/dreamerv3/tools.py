@@ -317,6 +317,7 @@ def simulate(
         _pause = envs[0].pause
     except Exception:
         _pause = None
+    gathered = envs[0].lockstep
 
     # initialize or unpack simulation state
     if state is None:
@@ -360,6 +361,10 @@ def simulate(
             action = np.array(action)
         assert len(action) == len(envs)
         # step envs
+        if gathered:
+            for applied in [e.apply_action(a) for e, a in zip(envs, action, strict=True)]:
+                applied()
+            envs[0].step_sim()()
         results = [e.step(a) for e, a in zip(envs, action, strict=True)]
         results = [r() for r in results]
         obs, reward, done = zip(*[p[:3] for p in results], strict=True)

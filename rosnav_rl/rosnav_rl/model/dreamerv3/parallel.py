@@ -507,3 +507,9 @@ class Damy:
 
     def reset(self) -> Callable[[], EncodedObservationDict]:
         return lambda: self._env.reset()
+
+    def apply_action(self, action: object) -> Callable[[], None]:
+        return lambda: self._env.apply_action(action)
+
+    def step_sim(self) -> Callable[[], None]:
+        return lambda: self._env.step_sim()
