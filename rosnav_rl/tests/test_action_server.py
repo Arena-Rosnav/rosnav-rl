@@ -29,9 +29,11 @@ import pytest
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def _get_agents_dir() -> Path:
     """Use the same resolution logic as the action server itself."""
     from rosnav_rl.action_server.arena_server import _find_agents_dir
+
     return _find_agents_dir()
 
 
@@ -206,13 +208,9 @@ class TestGetCommandService:
         if not rclpy.ok():
             rclpy.init()
 
-        self.server = ConcreteServer(
-            agent_name="action_server_agent", namespace="test_ns"
-        )
+        self.server = ConcreteServer(agent_name="action_server_agent", namespace="test_ns")
 
-        self._spin_thread = threading.Thread(
-            target=self.server.start, daemon=True
-        )
+        self._spin_thread = threading.Thread(target=self.server.start, daemon=True)
         self._spin_thread.start()
         time.sleep(0.5)
         yield
@@ -225,14 +223,11 @@ class TestGetCommandService:
         from rosnav_rl_msgs.srv import GetCommand
 
         client_node = rclpy.create_node("test_client")
-        client = client_node.create_client(
-            GetCommand, "/test_ns/get_command"
-        )
+        client = client_node.create_client(GetCommand, "/test_ns/get_command")
         executor = SingleThreadedExecutor()
         executor.add_node(client_node)
 
-        assert client.wait_for_service(timeout_sec=5.0), \
-            "GetCommand service not available within 5 s"
+        assert client.wait_for_service(timeout_sec=5.0), "GetCommand service not available within 5 s"
 
         future = client.call_async(GetCommand.Request())
         executor.spin_until_future_complete(future, timeout_sec=5.0)
@@ -269,10 +264,7 @@ class TestGetCommandService:
 TEST_AGENT_DIR = _get_agents_dir() / "test_agent"
 requires_test_agent = pytest.mark.skipif(
     not TEST_AGENT_DIR.is_dir(),
-    reason=(
-        "Test agent not found. Run: "
-        "python3 scripts/create_test_agent.py --agent-name test_agent"
-    ),
+    reason=("Test agent not found. Run: python3 scripts/create_test_agent.py --agent-name test_agent"),
 )
 
 
@@ -291,9 +283,7 @@ class TestLoadPipeline:
         from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg
         from rosnav_rl.utils.utils import load_yaml
 
-        cfg = TrainingCfg.model_validate(
-            load_yaml(TEST_AGENT_DIR / "training_config.yaml")
-        )
+        cfg = TrainingCfg.model_validate(load_yaml(TEST_AGENT_DIR / "training_config.yaml"))
         assert cfg.agent_cfg.name == "test_agent"
 
     @ros2
@@ -318,8 +308,7 @@ class TestLoadPipeline:
         # Verify the model weights were actually loaded (not still uninitialised).
         # StableBaselinesModel.load() sets self._model; is_model_initialized
         # becomes True only after a successful load.
-        assert agent.model.is_model_initialized, \
-            "Model was not loaded — is_model_initialized is still False"
+        assert agent.model.is_model_initialized, "Model was not loaded — is_model_initialized is still False"
 
         # Sanity-check the action + observation spaces match AGENT_3 specs.
         obs_space = agent.observation_space

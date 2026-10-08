@@ -87,7 +87,8 @@ class RL_Agent:
         self._reward_function = None
 
         self._model = ModelFactory.create_model_instance(
-            framework_cfg=spec.framework, rl_agent=self,
+            framework_cfg=spec.framework,
+            rl_agent=self,
         )
 
         self._space_manager = BaseSpaceManager(

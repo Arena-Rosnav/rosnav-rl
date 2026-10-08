@@ -7,9 +7,7 @@ from geometry_msgs.msg import Pose, Pose2D, PoseWithCovariance
 DistanceToGoal = float
 AngleToGoal = float
 Pose2DType = np.dtype([("x", np.float32), ("y", np.float32), ("yaw", np.float32)])
-TwistType = np.dtype(
-    [("linear_x", np.float32), ("linear_y", np.float32), ("angular", np.float32)]
-)
+TwistType = np.dtype([("linear_x", np.float32), ("linear_y", np.float32), ("angular", np.float32)])
 
 
 def euler_from_quaternion(quaternion: Sequence[float]) -> tuple[float, float, float]:
@@ -38,15 +36,11 @@ def euler_from_quaternion(quaternion: Sequence[float]) -> tuple[float, float, fl
     return (roll, pitch, yaw)
 
 
-def get_goal_pose_in_robot_frame(
-    goal_pos: Pose2D, robot_pos: Pose2D
-) -> tuple[DistanceToGoal, AngleToGoal]:
+def get_goal_pose_in_robot_frame(goal_pos: Pose2D, robot_pos: Pose2D) -> tuple[DistanceToGoal, AngleToGoal]:
     y_relative = goal_pos.y - robot_pos.y
     x_relative = goal_pos.x - robot_pos.x
     rho = (x_relative**2 + y_relative**2) ** 0.5
-    theta = (np.arctan2(y_relative, x_relative) - robot_pos.theta + 4 * np.pi) % (
-        2 * np.pi
-    ) - np.pi
+    theta = (np.arctan2(y_relative, x_relative) - robot_pos.theta + 4 * np.pi) % (2 * np.pi) - np.pi
     return rho, theta
 
 

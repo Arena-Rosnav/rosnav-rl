@@ -40,13 +40,17 @@ def test_types_are_empty_before_the_first_pedestrians_message():
 def test_type_distance_is_the_nearest_pedestrian_under_type_zero():
     locations = np.array([[3.0, 4.0], [0.0, 2.0], [-6.0, 0.0]], dtype=np.float32)
 
-    distances = ArenaPedestrianTypeDistanceGenerator(name="pedestrian_distances")._generate(locations, AgentParameters())
+    distances = ArenaPedestrianTypeDistanceGenerator(name="pedestrian_distances")._generate(
+        locations, AgentParameters()
+    )
 
     assert distances == {0: 2.0}
 
 
 def test_type_distance_is_empty_without_pedestrians():
-    distances = ArenaPedestrianTypeDistanceGenerator(name="pedestrian_distances")._generate(np.array([]), AgentParameters())
+    distances = ArenaPedestrianTypeDistanceGenerator(name="pedestrian_distances")._generate(
+        np.array([]), AgentParameters()
+    )
 
     assert distances == {}
 

@@ -101,9 +101,7 @@ class NormalizeActions(_GymDelegatingWrapper):
 
     def __init__(self, env: gym.Env):
         super().__init__(env)
-        self._mask = np.logical_and(
-            np.isfinite(env.action_space.low), np.isfinite(env.action_space.high)
-        )
+        self._mask = np.logical_and(np.isfinite(env.action_space.low), np.isfinite(env.action_space.high))
         self._low = np.where(self._mask, env.action_space.low, -1)
         self._high = np.where(self._mask, env.action_space.high, 1)
         low = np.where(self._mask, -np.ones_like(self._low), self._low)
@@ -188,9 +186,7 @@ class RewardObs(_GymDelegatingWrapper):
         super().__init__(env)
         spaces = self.env.observation_space.spaces
         if "obs_reward" not in spaces:
-            spaces["obs_reward"] = gym.spaces.Box(
-                -np.inf, np.inf, shape=(1,), dtype=np.float32
-            )
+            spaces["obs_reward"] = gym.spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float32)
         self.observation_space = gym.spaces.Dict(spaces)
 
     def step(self, action: object) -> StepResult:

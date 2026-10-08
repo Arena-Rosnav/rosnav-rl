@@ -26,12 +26,8 @@ class TransferWeightsCfg(BaseModel):
         check_source_dir: Validates that the source directory exists and converts it to a Path object.
     """
 
-    source_dir: str | Path = Field(
-        ..., description="Directory where the source agent's model is saved."
-    )
-    source_checkpoint: str = Field(
-        "last_model", description="Checkpoint to load from the source agent."
-    )
+    source_dir: str | Path = Field(..., description="Directory where the source agent's model is saved.")
+    source_checkpoint: str = Field("last_model", description="Checkpoint to load from the source agent.")
     include: list[str] | None = Field(
         default_factory=list,
         description="List of regex patterns for keys to include in the transfer. If None, no weights will be transferred.",

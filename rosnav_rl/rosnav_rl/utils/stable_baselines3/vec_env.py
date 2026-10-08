@@ -4,9 +4,7 @@ import rosnav_rl.utils.stable_baselines3.vec_frame_stack as vec_frame_stack
 
 
 def apply_vec_framestack(env: VecEnv, stack_size: int) -> VecEnv:
-    return vec_frame_stack.VecFrameStack(
-        env, n_stack=stack_size, channels_order="first"
-    )
+    return vec_frame_stack.VecFrameStack(env, n_stack=stack_size, channels_order="first")
 
 
 def apply_vec_normalize(

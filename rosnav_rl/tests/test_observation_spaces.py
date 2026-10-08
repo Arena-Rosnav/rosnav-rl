@@ -59,6 +59,7 @@ from rosnav_rl.spaces.observation_space.spaces.meta.basic_meta_spaces import (
 #  Helper
 # =====================================================================
 
+
 def make_pose(x, y, yaw):
     p = np.zeros(1, dtype=Pose2DType)[0]
     p["x"] = x
@@ -70,6 +71,7 @@ def make_pose(x, y, yaw):
 # =====================================================================
 #  LaserScanSpace
 # =====================================================================
+
 
 class TestLaserScanSpace:
     def test_shape(self):
@@ -119,8 +121,7 @@ class TestLaserScanSpace:
         assert gym_space.high[0] == 8.0
 
     def test_with_normalization(self):
-        space = LaserScanSpace(laser_num_beams=3, laser_max_range=10.0,
-                               normalize=True, normalizer="max_abs")
+        space = LaserScanSpace(laser_num_beams=3, laser_max_range=10.0, normalize=True, normalizer="max_abs")
         laser = np.array([0.0, 5.0, 10.0], dtype=np.float32)
 
         result = space.encode_observation(front_laser=laser)
@@ -135,17 +136,14 @@ class TestLaserScanSpace:
 #  ReducedLaserScanSpace
 # =====================================================================
 
+
 class TestReducedLaserScanSpace:
     def test_shape(self):
-        space = ReducedLaserScanSpace(
-            laser_num_beams=360, laser_max_range=10.0, reduced_num_beams=60
-        )
+        space = ReducedLaserScanSpace(laser_num_beams=360, laser_max_range=10.0, reduced_num_beams=60)
         assert space.shape == (60,)
 
     def test_reduction(self):
-        space = ReducedLaserScanSpace(
-            laser_num_beams=10, laser_max_range=10.0, reduced_num_beams=5
-        )
+        space = ReducedLaserScanSpace(laser_num_beams=10, laser_max_range=10.0, reduced_num_beams=5)
         laser = np.arange(10, dtype=np.float32)
 
         result = space.encode_observation(front_laser=laser)
@@ -155,9 +153,7 @@ class TestReducedLaserScanSpace:
         np.testing.assert_array_equal(result, [0, 2, 4, 6, 8])
 
     def test_reduction_with_clamping(self):
-        space = ReducedLaserScanSpace(
-            laser_num_beams=10, laser_max_range=5.0, reduced_num_beams=3
-        )
+        space = ReducedLaserScanSpace(laser_num_beams=10, laser_max_range=5.0, reduced_num_beams=3)
         laser = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=np.float32)
 
         result = space.encode_observation(front_laser=laser)
@@ -167,9 +163,7 @@ class TestReducedLaserScanSpace:
         assert np.all(result <= 5.0)
 
     def test_cached_indices(self):
-        space = ReducedLaserScanSpace(
-            laser_num_beams=360, laser_max_range=10.0, reduced_num_beams=60
-        )
+        space = ReducedLaserScanSpace(laser_num_beams=360, laser_max_range=10.0, reduced_num_beams=60)
 
         idx1 = space.get_indices()
         idx2 = space.get_indices()
@@ -177,17 +171,13 @@ class TestReducedLaserScanSpace:
         assert idx1 is idx2  # Same object from cache
 
     def test_invalid_reduced_size(self):
-        space = ReducedLaserScanSpace(
-            laser_num_beams=5, laser_max_range=10.0, reduced_num_beams=10
-        )
+        space = ReducedLaserScanSpace(laser_num_beams=5, laser_max_range=10.0, reduced_num_beams=10)
         with pytest.raises(ValueError, match="Cannot reduce"):
             space.get_indices()
 
     def test_same_as_full(self):
         """When reduced == full, output is same as full."""
-        space = ReducedLaserScanSpace(
-            laser_num_beams=5, laser_max_range=10.0, reduced_num_beams=5
-        )
+        space = ReducedLaserScanSpace(laser_num_beams=5, laser_max_range=10.0, reduced_num_beams=5)
         laser = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32)
 
         result = space.encode_observation(front_laser=laser)
@@ -198,6 +188,7 @@ class TestReducedLaserScanSpace:
 # =====================================================================
 #  DistAngleToGoalSpace
 # =====================================================================
+
 
 class TestDistAngleToGoalSpace:
     def test_shape(self):
@@ -226,6 +217,7 @@ class TestDistAngleToGoalSpace:
 #  DistAngleToSubgoalSpace
 # =====================================================================
 
+
 class TestDistAngleToSubgoalSpace:
     def test_passthrough(self):
         space = DistAngleToSubgoalSpace(subgoal_max_dist=15.0)
@@ -240,26 +232,34 @@ class TestDistAngleToSubgoalSpace:
 #  LastActionSpace
 # =====================================================================
 
+
 class TestLastActionSpace:
     def test_differential_drive_shape(self):
         space = LastActionSpace(
-            min_linear_vel=-0.5, max_linear_vel=1.0,
-            min_angular_vel=-1.0, max_angular_vel=1.0,
+            min_linear_vel=-0.5,
+            max_linear_vel=1.0,
+            min_angular_vel=-1.0,
+            max_angular_vel=1.0,
         )
         assert space.shape == (2,)
 
     def test_holonomic_shape(self):
         space = LastActionSpace(
-            min_linear_vel=-0.5, max_linear_vel=1.0,
-            min_angular_vel=-1.0, max_angular_vel=1.0,
-            min_translational_vel=-0.5, max_translational_vel=0.5,
+            min_linear_vel=-0.5,
+            max_linear_vel=1.0,
+            min_angular_vel=-1.0,
+            max_angular_vel=1.0,
+            min_translational_vel=-0.5,
+            max_translational_vel=0.5,
         )
         assert space.shape == (3,)
 
     def test_passthrough(self):
         space = LastActionSpace(
-            min_linear_vel=-1.0, max_linear_vel=1.0,
-            min_angular_vel=-1.0, max_angular_vel=1.0,
+            min_linear_vel=-1.0,
+            max_linear_vel=1.0,
+            min_angular_vel=-1.0,
+            max_angular_vel=1.0,
         )
         action = np.array([0.5, 0.3], dtype=np.float32)
 
@@ -271,6 +271,7 @@ class TestLastActionSpace:
 # =====================================================================
 #  SubgoalInRobotFrameSpace
 # =====================================================================
+
 
 class TestSubgoalInRobotFrameSpace:
     def test_shape(self):
@@ -289,6 +290,7 @@ class TestSubgoalInRobotFrameSpace:
 # =====================================================================
 #  IsFirstStepSpace / IsTerminalStepSpace / EpisodeStepSpace
 # =====================================================================
+
 
 class TestMetaSpaces:
     def test_is_first_space(self):
@@ -324,6 +326,7 @@ class TestMetaSpaces:
 # =====================================================================
 #  MotionStateSpace
 # =====================================================================
+
 
 class TestMotionStateSpace:
     def test_shape_without_acceleration(self):
@@ -396,6 +399,7 @@ class TestMotionStateSpace:
 #  KinematicStateSpace
 # =====================================================================
 
+
 class TestKinematicStateSpace:
     def test_shape_with_alignment(self):
         space = KinematicStateSpace(max_velocity=2.0, include_motion_alignment=True)
@@ -467,6 +471,7 @@ class TestKinematicStateSpace:
 #  RobustGoalSpace
 # =====================================================================
 
+
 class TestRobustGoalSpace:
     def test_shape_with_progress(self):
         space = RobustGoalSpace(include_progress=True)
@@ -477,8 +482,7 @@ class TestRobustGoalSpace:
         assert space.shape == (2,)
 
     def test_tanh_distance_normalization(self):
-        space = RobustGoalSpace(goal_max_dist=50.0, distance_scaling="tanh",
-                                include_progress=False)
+        space = RobustGoalSpace(goal_max_dist=50.0, distance_scaling="tanh", include_progress=False)
         da = np.array([25.0, 0.0])
 
         result = space.encode_observation(dist_angle_to_goal=da)
@@ -487,8 +491,7 @@ class TestRobustGoalSpace:
         assert result[1] == pytest.approx(0.0)
 
     def test_linear_distance_normalization(self):
-        space = RobustGoalSpace(goal_max_dist=10.0, distance_scaling="linear",
-                                include_progress=False)
+        space = RobustGoalSpace(goal_max_dist=10.0, distance_scaling="linear", include_progress=False)
         da = np.array([5.0, np.pi / 2])
 
         result = space.encode_observation(dist_angle_to_goal=da)
@@ -497,8 +500,7 @@ class TestRobustGoalSpace:
         assert result[1] == pytest.approx(0.5)  # pi/2 / pi
 
     def test_log_distance_normalization(self):
-        space = RobustGoalSpace(goal_max_dist=10.0, distance_scaling="log",
-                                include_progress=False)
+        space = RobustGoalSpace(goal_max_dist=10.0, distance_scaling="log", include_progress=False)
         da = np.array([10.0, 0.0])
 
         result = space.encode_observation(dist_angle_to_goal=da)
@@ -541,6 +543,7 @@ class TestRobustGoalSpace:
 #  MultiScaleGoalSpace
 # =====================================================================
 
+
 class TestMultiScaleGoalSpace:
     def test_shape(self):
         space = MultiScaleGoalSpace(distance_scales=[0.5, 1.0, 2.0])
@@ -555,6 +558,7 @@ class TestMultiScaleGoalSpace:
 # =====================================================================
 #  Base observation space: safe_encode_observation
 # =====================================================================
+
 
 class TestSafeEncodeObservation:
     def test_returns_zeros_on_missing_key(self):
@@ -579,10 +583,10 @@ class TestSafeEncodeObservation:
 #  Normalization integration
 # =====================================================================
 
+
 class TestNormalizationIntegration:
     def test_min_max_scaler(self):
-        space = DistAngleToGoalSpace(goal_max_dist=10.0,
-                                      normalize=True, normalizer="min_max")
+        space = DistAngleToGoalSpace(goal_max_dist=10.0, normalize=True, normalizer="min_max")
         da = np.array([5.0, 0.0], dtype=np.float32)
 
         result = space.encode_observation(dist_angle_to_goal=da)
@@ -594,8 +598,7 @@ class TestNormalizationIntegration:
         assert result[1] == pytest.approx(0.5)
 
     def test_identity_normalizer(self):
-        space = DistAngleToGoalSpace(goal_max_dist=10.0,
-                                      normalize=True, normalizer="identity")
+        space = DistAngleToGoalSpace(goal_max_dist=10.0, normalize=True, normalizer="identity")
         da = np.array([7.0, 1.5], dtype=np.float32)
 
         result = space.encode_observation(dist_angle_to_goal=da)
@@ -615,11 +618,10 @@ class TestNormalizationIntegration:
 #  apply_limit static method
 # =====================================================================
 
+
 class TestApplyLimit:
     def test_basic_clamping(self):
-        result = LaserScanSpace.apply_limit(
-            np.array([1.0, 5.0, 10.0]), max_range=3.0
-        )
+        result = LaserScanSpace.apply_limit(np.array([1.0, 5.0, 10.0]), max_range=3.0)
         np.testing.assert_array_equal(result, [1.0, 3.0, 3.0])
 
     def test_no_clamping_needed(self):

@@ -74,9 +74,7 @@ class TwistCollector(Collector[geometry_msgs.Twist, RobotVelocity]):
         return np.array((msg.linear.x, msg.linear.y, msg.angular.z))
 
 
-class CollisionMonitorStateCollector(
-    Collector[nav2_msgs.CollisionMonitorState, SafetyStatus]
-):
+class CollisionMonitorStateCollector(Collector[nav2_msgs.CollisionMonitorState, SafetyStatus]):
     """
     Collects the collision monitor state.
     """
@@ -161,9 +159,7 @@ class PeopleCollector(Collector[people_msgs.People, PedestrianDetections]):
         return msg
 
 
-class ArenaPedestrianCollector(
-    Collector[arena_people_msgs.Pedestrians, ArenaPedestrianDetections]
-):
+class ArenaPedestrianCollector(Collector[arena_people_msgs.Pedestrians, ArenaPedestrianDetections]):
     """A class that collects information about pedestrians from Arena simulator.
 
     Processes arena_people_msgs/Pedestrians messages which include:
@@ -176,7 +172,5 @@ class ArenaPedestrianCollector(
       - animation_state: Behavioral state (IDLE, WALKING, RUNNING, etc.)
     """
 
-    def _preprocess(
-        self, msg: arena_people_msgs.Pedestrians
-    ) -> arena_people_msgs.Pedestrians:
+    def _preprocess(self, msg: arena_people_msgs.Pedestrians) -> arena_people_msgs.Pedestrians:
         return msg

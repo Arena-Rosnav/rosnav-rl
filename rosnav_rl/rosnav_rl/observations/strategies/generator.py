@@ -44,9 +44,7 @@ class GeneratorManager:
         self._simulation_state_container = simulation_state_container
         self._validate_generators = validate_generators
 
-    def generate_observations(
-        self, generators: dict[str, Generator], obs_dict: dict[str, Any]
-    ) -> None:
+    def generate_observations(self, generators: dict[str, Generator], obs_dict: dict[str, Any]) -> None:
         """
         Generate derived observations from collected data with optional validation.
 
@@ -67,16 +65,12 @@ class GeneratorManager:
         for name in self._dependency_resolver.execution_order:
             try:
                 generator = generators[name]
-                obs_dict[name] = generator.get_observation(
-                    obs_dict, simulation_state_container=sim_state
-                )
+                obs_dict[name] = generator.get_observation(obs_dict, simulation_state_container=sim_state)
             except Exception as e:
                 self._logger.error(f"Error generating observation '{name}': {e}")
                 obs_dict[name] = None
 
-    def _validate_root_generators(
-        self, obs_dict: dict[str, Any], generators: dict[str, Generator]
-    ) -> None:
+    def _validate_root_generators(self, obs_dict: dict[str, Any], generators: dict[str, Generator]) -> None:
         """Validate root generators that only depend on collectors."""
         try:
             GeneratorSchemaValidator.validate_root_generators(obs_dict, generators)
@@ -84,9 +78,7 @@ class GeneratorManager:
             self._logger.error(f"Root generator validation failed: {e}")
             # Continue execution - validation is advisory
 
-    def _execute_generator(
-        self, name: str, generator: Generator, obs_dict: dict[str, Any]
-    ) -> None:
+    def _execute_generator(self, name: str, generator: Generator, obs_dict: dict[str, Any]) -> None:
         """
         Execute a single generator with proper error handling.
         Note: Primarily used for one-off calls. The hot path in generate_observations()

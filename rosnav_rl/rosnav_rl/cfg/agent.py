@@ -60,9 +60,7 @@ class AgentConfig(BaseModel):
         reward: Reward function definition (optional, training only).
     """
 
-    name: str | None = Field(
-        None, description="Agent identifier. Auto-generated if omitted."
-    )
+    name: str | None = Field(None, description="Agent identifier. Auto-generated if omitted.")
     robot: str | None = Field(
         None, description="Robot model name (e.g. 'jackal', 'turtlebot3'). Derived from arena_robots at training time."
     )

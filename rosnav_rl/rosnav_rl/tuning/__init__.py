@@ -54,4 +54,3 @@ __all__ = [
     "SB3TrialPruner",
     "DreamerV3TrialPruner",
 ]
-

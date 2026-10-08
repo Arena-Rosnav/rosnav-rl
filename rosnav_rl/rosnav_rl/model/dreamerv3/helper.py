@@ -182,23 +182,18 @@ def prefill_dataset(
         list(observation_space.keys()),
     )
 
-    _num_actions = (
-        int(action_space.n) if isinstance(action_space, gym.spaces.Discrete) else action_space.shape[0]
-    )
+    _num_actions = int(action_space.n) if isinstance(action_space, gym.spaces.Discrete) else action_space.shape[0]
     _image_available = observation_space.get("image", None) is not None
 
     # Prefill dataset if no offline dataset is provided
     if not config.general.offline_traindir:
         prefill = max(
             0,
-            config.training.prefill_steps
-            - data_tools.count_steps(config.general.traindir),
+            config.training.prefill_steps - data_tools.count_steps(config.general.traindir),
         )
         _log.info("Prefilling dataset (%d steps).", prefill)
         if hasattr(action_space, "discrete"):
-            random_actor = tools.OneHotDist(
-                torch.zeros(_num_actions).repeat(len(train_envs), 1)
-            )
+            random_actor = tools.OneHotDist(torch.zeros(_num_actions).repeat(len(train_envs), 1))
         else:
             random_actor = torchd.independent.Independent(
                 torchd.uniform.Uniform(
@@ -208,9 +203,7 @@ def prefill_dataset(
                 1,
             )
 
-        def random_agent(
-            o: dict[str, np.ndarray], d: np.ndarray, s: None
-        ) -> tuple[dict[str, torch.Tensor], None]:
+        def random_agent(o: dict[str, np.ndarray], d: np.ndarray, s: None) -> tuple[dict[str, torch.Tensor], None]:
             action = random_actor.sample()
             logprob = random_actor.log_prob(action)
             return {"action": action, "logprob": logprob}, None
@@ -253,9 +246,7 @@ def make_datasets(
             - Evaluation dataset generator that yields batches of data.
             Both generators produce dictionaries where keys are feature names and values are numpy arrays.
     """
-    return data_tools.make_dataset(train_eps, config), data_tools.make_dataset(
-        eval_eps, config
-    )
+    return data_tools.make_dataset(train_eps, config), data_tools.make_dataset(eval_eps, config)
 
 
 def create_agent(
@@ -346,9 +337,10 @@ def train(
             # Run evaluation phase if configured (skip until model has been trained at least once)
             if config.training.eval_episode_num > 0 and agent._update_count > 0:
                 _log.info(
-                    "\n" + "=" * 60 + "\n"
-                    "  EVALUATION  |  step=%d / %d  |  updates=%d\n" + "=" * 60,
-                    agent._step, config.training.steps, agent._update_count,
+                    "\n" + "=" * 60 + "\n  EVALUATION  |  step=%d / %d  |  updates=%d\n" + "=" * 60,
+                    agent._step,
+                    config.training.steps,
+                    agent._update_count,
                 )
                 _run_evaluation(
                     agent=agent,
@@ -360,16 +352,19 @@ def train(
                     is_image_available=is_image_available,
                 )
                 if after_eval_fn is not None:
-                    after_eval_fn({
-                        "eval_return": logger._scalars.get("eval_return", float("-inf")),
-                        "eval_success_rate": logger._scalars.get("eval_success_rate", 0.0),
-                    })
+                    after_eval_fn(
+                        {
+                            "eval_return": logger._scalars.get("eval_return", float("-inf")),
+                            "eval_success_rate": logger._scalars.get("eval_success_rate", 0.0),
+                        }
+                    )
 
             # Run training phase
             _log.info(
-                "\n" + "-" * 60 + "\n"
-                "  TRAINING    |  step=%d / %d  |  eval_every=%d\n" + "-" * 60,
-                agent._step, config.training.steps, config.training.eval_every,
+                "\n" + "-" * 60 + "\n  TRAINING    |  step=%d / %d  |  eval_every=%d\n" + "-" * 60,
+                agent._step,
+                config.training.steps,
+                config.training.eval_every,
             )
             state = _run_training(
                 agent=agent,

@@ -100,9 +100,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         grid_y = int(y * self._inv_grid_resolution + self._grid_center)
         return grid_x, grid_y
 
-    def _get_map_indices_vectorized(
-        self, positions: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _get_map_indices_vectorized(self, positions: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Convert multiple real-world coordinates to grid indices (vectorized).
 
         Args:
@@ -114,10 +112,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         grid_coords = (positions * self._inv_grid_resolution + self._grid_center).astype(np.intp)
         grid_x = grid_coords[:, 0]
         grid_y = grid_coords[:, 1]
-        valid = (
-            (grid_x >= 0) & (grid_x < self._feature_map_size)
-            & (grid_y >= 0) & (grid_y < self._feature_map_size)
-        )
+        valid = (grid_x >= 0) & (grid_x < self._feature_map_size) & (grid_y >= 0) & (grid_y < self._feature_map_size)
         return grid_x, grid_y, valid
 
     def _create_feature_map(self) -> np.ndarray:
@@ -143,9 +138,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         raise NotImplementedError
 
     @abstractmethod
-    def encode_observation(
-        self, *args: Any, **kwargs: Any
-    ) -> np.ndarray:
+    def encode_observation(self, *args: Any, **kwargs: Any) -> np.ndarray:
         """Encode observation into feature map."""
         raise NotImplementedError
 
@@ -237,15 +230,11 @@ class PedestrianVelXSpace(BaseFeatureMapSpace):
                 - Example: 64x64 grid with pedestrian x-velocity values at corresponding locations
         """
         # Initialize feature map with zeros
-        feature_map = np.zeros(
-            (self._feature_map_size, self._feature_map_size), dtype=np.float32
-        )
+        feature_map = np.zeros((self._feature_map_size, self._feature_map_size), dtype=np.float32)
 
         # Process pedestrian data if available — vectorized
         if len(pedestrian_relative_locations) > 0 and len(pedestrian_vel_x) > 0:
-            grid_x, grid_y, valid = self._get_map_indices_vectorized(
-                pedestrian_relative_locations
-            )
+            grid_x, grid_y, valid = self._get_map_indices_vectorized(pedestrian_relative_locations)
             feature_map[grid_y[valid], grid_x[valid]] = pedestrian_vel_x[valid]
 
         return feature_map.flatten() if self._flatten else feature_map
@@ -338,15 +327,11 @@ class PedestrianVelYSpace(BaseFeatureMapSpace):
                 - Example: 64x64 grid with pedestrian y-velocity values at corresponding locations
         """
         # Initialize feature map with zeros
-        feature_map = np.zeros(
-            (self._feature_map_size, self._feature_map_size), dtype=np.float32
-        )
+        feature_map = np.zeros((self._feature_map_size, self._feature_map_size), dtype=np.float32)
 
         # Process pedestrian data if available — vectorized
         if len(pedestrian_relative_locations) > 0 and len(pedestrian_vel_y) > 0:
-            grid_x, grid_y, valid = self._get_map_indices_vectorized(
-                pedestrian_relative_locations
-            )
+            grid_x, grid_y, valid = self._get_map_indices_vectorized(pedestrian_relative_locations)
             feature_map[grid_y[valid], grid_x[valid]] = pedestrian_vel_y[valid]
 
         return feature_map.flatten() if self._flatten else feature_map
@@ -394,9 +379,7 @@ class StackedLaserMapSpace(BaseObservationSpace):
         self._norm_scale = np.float32(2.0 / laser_max_range)
 
         # Eagerly allocate ring buffer — no nullable sentinel needed
-        self._ring_buffer = np.zeros(
-            (laser_stack_size, laser_num_beams), dtype=np.float32
-        )
+        self._ring_buffer = np.zeros((laser_stack_size, laser_num_beams), dtype=np.float32)
         self._ring_idx: int = 0
 
         super().__init__(*args, **kwargs)
@@ -449,9 +432,7 @@ class StackedLaserMapSpace(BaseObservationSpace):
             n = scan.shape[0]
             if n != self._ring_buffer.shape[1]:
                 # Beam count changed — reallocate and recompute constants
-                self._ring_buffer = np.zeros(
-                    (self._laser_stack_size, n), dtype=np.float32
-                )
+                self._ring_buffer = np.zeros((self._laser_stack_size, n), dtype=np.float32)
                 self._beams_per_col = max(1, n // self._feature_map_size)
                 self._usable_beams = self._feature_map_size * self._beams_per_col
             else:
@@ -464,27 +445,23 @@ class StackedLaserMapSpace(BaseObservationSpace):
 
         # 4. Read in insertion order (oldest → newest)
         ordered = np.roll(self._ring_buffer, -self._ring_idx, axis=0)
-        reshaped = ordered[:, :self._usable_beams].reshape(
+        reshaped = ordered[:, : self._usable_beams].reshape(
             self._laser_stack_size, self._feature_map_size, self._beams_per_col
         )
 
         # 5. Per-column min (even rows) and mean (odd rows)
-        summary = np.empty(
-            (self._laser_stack_size * 2, self._feature_map_size), dtype=np.float32
-        )
+        summary = np.empty((self._laser_stack_size * 2, self._feature_map_size), dtype=np.float32)
         summary[::2] = reshaped.min(axis=2)
         summary[1::2] = reshaped.mean(axis=2)
 
         # 6. Tile flat summary to fill H × W
-        flat = summary.ravel()           # 1600 for defaults
+        flat = summary.ravel()  # 1600 for defaults
         target = self._feature_map_size * self._feature_map_size  # 6400
-        reps = -(-target // len(flat))   # ceil division
+        reps = -(-target // len(flat))  # ceil division
         tiled = np.tile(flat, reps)[:target]
 
         # 7. MaxAbsScaler: [0, laser_max_range] → [-1, 1]
-        result = (tiled * self._norm_scale - 1.0).reshape(
-            1, self._feature_map_size, self._feature_map_size
-        )
+        result = (tiled * self._norm_scale - 1.0).reshape(1, self._feature_map_size, self._feature_map_size)
         return result.flatten() if self._flatten else result
 
 
@@ -551,9 +528,7 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
 
         # Process each pedestrian location — vectorized
         if len(pedestrian_relative_locations) > 0:
-            grid_x, grid_y, valid = self._get_map_indices_vectorized(
-                pedestrian_relative_locations
-            )
+            grid_x, grid_y, valid = self._get_map_indices_vectorized(pedestrian_relative_locations)
             feature_map[grid_y[valid], grid_x[valid]] = 1.0
 
         return feature_map.flatten() if self._flatten else feature_map
@@ -644,18 +619,11 @@ class PedestrianSocialStateSpace(BaseFeatureMapSpace):
                 - Example: 32x32 grid with sparse integer values
         """
         # Create feature map with background value
-        feature_map = np.zeros(
-            (self._feature_map_size, self._feature_map_size), dtype=np.int32
-        )
+        feature_map = np.zeros((self._feature_map_size, self._feature_map_size), dtype=np.int32)
 
         # Process each pedestrian's location and social state — vectorized
-        if (
-            len(pedestrian_relative_locations) > 0
-            and len(pedestrian_social_states) > 0
-        ):
-            grid_x, grid_y, valid = self._get_map_indices_vectorized(
-                pedestrian_relative_locations
-            )
+        if len(pedestrian_relative_locations) > 0 and len(pedestrian_social_states) > 0:
+            grid_x, grid_y, valid = self._get_map_indices_vectorized(pedestrian_relative_locations)
             feature_map[grid_y[valid], grid_x[valid]] = pedestrian_social_states[valid]
 
         return feature_map.flatten() if self._flatten else feature_map
@@ -746,15 +714,11 @@ class PedestrianTypeSpace(BaseFeatureMapSpace):
                 - Example: 32x32 grid with sparse integer values
         """
         # Create feature map with background value (-1 for empty cells)
-        feature_map = np.full(
-            (self._feature_map_size, self._feature_map_size), -1, dtype=np.int32
-        )
+        feature_map = np.full((self._feature_map_size, self._feature_map_size), -1, dtype=np.int32)
 
         # Process each pedestrian's location and type — vectorized
         if len(pedestrian_relative_locations) > 0 and len(pedestrian_types) > 0:
-            grid_x, grid_y, valid = self._get_map_indices_vectorized(
-                pedestrian_relative_locations
-            )
+            grid_x, grid_y, valid = self._get_map_indices_vectorized(pedestrian_relative_locations)
             feature_map[grid_y[valid], grid_x[valid]] = pedestrian_types[valid]
 
         return feature_map.flatten() if self._flatten else feature_map
@@ -830,13 +794,9 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
 
     def get_gym_space(self) -> spaces.Space:
         """Returns a Box in [0, 1] with the feature map shape."""
-        return spaces.Box(
-            low=0.0, high=1.0, shape=self._get_feature_map_shape(), dtype=np.float32
-        )
+        return spaces.Box(low=0.0, high=1.0, shape=self._get_feature_map_shape(), dtype=np.float32)
 
-    def encode_observation(
-        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
-    ) -> LaserFeatureMap:
+    def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> LaserFeatureMap:
         """Project laser beam endpoints to a robot-centric Cartesian grid.
 
         Args:

@@ -54,7 +54,7 @@ class EnvironmentContextSpace(BaseObservationSpace):
         density_sectors: int = 8,
         obstacle_threshold: float = 0.5,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize environment context space.
 
@@ -77,9 +77,7 @@ class EnvironmentContextSpace(BaseObservationSpace):
         # overall_metrics: [total_density, min_clearance, max_clearance]
         dims = self.density_sectors + 3
 
-        return spaces.Box(
-            low=np.array([0.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([0.0] * dims), high=np.array([1.0] * dims), dtype=np.float32)
 
     def _analyze_laser_data(self, laser_data: np.ndarray) -> dict[str, Any]:
         """Analyze laser data for environment features."""
@@ -101,20 +99,14 @@ class EnvironmentContextSpace(BaseObservationSpace):
 
         for i in range(self.density_sectors):
             start_idx = i * readings_per_sector
-            end_idx = (
-                (i + 1) * readings_per_sector
-                if i < self.density_sectors - 1
-                else len(laser_data)
-            )
+            end_idx = (i + 1) * readings_per_sector if i < self.density_sectors - 1 else len(laser_data)
 
             sector_data = laser_data[start_idx:end_idx]
             sector_valid = (sector_data > 0.0) & (sector_data < self.max_range)
 
             if np.any(sector_valid):
                 # Density based on how many obstacles are close
-                close_obstacles = np.sum(
-                    sector_data[sector_valid] < self.obstacle_threshold
-                )
+                close_obstacles = np.sum(sector_data[sector_valid] < self.obstacle_threshold)
                 total_valid = np.sum(sector_valid)
                 density = close_obstacles / max(total_valid, 1)
             else:
@@ -134,9 +126,7 @@ class EnvironmentContextSpace(BaseObservationSpace):
             "max_clearance": max_clearance,
         }
 
-    def encode_observation(
-        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
-    ) -> EnvironmentContextVector:
+    def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> EnvironmentContextVector:
         """Encode comprehensive environment context with obstacle density and clearance metrics.
 
         Processes preprocessed front-facing laser scan data to extract sector-wise obstacle densities,
@@ -210,7 +200,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
         safety_distance: float = 0.8,
         corridor_width_threshold: float = 1.5,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize spatial awareness space.
 
@@ -231,13 +221,9 @@ class SpatialAwarenessSpace(BaseObservationSpace):
         """Return gym space for spatial awareness."""
         # [front_clear, left_clear, right_clear, back_clear,
         #  corridor_detected, corridor_direction, spatial_constraint]
-        return spaces.Box(
-            low=np.array([0.0] * 7), high=np.array([1.0] * 7), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([0.0] * 7), high=np.array([1.0] * 7), dtype=np.float32)
 
-    def _compute_directional_clearance(
-        self, laser_data: np.ndarray
-    ) -> dict[str, float]:
+    def _compute_directional_clearance(self, laser_data: np.ndarray) -> dict[str, float]:
         """Compute clearance in cardinal directions."""
         n_rays = len(laser_data)
 
@@ -255,9 +241,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
             ("back", back_sector),
         ]:
             sector_data = laser_data[sector_indices]
-            valid_data = sector_data[
-                (sector_data > 0.0) & (sector_data < self.max_range)
-            ]
+            valid_data = sector_data[(sector_data > 0.0) & (sector_data < self.max_range)]
 
             if len(valid_data) > 0:
                 min_distance = np.min(valid_data)
@@ -269,9 +253,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
 
         return clearances
 
-    def _get_sector_indices(
-        self, n_rays: int, start_angle: float, end_angle: float
-    ) -> np.ndarray:
+    def _get_sector_indices(self, n_rays: int, start_angle: float, end_angle: float) -> np.ndarray:
         """Get laser ray indices for angular sector."""
         # Convert angles to indices (assuming 360° scan starting from front)
         start_idx = int((start_angle + 180) / 360 * n_rays) % n_rays
@@ -281,9 +263,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
             return np.arange(start_idx, end_idx + 1)
         else:
             # Wrap around case
-            return np.concatenate(
-                [np.arange(start_idx, n_rays), np.arange(0, end_idx + 1)]
-            )
+            return np.concatenate([np.arange(start_idx, n_rays), np.arange(0, end_idx + 1)])
 
     def _detect_corridor(self, laser_data: np.ndarray) -> tuple[float, float]:
         """Detect corridor and its direction.
@@ -335,9 +315,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
         constraint = 1.0 - (min_clearance * 0.6 + avg_clearance * 0.4)
         return np.clip(constraint, 0.0, 1.0)
 
-    def encode_observation(
-        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
-    ) -> SpatialAwarenessVector:
+    def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> SpatialAwarenessVector:
         """Encode comprehensive spatial awareness with directional clearance and corridor detection.
 
         Processes front-facing laser scan data to extract cardinal direction clearances, detect corridors,
@@ -417,7 +395,7 @@ class ObstacleProximitySpace(BaseObservationSpace):
         max_range: float = 10.0,
         risk_threshold: float = 1.0,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize obstacle proximity space.
 
@@ -439,13 +417,9 @@ class ObstacleProximitySpace(BaseObservationSpace):
         # [zone_occupancies + closest_distance + risk_level]
         dims = len(self.proximity_zones) + 2
 
-        return spaces.Box(
-            low=np.array([0.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([0.0] * dims), high=np.array([1.0] * dims), dtype=np.float32)
 
-    def encode_observation(
-        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
-    ) -> ObstacleProximityVector:
+    def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> ObstacleProximityVector:
         """Encode advanced obstacle proximity with multi-zone detection and risk assessment.
 
         Processes preprocessed front-facing laser scan data to compute zone occupancies, closest obstacle
@@ -495,6 +469,4 @@ class ObstacleProximitySpace(BaseObservationSpace):
         else:
             risk_level = 0.0
 
-        return np.array(
-            zone_occupancies + [normalized_closest, risk_level], dtype=np.float32
-        )
+        return np.array(zone_occupancies + [normalized_closest, risk_level], dtype=np.float32)

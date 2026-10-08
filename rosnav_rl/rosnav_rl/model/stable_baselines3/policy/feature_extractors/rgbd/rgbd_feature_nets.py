@@ -60,7 +60,7 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         rgbd_out_dim: int = 512,
         goal_out_dim: int = 32,
         last_action_out_dim: int = 32,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         self._features_dim = features_dim
         self._rgbd_backbone = rgbd_backbone
@@ -78,23 +78,17 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
             observation_space=observation_space,
             observation_space_manager=observation_space_manager,
             features_dim=features_dim,
-            **kwargs
+            **kwargs,
         )
 
     def _get_input_sizes(self):
-        self._goal_size = self._observation_space_manager[
-            DistAngleToSubgoalSpace
-        ].space.shape[-1]
-        self._last_action_size = self._observation_space_manager[
-            LastActionSpace
-        ].space.shape[-1]
+        self._goal_size = self._observation_space_manager[DistAngleToSubgoalSpace].space.shape[-1]
+        self._last_action_size = self._observation_space_manager[LastActionSpace].space.shape[-1]
         self._image_size = 4 * self._image_height * self._image_width
 
     def _setup_network(self, *args: Any, **kwargs: Any):
         # RGBD part
-        self.visual_net = RgbdPerceptionNet(
-            self._rgbd_out_dim, 4, self._rgbd_backbone, **kwargs
-        )
+        self.visual_net = RgbdPerceptionNet(self._rgbd_out_dim, 4, self._rgbd_backbone, **kwargs)
 
         # goal part
         self.goal_net = nn.Sequential(
@@ -113,18 +107,14 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
         # fusion
         self.fc = nn.Linear(
-            in_features=self._rgbd_out_dim
-            + self._goal_out_dim
-            + self._last_action_out_dim,
+            in_features=self._rgbd_out_dim + self._goal_out_dim + self._last_action_out_dim,
             out_features=self._features_dim,
         )
 
     def _forward_impl(self, image: Tensor, goal: Tensor, last_action: Tensor) -> Tensor:
         # normalize image
         image[:, :3, :, :] /= 255.0  # normalize to [0, 1]
-        image[:, 3, :, :] = torch.clamp(
-            image[:, 3, :, :], min=0, max=10
-        )  # clip to [0, 10]
+        image[:, 3, :, :] = torch.clamp(image[:, 3, :, :], min=0, max=10)  # clip to [0, 10]
         image[:, 3, :, :] /= 10.0
 
         # seperate nets

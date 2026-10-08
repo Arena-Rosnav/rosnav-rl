@@ -130,9 +130,7 @@ class StableBaselinesEnv:
         else:
             raise ValueError("Normalization wrapper not found.")
 
-    def normalize(
-        self, observation: EncodedObservationDict | np.ndarray
-    ) -> EncodedObservationDict | np.ndarray:
+    def normalize(self, observation: EncodedObservationDict | np.ndarray) -> EncodedObservationDict | np.ndarray:
         if self._norm_wrapper is None:
             raise ValueError("Normalization wrapper not found.")
         return self._norm_wrapper.normalize_obs(observation)
@@ -156,9 +154,7 @@ class StableBaselinesEnv:
             return {k: v[0] for k, v in stacked.items()}, infos
         return stacked[0], infos
 
-    def reset(
-        self, observation: EncodedObservationDict | np.ndarray
-    ) -> EncodedObservationDict | np.ndarray:
+    def reset(self, observation: EncodedObservationDict | np.ndarray) -> EncodedObservationDict | np.ndarray:
         if isinstance(observation, dict):
             batched = {k: np.asarray(v)[np.newaxis] for k, v in observation.items()}
         else:
@@ -262,8 +258,8 @@ class StableBaselinesModel(RL_Model):
             self._policy_description (StableBaselinesPolicyDescription): The policy description instantiated by the agent factory.
         """
         self._agent_factory: type[AgentFactory] = AgentFactory
-        self._policy_description: StableBaselinesPolicyDescription | type[BasePolicy] = (
-            self._agent_factory.instantiate(self.algorithm_cfg.architecture_name)
+        self._policy_description: StableBaselinesPolicyDescription | type[BasePolicy] = self._agent_factory.instantiate(
+            self.algorithm_cfg.architecture_name
         )
 
     def setup_model(
@@ -300,9 +296,7 @@ class StableBaselinesModel(RL_Model):
         )
 
         if checkpoint_path:
-            self.model = self._load_model(
-                path=checkpoint_path, env=env, algorithm_args=algorithm_args
-            )
+            self.model = self._load_model(path=checkpoint_path, env=env, algorithm_args=algorithm_args)
         else:
             self._initialize_model(algorithm_args)
 
@@ -356,9 +350,7 @@ class StableBaselinesModel(RL_Model):
         if is_first_observation:
             self.reset()
 
-        observation = self._rl_agent.space_manager.encode_observation(
-            observation
-        )
+        observation = self._rl_agent.space_manager.encode_observation(observation)
 
         if self.__env is None:
             self.__env = StableBaselinesEnv(
@@ -384,11 +376,7 @@ class StableBaselinesModel(RL_Model):
             observation=observation,
             deterministic=deterministic,
             state=self.__state.model_state,
-            episode_start=(
-                np.array([True] * self.__env.env.num_envs)
-                if episode_start
-                else None
-            ),
+            episode_start=(np.array([True] * self.__env.env.num_envs) if episode_start else None),
         )
 
         self.__state.last_action = self._rl_agent.space_manager.decode_action(action)
@@ -443,9 +431,9 @@ class StableBaselinesModel(RL_Model):
             config["agent_config"]["framework"]
         ).algorithm
 
-        source_model = StableBaselinesModel(
-            rl_agent=self._rl_agent, algorithm_cfg=validated_algorithm_cfg
-        )._load_model(Path(source_dir) / f"{source_checkpoint}")
+        source_model = StableBaselinesModel(rl_agent=self._rl_agent, algorithm_cfg=validated_algorithm_cfg)._load_model(
+            Path(source_dir) / f"{source_checkpoint}"
+        )
 
         self.model.policy = transfer_weights(
             target_model=self.model.policy,
@@ -454,9 +442,7 @@ class StableBaselinesModel(RL_Model):
             exclude=exclude,
         )
 
-    def setup_environment(
-        self, env: VecEnv, is_training: bool = True, *args: Any, **kwargs: Any
-    ) -> VecEnv:
+    def setup_environment(self, env: VecEnv, is_training: bool = True, *args: Any, **kwargs: Any) -> VecEnv:
         """
         Set up the environment for training or evaluation.
 
@@ -550,14 +536,9 @@ class StableBaselinesModel(RL_Model):
         # Dump config parameters, then filter to valid constructor kwargs and
         # drop any None values (so SB3 defaults are used for omitted params).
         config_dump = parameters.model_dump(exclude=dump_exclude)
-        filtered_config = {
-            k: v
-            for k, v in config_dump.items()
-            if k in algo_init_params and v is not None
-        }
+        filtered_config = {k: v for k, v in config_dump.items() if k in algo_init_params and v is not None}
 
         return {**base_kwargs, **filtered_config}
-
 
     def _initialize_model(self, algorithm_parameters: dict[str, Any]) -> None:
         """
@@ -617,9 +598,7 @@ class StableBaselinesModel(RL_Model):
         _th.load = _robust_load
         _sb3_save_util.th.load = _robust_load
         try:
-            return self._policy_description.algorithm_class.load(
-                path, env=env, custom_objects=algorithm_args
-            )
+            return self._policy_description.algorithm_class.load(path, env=env, custom_objects=algorithm_args)
         finally:
             _th.load = _orig_th_load
             _sb3_save_util.th.load = _orig_sb3_load
@@ -627,10 +606,7 @@ class StableBaselinesModel(RL_Model):
     @property
     def _is_recurrent(self) -> bool:
         """Check whether the current model uses a recurrent policy."""
-        return (
-            self._model is not None
-            and isinstance(self._model.policy, RecurrentActorCriticPolicy)
-        )
+        return self._model is not None and isinstance(self._model.policy, RecurrentActorCriticPolicy)
 
     def _predict(
         self,
@@ -654,12 +630,8 @@ class StableBaselinesModel(RL_Model):
             Tuple of ``(action, next_state)``.
         """
         if self._is_recurrent:
-            return self._predict_recurrent(
-                observation, state, episode_start, deterministic
-            )
-        return self._predict_non_recurrent(
-            observation, state, episode_start, deterministic
-        )
+            return self._predict_recurrent(observation, state, episode_start, deterministic)
+        return self._predict_non_recurrent(observation, state, episode_start, deterministic)
 
     def _predict_recurrent(
         self,
@@ -679,9 +651,7 @@ class StableBaselinesModel(RL_Model):
         Returns:
             ``(action, next_state)`` tuple.
         """
-        return self.model.policy.predict(
-            observation, state, episode_start, deterministic
-        )
+        return self.model.policy.predict(observation, state, episode_start, deterministic)
 
     def _predict_non_recurrent(
         self,
@@ -714,16 +684,10 @@ class StableBaselinesModel(RL_Model):
 
         with th.no_grad():
             actions = (
-                self._model.policy._predict(
-                    obs_as_tensor(observation, self._model.device), deterministic
-                )
-                .cpu()
-                .numpy()
+                self._model.policy._predict(obs_as_tensor(observation, self._model.device), deterministic).cpu().numpy()
             )
 
-        actions = np.clip(
-            actions, self._rl_agent.action_space.low, self._rl_agent.action_space.high
-        )
+        actions = np.clip(actions, self._rl_agent.action_space.low, self._rl_agent.action_space.high)
 
         return actions.squeeze(axis=0), state
 
@@ -756,9 +720,7 @@ class StableBaselinesModel(RL_Model):
     @property
     def config(self) -> dict[str, Any]:
         return {
-            "algorithm_cfg": (
-                self.algorithm_cfg.model_dump() if self.algorithm_cfg else {}
-            ),
+            "algorithm_cfg": (self.algorithm_cfg.model_dump() if self.algorithm_cfg else {}),
         }
 
     @property

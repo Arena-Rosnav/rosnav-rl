@@ -27,9 +27,7 @@ class ModelFactory:
     _model_registry: dict[SupportedRLFrameworks, type["RL_Model"]] = {}
 
     @classmethod
-    def register(
-        cls, framework: SupportedRLFrameworks
-    ) -> Callable[[type["RL_Model"]], type["RL_Model"]]:
+    def register(cls, framework: SupportedRLFrameworks) -> Callable[[type["RL_Model"]], type["RL_Model"]]:
         """Decorator to register a model class for a specific framework.
 
         Args:
@@ -51,9 +49,7 @@ class ModelFactory:
         return decorator
 
     @classmethod
-    def register_model(
-        cls, framework: SupportedRLFrameworks, model_class: type["RL_Model"]
-    ) -> None:
+    def register_model(cls, framework: SupportedRLFrameworks, model_class: type["RL_Model"]) -> None:
         """Register a model class for a specific framework (programmatic registration).
 
         Args:
@@ -63,9 +59,7 @@ class ModelFactory:
         cls._model_registry[framework] = model_class
 
     @classmethod
-    def create_model_instance(
-        cls, framework_cfg: FrameworkCfg, rl_agent: "RL_Agent"
-    ) -> "RL_Model":
+    def create_model_instance(cls, framework_cfg: FrameworkCfg, rl_agent: "RL_Agent") -> "RL_Model":
         """Create an RL model instance based on the framework configuration.
 
         Each registered model class is responsible for accepting a uniform
@@ -86,8 +80,7 @@ class ModelFactory:
 
         if framework_name not in cls._model_registry:
             raise ValueError(
-                f"Unsupported RL framework: {framework_name}. "
-                f"Supported frameworks: {list(cls._model_registry.keys())}"
+                f"Unsupported RL framework: {framework_name}. Supported frameworks: {list(cls._model_registry.keys())}"
             )
 
         model_class = cls._model_registry[framework_name]
@@ -112,9 +105,7 @@ def _register_models():
     from rosnav_rl.model.dreamerv3.dreamerv3_model import DreamerV3Model
     from rosnav_rl.model.stable_baselines3 import StableBaselinesModel
 
-    ModelFactory.register_model(
-        SupportedRLFrameworks.STABLE_BASELINES3, StableBaselinesModel
-    )
+    ModelFactory.register_model(SupportedRLFrameworks.STABLE_BASELINES3, StableBaselinesModel)
     ModelFactory.register_model(SupportedRLFrameworks.DREAMER_V3, DreamerV3Model)
 
 

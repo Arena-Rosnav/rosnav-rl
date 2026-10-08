@@ -101,9 +101,7 @@ class ArenaInferenceNode:
             self.observation_manager = self._load_observation_manager()
             self.logger.info("[rosnav_rl] observation manager ready")
         else:
-            self.logger.info(
-                "[rosnav_rl] subgoal-only mode (train_mode=true); agent and cmd_vel publisher skipped"
-            )
+            self.logger.info("[rosnav_rl] subgoal-only mode (train_mode=true); agent and cmd_vel publisher skipped")
 
         period = 1.0 / max(self.control_rate, 1e-3)
         self._timer = node.create_timer(period, self._step)
@@ -159,9 +157,7 @@ class ArenaInferenceNode:
         try:
             observations = self.observation_manager.get_observations()
         except Exception as exc:
-            self.logger.warn(
-                f"[rosnav_rl] get_observations failed: {type(exc).__name__}: {exc}"
-            )
+            self.logger.warn(f"[rosnav_rl] get_observations failed: {type(exc).__name__}: {exc}")
             return
 
         try:

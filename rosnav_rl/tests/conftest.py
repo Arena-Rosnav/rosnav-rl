@@ -38,6 +38,7 @@ SimulationStateContainerStub = AgentParameters
 # Shared pytest fixtures
 # ============================================================
 
+
 @pytest.fixture
 def sim_state():
     """Default AgentParameters used as the per-step config in reward unit tests."""
@@ -52,6 +53,7 @@ def sim_state():
 @pytest.fixture
 def make_reward_function():
     """Factory that builds a minimal mock RewardFunction for unit testing."""
+
     def _factory():
         rf = MagicMock()
         rf.add_reward = MagicMock()

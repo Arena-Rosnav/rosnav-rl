@@ -122,7 +122,6 @@ class DiscretizationCfg(BaseModel):
     buckets_angular: int = Field(9, ge=2, description="Angular velocity buckets (UNIFORM / EXPONENTIAL)")
 
 
-
 class BaseActionSpace(BaseModel):
     """Base for all robot action space specifications.
 
@@ -241,8 +240,7 @@ class DifferentialDriveActionSpace(BaseActionSpace):
         if strategy == DiscretizationStrategy.ROBOT_DEFINED:
             if robot_discrete_actions:
                 actions: list[dict[str, Any]] = [
-                    {"name": a.name, "linear": a.linear, "angular": a.angular}
-                    for a in robot_discrete_actions
+                    {"name": a.name, "linear": a.linear, "angular": a.angular} for a in robot_discrete_actions
                 ]
             else:
                 # No robot-defined actions — fall back to UNIFORM
@@ -271,20 +269,20 @@ class DifferentialDriveActionSpace(BaseActionSpace):
 
         return self.model_copy(update={"discrete_actions": actions, "discretization": None})
 
-    def to_discrete(
-        self, buckets_linear: int = 12, buckets_angular: int = 16
-    ) -> DifferentialDriveActionSpace:
+    def to_discrete(self, buckets_linear: int = 12, buckets_angular: int = 16) -> DifferentialDriveActionSpace:
         """Return a discretised copy using a uniform grid (legacy helper).
 
         Prefer setting ``discretization=DiscretizationCfg(strategy=...)`` in
         your config and calling ``resolve_discretization()`` instead.
         """
         return self.model_copy(
-            update={"discretization": DiscretizationCfg(
-                strategy=DiscretizationStrategy.UNIFORM,
-                buckets_linear=buckets_linear,
-                buckets_angular=buckets_angular,
-            )}
+            update={
+                "discretization": DiscretizationCfg(
+                    strategy=DiscretizationStrategy.UNIFORM,
+                    buckets_linear=buckets_linear,
+                    buckets_angular=buckets_angular,
+                )
+            }
         ).resolve_discretization()
 
     # -- legacy bridge -----------------------------------------------------
@@ -344,9 +342,7 @@ class OmnidirectionalActionSpace(BaseActionSpace):
         if self.is_discrete:
             idx = int(action[0]) if isinstance(action, Sized) else int(action)
             a = self.discrete_actions[idx]
-            return np.array(
-                [a["linear_x"], a["linear_y"], a["angular"]], dtype=np.float32
-            )
+            return np.array([a["linear_x"], a["linear_y"], a["angular"]], dtype=np.float32)
         return np.asarray(action[:3], dtype=np.float32)
 
     def resolve_discretization(

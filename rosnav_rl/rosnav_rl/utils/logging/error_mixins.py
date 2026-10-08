@@ -73,9 +73,7 @@ class ErrorReportingMixin:
 
     def _report_critical(self, message: str, error_type: str | None = None) -> None:
         """Report a critical error."""
-        self._report_error(
-            message, severity=ErrorSeverity.CRITICAL, error_type=error_type
-        )
+        self._report_error(message, severity=ErrorSeverity.CRITICAL, error_type=error_type)
 
     @contextmanager
     def _error_context(self, operation: str):

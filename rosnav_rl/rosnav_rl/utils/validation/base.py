@@ -81,12 +81,8 @@ class BaseSchemaValidator:
                 }
 
         if all_missing:
-            error_msg = BaseSchemaValidator._format_error_message(
-                observations, all_missing, component_type
-            )
-            missing_keys_list = [
-                key for info in all_missing.values() for key in info["missing_keys"]
-            ]
+            error_msg = BaseSchemaValidator._format_error_message(observations, all_missing, component_type)
+            missing_keys_list = [key for info in all_missing.values() for key in info["missing_keys"]]
             raise MissingObservationError(error_msg, missing_keys=missing_keys_list)
 
     @staticmethod
@@ -97,9 +93,7 @@ class BaseSchemaValidator:
     ) -> str:
         """Format a clean, readable error message with excellent information density."""
 
-        total_missing = sum(
-            len(info["missing_keys"]) for info in missing_components.values()
-        )
+        total_missing = sum(len(info["missing_keys"]) for info in missing_components.values())
         total_components = len(missing_components)
 
         lines = [
@@ -128,59 +122,33 @@ class BaseSchemaValidator:
                     obs_type = component.requires[key]
                     metadata = BaseSchemaValidator._extract_metadata(obs_type)
 
-                    lines.append(f"  {i+1}. 🔍 '{key}'")
+                    lines.append(f"  {i + 1}. 🔍 '{key}'")
 
                     # Compact metadata display
                     details = []
                     if metadata.get("description"):
-                        description = (
-                            metadata["description"]
-                            if metadata.get("description") is not None
-                            else "N/A"
-                        )
+                        description = metadata["description"] if metadata.get("description") is not None else "N/A"
                         details.append(f"📝 Description: {description}")
                     if metadata.get("shape"):
-                        shape = (
-                            metadata["shape"]
-                            if metadata.get("shape") is not None
-                            else "N/A"
-                        )
+                        shape = metadata["shape"] if metadata.get("shape") is not None else "N/A"
                         details.append(f"📐 Shape: {shape}")
                     if metadata.get("units"):
-                        units = (
-                            metadata["units"]
-                            if metadata.get("units") is not None
-                            else "N/A"
-                        )
+                        units = metadata["units"] if metadata.get("units") is not None else "N/A"
                         details.append(f"📏 Units: {units}")
                     if metadata.get("constraints"):
-                        constraints = (
-                            metadata["constraints"]
-                            if metadata.get("constraints") is not None
-                            else "N/A"
-                        )
+                        constraints = metadata["constraints"] if metadata.get("constraints") is not None else "N/A"
                         details.append(f"🔒 Constraints: {constraints}")
                     if metadata.get("source"):
-                        source = (
-                            metadata["source"]
-                            if metadata.get("source") is not None
-                            else "N/A"
-                        )
+                        source = metadata["source"] if metadata.get("source") is not None else "N/A"
                         details.append(f"🌐 Source: {source}")
                     if metadata.get("example"):
-                        example = (
-                            metadata["example"]
-                            if metadata.get("example") is not None
-                            else "N/A"
-                        )
+                        example = metadata["example"] if metadata.get("example") is not None else "N/A"
                         details.append(f"💡 Example: {example}")
                     for detail in details:
                         lines.append(f"     {detail}")
 
                     # Similar suggestions
-                    suggestions = get_close_matches(
-                        key, observations.keys(), n=3, cutoff=0.6
-                    )
+                    suggestions = get_close_matches(key, observations.keys(), n=3, cutoff=0.6)
                     if suggestions:
                         lines.append(f"     💡 Similar: {', '.join(suggestions)}")
 
@@ -261,9 +229,7 @@ class BaseSchemaValidator:
 
         except Exception as e:
             # Safe fallback with error info for debugging
-            metadata["description"] = (
-                f"Type: {str(obs_type)} (metadata extraction failed: {e})"
-            )
+            metadata["description"] = f"Type: {str(obs_type)} (metadata extraction failed: {e})"
 
         return metadata
 

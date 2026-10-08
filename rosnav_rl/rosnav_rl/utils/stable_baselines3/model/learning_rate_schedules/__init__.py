@@ -9,10 +9,12 @@ from .square_root import square_root_decay
 if TYPE_CHECKING:
     import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
 
+
 def load_lr_schedule(
-    settings: float | Callable[[float], float] | dict[str, Any] | sb3_cfg.LearningRateSchedulerCfg
+    settings: float | Callable[[float], float] | dict[str, Any] | sb3_cfg.LearningRateSchedulerCfg,
 ) -> float | Callable[[float], float]:
     import rosnav_rl.model.stable_baselines3.cfg as sb3_cfg
+
     if isinstance(settings, sb3_cfg.LearningRateSchedulerCfg):
         return _get_lr_schedule(settings.type, settings.kwargs)
     elif isinstance(settings, dict):

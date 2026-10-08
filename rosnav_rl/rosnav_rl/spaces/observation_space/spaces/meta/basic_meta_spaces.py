@@ -105,9 +105,7 @@ class EpisodeStepSpace(BaseObservationSpace):
         Returns:
             spaces.Space: Box space [0, max_episode_steps].
         """
-        return spaces.Box(
-            low=0, high=self.max_episode_steps, shape=(1,), dtype=np.int32
-        )
+        return spaces.Box(low=0, high=self.max_episode_steps, shape=(1,), dtype=np.int32)
 
     def encode_observation(self, episode_step: int = 0, *args: Any, **kwargs: Any) -> np.ndarray:
         """

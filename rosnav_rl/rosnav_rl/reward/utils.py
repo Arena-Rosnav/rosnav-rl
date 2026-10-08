@@ -25,6 +25,4 @@ def min_distance_from_pointcloud(point_cloud: np.ndarray) -> np.floating:
 
 
 def distances_from_pointcloud(point_cloud: np.ndarray) -> np.ndarray:
-    return np.sqrt(
-        point_cloud["x"] ** 2 + point_cloud["y"] ** 2 + point_cloud["z"] ** 2
-    )
+    return np.sqrt(point_cloud["x"] ** 2 + point_cloud["y"] ** 2 + point_cloud["z"] ** 2)

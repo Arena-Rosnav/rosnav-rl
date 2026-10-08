@@ -13,19 +13,10 @@ from rosnav_rl.utils.type_aliases.spaces import TensorDict
 from ..dreamerv3 import tools
 
 RSSMState = TensorDict
-HeadDist = (
-    tools.SampleDist
-    | tools.ContDist
-    | tools.OneHotDist
-    | tools.Bernoulli
-    | tools.DiscDist
-    | tools.SymlogDist
-)
+HeadDist = tools.SampleDist | tools.ContDist | tools.OneHotDist | tools.Bernoulli | tools.DiscDist | tools.SymlogDist
 
 
-def add_batch_dim(
-    shape: tuple[int, ...], is_channels_first: bool = False
-) -> tuple[int, ...]:
+def add_batch_dim(shape: tuple[int, ...], is_channels_first: bool = False) -> tuple[int, ...]:
     if len(shape) == 3:
         return shape
 
@@ -91,6 +82,7 @@ class RSSM(nn.Module):
         - Variable recurrent depth
         - Layer normalization
     """
+
     def __init__(
         self,
         stoch: int = 30,
@@ -189,9 +181,7 @@ class RSSM(nn.Module):
         self._obs_out_layers.apply(tools.weight_init)
 
         if self._discrete:
-            self._imgs_stat_layer = nn.Linear(
-                self._hidden, self._stoch * self._discrete
-            )
+            self._imgs_stat_layer = nn.Linear(self._hidden, self._stoch * self._discrete)
             self._imgs_stat_layer.apply(tools.uniform_weight_init(1.0))
             self._obs_stat_layer = nn.Linear(self._hidden, self._stoch * self._discrete)
             self._obs_stat_layer.apply(tools.uniform_weight_init(1.0))
@@ -211,12 +201,8 @@ class RSSM(nn.Module):
         deter = torch.zeros(batch_size, self._deter, device=self._device)
         if self._discrete:
             state = dict(
-                logit=torch.zeros(
-                    [batch_size, self._stoch, self._discrete], device=self._device
-                ),
-                stoch=torch.zeros(
-                    [batch_size, self._stoch, self._discrete], device=self._device
-                ),
+                logit=torch.zeros([batch_size, self._stoch, self._discrete], device=self._device),
+                stoch=torch.zeros([batch_size, self._stoch, self._discrete], device=self._device),
                 deter=deter,
             )
         else:
@@ -266,9 +252,7 @@ class RSSM(nn.Module):
         embed, action, is_first = swap(embed), swap(action), swap(is_first)
         # prev_state[0] means selecting posterior of return(posterior, prior) from obs_step
         post, prior = tools.static_scan(
-            lambda prev_state, prev_act, embed, is_first: self.obs_step(
-                prev_state[0], prev_act, embed, is_first
-            ),
+            lambda prev_state, prev_act, embed, is_first: self.obs_step(prev_state[0], prev_act, embed, is_first),
             (action, embed, is_first),
             (state, state),
         )
@@ -278,9 +262,7 @@ class RSSM(nn.Module):
         prior = {k: swap(v) for k, v in prior.items()}
         return post, prior
 
-    def imagine_with_action(
-        self, action: torch.Tensor, state: RSSMState
-    ) -> RSSMState:
+    def imagine_with_action(self, action: torch.Tensor, state: RSSMState) -> RSSMState:
         """
         Imagine future states given an action sequence and initial state.
 
@@ -315,19 +297,13 @@ class RSSM(nn.Module):
             stoch = stoch.reshape(shape)
         return torch.cat([stoch, state["deter"]], -1)
 
-    def get_dist(
-        self, state: RSSMState, dtype: torch.dtype | None = None
-    ) -> torchd.Independent | tools.ContDist:
+    def get_dist(self, state: RSSMState, dtype: torch.dtype | None = None) -> torchd.Independent | tools.ContDist:
         if self._discrete:
             logit = state["logit"]
-            dist = torchd.independent.Independent(
-                tools.OneHotDist(logit, unimix_ratio=self._unimix_ratio), 1
-            )
+            dist = torchd.independent.Independent(tools.OneHotDist(logit, unimix_ratio=self._unimix_ratio), 1)
         else:
             mean, std = state["mean"], state["std"]
-            dist = tools.ContDist(
-                torchd.independent.Independent(torchd.normal.Normal(mean, std), 1)
-            )
+            dist = tools.ContDist(torchd.independent.Independent(torchd.normal.Normal(mean, std), 1))
         return dist
 
     def obs_step(
@@ -360,9 +336,7 @@ class RSSM(nn.Module):
         # initialize all prev_state
         if prev_state is None or torch.sum(is_first) == len(is_first):
             prev_state = self.initial(len(is_first))
-            prev_action = torch.zeros(
-                (len(is_first), self._num_actions), device=self._device
-            )
+            prev_action = torch.zeros((len(is_first), self._num_actions), device=self._device)
         # overwrite the prev_state only where is_first=True
         elif torch.sum(is_first) > 0:
             is_first = is_first[:, None]
@@ -373,9 +347,7 @@ class RSSM(nn.Module):
                     is_first,
                     is_first.shape + (1,) * (len(val.shape) - len(is_first.shape)),
                 )
-                prev_state[key] = (
-                    val * (1.0 - is_first_r) + init_state[key] * is_first_r
-                )
+                prev_state[key] = val * (1.0 - is_first_r) + init_state[key] * is_first_r
 
         prior = self.img_step(prev_state, prev_action)
         x = torch.cat([prior["deter"], embed], -1)
@@ -390,9 +362,7 @@ class RSSM(nn.Module):
         post = {"stoch": stoch, "deter": prior["deter"], **stats}
         return post, prior
 
-    def img_step(
-        self, prev_state: RSSMState, prev_action: torch.Tensor, sample: bool = True
-    ) -> RSSMState:
+    def img_step(self, prev_state: RSSMState, prev_action: torch.Tensor, sample: bool = True) -> RSSMState:
         """
         Performs one step of the image transition model, computing the prior state distribution.
 
@@ -642,25 +612,11 @@ class MultiEncoder(nn.Module):
         super().__init__()
         excluded = ("is_first", "is_last", "is_terminal", "reward")
 
-        shapes = {
-            k: v
-            for k, v in shapes.items()
-            if k not in excluded and not k.startswith("log_")
-        }
-        self.cnn_shapes = {
-            k: v
-            for k, v in shapes.items()
-            if len(v) in [2, 3] and re.match(cnn_keys, k)
-        }
-        self.mlp_shapes = {
-            k: v
-            for k, v in shapes.items()
-            if len(v) in (1, 2) and re.match(mlp_keys, k)
-        }
+        shapes = {k: v for k, v in shapes.items() if k not in excluded and not k.startswith("log_")}
+        self.cnn_shapes = {k: v for k, v in shapes.items() if len(v) in [2, 3] and re.match(cnn_keys, k)}
+        self.mlp_shapes = {k: v for k, v in shapes.items() if len(v) in (1, 2) and re.match(mlp_keys, k)}
 
-        self.cnn_shapes = add_batch_dim_to_cnn_shapes(
-            self.cnn_shapes, is_channels_first
-        )
+        self.cnn_shapes = add_batch_dim_to_cnn_shapes(self.cnn_shapes, is_channels_first)
         # translate to channels last if is_channels_first is True, shapes is dictionary of shapes
         if is_channels_first:
             self.cnn_shapes = translate_to_channels_last(self.cnn_shapes)
@@ -673,9 +629,7 @@ class MultiEncoder(nn.Module):
         if self.cnn_shapes:
             input_ch = sum([v[-1] for v in self.cnn_shapes.values()])
             input_shape = tuple(self.cnn_shapes.values())[0][:2] + (input_ch,)
-            self._cnn = ConvEncoder(
-                input_shape, cnn_depth, act, norm, kernel_size, minres
-            )
+            self._cnn = ConvEncoder(input_shape, cnn_depth, act, norm, kernel_size, minres)
             self.outdim += self._cnn.outdim
         if self.mlp_shapes:
             input_size = sum([sum(v) for v in self.mlp_shapes.values()])
@@ -717,7 +671,7 @@ class MultiEncoder(nn.Module):
 
 
 class MultiDecoder(nn.Module):
-    """"MultiDecoder is a versatile neural network module for decoding latent features into multiple output formats.
+    """MultiDecoder is a versatile neural network module for decoding latent features into multiple output formats.
 
     This decoder can handle both CNN-based outputs (e.g., images) and MLP-based outputs (e.g., vectors),
     supporting different distribution types for each. It automatically routes outputs to the appropriate
@@ -753,6 +707,7 @@ class MultiDecoder(nn.Module):
         distributions = decoder(features)
         ```
     """
+
     def __init__(
         self,
         feat_size: int,
@@ -808,20 +763,10 @@ class MultiDecoder(nn.Module):
         super().__init__()
         excluded = ("is_first", "is_last", "is_terminal")
         shapes = {k: v for k, v in shapes.items() if k not in excluded}
-        self.cnn_shapes = {
-            k: v
-            for k, v in shapes.items()
-            if len(v) in [2, 3] and re.match(cnn_keys, k)
-        }
-        self.mlp_shapes = {
-            k: v
-            for k, v in shapes.items()
-            if len(v) in (1, 2) and re.match(mlp_keys, k)
-        }
+        self.cnn_shapes = {k: v for k, v in shapes.items() if len(v) in [2, 3] and re.match(cnn_keys, k)}
+        self.mlp_shapes = {k: v for k, v in shapes.items() if len(v) in (1, 2) and re.match(mlp_keys, k)}
 
-        self.cnn_shapes = add_batch_dim_to_cnn_shapes(
-            self.cnn_shapes, is_channels_first
-        )
+        self.cnn_shapes = add_batch_dim_to_cnn_shapes(self.cnn_shapes, is_channels_first)
         # translate to channels last if is_channels_first is True, shapes is dictionary of shapes
         if is_channels_first:
             self.cnn_shapes = translate_to_channels_last(self.cnn_shapes)
@@ -859,9 +804,7 @@ class MultiDecoder(nn.Module):
             )
         self._image_dist = image_dist
 
-    def forward(
-        self, features: torch.Tensor
-    ) -> dict[str, HeadDist | tools.MSEDist]:
+    def forward(self, features: torch.Tensor) -> dict[str, HeadDist | tools.MSEDist]:
         """Forward pass through the decoder network.
 
         This method processes input features through CNN and MLP networks to generate
@@ -894,9 +837,7 @@ class MultiDecoder(nn.Module):
 
     def _make_image_dist(self, mean: torch.Tensor) -> tools.ContDist | tools.MSEDist:
         if self._image_dist == "normal":
-            return tools.ContDist(
-                torchd.independent.Independent(torchd.normal.Normal(mean, 1), 3)
-            )
+            return tools.ContDist(torchd.independent.Independent(torchd.normal.Normal(mean, 1), 3))
         if self._image_dist == "mse":
             return tools.MSEDist(mean)
         raise NotImplementedError(self._image_dist)
@@ -1100,9 +1041,7 @@ class ConvDecoder(nn.Module):
         outpad = pad * 2 - val
         return pad, outpad
 
-    def forward(
-        self, features: torch.Tensor, dtype: torch.dtype | None = None
-    ) -> torch.Tensor:
+    def forward(self, features: torch.Tensor, dtype: torch.dtype | None = None) -> torch.Tensor:
         """Forward pass of the decoder network.
 
         This method transforms the input features through a series of deconvolutional layers
@@ -1130,9 +1069,7 @@ class ConvDecoder(nn.Module):
         """
         x = self._linear_layer(features)
         # (batch, time, -1) -> (batch * time, h, w, ch)
-        x = x.reshape(
-            [-1, self._minres, self._minres, self._embed_size // self._minres**2]
-        )
+        x = x.reshape([-1, self._minres, self._minres, self._embed_size // self._minres**2])
         # (batch, time, -1) -> (batch * time, ch, h, w)
         x = x.permute(0, 3, 1, 2)
         x = self.layers(x)
@@ -1185,13 +1122,9 @@ class MLP(nn.Module):
 
         self.layers = nn.Sequential()
         for i in range(layers):
-            self.layers.add_module(
-                f"{name}_linear{i}", nn.Linear(inp_dim, units, bias=False)
-            )
+            self.layers.add_module(f"{name}_linear{i}", nn.Linear(inp_dim, units, bias=False))
             if norm:
-                self.layers.add_module(
-                    f"{name}_norm{i}", nn.LayerNorm(units, eps=1e-03)
-                )
+                self.layers.add_module(f"{name}_norm{i}", nn.LayerNorm(units, eps=1e-03))
             self.layers.add_module(f"{name}_act{i}", act())
             if i == 0:
                 inp_dim = units
@@ -1255,37 +1188,25 @@ class MLP(nn.Module):
             mean = torch.tanh(mean)
             std = F.softplus(std) + self._min_std
             dist = torchd.normal.Normal(mean, std)
-            dist = torchd.transformed_distribution.TransformedDistribution(
-                dist, tools.TanhBijector()
-            )
+            dist = torchd.transformed_distribution.TransformedDistribution(dist, tools.TanhBijector())
             dist = torchd.independent.Independent(dist, 1)
             dist = tools.SampleDist(dist)
         elif dist == "normal":
-            std = (self._max_std - self._min_std) * torch.sigmoid(
-                std + 2.0
-            ) + self._min_std
+            std = (self._max_std - self._min_std) * torch.sigmoid(std + 2.0) + self._min_std
             dist = torchd.normal.Normal(torch.tanh(mean), std)
-            dist = tools.ContDist(
-                torchd.independent.Independent(dist, 1), absmax=self._absmax
-            )
+            dist = tools.ContDist(torchd.independent.Independent(dist, 1), absmax=self._absmax)
         elif dist == "normal_std_fixed":
             dist = torchd.normal.Normal(mean, self._std)
-            dist = tools.ContDist(
-                torchd.independent.Independent(dist, 1), absmax=self._absmax
-            )
+            dist = tools.ContDist(torchd.independent.Independent(dist, 1), absmax=self._absmax)
         elif dist == "trunc_normal":
             mean = torch.tanh(mean)
             std = 2 * torch.sigmoid(std / 2) + self._min_std
             dist = tools.SafeTruncatedNormal(mean, std, -1, 1)
-            dist = tools.ContDist(
-                torchd.independent.Independent(dist, 1), absmax=self._absmax
-            )
+            dist = tools.ContDist(torchd.independent.Independent(dist, 1), absmax=self._absmax)
         elif dist == "onehot":
             dist = tools.OneHotDist(mean, unimix_ratio=self._unimix_ratio)
         elif dist == "onehot_gumble":
-            dist = tools.ContDist(
-                torchd.gumbel.Gumbel(mean, 1 / self._temp), absmax=self._absmax
-            )
+            dist = tools.ContDist(torchd.gumbel.Gumbel(mean, 1 / self._temp), absmax=self._absmax)
         elif dist == "huber":
             dist = tools.ContDist(
                 torchd.independent.Independent(
@@ -1295,11 +1216,7 @@ class MLP(nn.Module):
                 absmax=self._absmax,
             )
         elif dist == "binary":
-            dist = tools.Bernoulli(
-                torchd.independent.Independent(
-                    torchd.bernoulli.Bernoulli(logits=mean), len(shape)
-                )
-            )
+            dist = tools.Bernoulli(torchd.independent.Independent(torchd.bernoulli.Bernoulli(logits=mean), len(shape)))
         elif dist == "symlog_disc":
             dist = tools.DiscDist(logits=mean, device=self._device)
         elif dist == "symlog_mse":
@@ -1341,9 +1258,7 @@ class GRUCell(nn.Module):
         self._act = act
         self._update_bias = update_bias
         self.layers = nn.Sequential()
-        self.layers.add_module(
-            "GRU_linear", nn.Linear(inp_size + size, 3 * size, bias=False)
-        )
+        self.layers.add_module("GRU_linear", nn.Linear(inp_size + size, 3 * size, bias=False))
         if norm:
             self.layers.add_module("GRU_norm", nn.LayerNorm(3 * size, eps=1e-03))
 
@@ -1351,9 +1266,7 @@ class GRUCell(nn.Module):
     def state_size(self) -> int:
         return self._size
 
-    def forward(
-        self, inputs: torch.Tensor, state: list[torch.Tensor]
-    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
+    def forward(self, inputs: torch.Tensor, state: list[torch.Tensor]) -> tuple[torch.Tensor, list[torch.Tensor]]:
         """Forward pass for a custom GRU-like cell.
 
         Args:
@@ -1427,17 +1340,11 @@ class Conv2dSamePad(torch.nn.Conv2d):
             input dimensions when accounting for stride and dilation.
         """
         ih, iw = x.size()[-2:]
-        pad_h = self.calc_same_pad(
-            i=ih, k=self.kernel_size[0], s=self.stride[0], d=self.dilation[0]
-        )
-        pad_w = self.calc_same_pad(
-            i=iw, k=self.kernel_size[1], s=self.stride[1], d=self.dilation[1]
-        )
+        pad_h = self.calc_same_pad(i=ih, k=self.kernel_size[0], s=self.stride[0], d=self.dilation[0])
+        pad_w = self.calc_same_pad(i=iw, k=self.kernel_size[1], s=self.stride[1], d=self.dilation[1])
 
         if pad_h > 0 or pad_w > 0:
-            x = F.pad(
-                x, [pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2]
-            )
+            x = F.pad(x, [pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2])
 
         ret = F.conv2d(
             x,

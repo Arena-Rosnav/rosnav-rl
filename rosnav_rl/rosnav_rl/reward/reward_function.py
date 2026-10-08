@@ -155,9 +155,7 @@ class RewardFunction(ErrorReportingMixin):
         if not eligible_units:
             return
 
-        execution_kwargs = self._prepare_execution_kwargs(
-            obs_dict, simulation_state_container, **kwargs
-        )
+        execution_kwargs = self._prepare_execution_kwargs(obs_dict, simulation_state_container, **kwargs)
         self._execute_reward_units(eligible_units, execution_kwargs)
 
     def _validate_if_enabled(self, obs_dict: ObservationDict) -> None:
@@ -183,11 +181,7 @@ class RewardFunction(ErrorReportingMixin):
         (already-cleared) reward state, which was always False before this fix.
         """
         safe_dist_violation = bool(obs_dict.get("laser_safety_violation", False))
-        return (
-            self._safe_dist_sensitive_units
-            if safe_dist_violation
-            else self._reward_units
-        )
+        return self._safe_dist_sensitive_units if safe_dist_violation else self._reward_units
 
     def _prepare_execution_kwargs(
         self,
@@ -208,9 +202,7 @@ class RewardFunction(ErrorReportingMixin):
             ek.update(kwargs)
         return ek
 
-    def _execute_reward_units(
-        self, units: list["RewardUnit"], kwargs: dict[str, Any]
-    ) -> None:
+    def _execute_reward_units(self, units: list["RewardUnit"], kwargs: dict[str, Any]) -> None:
         """Execute reward units sequentially."""
         if len(units) == 1:
             self._execute_single_unit(units[0], kwargs)
@@ -226,15 +218,11 @@ class RewardFunction(ErrorReportingMixin):
 
     def _handle_unit_error(self, unit_name: str, error: Exception) -> None:
         """Handle errors from reward unit execution."""
-        error_message = (
-            f"Error during reward calculation: {str(error)}{ERROR_MESSAGE_SUFFIX}"
-        )
+        error_message = f"Error during reward calculation: {str(error)}{ERROR_MESSAGE_SUFFIX}"
         if self.verbose:
             self._report_error(message=error_message, component_name=unit_name)
 
-    def _calculate_reward_sequential(
-        self, reward_units: list["RewardUnit"], all_kwargs: dict[str, Any]
-    ) -> None:
+    def _calculate_reward_sequential(self, reward_units: list["RewardUnit"], all_kwargs: dict[str, Any]) -> None:
         """Calculate rewards sequentially with optimized error handling."""
         for reward_unit in reward_units:
             try:
@@ -277,9 +265,7 @@ class RewardFunction(ErrorReportingMixin):
         if called_by:
             self.state.reward_overview[called_by] = value
 
-    def _update_reward_and_overview(
-        self, value: float, called_by: str | None
-    ) -> None:
+    def _update_reward_and_overview(self, value: float, called_by: str | None) -> None:
         """Update current reward and overview tracking."""
         self.state.current_reward += value
         if called_by:
@@ -309,10 +295,7 @@ class RewardFunction(ErrorReportingMixin):
         log_messages = [
             "____________________________________",
             "Reward Overview:",
-            *[
-                f"{key}: {value:.4f}"
-                for key, value in self.state.reward_overview.items()
-            ],
+            *[f"{key}: {value:.4f}" for key, value in self.state.reward_overview.items()],
             "------------------------------------",
             f"Total Reward: {self.state.current_reward:.4f}",
             "____________________________________",
@@ -331,10 +314,7 @@ class RewardFunction(ErrorReportingMixin):
         return "\n".join(
             [
                 f"{self.__class__.__name__}(",
-                *[
-                    f"  {name}: {params}"
-                    for name, params in self.reward_function_dict.items()
-                ],
+                *[f"  {name}: {params}" for name, params in self.reward_function_dict.items()],
                 ")",
             ]
         )

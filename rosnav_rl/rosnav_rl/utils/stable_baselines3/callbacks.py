@@ -16,7 +16,6 @@ from stable_baselines3.common.vec_env import (
 
 
 class RosnavEvalCallback(EvalCallback):
-
     def __init__(
         self,
         eval_env: gym.Env | VecEnv,
@@ -97,16 +96,11 @@ class RosnavEvalCallback(EvalCallback):
                 )
 
             mean_reward, std_reward = np.mean(episode_rewards), np.std(episode_rewards)
-            mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(
-                episode_lengths
-            )
+            mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(episode_lengths)
             self.last_mean_reward = mean_reward
 
             if self.verbose >= 1:
-                print(
-                    f"Eval num_timesteps={self.num_timesteps}, "
-                    f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}"
-                )
+                print(f"Eval num_timesteps={self.num_timesteps}, episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
                 print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
             # Add to current Logger
             self.logger.record("eval/mean_reward", float(mean_reward))
@@ -119,18 +113,14 @@ class RosnavEvalCallback(EvalCallback):
                 self.logger.record("eval/success_rate", self.last_success_rate)
 
             # Dump log so the evaluation results are printed with the correct timestep
-            self.logger.record(
-                "time/total_timesteps", self.num_timesteps, exclude="tensorboard"
-            )
+            self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
             self.logger.dump(self.num_timesteps)
 
             if mean_reward > self.best_mean_reward:
                 if self.verbose >= 1:
                     print("New best mean reward!")
                 if self.best_model_save_path is not None:
-                    self.model.save(
-                        os.path.join(self.best_model_save_path, "best_model")
-                    )
+                    self.model.save(os.path.join(self.best_model_save_path, "best_model"))
 
                     vec_normalize = unwrap_vec_normalize(self.training_env)
                     if vec_normalize is not None:
@@ -191,14 +181,10 @@ class StopTrainingOnRewardThreshold(BaseCallback):
         self.is_last_state_getter = is_last_state_getter
 
     def _on_step(self) -> bool:
-        assert self.parent is not None, (
-            "``StopTrainingOnMinimumReward`` callback must be used "
-            "with an ``EvalCallback``"
-        )
+        assert self.parent is not None, "``StopTrainingOnMinimumReward`` callback must be used with an ``EvalCallback``"
         # Convert np.bool_ to bool, otherwise callback() is False won't work
         continue_training = bool(
-            self.parent.best_mean_reward < self.reward_threshold
-            or not self.is_last_state_getter()
+            self.parent.best_mean_reward < self.reward_threshold or not self.is_last_state_getter()
         )
         if self.verbose >= 1 and not continue_training:
             print(
@@ -233,15 +219,9 @@ class StopTrainingOnSuccessThreshold(BaseCallback):
         self.last_state_getter = is_last_state_getter
 
     def _on_step(self) -> bool:
-        assert self.parent is not None, (
-            "``StopTrainingOnMinimumReward`` callback must be used "
-            "with an ``EvalCallback``"
-        )
+        assert self.parent is not None, "``StopTrainingOnMinimumReward`` callback must be used with an ``EvalCallback``"
         # Convert np.bool_ to bool, otherwise callback() is False won't work
-        continue_training = bool(
-            self.parent.last_success_rate < self.success_threshold
-            or not self.last_state_getter()
-        )
+        continue_training = bool(self.parent.last_success_rate < self.success_threshold or not self.last_state_getter())
         if self.verbose >= 1 and not continue_training:
             print(
                 f"Stopping training because the success rate {self.parent.last_success_rate:.2f} "

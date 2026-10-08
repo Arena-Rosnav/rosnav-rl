@@ -150,6 +150,7 @@ class ObservationManager:
         """
         if simulation_state_container is None:
             from rosnav_rl.cfg.parameters import AgentParameters  # noqa: PLC0415
+
             simulation_state_container = AgentParameters()
             logging.getLogger(__name__).warning(
                 "No AgentParameters provided to ObservationManager. "
@@ -164,23 +165,15 @@ class ObservationManager:
         self._validate_generators = validate_generators
 
         # Separate collectors and generators
-        self._collectors = {
-            name: ds for name, ds in data_sources.items() if isinstance(ds, Collector)
-        }
-        self._generators = {
-            name: ds for name, ds in data_sources.items() if isinstance(ds, Generator)
-        }
+        self._collectors = {name: ds for name, ds in data_sources.items() if isinstance(ds, Collector)}
+        self._generators = {name: ds for name, ds in data_sources.items() if isinstance(ds, Generator)}
 
         # Dependency resolver for generators
-        self._dependency_resolver = DependencyResolver(
-            self._generators, self._collectors
-        )
+        self._dependency_resolver = DependencyResolver(self._generators, self._collectors)
 
         # Validate generator dependencies during initialization
         if self._validate_generators:
-            GeneratorSchemaValidator.validate_configuration_dependencies(
-                self._generators, self._collectors
-            )
+            GeneratorSchemaValidator.validate_configuration_dependencies(self._generators, self._collectors)
 
         # Initialize strategy components
         self._subscription_manager = SubscriptionManager(
@@ -356,8 +349,7 @@ class ObservationManager:
                 with self._subscription_manager.lock:
                     collector.update(msg)
                     self._logger.debug(
-                        f"✓ Collector '{collector.name}' updated successfully "
-                        f"(count={collector.update_count})"
+                        f"✓ Collector '{collector.name}' updated successfully (count={collector.update_count})"
                     )
             except Exception as e:
                 self._logger.error(f"Error updating collector '{collector.name}': {e}")
@@ -365,9 +357,7 @@ class ObservationManager:
         def _synchronized_callback(*msgs: object) -> None:
             """Callback for synchronized messages from message_filters."""
             with self._subscription_manager.lock:
-                for collector_name, msg in zip(
-                    self._subscription_manager.sync_collector_names, msgs, strict=True
-                ):
+                for collector_name, msg in zip(self._subscription_manager.sync_collector_names, msgs, strict=True):
                     try:
                         collector = self._collectors[collector_name]
                         collector.update(msg)
@@ -376,9 +366,7 @@ class ObservationManager:
                             f"(count={collector.update_count})"
                         )
                     except Exception as e:
-                        self._logger.error(
-                            f"Error updating synchronized collector '{collector_name}': {e}"
-                        )
+                        self._logger.error(f"Error updating synchronized collector '{collector_name}': {e}")
 
         self._subscription_manager.setup_collectors(
             self._collectors,

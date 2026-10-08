@@ -31,8 +31,7 @@ def freeze_weights(
     weights_dict = {
         key: value
         for key, value in state_dict_model.items()
-        if any(re.match(_key, key) for _key in include)
-        and not any(item in key for item in exclude)
+        if any(re.match(_key, key) for _key in include) and not any(item in key for item in exclude)
     }
 
     print(f"Freezing weights for {len(weights_dict.keys())} keys!")

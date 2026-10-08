@@ -159,38 +159,23 @@ class AgentParameters(BaseModel, frozen=True):
     )
     ped_min_speed_x: float = Field(
         0.0,
-        description=(
-            "Minimum pedestrian speed along x-axis (m/s). "
-            "Used by: PedestrianSpeedXSpace (space low bound)."
-        ),
+        description=("Minimum pedestrian speed along x-axis (m/s). Used by: PedestrianSpeedXSpace (space low bound)."),
     )
     ped_max_speed_x: float = Field(
         2.0,
-        description=(
-            "Maximum pedestrian speed along x-axis (m/s). "
-            "Used by: PedestrianSpeedXSpace (space high bound)."
-        ),
+        description=("Maximum pedestrian speed along x-axis (m/s). Used by: PedestrianSpeedXSpace (space high bound)."),
     )
     ped_min_speed_y: float = Field(
         0.0,
-        description=(
-            "Minimum pedestrian speed along y-axis (m/s). "
-            "Used by: PedestrianSpeedYSpace (space low bound)."
-        ),
+        description=("Minimum pedestrian speed along y-axis (m/s). Used by: PedestrianSpeedYSpace (space low bound)."),
     )
     ped_max_speed_y: float = Field(
         2.0,
-        description=(
-            "Maximum pedestrian speed along y-axis (m/s). "
-            "Used by: PedestrianSpeedYSpace (space high bound)."
-        ),
+        description=("Maximum pedestrian speed along y-axis (m/s). Used by: PedestrianSpeedYSpace (space high bound)."),
     )
     ped_social_state_num: int = Field(
         6,
-        description=(
-            "Number of social-state categories for pedestrian modelling. "
-            "Used by: SocialStateFeaturesSpace."
-        ),
+        description=("Number of social-state categories for pedestrian modelling. Used by: SocialStateFeaturesSpace."),
     )
 
     # ------------------------------------------------------------------

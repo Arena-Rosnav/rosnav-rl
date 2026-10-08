@@ -63,20 +63,16 @@ class SpaceFactory:
                 auto_aliases.append(snake_name)
 
             if primary_name is None:
-                raise ValueError(
-                    f"Must provide either 'name' or set 'auto_name=True' for {wrapped_class.__name__}"
-                )
+                raise ValueError(f"Must provide either 'name' or set 'auto_name=True' for {wrapped_class.__name__}")
 
             import rosnav_rl.spaces.observation_space.spaces.base_observation_space as base_space
 
-            assert issubclass(
-                wrapped_class, base_space.BaseObservationSpace
-            ), f"Wrapped class {wrapped_class.__name__} is not a subclass of 'BaseObservationSpace'!"
+            assert issubclass(wrapped_class, base_space.BaseObservationSpace), (
+                f"Wrapped class {wrapped_class.__name__} is not a subclass of 'BaseObservationSpace'!"
+            )
 
             # Register primary name
-            assert (
-                primary_name not in cls.registry
-            ), f"ObservationSpace '{primary_name}' already exists!"
+            assert primary_name not in cls.registry, f"ObservationSpace '{primary_name}' already exists!"
 
             space_info = {
                 "class": wrapped_class,
@@ -95,9 +91,7 @@ class SpaceFactory:
             # Register aliases if provided
             if aliases:
                 for alias in aliases:
-                    assert (
-                        alias not in cls.registry
-                    ), f"ObservationSpace alias '{alias}' already exists!"
+                    assert alias not in cls.registry, f"ObservationSpace alias '{alias}' already exists!"
                     cls.registry[alias] = space_info
 
             return wrapped_class

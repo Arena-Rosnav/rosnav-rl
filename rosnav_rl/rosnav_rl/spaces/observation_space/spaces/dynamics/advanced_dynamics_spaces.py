@@ -53,7 +53,7 @@ class MotionStateSpace(BaseObservationSpace):
         stability_window: int = 5,
         include_acceleration: bool = False,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize motion state space.
 
@@ -84,9 +84,7 @@ class MotionStateSpace(BaseObservationSpace):
         # [velocity_magnitude, velocity_direction, stability, acceleration?]
         dims = 4 if self.include_acceleration else 3
 
-        return spaces.Box(
-            low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32)
 
     def _compute_stability(self, current_velocity: tuple[float, float]) -> float:
         """Compute motion stability metric."""
@@ -128,9 +126,7 @@ class MotionStateSpace(BaseObservationSpace):
         self.last_velocity = current_velocity
         return acceleration_magnitude
 
-    def encode_observation(
-        self, last_action: RobotActionVector, *args: Any, **kwargs: Any
-    ) -> MotionStateVector:
+    def encode_observation(self, last_action: RobotActionVector, *args: Any, **kwargs: Any) -> MotionStateVector:
         """Encode comprehensive motion state from robot action commands.
 
         Args:
@@ -219,7 +215,7 @@ class KinematicStateSpace(BaseObservationSpace):
         position_scale: float = 10.0,
         include_motion_alignment: bool = True,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize kinematic state space.
 
@@ -241,13 +237,9 @@ class KinematicStateSpace(BaseObservationSpace):
         # [x, y, cos_yaw, sin_yaw, linear_vel, angular_vel, motion_alignment?]
         dims = 7 if self.include_motion_alignment else 6
 
-        return spaces.Box(
-            low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32)
 
-    def _compute_motion_alignment(
-        self, yaw: float, linear_vel: float, angular_vel: float
-    ) -> float:
+    def _compute_motion_alignment(self, yaw: float, linear_vel: float, angular_vel: float) -> float:
         """Compute alignment between motion and orientation.
 
         Measures how well the robot's velocity vector aligns with its heading.
@@ -332,9 +324,7 @@ class KinematicStateSpace(BaseObservationSpace):
 
         # Directly construct the final numpy array
         if self.include_motion_alignment:
-            motion_alignment = self._compute_motion_alignment(
-                yaw, linear_vel, angular_vel
-            )
+            motion_alignment = self._compute_motion_alignment(yaw, linear_vel, angular_vel)
             return np.array(
                 [
                     normalized_x,
@@ -401,12 +391,7 @@ class TrajectoryStateSpace(BaseObservationSpace):
     }
 
     def __init__(
-        self,
-        history_length: int = 3,
-        max_velocity: float = 2.0,
-        position_scale: float = 5.0,
-        *args: Any,
-        **kwargs: Any
+        self, history_length: int = 3, max_velocity: float = 2.0, position_scale: float = 5.0, *args: Any, **kwargs: Any
     ):
         """Initialize trajectory state space.
 
@@ -438,9 +423,7 @@ class TrajectoryStateSpace(BaseObservationSpace):
         # trajectory_features: [path_length, curvature, speed_consistency]
         dims = 9
 
-        return spaces.Box(
-            low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32)
 
     def _update_history(self, pose: tuple[float, float, float], velocity: tuple[float, float]):
         """Update pose and velocity history."""

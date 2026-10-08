@@ -30,9 +30,7 @@ class ObservationSpaceManager:
         Args:
             validate_observations: If True, validates observation keys before encoding.
         """
-        self.spaces: OrderedDict[str, BaseObservationSpace] = (
-            OrderedDict()
-        )  # Preserve space order
+        self.spaces: OrderedDict[str, BaseObservationSpace] = OrderedDict()  # Preserve space order
         self.config = {}
         self.validate_observations = validate_observations
         self.space_factory = SpaceFactory
@@ -40,12 +38,9 @@ class ObservationSpaceManager:
         # Performance optimization: cache required keys per space
         self._space_required_keys: dict[str, list[str]] = {}
 
-    def _auto_load_spacefactory(
-        self, auto_load_spaces: bool = True
-    ) -> type[SpaceFactory] | None:
+    def _auto_load_spacefactory(self, auto_load_spaces: bool = True) -> type[SpaceFactory] | None:
         """Automatically load SpaceFactory and register all spaces."""
         try:
-
             if auto_load_spaces:
                 # Import all space modules to trigger registration
                 try:
@@ -58,17 +53,13 @@ class ObservationSpaceManager:
                         perception,
                     )
 
-                    print(
-                        f"Auto-loaded {len(SpaceFactory.registry)} observation spaces"
-                    )
+                    print(f"Auto-loaded {len(SpaceFactory.registry)} observation spaces")
                 except ImportError as e:
                     print(f"Warning: Could not auto-load all spaces: {e}")
 
             return SpaceFactory
         except ImportError:
-            print(
-                "Warning: Could not import SpaceFactory. You'll need to provide it manually."
-            )
+            print("Warning: Could not import SpaceFactory. You'll need to provide it manually.")
             return None
 
     def load_configuration(self, config: dict[str, dict[str, Any]]):
@@ -133,9 +124,7 @@ class ObservationSpaceManager:
 
         return self._encode_sequential(observations)
 
-    def _extract_space_args(
-        self, space_name: str, observations: ObservationDict
-    ) -> dict[str, Any]:
+    def _extract_space_args(self, space_name: str, observations: ObservationDict) -> dict[str, Any]:
         """Extract required arguments for a specific space from observations.
 
         Args:
@@ -164,11 +153,8 @@ class ObservationSpaceManager:
         encoded = OrderedDict()
 
         for space_name, space in self.spaces.items():
-
             # Call space with safe encoding that handles errors gracefully
-            encoded[space_name] = space.safe_encode_observation(
-                **self._extract_space_args(space_name, observations)
-            )
+            encoded[space_name] = space.safe_encode_observation(**self._extract_space_args(space_name, observations))
 
         # If single space, return value directly
         if len(encoded) == 1:

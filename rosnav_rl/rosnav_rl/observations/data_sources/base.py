@@ -128,9 +128,7 @@ class Collector[RosMessageType, ProcessedDataType](DataSource, ErrorReportingMix
     ):
         super().__init__(name, **kwargs)
         # Unified error reporting
-        ErrorReportingMixin.__init__(
-            self, component_type=ComponentType.COLLECTOR, component_name=name
-        )
+        ErrorReportingMixin.__init__(self, component_type=ComponentType.COLLECTOR, component_name=name)
 
         self.topic = topic
         self._node = node
@@ -168,9 +166,7 @@ class Collector[RosMessageType, ProcessedDataType](DataSource, ErrorReportingMix
             self.update_count += 1
         except Exception as e:
             self.error_count += 1
-            self._report_error(
-                f"Failed to update from message: {e}", error_type=type(e).__name__
-            )
+            self._report_error(f"Failed to update from message: {e}", error_type=type(e).__name__)
             raise e
 
     @property
@@ -272,9 +268,7 @@ class Generator[ProcessedDataType](DataSource, RequiresProtocol, ErrorReportingM
     def __init__(self, name: str, **kwargs: Any):
         super().__init__(name, **kwargs)
         # Set up error reporting
-        ErrorReportingMixin.__init__(
-            self, component_type=ComponentType.GENERATOR, component_name=name
-        )
+        ErrorReportingMixin.__init__(self, component_type=ComponentType.GENERATOR, component_name=name)
         self.required_keys = list(self.requires.keys())
 
     @abstractmethod
@@ -288,9 +282,7 @@ class Generator[ProcessedDataType](DataSource, RequiresProtocol, ErrorReportingM
 
     def get_observation(self, obs_dict: dict[str, Any], **kwargs: Any) -> ProcessedDataType | None:
         try:
-            return self._generate(
-                **{k: obs_dict[k] for k in self.required_keys}, **kwargs
-            )
+            return self._generate(**{k: obs_dict[k] for k in self.required_keys}, **kwargs)
         except KeyError as e:
             missing = e.args[0]
             error_msg = (
@@ -301,9 +293,7 @@ class Generator[ProcessedDataType](DataSource, RequiresProtocol, ErrorReportingM
             return None
         except TypeError as e:
             # This can catch missing or unexpected arguments
-            self._report_error(
-                self._format_type_error(e, obs_dict), error_type="TypeError"
-            )
+            self._report_error(self._format_type_error(e, obs_dict), error_type="TypeError")
             return None
 
     def _format_type_error(self, error: TypeError, obs_dict: dict[str, Any]) -> str:

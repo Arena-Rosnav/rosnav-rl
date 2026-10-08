@@ -11,14 +11,7 @@ from rosnav_rl.utils.type_aliases import ObservationSpaceList, TensorDict
 class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
     REQUIRED_OBSERVATIONS: ClassVar[ObservationSpaceList] = []
 
-    def __init__(
-        self,
-        observation_space: spaces.Dict,
-        features_dim: int,
-        stack_size: int,
-        *args: Any,
-        **kwargs: Any
-    ):
+    def __init__(self, observation_space: spaces.Dict, features_dim: int, stack_size: int, *args: Any, **kwargs: Any):
         """
         Initialize the base feature extractor.
 

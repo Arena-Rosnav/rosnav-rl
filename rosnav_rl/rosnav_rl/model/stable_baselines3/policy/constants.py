@@ -6,9 +6,7 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
-POLICY_TYPE: dict[
-    type[BaseAlgorithm], Literal["MultiInputPolicy", "MultiInputLstmPolicy"]
-] = {
+POLICY_TYPE: dict[type[BaseAlgorithm], Literal["MultiInputPolicy", "MultiInputLstmPolicy"]] = {
     # On-policy
     PPO: "MultiInputPolicy",
     A2C: "MultiInputPolicy",

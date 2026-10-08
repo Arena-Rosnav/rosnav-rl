@@ -99,9 +99,7 @@ class MultiLaserProductionValidator:
     """Validation utilities for production multi-laser systems."""
 
     @staticmethod
-    def validate_fusion_output(
-        fused_scan: np.ndarray, expected_beams: int = 360
-    ) -> dict[str, Any]:
+    def validate_fusion_output(fused_scan: np.ndarray, expected_beams: int = 360) -> dict[str, Any]:
         """Validate fused laser output for production use.
 
         Args:
@@ -116,9 +114,7 @@ class MultiLaserProductionValidator:
         # Check shape
         if len(fused_scan) != expected_beams:
             report["valid"] = False
-            report["issues"].append(
-                f"Wrong beam count: {len(fused_scan)} != {expected_beams}"
-            )
+            report["issues"].append(f"Wrong beam count: {len(fused_scan)} != {expected_beams}")
 
         # Check data range
         if np.any(fused_scan < 0) or np.any(fused_scan > 1):
@@ -146,16 +142,12 @@ class MultiLaserProductionValidator:
                 report["issues"].append("Low valid data ratio")
 
             if report["statistics"]["std"] < 0.01:
-                report["issues"].append(
-                    "Suspiciously low variance - possible stuck sensor"
-                )
+                report["issues"].append("Suspiciously low variance - possible stuck sensor")
 
         return report
 
     @staticmethod
-    def benchmark_fusion_performance(
-        space: MultiLaserFusionSpace, num_samples: int = 1000
-    ) -> dict[str, float]:
+    def benchmark_fusion_performance(space: MultiLaserFusionSpace, num_samples: int = 1000) -> dict[str, float]:
         """Benchmark fusion performance.
 
         Args:
@@ -225,9 +217,7 @@ def demonstrate_production_usage():
     print(f"   Statistics: {validation['statistics']}\n")
 
     # 5. Performance benchmark
-    performance = MultiLaserProductionValidator.benchmark_fusion_performance(
-        fusion_space
-    )
+    performance = MultiLaserProductionValidator.benchmark_fusion_performance(fusion_space)
     print("5. Performance benchmark:")
     print(f"   Average processing time: {performance['avg_time_ms']:.3f} ms")
     print(f"   Throughput: {performance['fps']:.1f} FPS\n")

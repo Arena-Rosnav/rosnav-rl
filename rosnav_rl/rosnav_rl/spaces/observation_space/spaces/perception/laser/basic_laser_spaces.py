@@ -42,9 +42,7 @@ class LaserScanSpace(BaseObservationSpace):
         "front_laser": LidarRanges,  # Front-facing laser scanner range measurements
     }
 
-    def __init__(
-        self, laser_num_beams: int, laser_max_range: float, *args: Any, **kwargs: Any
-    ) -> None:
+    def __init__(self, laser_num_beams: int, laser_max_range: float, *args: Any, **kwargs: Any) -> None:
         self._num_beams = laser_num_beams
         self._max_range = laser_max_range
         super().__init__(*args, **kwargs)
@@ -80,9 +78,7 @@ class LaserScanSpace(BaseObservationSpace):
         return np.minimum(laserbeams, max_range)
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(
-        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
-    ) -> LidarRanges:
+    def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> LidarRanges:
         """Encode full-resolution laser scan with range limiting for robust perception.
 
         Args:
@@ -174,9 +170,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
             return self._cached_indices
 
         if self._reduced_num_beams > self._num_beams:
-            raise ValueError(
-                f"Cannot reduce {self._num_beams} beams to {self._reduced_num_beams} beams"
-            )
+            raise ValueError(f"Cannot reduce {self._num_beams} beams to {self._reduced_num_beams} beams")
 
         # Calculate evenly spaced indices
         step = self._num_beams / self._reduced_num_beams
@@ -189,9 +183,7 @@ class ReducedLaserScanSpace(BaseObservationSpace):
         return indices
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(
-        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
-    ) -> LidarRanges:
+    def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> LidarRanges:
         """Encode reduced laser scan with range limiting and subsampling for efficient perception.
 
         Args:

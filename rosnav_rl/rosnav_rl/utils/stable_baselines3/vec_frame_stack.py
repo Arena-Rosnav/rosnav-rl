@@ -23,9 +23,7 @@ class UpdatedStackedObservations(StackedObservations):
         self._enforce_time_dimension = False
         if isinstance(observation_space, spaces.Dict):
             if not isinstance(channels_order, Mapping):
-                channels_order = {
-                    key: channels_order for key in observation_space.spaces.keys()
-                }
+                channels_order = {key: channels_order for key in observation_space.spaces.keys()}
             self.sub_stacked_observations = {
                 key: UpdatedStackedObservations(num_envs, n_stack, subspace, channels_order[key])  # type: ignore[arg-type]
                 for key, subspace in observation_space.spaces.items()
@@ -38,9 +36,7 @@ class UpdatedStackedObservations(StackedObservations):
             )  # type: Union[spaces.Dict, spaces.Box] # make mypy happy
         elif isinstance(observation_space, spaces.Box):
             if isinstance(channels_order, Mapping):
-                raise TypeError(
-                    "When the observation space is Box, channels_order can't be a dict."
-                )
+                raise TypeError("When the observation space is Box, channels_order can't be a dict.")
 
             if len(observation_space.shape) == 1:
                 observation_space = spaces.Box(
@@ -64,9 +60,7 @@ class UpdatedStackedObservations(StackedObservations):
                 high=high,
                 dtype=observation_space.dtype,  # type: ignore[arg-type]
             )
-            self.stacked_obs = np.zeros(
-                (num_envs, *self.stacked_shape), dtype=observation_space.dtype
-            )
+            self.stacked_obs = np.zeros((num_envs, *self.stacked_shape), dtype=observation_space.dtype)
         else:
             raise TypeError(
                 f"StackedObservations only supports Box and Dict as observation spaces. {observation_space} was provided."
@@ -84,18 +78,14 @@ class UpdatedStackedObservations(StackedObservations):
         if self._enforce_time_dimension:
             for info in infos:
                 if "terminal_observation" in info:
-                    info["terminal_observation"] = np.expand_dims(
-                        info["terminal_observation"], 0
-                    )
+                    info["terminal_observation"] = np.expand_dims(info["terminal_observation"], 0)
         return super().update(self.add_time_dimension(observations), dones, infos)
 
     def reset(self, observation: TObs) -> TObs:
         return super().reset(self.add_time_dimension(observation))
 
     def add_time_dimension(self, observation: TObs) -> TObs:
-        if self._enforce_time_dimension and isinstance(
-            self.stacked_observation_space, spaces.Box
-        ):
+        if self._enforce_time_dimension and isinstance(self.stacked_observation_space, spaces.Box):
             return np.expand_dims(observation, 1)
         return observation
 
@@ -150,13 +140,11 @@ class VecFrameStack(VecEnvWrapper):
         n_stack: int,
         channels_order: str | Mapping[str, str] | None = None,
     ) -> None:
-        assert isinstance(
-            venv.observation_space, (spaces.Box, spaces.Dict)
-        ), "VecFrameStack only works with gym.spaces.Box and gym.spaces.Dict observation spaces"
-
-        self.stacked_obs = UpdatedStackedObservations(
-            venv.num_envs, n_stack, venv.observation_space, channels_order
+        assert isinstance(venv.observation_space, (spaces.Box, spaces.Dict)), (
+            "VecFrameStack only works with gym.spaces.Box and gym.spaces.Dict observation spaces"
         )
+
+        self.stacked_obs = UpdatedStackedObservations(venv.num_envs, n_stack, venv.observation_space, channels_order)
         observation_space = self.stacked_obs.stacked_observation_space
         super().__init__(venv, observation_space=observation_space)
 

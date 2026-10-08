@@ -98,11 +98,7 @@ class CurriculumBase(ABC):
         self.parameter_node_template = (
             parameter_node_template
             if parameter_node_template is not None
-            else (
-                "/task_generator_node_{i}"
-                if self.num_envs > 1
-                else "/task_generator_node"
-            )
+            else ("/task_generator_node_{i}" if self.num_envs > 1 else "/task_generator_node")
         )
         self.parameter_service_name = parameter_service_name
         self.verbose = verbose
@@ -159,9 +155,7 @@ class CurriculumBase(ABC):
             keys = list(train_stages.keys())
             lengths = [len(v) for v in train_stages.values()]
             if not lengths or len(set(lengths)) != 1:
-                raise ValueError(
-                    "All parameter lists must be non-empty and the same length"
-                )
+                raise ValueError("All parameter lists must be non-empty and the same length")
             n_stages = lengths[0]
             stages: list[dict[str, Any]] = []
             for i in range(n_stages):
@@ -199,9 +193,7 @@ class CurriculumBase(ABC):
             service_name = f"{node_name}/{self.parameter_service_name}"
             clients[node_name] = self.node.create_client(SetParameters, service_name)
             if self.verbose > 0:
-                print(
-                    f"[CURRICULUM_BASE] Created parameter client for {node_name} (service: {service_name})"
-                )
+                print(f"[CURRICULUM_BASE] Created parameter client for {node_name} (service: {service_name})")
 
         if self.verbose > 0:
             print(f"[CURRICULUM_BASE] Created {len(clients)} parameter clients total")
@@ -318,9 +310,7 @@ class CurriculumBase(ABC):
                     rcl_param = self._param_to_rcl_param(leaf, val)
                 except TypeError as exc:
                     if self.verbose > 0:
-                        print(
-                            f"[CURRICULUM_BASE] Failed to convert {key}={val}: {exc}"
-                        )
+                        print(f"[CURRICULUM_BASE] Failed to convert {key}={val}: {exc}")
                     plain[key] = val
                     continue
                 obstacles.append(rcl_param)
@@ -329,9 +319,7 @@ class CurriculumBase(ABC):
 
         return obstacles, robots, plain
 
-    def _send_set_parameters(
-        self, node_name: str, params: list[Parameter]
-    ) -> bool:
+    def _send_set_parameters(self, node_name: str, params: list[Parameter]) -> bool:
         """Send a SetParameters request for the given pre-built param list."""
         client = self.parameter_clients.get(node_name)
         if client is None:
@@ -341,9 +329,7 @@ class CurriculumBase(ABC):
 
         if not client.wait_for_service(timeout_sec=2.0):
             if self.verbose > 0:
-                print(
-                    f"[CURRICULUM_BASE] Service not available for node {node_name} after 2.0s timeout"
-                )
+                print(f"[CURRICULUM_BASE] Service not available for node {node_name} after 2.0s timeout")
             return False
 
         request = SetParameters.Request(parameters=params)
@@ -371,9 +357,7 @@ class CurriculumBase(ABC):
 
             if response and all(r.successful for r in response.results):
                 if self.verbose > 0:
-                    print(
-                        f"[CURRICULUM_BASE] Successfully set {len(params)} parameters for {node_name}"
-                    )
+                    print(f"[CURRICULUM_BASE] Successfully set {len(params)} parameters for {node_name}")
                 return True
 
             if self.verbose > 0:
@@ -388,9 +372,7 @@ class CurriculumBase(ABC):
             return False
         except Exception as e:
             if self.verbose > 0:
-                print(
-                    f"[CURRICULUM_BASE] Exception while setting parameters for {node_name}: {e}"
-                )
+                print(f"[CURRICULUM_BASE] Exception while setting parameters for {node_name}: {e}")
             return False
 
     def _set_parameters_batch(self, node_name: str, param_dict: dict[str, Any]) -> bool:
@@ -409,9 +391,7 @@ class CurriculumBase(ABC):
         Returns:
             True if all parameters were set successfully, False otherwise
         """
-        obstacles_params, robots_params, plain_dict = self._split_task_mode_params(
-            param_dict
-        )
+        obstacles_params, robots_params, plain_dict = self._split_task_mode_params(param_dict)
         has_task_params = bool(obstacles_params or robots_params)
 
         ok = True
@@ -434,9 +414,7 @@ class CurriculumBase(ABC):
                         time.sleep(0.01)
                         if time.time() - start > poll_timeout:
                             if self.verbose > 0:
-                                print(
-                                    f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}"
-                                )
+                                print(f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}")
                             ok = False
                             break
                     if future.done():
@@ -444,15 +422,11 @@ class CurriculumBase(ABC):
                         if not (response and response.success):
                             reason = response.error_msg if response else "no response"
                             if self.verbose > 0:
-                                print(
-                                    f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}"
-                                )
+                                print(f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}")
                             ok = False
                 except Exception as e:
                     if self.verbose > 0:
-                        print(
-                            f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}"
-                        )
+                        print(f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}")
                     ok = False
             else:
                 # Service absent: mark node so we don't re-check and fall back.
@@ -482,9 +456,7 @@ class CurriculumBase(ABC):
                     params.append(self._param_to_rcl_param(pname, pval))
                 except Exception as e:
                     if self.verbose > 0:
-                        print(
-                            f"[CURRICULUM_BASE] Failed to convert parameter {pname}={pval} for node {node_name}: {e}"
-                        )
+                        print(f"[CURRICULUM_BASE] Failed to convert parameter {pname}={pval} for node {node_name}: {e}")
                     return False
             if params:
                 ok = self._send_set_parameters(node_name, params) and ok
@@ -516,9 +488,7 @@ class CurriculumBase(ABC):
 
         if self.verbose > 0:
             if successful_nodes:
-                print(
-                    f"[CURRICULUM_BASE] Successfully set parameters for: {successful_nodes}"
-                )
+                print(f"[CURRICULUM_BASE] Successfully set parameters for: {successful_nodes}")
             if failed_nodes:
                 print(f"[CURRICULUM_BASE] Failed to set parameters for: {failed_nodes}")
             print(f"[CURRICULUM_BASE] Parameter setting complete: {success}")
@@ -584,12 +554,8 @@ class CurriculumBase(ABC):
         stage = self._stages[self.curriculum_index]
         if self.verbose > 0:
             print(f"[CURRICULUM_BASE] Applying stage {self.curriculum_index}: {stage}")
-            print(
-                f"[CURRICULUM_BASE] Available parameter clients: {list(self.parameter_clients.keys())}"
-            )
-            print(
-                f"[CURRICULUM_BASE] Parameter node template: {self.parameter_node_template}"
-            )
+            print(f"[CURRICULUM_BASE] Available parameter clients: {list(self.parameter_clients.keys())}")
+            print(f"[CURRICULUM_BASE] Parameter node template: {self.parameter_node_template}")
 
         tm_keys = self._TASK_MODE_KEYS.intersection(stage)
         param_dict = {k: v for k, v in stage.items() if k not in self._TASK_MODE_KEYS and k != "train_mode"}

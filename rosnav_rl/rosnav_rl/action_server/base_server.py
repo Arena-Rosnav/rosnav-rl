@@ -67,7 +67,7 @@ class ActionServer(ABC):
             "get_command",
             self.__handle_next_action_srv,
         )
-        #TODO: Adjust episode reset trigger
+        # TODO: Adjust episode reset trigger
         self._sub_reset_stacked_obs = self.node.create_subscription(
             Int16,
             "/scenario_reset",
@@ -97,15 +97,12 @@ class ActionServer(ABC):
         response.action_type = action_space_spec.type
 
         try:
-            action = self.agent.get_action(
-                self.observation_collector.get_observations()
-            )
+            action = self.agent.get_action(self.observation_collector.get_observations())
         except Exception as exc:
             # Gracefully handle transient observation failures (e.g. missing
             # topic data at startup) instead of crashing the whole node.
             self.logger.warn(
-                f"[Rosnav-RL] get_action failed — returning empty command. "
-                f"Reason: {type(exc).__name__}: {exc}"
+                f"[Rosnav-RL] get_action failed — returning empty command. Reason: {type(exc).__name__}: {exc}"
             )
             return response
 
@@ -141,9 +138,7 @@ class ActionServer(ABC):
         self.agent = self._initialize_agent()
         self.logger.info("[Rosnav-RL | Action Server] Agent initialized.")
         self.observation_collector = self._initialize_observation_collector()
-        self.logger.info(
-            "[Rosnav-RL | Action Server] Observation collector initialized."
-        )
+        self.logger.info("[Rosnav-RL | Action Server] Observation collector initialized.")
 
         self.logger.info("[Rosnav-RL | Action Server] Spinning...")
         rclpy.spin(self.node)

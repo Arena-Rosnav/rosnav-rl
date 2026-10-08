@@ -12,9 +12,7 @@ class DependencyMissingError(Exception):
 class DependencyResolver:
     """Handles dependency resolution and execution ordering for generators."""
 
-    def __init__(
-        self, generators: dict[str, Generator], collectors: dict[str, Collector]
-    ):
+    def __init__(self, generators: dict[str, Generator], collectors: dict[str, Collector]):
         self.generators = generators
         self.collectors = collectors
 
@@ -77,9 +75,7 @@ class DependencyResolver:
         # Check for circular dependencies
         if len(result) != len(self.generators):
             remaining = set(self.generators.keys()) - set(result)
-            raise ValueError(
-                f"Circular dependency detected among generators: {remaining}"
-            )
+            raise ValueError(f"Circular dependency detected among generators: {remaining}")
 
         return result
 
@@ -90,13 +86,8 @@ class DependencyResolver:
                 # Validate required dependencies exist
                 missing_deps = []
                 for req_key in ds.requires.keys():
-                    if (
-                        req_key not in self.collectors
-                        and req_key not in self.generators
-                    ):
+                    if req_key not in self.collectors and req_key not in self.generators:
                         missing_deps.append(req_key)
 
                 if missing_deps:
-                    raise DependencyMissingError(
-                        f"Generator '{name}' missing dependencies: {missing_deps}"
-                    )
+                    raise DependencyMissingError(f"Generator '{name}' missing dependencies: {missing_deps}")

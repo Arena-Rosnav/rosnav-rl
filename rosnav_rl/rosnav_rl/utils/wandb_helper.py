@@ -8,9 +8,7 @@ class WandbLogger:
         self.project_name = project_name
         wandb.init(project=project_name)
 
-    def update_hyperparameters(
-        self, hyper_params: dict[str, Any], robot_params: dict[str, Any], robot: str
-    ):
+    def update_hyperparameters(self, hyper_params: dict[str, Any], robot_params: dict[str, Any], robot: str):
         for key, value in hyper_params.items():
             wandb.config[f"{robot}/{key}"] = value
         for key, value in robot_params.items():
@@ -26,9 +24,7 @@ class WandbLogger:
             step (int): the step of updating the respective metric
         """
         print(f"[WandB] Logging {title} at step {step}")
-        formatted_dict = {
-            f"{title}/{robot}": value for robot, value in dict_to_log.items()
-        }
+        formatted_dict = {f"{title}/{robot}": value for robot, value in dict_to_log.items()}
         wandb.log(formatted_dict, step=int(step))  # , commit=True)
 
     def log_batch(self, dict_to_log: dict[str, Any], step: int):

@@ -31,9 +31,7 @@ class CollectorManager:
         self._wait_for_obs = wait_for_obs
         self._waiting_strategy = WaitingStrategy(node)
 
-    def collect_observations(
-        self, collectors: dict[str, Collector], obs_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def collect_observations(self, collectors: dict[str, Collector], obs_dict: dict[str, Any]) -> dict[str, Any]:
         """
         Collect observations from all collectors, waiting for required updates.
 

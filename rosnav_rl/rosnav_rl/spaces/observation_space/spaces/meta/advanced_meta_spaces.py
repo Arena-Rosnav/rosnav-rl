@@ -61,7 +61,7 @@ class MissionContextSpace(BaseObservationSpace):
         progress_smoothing: float = 0.9,
         phase_distance_thresholds: list[float] | None = None,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize mission context space.
 
@@ -116,8 +116,7 @@ class MissionContextSpace(BaseObservationSpace):
 
         # Apply smoothing
         self.smoothed_progress = (
-            self.progress_smoothing * self.smoothed_progress
-            + (1.0 - self.progress_smoothing) * raw_progress
+            self.progress_smoothing * self.smoothed_progress + (1.0 - self.progress_smoothing) * raw_progress
         )
 
         return self.smoothed_progress
@@ -140,9 +139,7 @@ class MissionContextSpace(BaseObservationSpace):
     def _compute_urgency(self, progress: float, time_normalized: float) -> float:
         """Compute urgency based on progress and time."""
         # Urgency increases if time is passing but progress is slow
-        expected_progress = (
-            time_normalized * 0.8
-        )  # Expected 80% progress by end of time
+        expected_progress = time_normalized * 0.8  # Expected 80% progress by end of time
 
         if progress < expected_progress:
             urgency = min(1.0, (expected_progress - progress) * 2.0)
@@ -249,9 +246,7 @@ class PerformanceContextSpace(BaseObservationSpace):
         "last_action": RobotActionVector,
     }
 
-    def __init__(
-        self, efficiency_window: int = 50, max_velocity: float = 2.0, *args: Any, **kwargs: Any
-    ):
+    def __init__(self, efficiency_window: int = 50, max_velocity: float = 2.0, *args: Any, **kwargs: Any):
         """Initialize performance context space.
 
         Args:
@@ -342,9 +337,7 @@ class PerformanceContextSpace(BaseObservationSpace):
         # Lower acceleration variance = higher smoothness
         if len(acceleration_magnitudes) > 0:
             avg_acceleration = np.mean(acceleration_magnitudes)
-            max_expected_acceleration = (
-                self.max_velocity * 0.5
-            )  # Assume reasonable acceleration
+            max_expected_acceleration = self.max_velocity * 0.5  # Assume reasonable acceleration
 
             smoothness = 1.0 - min(1.0, avg_acceleration / max_expected_acceleration)
         else:
@@ -352,24 +345,16 @@ class PerformanceContextSpace(BaseObservationSpace):
 
         return smoothness
 
-    def _compute_overall_performance(
-        self, path_eff: float, energy_eff: float, smoothness: float
-    ) -> float:
+    def _compute_overall_performance(self, path_eff: float, energy_eff: float, smoothness: float) -> float:
         """Compute overall performance score."""
         # Weighted combination of metrics
         weights = [0.5, 0.3, 0.2]  # Path efficiency most important
-        overall = (
-            weights[0] * path_eff + weights[1] * energy_eff + weights[2] * smoothness
-        )
+        overall = weights[0] * path_eff + weights[1] * energy_eff + weights[2] * smoothness
 
         return overall
 
     def encode_observation(
-        self,
-        dist_angle_to_goal: DistanceAngleMetrics,
-        last_action: RobotActionVector,
-        *args: Any,
-        **kwargs: Any
+        self, dist_angle_to_goal: DistanceAngleMetrics, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> PerformanceContextVector:
         """Encode comprehensive performance context with efficiency analysis and smoothness assessment.
 
@@ -416,9 +401,7 @@ class PerformanceContextSpace(BaseObservationSpace):
         path_efficiency = self._compute_path_efficiency()
         energy_efficiency = self._compute_energy_efficiency()
         smoothness = self._compute_smoothness()
-        overall_performance = self._compute_overall_performance(
-            path_efficiency, energy_efficiency, smoothness
-        )
+        overall_performance = self._compute_overall_performance(path_efficiency, energy_efficiency, smoothness)
 
         result = [path_efficiency, energy_efficiency, smoothness, overall_performance]
 
@@ -464,7 +447,7 @@ class SafetyContextSpace(BaseObservationSpace):
         critical_distance: float = 0.3,
         risk_history_length: int = 20,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize safety context space.
 
@@ -518,9 +501,7 @@ class SafetyContextSpace(BaseObservationSpace):
             distance_risk = 1.0
         elif min_distance <= self.safety_distance:
             # Linear risk increase as distance decreases
-            distance_risk = (self.safety_distance - min_distance) / (
-                self.safety_distance - self.critical_distance
-            )
+            distance_risk = (self.safety_distance - min_distance) / (self.safety_distance - self.critical_distance)
         else:
             distance_risk = 0.0
 

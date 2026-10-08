@@ -45,18 +45,10 @@ requires_optuna = pytest.mark.skipif(
 @pytest.fixture
 def sample_search_space() -> SearchSpace:
     return {
-        "agent_cfg.framework.algorithm.parameters.learning_rate": FloatParam(
-            low=1e-5, high=1e-3, log=True
-        ),
-        "agent_cfg.framework.algorithm.parameters.n_steps": IntParam(
-            low=128, high=4096, step=128
-        ),
-        "agent_cfg.framework.algorithm.parameters.gamma": FloatParam(
-            low=0.9, high=0.9999
-        ),
-        "agent_cfg.framework.algorithm.parameters.batch_size": CategoricalParam(
-            choices=[64, 128, 256, 512]
-        ),
+        "agent_cfg.framework.algorithm.parameters.learning_rate": FloatParam(low=1e-5, high=1e-3, log=True),
+        "agent_cfg.framework.algorithm.parameters.n_steps": IntParam(low=128, high=4096, step=128),
+        "agent_cfg.framework.algorithm.parameters.gamma": FloatParam(low=0.9, high=0.9999),
+        "agent_cfg.framework.algorithm.parameters.batch_size": CategoricalParam(choices=[64, 128, 256, 512]),
     }
 
 
@@ -148,9 +140,7 @@ class TestSearchSpaceModels:
         from rosnav_rl.tuning.search_space import SearchParam
 
         adapter = TypeAdapter(SearchParam)
-        result = adapter.validate_python(
-            {"type": "categorical", "choices": [1, 2, 3]}
-        )
+        result = adapter.validate_python({"type": "categorical", "choices": [1, 2, 3]})
         assert isinstance(result, CategoricalParam)
 
 
@@ -205,9 +195,7 @@ class TestTuningCfg:
         }
         cfg = TuningCfg.model_validate(data)
         assert cfg.n_trials == 10
-        lr_param = cfg.search_space[
-            "agent_cfg.framework.algorithm.parameters.learning_rate"
-        ]
+        lr_param = cfg.search_space["agent_cfg.framework.algorithm.parameters.learning_rate"]
         assert isinstance(lr_param, FloatParam)
         assert lr_param.log is True
 
@@ -293,19 +281,9 @@ class TestApplyParams:
             "agent_cfg.framework.algorithm.parameters.learning_rate": 1e-4,
         }
         result = apply_params(nested_config, params)
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"][
-                "learning_rate"
-            ]
-            == 1e-4
-        )
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["learning_rate"] == 1e-4
         # Original should be unchanged
-        assert (
-            nested_config["agent_cfg"]["framework"]["algorithm"]["parameters"][
-                "learning_rate"
-            ]
-            == 3e-4
-        )
+        assert nested_config["agent_cfg"]["framework"]["algorithm"]["parameters"]["learning_rate"] == 3e-4
 
     def test_multiple_overrides(self, nested_config):
         params = {
@@ -314,32 +292,16 @@ class TestApplyParams:
             "agent_cfg.framework.algorithm.parameters.gamma": 0.999,
         }
         result = apply_params(nested_config, params)
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"][
-                "learning_rate"
-            ]
-            == 1e-4
-        )
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_steps"]
-            == 512
-        )
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["gamma"]
-            == 0.999
-        )
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["learning_rate"] == 1e-4
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_steps"] == 512
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["gamma"] == 0.999
 
     def test_nested_reward_override(self, nested_config):
         params = {
             "agent_cfg.reward.reward_function_dict.goal_reached.reward": 20.0,
         }
         result = apply_params(nested_config, params)
-        assert (
-            result["agent_cfg"]["reward"]["reward_function_dict"]["goal_reached"][
-                "reward"
-            ]
-            == 20.0
-        )
+        assert result["agent_cfg"]["reward"]["reward_function_dict"]["goal_reached"]["reward"] == 20.0
 
     def test_deep_copy(self, nested_config):
         """Ensure apply_params does not mutate the original config."""
@@ -353,17 +315,13 @@ class TestApplyParams:
 
     def test_missing_intermediate_key_raises(self, nested_config):
         with pytest.raises(KeyError, match="nonexistent"):
-            apply_params(
-                nested_config, {"agent_cfg.nonexistent.key": "value"}
-            )
+            apply_params(nested_config, {"agent_cfg.nonexistent.key": "value"})
 
     def test_missing_final_key_raises(self, nested_config):
         with pytest.raises(KeyError, match="nonexistent_param"):
             apply_params(
                 nested_config,
-                {
-                    "agent_cfg.framework.algorithm.parameters.nonexistent_param": 42
-                },
+                {"agent_cfg.framework.algorithm.parameters.nonexistent_param": 42},
             )
 
     def test_empty_params(self, nested_config):
@@ -377,10 +335,7 @@ class TestApplyParams:
         }
         result = apply_params(nested_config, params)
         # n_epochs should still be 10
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_epochs"]
-            == 10
-        )
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_epochs"] == 10
 
 
 # ── TrialPrunerBase ───────────────────────────────────────────────────────────

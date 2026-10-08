@@ -35,9 +35,7 @@ class RGBDSpace(BaseObservationSpace):
         "depth_image": ImageData,  # Depth image
     }
 
-    def __init__(
-        self, rgbd_image_height: int, rgbd_image_width: int, *args: Any, **kwargs: Any
-    ) -> None:
+    def __init__(self, rgbd_image_height: int, rgbd_image_width: int, *args: Any, **kwargs: Any) -> None:
         self._image_height = rgbd_image_height
         self._image_width = rgbd_image_width
         super().__init__(*args, **kwargs)

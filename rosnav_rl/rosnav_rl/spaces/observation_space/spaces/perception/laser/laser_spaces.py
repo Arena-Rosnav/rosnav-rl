@@ -56,7 +56,7 @@ class ReliableLaserSpace(BaseObservationSpace):
         enable_median_filter: bool = False,
         filter_window: int = 3,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize reliable laser space.
 
@@ -96,9 +96,7 @@ class ReliableLaserSpace(BaseObservationSpace):
     def _validate_scan(self, scan: np.ndarray) -> np.ndarray:
         """Validate and clean laser scan data."""
         # Handle NaN and Inf values
-        scan = np.nan_to_num(
-            scan, nan=self.max_range, posinf=self.max_range, neginf=self.min_range
-        )
+        scan = np.nan_to_num(scan, nan=self.max_range, posinf=self.max_range, neginf=self.min_range)
 
         # Clip to valid range
         scan = np.clip(scan, self.min_range, self.max_range)
@@ -133,26 +131,18 @@ class ReliableLaserSpace(BaseObservationSpace):
         if scan_len != self._last_scan_len:
             self._last_scan_len = scan_len
             if scan_len > self.reduced_beams:
-                self._reduce_indices = np.linspace(
-                    0, scan_len - 1, self.reduced_beams, dtype=int
-                )
+                self._reduce_indices = np.linspace(0, scan_len - 1, self.reduced_beams, dtype=int)
                 self._interp_indices = None
             else:
-                self._interp_indices = np.linspace(
-                    0, scan_len - 1, self.reduced_beams
-                )
+                self._interp_indices = np.linspace(0, scan_len - 1, self.reduced_beams)
                 self._reduce_indices = None
 
         if self._reduce_indices is not None:
             return scan[self._reduce_indices]
         else:
-            return np.interp(
-                self._interp_indices, np.arange(scan_len), scan
-            )
+            return np.interp(self._interp_indices, np.arange(scan_len), scan)
 
-    def encode_observation(
-        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
-    ) -> np.ndarray:
+    def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> np.ndarray:
         """Encode robust laser scan with validation, filtering, and beam reduction.
 
         Args:
@@ -215,7 +205,7 @@ class MultiRangeLaserSpace(BaseObservationSpace):
         laser_max_range: float = 30.0,
         min_range: float = 0.1,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize multi-range laser space.
 
@@ -233,9 +223,9 @@ class MultiRangeLaserSpace(BaseObservationSpace):
         self.min_range = min_range
 
         # Pre-compute scale denominators for vectorized multi-scale encoding
-        self._max_ranges = np.array(
-            [self.base_max_range * s for s in self.range_scales], dtype=np.float32
-        ).reshape(-1, 1)  # Shape: (num_scales, 1) for broadcasting
+        self._max_ranges = np.array([self.base_max_range * s for s in self.range_scales], dtype=np.float32).reshape(
+            -1, 1
+        )  # Shape: (num_scales, 1) for broadcasting
 
         # Cache for interp indices
         self._interp_source: np.ndarray | None = None
@@ -252,12 +242,13 @@ class MultiRangeLaserSpace(BaseObservationSpace):
         """Return gym space for multi-range laser data."""
         total_dims = self.num_beams * len(self.range_scales)
         return spaces.Box(
-            low=0.0, high=1.0, shape=(total_dims,), dtype=np.float32  # Normalized
+            low=0.0,
+            high=1.0,
+            shape=(total_dims,),
+            dtype=np.float32,  # Normalized
         )
 
-    def encode_observation(
-        self, front_laser: LidarRanges, *args: Any, **kwargs: Any
-    ) -> np.ndarray:
+    def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> np.ndarray:
         """Encode multi-scale laser scan with configurable range sensitivities.
 
         Args:
@@ -281,9 +272,7 @@ class MultiRangeLaserSpace(BaseObservationSpace):
             total_dims = self.num_beams * len(self.range_scales)
             return np.zeros(total_dims, dtype=np.float32)
         scan = np.nan_to_num(raw_scan, nan=self.base_max_range)
-        scan = np.clip(
-            scan, self.min_range, self.base_max_range * max(self.range_scales)
-        )
+        scan = np.clip(scan, self.min_range, self.base_max_range * max(self.range_scales))
         if len(scan) != self.num_beams:
             # Cache interp indices for consistent scan lengths
             if len(scan) != self._last_scan_len:
@@ -338,7 +327,7 @@ class MultiLaserFusionSpace(BaseObservationSpace):
         enable_failure_detection: bool = True,
         outlier_threshold: float = 3.0,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize multi-laser fusion space.
 
@@ -423,9 +412,7 @@ class MultiLaserFusionSpace(BaseObservationSpace):
         # Exponential moving average for health
         alpha = 0.1
         base_confidence = 0.9  # Base confidence for good data
-        self.sensor_health[topic] = (
-            1 - alpha
-        ) * current_health + alpha * base_confidence
+        self.sensor_health[topic] = (1 - alpha) * current_health + alpha * base_confidence
 
         return min(self.sensor_health[topic], 1.0)
 
@@ -480,9 +467,7 @@ class MultiLaserFusionSpace(BaseObservationSpace):
 
             # Apply angular offset if specified
             if config.get("angle_offset", 0.0) != 0.0:
-                offset_samples = int(
-                    config["angle_offset"] / (2 * np.pi) * self.num_output_beams
-                )
+                offset_samples = int(config["angle_offset"] / (2 * np.pi) * self.num_output_beams)
                 scan_data = np.roll(scan_data, offset_samples)
 
             # Detect and handle outliers
@@ -494,9 +479,7 @@ class MultiLaserFusionSpace(BaseObservationSpace):
 
             if self.fusion_method == "weighted_average":
                 # Weighted average fusion
-                fused_scan = (fused_scan * weight_sum + scan_data * sensor_weight) / (
-                    weight_sum + sensor_weight
-                )
+                fused_scan = (fused_scan * weight_sum + scan_data * sensor_weight) / (weight_sum + sensor_weight)
                 weight_sum += sensor_weight
 
             elif self.fusion_method == "confidence_max":
@@ -517,9 +500,7 @@ class MultiLaserFusionSpace(BaseObservationSpace):
 
         return normalized_scan
 
-    def encode_observation(
-        self, laser_fusion: LidarRanges, *args: Any, **kwargs: Any
-    ) -> np.ndarray:
+    def encode_observation(self, laser_fusion: LidarRanges, *args: Any, **kwargs: Any) -> np.ndarray:
         """Encode fused multi-laser scan with robust sensor integration and normalization.
 
         Args:

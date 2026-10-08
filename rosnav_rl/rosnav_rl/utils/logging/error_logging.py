@@ -167,9 +167,7 @@ class ErrorCollector:
         total_errors = 0
 
         for error_msg, count in errors.items():
-            by_severity[error_msg.severity][error_msg.component_type].append(
-                (error_msg, count)
-            )
+            by_severity[error_msg.severity][error_msg.component_type].append((error_msg, count))
             total_errors += count
 
         # Format the log message
@@ -191,9 +189,7 @@ class ErrorCollector:
                 continue
 
             severity_count = sum(
-                count
-                for component_errors in by_severity[severity].values()
-                for _, count in component_errors
+                count for component_errors in by_severity[severity].values() for _, count in component_errors
             )
 
             # Severity header
@@ -218,9 +214,7 @@ class ErrorCollector:
 
                 for error_msg, count in component_errors:
                     count_str = f" (×{count})" if count > 1 else ""
-                    lines.append(
-                        f"    • {error_msg.component_name}: {error_msg.message}{count_str}"
-                    )
+                    lines.append(f"    • {error_msg.component_name}: {error_msg.message}{count_str}")
 
                 lines.append("")
 
@@ -238,9 +232,7 @@ class ErrorCollector:
 
         # Log the complete report
         report = "\n".join(lines)
-        self._output_log(
-            report, severity=max(by_severity.keys(), key=lambda x: x.value)
-        )
+        self._output_log(report, severity=max(by_severity.keys(), key=lambda x: x.value))
 
     def _get_severity_emoji(self, severity: ErrorSeverity) -> str:
         """Get emoji for severity level."""
@@ -353,9 +345,7 @@ def _apply_env_log_config() -> None:
             try:
                 overrides = json.loads(overrides_json)
                 for ns, lvl in overrides.items():
-                    logging.getLogger(ns).setLevel(
-                        getattr(logging, lvl, logging.WARNING)
-                    )
+                    logging.getLogger(ns).setLevel(getattr(logging, lvl, logging.WARNING))
             except Exception:
                 pass
         _env_log_applied = True

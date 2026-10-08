@@ -29,11 +29,7 @@ def extract_init_arguments(
         params = {}
         for param in signature.parameters.values():
             if param.name != "self":  # Skip 'self'
-                params[param.name] = (
-                    str(param.annotation)
-                    if param.annotation is not inspect.Parameter.empty
-                    else "Any"
-                )
+                params[param.name] = str(param.annotation) if param.annotation is not inspect.Parameter.empty else "Any"
 
         init_args[cls.__name__] = params
 

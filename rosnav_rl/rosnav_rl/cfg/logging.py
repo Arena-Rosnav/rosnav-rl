@@ -59,6 +59,7 @@ _STDLIB_TO_ERROR_SEVERITY: dict[int, ErrorSeverity] = {
 
 # ── Config model ────────────────────────────────────────────────────────────
 
+
 class LoggingCfg(BaseModel):
     """Per-namespace logging levels for rosnav_rl components and the ROS 2 system.
 
@@ -106,6 +107,7 @@ class LoggingCfg(BaseModel):
 
 # ── Helper function ─────────────────────────────────────────────────────────
 
+
 def configure_rosnav_rl_logging(
     logging_cfg: LoggingCfg | None,
     verbose: int = 0,
@@ -136,17 +138,13 @@ def configure_rosnav_rl_logging(
     import json as _json
     import os as _os
 
-    fallback_level = VERBOSE_TO_LEVEL.get(
-        int(verbose), _logging.INFO if verbose else _logging.WARNING
-    )
+    fallback_level = VERBOSE_TO_LEVEL.get(int(verbose), _logging.INFO if verbose else _logging.WARNING)
 
     if logging_cfg is not None:
         root_level = getattr(_logging, logging_cfg.default_level, _logging.INFO)
         _logging.getLogger("rosnav_rl").setLevel(root_level)
         for ns, lvl_str in logging_cfg.overrides.items():
-            _logging.getLogger(ns).setLevel(
-                getattr(_logging, lvl_str, root_level)
-            )
+            _logging.getLogger(ns).setLevel(getattr(_logging, lvl_str, root_level))
         # ── Propagate to child processes via env vars ──────────────────────
         _os.environ["ROSNAV_RL_LOG_LEVEL"] = logging_cfg.default_level
         _os.environ["ROSNAV_RL_LOG_OVERRIDES"] = _json.dumps(dict(logging_cfg.overrides))
@@ -163,9 +161,7 @@ def configure_rosnav_rl_logging(
     # Sync ErrorCollector threshold to the effective root level so the
     # collect-then-dump report also respects the verbosity setting.
     effective_root = (
-        getattr(_logging, logging_cfg.default_level, _logging.INFO)
-        if logging_cfg is not None
-        else fallback_level
+        getattr(_logging, logging_cfg.default_level, _logging.INFO) if logging_cfg is not None else fallback_level
     )
     error_severity = _STDLIB_TO_ERROR_SEVERITY.get(effective_root, ErrorSeverity.INFO)
     get_error_collector().set_min_severity(error_severity)

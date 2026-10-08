@@ -61,7 +61,7 @@ class RobustOdometrySpace(BaseObservationSpace):
         velocity_filter_alpha: float = 0.8,
         include_acceleration: bool = False,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize robust odometry space.
 
@@ -93,13 +93,9 @@ class RobustOdometrySpace(BaseObservationSpace):
 
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for odometry."""
-        dims = (
-            4 if self.include_acceleration else 2
-        )  # [linear_vel, angular_vel, linear_acc, angular_acc]
+        dims = 4 if self.include_acceleration else 2  # [linear_vel, angular_vel, linear_acc, angular_acc]
 
-        return spaces.Box(
-            low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32)
 
     def _filter_velocity(self, linear_vel: float, angular_vel: float) -> tuple[float, float]:
         """Apply exponential moving average filtering to velocities."""
@@ -110,12 +106,8 @@ class RobustOdometrySpace(BaseObservationSpace):
         else:
             # Apply EMA filter
             alpha = self.velocity_filter_alpha
-            self.filtered_linear_vel = (
-                alpha * self.filtered_linear_vel + (1 - alpha) * linear_vel
-            )
-            self.filtered_angular_vel = (
-                alpha * self.filtered_angular_vel + (1 - alpha) * angular_vel
-            )
+            self.filtered_linear_vel = alpha * self.filtered_linear_vel + (1 - alpha) * linear_vel
+            self.filtered_angular_vel = alpha * self.filtered_angular_vel + (1 - alpha) * angular_vel
 
         return self.filtered_linear_vel, self.filtered_angular_vel
 
@@ -128,9 +120,7 @@ class RobustOdometrySpace(BaseObservationSpace):
             angular_acc = current_velocities[1] - self.last_velocities[1]
 
             # Apply limits to acceleration (simple clipping)
-            max_linear_acc = (
-                self.max_linear_vel * 2.0
-            )  # Assume 2x velocity as max acceleration
+            max_linear_acc = self.max_linear_vel * 2.0  # Assume 2x velocity as max acceleration
             max_angular_acc = self.max_angular_vel * 2.0
 
             linear_acc = np.clip(linear_acc, -max_linear_acc, max_linear_acc)
@@ -141,9 +131,7 @@ class RobustOdometrySpace(BaseObservationSpace):
         self.last_velocities = current_velocities
         return acceleration
 
-    def encode_observation(
-        self, last_action: RobotActionVector, *args: Any, **kwargs: Any
-    ) -> FilteredOdometryVector:
+    def encode_observation(self, last_action: RobotActionVector, *args: Any, **kwargs: Any) -> FilteredOdometryVector:
         """Encode robust odometry data with advanced filtering and normalization processing.
 
         Processes robot action commands through exponential moving average filtering to produce
@@ -183,32 +171,20 @@ class RobustOdometrySpace(BaseObservationSpace):
         )
 
         # Apply velocity filtering
-        filtered_linear_vel, filtered_angular_vel = self._filter_velocity(
-            raw_linear_vel, raw_angular_vel
-        )
+        filtered_linear_vel, filtered_angular_vel = self._filter_velocity(raw_linear_vel, raw_angular_vel)
 
         # Normalize velocities
-        normalized_linear_vel = np.clip(
-            filtered_linear_vel / self.max_linear_vel, -1.0, 1.0
-        )
-        normalized_angular_vel = np.clip(
-            filtered_angular_vel / self.max_angular_vel, -1.0, 1.0
-        )
+        normalized_linear_vel = np.clip(filtered_linear_vel / self.max_linear_vel, -1.0, 1.0)
+        normalized_angular_vel = np.clip(filtered_angular_vel / self.max_angular_vel, -1.0, 1.0)
 
         result = [normalized_linear_vel, normalized_angular_vel]
 
         if self.include_acceleration:
             # Compute and normalize accelerations
-            acceleration = self._compute_acceleration(
-                (filtered_linear_vel, filtered_angular_vel)
-            )
+            acceleration = self._compute_acceleration((filtered_linear_vel, filtered_angular_vel))
 
-            normalized_linear_acc = np.clip(
-                acceleration[0] / (self.max_linear_vel * 2.0), -1.0, 1.0
-            )
-            normalized_angular_acc = np.clip(
-                acceleration[1] / (self.max_angular_vel * 2.0), -1.0, 1.0
-            )
+            normalized_linear_acc = np.clip(acceleration[0] / (self.max_linear_vel * 2.0), -1.0, 1.0)
+            normalized_angular_acc = np.clip(acceleration[1] / (self.max_angular_vel * 2.0), -1.0, 1.0)
 
             result.extend([normalized_linear_acc, normalized_angular_acc])
 
@@ -254,7 +230,7 @@ class PoseStabilizedSpace(BaseObservationSpace):
         use_relative_coords: bool = False,
         include_confidence: bool = False,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize pose stabilized space.
 
@@ -283,9 +259,7 @@ class PoseStabilizedSpace(BaseObservationSpace):
         # [x, y, cos(yaw), sin(yaw), confidence?]
         dims = 5 if self.include_confidence else 4
 
-        return spaces.Box(
-            low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32)
 
     def _set_reference_pose(self, pose_data: np.ndarray):
         """Set reference pose for relative coordinates."""
@@ -296,9 +270,7 @@ class PoseStabilizedSpace(BaseObservationSpace):
                 "yaw": float(pose_data[2]),
             }
 
-    def encode_observation(
-        self, robot_pose: Pose2D, *args: Any, **kwargs: Any
-    ) -> StabilizedPoseVector:
+    def encode_observation(self, robot_pose: Pose2D, *args: Any, **kwargs: Any) -> StabilizedPoseVector:
         """Encode pose data with advanced stabilization and trigonometric orientation representation.
 
         Transforms raw pose data through trigonometric encoding and adaptive coordinate transformation
@@ -413,7 +385,7 @@ class LocalizationCombinedSpace(BaseObservationSpace):
         max_angular_vel: float = 2.0,
         velocity_filter_alpha: float = 0.8,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """Initialize combined localization space.
 
@@ -448,9 +420,7 @@ class LocalizationCombinedSpace(BaseObservationSpace):
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for combined localization."""
         # [x, y, cos_yaw, sin_yaw, linear_vel, angular_vel]
-        return spaces.Box(
-            low=np.array([-1.0] * 6), high=np.array([1.0] * 6), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([-1.0] * 6), high=np.array([1.0] * 6), dtype=np.float32)
 
     def encode_observation(
         self, robot_pose: Pose2D, last_action: RobotActionVector, *args: Any, **kwargs: Any

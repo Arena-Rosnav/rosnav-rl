@@ -79,9 +79,7 @@ class RobustGoalSpace(BaseObservationSpace):
         """Return gym space for goal representation."""
         dims = 3 if self.include_progress else 2  # [distance, angle, progress]
 
-        return spaces.Box(
-            low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32
-        )
+        return spaces.Box(low=np.array([-1.0] * dims), high=np.array([1.0] * dims), dtype=np.float32)
 
     def _normalize_distance(self, distance: float) -> float:
         """Normalize distance using selected method."""
@@ -104,9 +102,7 @@ class RobustGoalSpace(BaseObservationSpace):
         else:
             # Progress as normalized distance reduction
             distance_reduction = max(0.0, self.last_distance - current_distance)
-            progress = np.tanh(
-                distance_reduction / self.max_distance * 10.0
-            )  # Scale up for sensitivity
+            progress = np.tanh(distance_reduction / self.max_distance * 10.0)  # Scale up for sensitivity
 
         self.last_distance = current_distance
         return progress

@@ -23,6 +23,7 @@ def find_agents_dir() -> Path:
     # 2. Try to find via ament_index (arena_training package share)
     try:
         from ament_index_python.packages import get_package_share_directory
+
         at_share = Path(get_package_share_directory("arena_training"))
         # install/<pkg>/share/<pkg> -> 4 levels up is the workspace root
         ws_root = at_share.parents[3]

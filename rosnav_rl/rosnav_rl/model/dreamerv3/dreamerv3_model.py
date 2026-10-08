@@ -89,9 +89,7 @@ class DreamerV3Model(RL_Model):
 
         if algorithm_cfg.general.logdir is None:
             algorithm_cfg.general.logdir = Path.cwd() / "agents"
-        algorithm_cfg.general.logdir = (
-            Path(algorithm_cfg.general.logdir) / rl_agent.name
-        )
+        algorithm_cfg.general.logdir = Path(algorithm_cfg.general.logdir) / rl_agent.name
         self._logdir = prepare_config(algorithm_cfg)
         self._logger = prepare_logger(algorithm_cfg, self._logdir)
 
@@ -223,9 +221,7 @@ class DreamerV3Model(RL_Model):
         """
         items_to_save = {
             "agent_state_dict": self._model.state_dict(),
-            "optims_state_dict": tools.recursively_collect_optim_state_dict(
-                self._model
-            ),
+            "optims_state_dict": tools.recursively_collect_optim_state_dict(self._model),
         }
         torch.save(items_to_save, self._logdir / f"{file_name}.pt")
 
@@ -266,9 +262,7 @@ class DreamerV3Model(RL_Model):
         )
         obs = RenameObsForDreamer._remap(ChannelFirsttoLast._transform(dict(encoded)))
         batch = {key: np.asarray(value)[np.newaxis] for key, value in obs.items()}
-        policy_output, self._policy_state = self._model(
-            batch, np.array([is_first]), self._policy_state, training=False
-        )
+        policy_output, self._policy_state = self._model(batch, np.array([is_first]), self._policy_state, training=False)
         return self._rl_agent.space_manager.decode_action(policy_output["action"][0].cpu().numpy())
 
     def reset(self) -> None:

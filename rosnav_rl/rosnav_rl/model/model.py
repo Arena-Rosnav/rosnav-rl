@@ -49,16 +49,12 @@ class RL_Model(ABC):
     _algorithm_cfg: BaseModel
     _rl_agent: "RL_Agent"
 
-    def __init__(
-        self, rl_agent: "RL_Agent", algorithm_cfg: BaseModel, *args: Any, **kwargs: Any
-    ) -> None:
+    def __init__(self, rl_agent: "RL_Agent", algorithm_cfg: BaseModel, *args: Any, **kwargs: Any) -> None:
         self._rl_agent = rl_agent
         self._algorithm_cfg = algorithm_cfg
 
     @classmethod
-    def from_framework_cfg(
-        cls, rl_agent: "RL_Agent", framework_cfg: "FrameworkCfg", *args: Any, **kwargs: Any
-    ) -> Self:
+    def from_framework_cfg(cls, rl_agent: "RL_Agent", framework_cfg: "FrameworkCfg", *args: Any, **kwargs: Any) -> Self:
         """Construct a model from a :class:`FrameworkCfg` envelope.
 
         Subclasses may override this to extract the relevant portion of the

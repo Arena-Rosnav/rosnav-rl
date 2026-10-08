@@ -67,9 +67,7 @@ class Dreamer(nn.Module):
         self._should_train = tools.Every(batch_steps / config.training.train_ratio)
         self._should_pretrain = tools.Once()
         self._should_reset = tools.Every(config.environment.reset_every)
-        self._should_expl = tools.Until(
-            int(config.model.exploration.until / config.environment.action_repeat)
-        )
+        self._should_expl = tools.Until(int(config.model.exploration.until / config.environment.action_repeat))
         self._metrics = {}
 
         # this is update step
@@ -82,15 +80,11 @@ class Dreamer(nn.Module):
         self._obs_space = obs_space
         self._act_space = act_space
 
-        if (
-            config.general.compile and os.name != "nt"
-        ):  # compilation is not supported on windows
+        if config.general.compile and os.name != "nt":  # compilation is not supported on windows
             self._wm = torch.compile(self._wm)
             self._task_behavior = torch.compile(self._task_behavior)
 
-        def reward(
-            f: torch.Tensor, s: networks.RSSMState, a: torch.Tensor
-        ) -> torch.Tensor:
+        def reward(f: torch.Tensor, s: networks.RSSMState, a: torch.Tensor) -> torch.Tensor:
             """
             Calculate reward based on world model predictions.
 
@@ -107,9 +101,7 @@ class Dreamer(nn.Module):
         self._expl_behavior = dict(
             greedy=lambda: self._task_behavior,
             random=lambda: expl.Random(config, act_space),
-            plan2explore=lambda: expl.Plan2Explore(
-                config, self._wm, reward, self._act_space
-            ),
+            plan2explore=lambda: expl.Plan2Explore(config, self._wm, reward, self._act_space),
         )[config.model.exploration.behavior]().to(self._config.general.device)
 
     def __call__(
@@ -143,11 +135,7 @@ class Dreamer(nn.Module):
         """
         step = self._step
         if training:
-            steps = (
-                self._config.training.pretrain_steps
-                if self._should_pretrain()
-                else self._should_train(step)
-            )
+            steps = self._config.training.pretrain_steps if self._should_pretrain() else self._should_train(step)
             for _ in range(steps):
                 self._train(next(self._dataset))
                 self._update_count += 1
@@ -261,9 +249,7 @@ class Dreamer(nn.Module):
         metrics.update(mets)
         start = post
 
-        def reward(
-            f: torch.Tensor, s: networks.RSSMState, a: torch.Tensor
-        ) -> torch.Tensor:
+        def reward(f: torch.Tensor, s: networks.RSSMState, a: torch.Tensor) -> torch.Tensor:
             """
             Calculate the reward based on feature, state, and action.
 

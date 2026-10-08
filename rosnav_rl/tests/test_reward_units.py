@@ -44,6 +44,7 @@ from rosnav_rl.reward.constants import DEFAULTS, DONE_REASONS
 #  Helper for extracting reward from mock
 # =====================================================================
 
+
 def total_reward(rf):
     """Get the total reward accumulated via add_reward calls."""
     return rf._reward_accum["total"]
@@ -63,6 +64,7 @@ def reset_rf(rf):
 #  RewardGoalReached
 # =====================================================================
 
+
 class TestRewardGoalReached:
     def test_goal_reached_gives_reward_and_done(self, make_reward_function, sim_state):
         rf = make_reward_function()
@@ -72,8 +74,9 @@ class TestRewardGoalReached:
         dist_to_goal = np.array([0.1, 0.5])  # distance=0.1 < 0.3 goal_radius
         dist_to_subgoal = np.array([1.0, 0.3])
 
-        unit(dist_angle_to_goal=dist_to_goal, dist_angle_to_subgoal=dist_to_subgoal,
-             simulation_state_container=sim_state)
+        unit(
+            dist_angle_to_goal=dist_to_goal, dist_angle_to_subgoal=dist_to_subgoal, simulation_state_container=sim_state
+        )
 
         assert total_reward(rf) == pytest.approx(15.0)
         assert info(rf)["is_done"] is True
@@ -87,8 +90,9 @@ class TestRewardGoalReached:
         dist_to_goal = np.array([5.0, 0.5])  # far away
         dist_to_subgoal = np.array([3.0, 0.3])
 
-        unit(dist_angle_to_goal=dist_to_goal, dist_angle_to_subgoal=dist_to_subgoal,
-             simulation_state_container=sim_state)
+        unit(
+            dist_angle_to_goal=dist_to_goal, dist_angle_to_subgoal=dist_to_subgoal, simulation_state_container=sim_state
+        )
 
         assert total_reward(rf) == 0.0
         assert info(rf)["is_done"] is False
@@ -101,8 +105,9 @@ class TestRewardGoalReached:
         dist_to_goal = np.array([10.0, 0.0])
         dist_to_subgoal = np.array([0.1, 0.0])  # within goal_radius
 
-        unit(dist_angle_to_goal=dist_to_goal, dist_angle_to_subgoal=dist_to_subgoal,
-             simulation_state_container=sim_state)
+        unit(
+            dist_angle_to_goal=dist_to_goal, dist_angle_to_subgoal=dist_to_subgoal, simulation_state_container=sim_state
+        )
 
         assert total_reward(rf) == pytest.approx(10.0)
         assert info(rf)["is_done"] is True
@@ -115,8 +120,9 @@ class TestRewardGoalReached:
         dist_to_goal = np.array([0.3, 0.0])
         dist_to_subgoal = np.array([1.0, 0.0])
 
-        unit(dist_angle_to_goal=dist_to_goal, dist_angle_to_subgoal=dist_to_subgoal,
-             simulation_state_container=sim_state)
+        unit(
+            dist_angle_to_goal=dist_to_goal, dist_angle_to_subgoal=dist_to_subgoal, simulation_state_container=sim_state
+        )
 
         assert total_reward(rf) == 0.0
         assert info(rf)["is_done"] is False
@@ -135,6 +141,7 @@ class TestRewardGoalReached:
 # =====================================================================
 #  RewardSafeDistance
 # =====================================================================
+
 
 class TestRewardSafeDistance:
     def test_violation_gives_penalty(self, make_reward_function):
@@ -169,6 +176,7 @@ class TestRewardSafeDistance:
 #  RewardFactoredSafeDistance
 # =====================================================================
 
+
 class TestRewardFactoredSafeDistance:
     def test_proportional_penalty(self, make_reward_function, sim_state):
         rf = make_reward_function()
@@ -178,8 +186,7 @@ class TestRewardFactoredSafeDistance:
         # violation = 0.8 - 0.3 = 0.5; reward = -0.5 * 0.5 = -0.25
         laser = np.array([0.3, 1.0, 2.0, 1.5])
 
-        unit(laser_safety_violation=True, front_laser=laser,
-             simulation_state_container=sim_state)
+        unit(laser_safety_violation=True, front_laser=laser, simulation_state_container=sim_state)
 
         assert total_reward(rf) == pytest.approx(-0.25)
 
@@ -188,8 +195,7 @@ class TestRewardFactoredSafeDistance:
         unit = RewardFactoredSafeDistance(rf, factor=-0.5)
 
         laser = np.array([2.0, 3.0, 4.0])
-        unit(laser_safety_violation=False, front_laser=laser,
-             simulation_state_container=sim_state)
+        unit(laser_safety_violation=False, front_laser=laser, simulation_state_container=sim_state)
 
         assert total_reward(rf) == 0.0
 
@@ -197,6 +203,7 @@ class TestRewardFactoredSafeDistance:
 # =====================================================================
 #  RewardNoMovement
 # =====================================================================
+
 
 class TestRewardNoMovement:
     def test_stationary_robot_penalized(self, make_reward_function):
@@ -242,6 +249,7 @@ class TestRewardNoMovement:
 #  RewardApproachGoal
 # =====================================================================
 
+
 class TestRewardApproachGoal:
     def test_approaching_goal_positive_reward(self, make_reward_function):
         rf = make_reward_function()
@@ -249,16 +257,20 @@ class TestRewardApproachGoal:
 
         # World goal fixed at (5, 0)
         # Step 1: robot at (0,0,0) => goal_in_robot_frame=(5,0), dist=5.0
-        unit(robot_pose=make_pose2d(0.0, 0.0, 0.0),
-             goal_in_robot_frame=np.array([5.0, 0.0]),
-             subgoal_in_robot_frame=np.array([3.0, 0.0]))
+        unit(
+            robot_pose=make_pose2d(0.0, 0.0, 0.0),
+            goal_in_robot_frame=np.array([5.0, 0.0]),
+            subgoal_in_robot_frame=np.array([3.0, 0.0]),
+        )
         assert total_reward(rf) == 0.0  # No reward on first call
 
         # Step 2: robot advanced to (2,0,0) => goal_in_robot_frame=(3,0), dist=3.0
         # world goal = 2+3 = (5, 0) -- unchanged, no jump
-        unit(robot_pose=make_pose2d(2.0, 0.0, 0.0),
-             goal_in_robot_frame=np.array([3.0, 0.0]),
-             subgoal_in_robot_frame=np.array([3.0, 0.0]))
+        unit(
+            robot_pose=make_pose2d(2.0, 0.0, 0.0),
+            goal_in_robot_frame=np.array([3.0, 0.0]),
+            subgoal_in_robot_frame=np.array([3.0, 0.0]),
+        )
 
         # distance changed from 5.0 to 3.0 => change=2.0 => reward = 0.3*2.0 = 0.6
         assert total_reward(rf) == pytest.approx(0.6)
@@ -269,16 +281,20 @@ class TestRewardApproachGoal:
 
         # World goal fixed at (3, 0)
         # Step 1: robot at (1,0,0) => goal_in_robot_frame = (2, 0), dist=2.0
-        unit(robot_pose=make_pose2d(1.0, 0.0, 0.0),
-             goal_in_robot_frame=np.array([2.0, 0.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=make_pose2d(1.0, 0.0, 0.0),
+            goal_in_robot_frame=np.array([2.0, 0.0]),
+            subgoal_in_robot_frame=np.array([1.0, 0.0]),
+        )
         reset_rf(rf)
 
         # Step 2: robot backed up to (-2,0,0) => goal_in_robot_frame = (5, 0), dist=5.0
         # world goal = (-2)+5 = (3, 0) — unchanged, no jump
-        unit(robot_pose=make_pose2d(-2.0, 0.0, 0.0),
-             goal_in_robot_frame=np.array([5.0, 0.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=make_pose2d(-2.0, 0.0, 0.0),
+            goal_in_robot_frame=np.array([5.0, 0.0]),
+            subgoal_in_robot_frame=np.array([1.0, 0.0]),
+        )
 
         # distance changed from 2.0 to 5.0 => change=-3.0 => reward = 0.5*(-3.0) = -1.5
         assert total_reward(rf) == pytest.approx(-1.5)
@@ -288,8 +304,9 @@ class TestRewardApproachGoal:
         unit = RewardApproachGoal(rf, pos_factor=0.3, neg_factor=0.5)
 
         robot_pose = make_pose2d(0.0, 0.0, 0.0)
-        unit(robot_pose=robot_pose, goal_in_robot_frame=np.array([5.0, 0.0]),
-             subgoal_in_robot_frame=np.array([3.0, 0.0]))
+        unit(
+            robot_pose=robot_pose, goal_in_robot_frame=np.array([5.0, 0.0]), subgoal_in_robot_frame=np.array([3.0, 0.0])
+        )
 
         unit.reset()
 
@@ -303,15 +320,19 @@ class TestRewardApproachGoal:
 
         # World subgoal fixed at (5, 0)
         # Step 1: robot at (0,0,0) => subgoal_in_robot_frame = (5, 0), dist=5.0
-        unit(robot_pose=make_pose2d(0.0, 0.0, 0.0),
-             goal_in_robot_frame=np.array([10.0, 0.0]),
-             subgoal_in_robot_frame=np.array([5.0, 0.0]))
+        unit(
+            robot_pose=make_pose2d(0.0, 0.0, 0.0),
+            goal_in_robot_frame=np.array([10.0, 0.0]),
+            subgoal_in_robot_frame=np.array([5.0, 0.0]),
+        )
 
         # Step 2: robot advanced to (3,0,0) => subgoal_in_robot_frame = (2, 0), dist=2.0
         # world subgoal = 3+2 = (5, 0) — unchanged
-        unit(robot_pose=make_pose2d(3.0, 0.0, 0.0),
-             goal_in_robot_frame=np.array([10.0, 0.0]),
-             subgoal_in_robot_frame=np.array([2.0, 0.0]))
+        unit(
+            robot_pose=make_pose2d(3.0, 0.0, 0.0),
+            goal_in_robot_frame=np.array([10.0, 0.0]),
+            subgoal_in_robot_frame=np.array([2.0, 0.0]),
+        )
 
         # Distance: 5.0 -> 2.0, change = 3.0, reward = 0.3 * 3.0 = 0.9
         assert total_reward(rf) == pytest.approx(0.9)
@@ -322,15 +343,19 @@ class TestRewardApproachGoal:
 
         # World goal fixed at (3, 4)
         # Step 1: robot at (0,0,0) => goal_in_robot_frame = (3,4), dist=5.0
-        unit(robot_pose=make_pose2d(0.0, 0.0, 0.0),
-             goal_in_robot_frame=np.array([3.0, 4.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=make_pose2d(0.0, 0.0, 0.0),
+            goal_in_robot_frame=np.array([3.0, 4.0]),
+            subgoal_in_robot_frame=np.array([1.0, 0.0]),
+        )
 
         # Step 2: robot at (3,4,0) => goal_in_robot_frame = (0,0), dist=0.0
         # world goal = (3+0, 4+0) = (3, 4) — unchanged
-        unit(robot_pose=make_pose2d(3.0, 4.0, 0.0),
-             goal_in_robot_frame=np.array([0.0, 0.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=make_pose2d(3.0, 4.0, 0.0),
+            goal_in_robot_frame=np.array([0.0, 0.0]),
+            subgoal_in_robot_frame=np.array([1.0, 0.0]),
+        )
 
         # Distance: 5.0 -> 0.0, change = 5.0, reward = 1.0 * 5.0
         assert total_reward(rf) == pytest.approx(5.0)
@@ -339,43 +364,43 @@ class TestRewardApproachGoal:
         """When the goal teleports beyond the threshold, no reward is issued for that step."""
         rf = make_reward_function()
         # threshold=1.0 => threshold_sq=1.0
-        unit = RewardApproachGoal(rf, pos_factor=0.3, neg_factor=0.5,
-                                  _goal_update_threshold=1.0)
+        unit = RewardApproachGoal(rf, pos_factor=0.3, neg_factor=0.5, _goal_update_threshold=1.0)
 
         # Robot at origin, facing right (yaw=0)
         robot_pose = make_pose2d(0.0, 0.0, 0.0)
 
         # Step 1: goal 5 m ahead in robot frame => world (5, 0)
-        unit(robot_pose=robot_pose,
-             goal_in_robot_frame=np.array([5.0, 0.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=robot_pose, goal_in_robot_frame=np.array([5.0, 0.0]), subgoal_in_robot_frame=np.array([1.0, 0.0])
+        )
         assert total_reward(rf) == 0.0  # baseline step
 
         # Step 2: goal jumps to world (5, 10) — far outside threshold
         # In robot frame (yaw=0): same as world offset => (5, 10)
-        unit(robot_pose=robot_pose,
-             goal_in_robot_frame=np.array([5.0, 10.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=robot_pose,
+            goal_in_robot_frame=np.array([5.0, 10.0]),
+            subgoal_in_robot_frame=np.array([1.0, 0.0]),
+        )
         # Jump detected => reward must stay 0
         assert total_reward(rf) == pytest.approx(0.0)
 
     def test_small_goal_change_not_skipped(self, make_reward_function):
         """Small target movement within threshold should produce a normal reward."""
         rf = make_reward_function()
-        unit = RewardApproachGoal(rf, pos_factor=0.3, neg_factor=0.5,
-                                  _goal_update_threshold=5.0)  # generous threshold
+        unit = RewardApproachGoal(rf, pos_factor=0.3, neg_factor=0.5, _goal_update_threshold=5.0)  # generous threshold
 
         robot_pose = make_pose2d(0.0, 0.0, 0.0)
 
         # Step 1: goal 5 m ahead
-        unit(robot_pose=robot_pose,
-             goal_in_robot_frame=np.array([5.0, 0.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=robot_pose, goal_in_robot_frame=np.array([5.0, 0.0]), subgoal_in_robot_frame=np.array([1.0, 0.0])
+        )
 
         # Step 2: goal 3 m ahead (robot advanced) — still within 5 m threshold
-        unit(robot_pose=robot_pose,
-             goal_in_robot_frame=np.array([3.0, 0.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=robot_pose, goal_in_robot_frame=np.array([3.0, 0.0]), subgoal_in_robot_frame=np.array([1.0, 0.0])
+        )
 
         # distance 5 -> 3, change=2.0, factor=0.3 => reward=0.6
         assert total_reward(rf) == pytest.approx(0.6)
@@ -383,27 +408,28 @@ class TestRewardApproachGoal:
     def test_after_jump_next_step_resumes(self, make_reward_function):
         """After a skipped jump step, the following step should reward normally."""
         rf = make_reward_function()
-        unit = RewardApproachGoal(rf, pos_factor=1.0, neg_factor=1.0,
-                                  _goal_update_threshold=1.0)
+        unit = RewardApproachGoal(rf, pos_factor=1.0, neg_factor=1.0, _goal_update_threshold=1.0)
 
         robot_pose = make_pose2d(0.0, 0.0, 0.0)
 
         # Step 1: baseline at 5 m
-        unit(robot_pose=robot_pose,
-             goal_in_robot_frame=np.array([5.0, 0.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=robot_pose, goal_in_robot_frame=np.array([5.0, 0.0]), subgoal_in_robot_frame=np.array([1.0, 0.0])
+        )
 
         # Step 2: jump — skipped, but last_goal_distance now = sqrt(5^2+10^2)
-        unit(robot_pose=robot_pose,
-             goal_in_robot_frame=np.array([5.0, 10.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=robot_pose,
+            goal_in_robot_frame=np.array([5.0, 10.0]),
+            subgoal_in_robot_frame=np.array([1.0, 0.0]),
+        )
         assert total_reward(rf) == pytest.approx(0.0)
 
         # Step 3: small movement from the new reference point
         # goal in robot frame: (5, 9) => distance slightly less
-        unit(robot_pose=robot_pose,
-             goal_in_robot_frame=np.array([5.0, 9.0]),
-             subgoal_in_robot_frame=np.array([1.0, 0.0]))
+        unit(
+            robot_pose=robot_pose, goal_in_robot_frame=np.array([5.0, 9.0]), subgoal_in_robot_frame=np.array([1.0, 0.0])
+        )
         # Should get a positive reward now (approaching from the new reference)
         assert total_reward(rf) > 0.0
 
@@ -412,14 +438,14 @@ class TestRewardApproachGoal:
 #  RewardCollision
 # =====================================================================
 
+
 class TestRewardCollision:
     def test_collision_monitor_true_terminates(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardCollision(rf, reward=-10.0, bumper_zone=0.05)
 
         laser = np.array([1.0, 2.0, 3.0])
-        unit(front_laser=laser, collision_monitor=True,
-             simulation_state_container=sim_state)
+        unit(front_laser=laser, collision_monitor=True, simulation_state_container=sim_state)
 
         assert total_reward(rf) == pytest.approx(-10.0)
         assert info(rf)["is_done"] is True
@@ -432,8 +458,7 @@ class TestRewardCollision:
         # radius=0.3, bumper_zone=0.05 => threshold=0.35
         # min laser = 0.2 < 0.35 => collision
         laser = np.array([0.2, 1.0, 2.0])
-        unit(front_laser=laser, collision_monitor=False,
-             simulation_state_container=sim_state)
+        unit(front_laser=laser, collision_monitor=False, simulation_state_container=sim_state)
 
         assert total_reward(rf) == pytest.approx(-10.0)
         assert info(rf)["is_done"] is True
@@ -443,8 +468,7 @@ class TestRewardCollision:
         unit = RewardCollision(rf, reward=-10.0, bumper_zone=0.05)
 
         laser = np.array([1.0, 2.0, 3.0])
-        unit(front_laser=laser, collision_monitor=False,
-             simulation_state_container=sim_state)
+        unit(front_laser=laser, collision_monitor=False, simulation_state_container=sim_state)
 
         assert total_reward(rf) == 0.0
         assert "is_done" not in info(rf)
@@ -456,8 +480,7 @@ class TestRewardCollision:
         # collision_monitor=None => falls back to laser check
         # laser min = 0.1 < 0.35 => collision
         laser = np.array([0.1, 5.0])
-        unit(front_laser=laser, collision_monitor=None,
-             simulation_state_container=sim_state)
+        unit(front_laser=laser, collision_monitor=None, simulation_state_container=sim_state)
 
         assert total_reward(rf) == pytest.approx(-10.0)
         assert info(rf)["is_done"] is True
@@ -467,11 +490,11 @@ class TestRewardCollision:
 #  RewardDistanceTravelled
 # =====================================================================
 
+
 class TestRewardDistanceTravelled:
     def test_energy_consumption(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardDistanceTravelled(rf, consumption_factor=0.005,
-                                        lin_vel_scalar=1.0, ang_vel_scalar=0.001)
+        unit = RewardDistanceTravelled(rf, consumption_factor=0.005, lin_vel_scalar=1.0, ang_vel_scalar=0.001)
 
         action = np.array([0.5, 0.0, 1.0])
         unit(last_action=action)
@@ -491,8 +514,7 @@ class TestRewardDistanceTravelled:
 
     def test_reverse_velocity_uses_abs(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardDistanceTravelled(rf, consumption_factor=1.0,
-                                        lin_vel_scalar=1.0, ang_vel_scalar=0.0)
+        unit = RewardDistanceTravelled(rf, consumption_factor=1.0, lin_vel_scalar=1.0, ang_vel_scalar=0.0)
 
         action_fwd = np.array([0.5, 0.0, 0.0])
         action_rev = np.array([-0.5, 0.0, 0.0])
@@ -510,6 +532,7 @@ class TestRewardDistanceTravelled:
 # =====================================================================
 #  RewardReverseDrive
 # =====================================================================
+
 
 class TestRewardReverseDrive:
     def test_reverse_penalized(self, make_reward_function):
@@ -560,6 +583,7 @@ class TestRewardReverseDrive:
 #  RewardFactoredReverseDrive
 # =====================================================================
 
+
 class TestRewardFactoredReverseDrive:
     def test_proportional_penalty(self, make_reward_function):
         rf = make_reward_function()
@@ -597,6 +621,7 @@ class TestRewardFactoredReverseDrive:
 #  RewardAbruptVelocityChange
 # =====================================================================
 
+
 class TestRewardAbruptVelocityChange:
     def test_first_step_no_penalty(self, make_reward_function):
         rf = make_reward_function()
@@ -620,8 +645,7 @@ class TestRewardAbruptVelocityChange:
 
     def test_abrupt_change_penalized(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardAbruptVelocityChange(rf,
-                                           vel_factors={"0": 1.0, "2": 1.0})
+        unit = RewardAbruptVelocityChange(rf, vel_factors={"0": 1.0, "2": 1.0})
 
         action1 = np.array([0.0, 0.0, 0.0])
         action2 = np.array([1.0, 0.0, 1.0])
@@ -647,8 +671,7 @@ class TestRewardAbruptVelocityChange:
 
     def test_small_change_small_penalty(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardAbruptVelocityChange(rf,
-                                           vel_factors={"0": 1.0})
+        unit = RewardAbruptVelocityChange(rf, vel_factors={"0": 1.0})
 
         unit(last_action=np.array([0.0, 0.0, 0.0]))
         reset_rf(rf)
@@ -661,6 +684,7 @@ class TestRewardAbruptVelocityChange:
 # =====================================================================
 #  RewardRootVelocityDifference
 # =====================================================================
+
 
 class TestRewardRootVelocityDifference:
     def test_first_step_no_reward(self, make_reward_function):
@@ -707,6 +731,7 @@ class TestRewardRootVelocityDifference:
 #  RewardTwoFactorVelocityDifference
 # =====================================================================
 
+
 class TestRewardTwoFactorVelocityDifference:
     def test_first_step_no_penalty(self, make_reward_function):
         rf = make_reward_function()
@@ -752,6 +777,7 @@ class TestRewardTwoFactorVelocityDifference:
 # =====================================================================
 #  RewardAngularVelocityConstraint
 # =====================================================================
+
 
 class TestRewardAngularVelocityConstraint:
     def test_below_threshold_no_penalty(self, make_reward_function):
@@ -802,6 +828,7 @@ class TestRewardAngularVelocityConstraint:
 #  RewardLinearVelBoost
 # =====================================================================
 
+
 class TestRewardLinearVelBoost:
     def test_above_threshold_boosted(self, make_reward_function):
         rf = make_reward_function()
@@ -840,6 +867,7 @@ class TestRewardLinearVelBoost:
 #  RewardMaxStepsExceeded
 # =====================================================================
 
+
 class TestRewardMaxStepsExceeded:
     def test_below_max_steps(self, make_reward_function, sim_state):
         rf = make_reward_function()
@@ -877,11 +905,11 @@ class TestRewardMaxStepsExceeded:
 #  RewardPedTypeSafetyDistance
 # =====================================================================
 
+
 class TestRewardPedTypeSafetyDistance:
     def test_violation_penalized(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardPedTypeSafetyDistance(rf, ped_type=1, reward=-0.25,
-                                           safety_distance=1.25)
+        unit = RewardPedTypeSafetyDistance(rf, ped_type=1, reward=-0.25, safety_distance=1.25)
 
         distances = {1: 0.5}
         unit(pedestrian_distances=distances)
@@ -890,8 +918,7 @@ class TestRewardPedTypeSafetyDistance:
 
     def test_no_violation(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardPedTypeSafetyDistance(rf, ped_type=1, reward=-0.25,
-                                           safety_distance=1.25)
+        unit = RewardPedTypeSafetyDistance(rf, ped_type=1, reward=-0.25, safety_distance=1.25)
 
         distances = {1: 2.0}
         unit(pedestrian_distances=distances)
@@ -900,16 +927,14 @@ class TestRewardPedTypeSafetyDistance:
 
     def test_empty_distances(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardPedTypeSafetyDistance(rf, ped_type=1, reward=-0.25,
-                                           safety_distance=1.25)
+        unit = RewardPedTypeSafetyDistance(rf, ped_type=1, reward=-0.25, safety_distance=1.25)
 
         unit(pedestrian_distances={})
         assert total_reward(rf) == 0.0
 
     def test_multiple_types(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardPedTypeSafetyDistance(rf, type_reward_pairs={1: -0.25, 2: -0.5},
-                                           safety_distance=1.0)
+        unit = RewardPedTypeSafetyDistance(rf, type_reward_pairs={1: -0.25, 2: -0.5}, safety_distance=1.0)
 
         distances = {1: 0.5, 2: 0.3}
         unit(pedestrian_distances=distances)
@@ -921,11 +946,11 @@ class TestRewardPedTypeSafetyDistance:
 #  RewardPedTypeFactoredSafetyDistance
 # =====================================================================
 
+
 class TestRewardPedTypeFactoredSafetyDistance:
     def test_proportional_penalty(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardPedTypeFactoredSafetyDistance(rf, ped_type=1, factor=-0.5,
-                                                    safety_distance=1.25)
+        unit = RewardPedTypeFactoredSafetyDistance(rf, ped_type=1, factor=-0.5, safety_distance=1.25)
 
         distances = {1: 0.75}  # violation = 1.25 - 0.75 = 0.5
         unit(pedestrian_distances=distances)
@@ -934,8 +959,7 @@ class TestRewardPedTypeFactoredSafetyDistance:
 
     def test_no_violation(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardPedTypeFactoredSafetyDistance(rf, ped_type=1, factor=-0.5,
-                                                    safety_distance=1.0)
+        unit = RewardPedTypeFactoredSafetyDistance(rf, ped_type=1, factor=-0.5, safety_distance=1.0)
 
         distances = {1: 2.0}
         unit(pedestrian_distances=distances)
@@ -946,6 +970,7 @@ class TestRewardPedTypeFactoredSafetyDistance:
 # =====================================================================
 #  RewardPedTypeCollision
 # =====================================================================
+
 
 class TestRewardPedTypeCollision:
     def test_collision_penalized(self, make_reward_function, sim_state):
@@ -972,11 +997,11 @@ class TestRewardPedTypeCollision:
 #  RewardPedTypeVelocityConstraint
 # =====================================================================
 
+
 class TestRewardPedTypeVelocityConstraint:
     def test_close_ped_velocity_penalty(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardPedTypeVelocityConstraint(rf, ped_type=1, penalty_factor=0.05,
-                                                active_distance=1.25)
+        unit = RewardPedTypeVelocityConstraint(rf, ped_type=1, penalty_factor=0.05, active_distance=1.25)
 
         distances = {1: 0.5}
         action = np.array([0.8, 0.0, 0.0])
@@ -988,8 +1013,7 @@ class TestRewardPedTypeVelocityConstraint:
 
     def test_far_ped_no_penalty(self, make_reward_function):
         rf = make_reward_function()
-        unit = RewardPedTypeVelocityConstraint(rf, ped_type=1, penalty_factor=0.05,
-                                                active_distance=1.25)
+        unit = RewardPedTypeVelocityConstraint(rf, ped_type=1, penalty_factor=0.05, active_distance=1.25)
 
         distances = {1: 5.0}
         action = np.array([0.8, 0.0, 0.0])
@@ -1001,6 +1025,7 @@ class TestRewardPedTypeVelocityConstraint:
 # =====================================================================
 #  Cross-cutting concerns
 # =====================================================================
+
 
 class TestRewardUnitBase:
     """Test base class behaviors."""
@@ -1033,6 +1058,7 @@ class TestRewardUnitBase:
 #  RewardActiveHeadingDirection (basic tests)
 # =====================================================================
 
+
 class TestRewardActiveHeadingDirection:
     def test_no_pedestrians_uses_goal_direction(self, make_reward_function, sim_state):
         rf = make_reward_function()
@@ -1044,12 +1070,14 @@ class TestRewardActiveHeadingDirection:
         ped_locs = np.array([])
         ped_vels = np.array([])
 
-        unit(dist_angle_to_goal=dist_to_goal,
-             dist_angle_to_subgoal=dist_to_subgoal,
-             last_action=last_action,
-             pedestrian_relative_locations=ped_locs,
-             pedestrian_relative_velocities=ped_vels,
-             simulation_state_container=sim_state)
+        unit(
+            dist_angle_to_goal=dist_to_goal,
+            dist_angle_to_subgoal=dist_to_subgoal,
+            last_action=last_action,
+            pedestrian_relative_locations=ped_locs,
+            pedestrian_relative_velocities=ped_vels,
+            simulation_state_container=sim_state,
+        )
 
         # reward = 0.6 * (pi/6 - |0.1|) > 0
         expected = 0.6 * (np.pi / 6 - abs(0.1))
@@ -1059,11 +1087,13 @@ class TestRewardActiveHeadingDirection:
         rf = make_reward_function()
         unit = RewardActiveHeadingDirection(rf)
 
-        unit(dist_angle_to_goal=np.array([5.0, 0.1]),
-             dist_angle_to_subgoal=np.array([2.0, 0.2]),
-             last_action=None,
-             pedestrian_relative_locations=None,
-             pedestrian_relative_velocities=None,
-             simulation_state_container=sim_state)
+        unit(
+            dist_angle_to_goal=np.array([5.0, 0.1]),
+            dist_angle_to_subgoal=np.array([2.0, 0.2]),
+            last_action=None,
+            pedestrian_relative_locations=None,
+            pedestrian_relative_velocities=None,
+            simulation_state_container=sim_state,
+        )
 
         assert total_reward(rf) == 0.0

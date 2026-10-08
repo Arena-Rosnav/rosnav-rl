@@ -133,18 +133,67 @@ class Logger:
             scalars.append(("fps", self._compute_fps(step)))
         # Pretty-print: group metrics by category, one group per line
         _GROUPS = [
-            ("Episode ", lambda k: k in ("dataset_size", "train_return", "train_length",
-                                         "train_episodes", "eval_return", "eval_length",
-                                         "eval_episodes", "fps", "update_count")),
-            ("World   ", lambda k: k in ("model_loss", "model_grad_norm", "kl", "kl_free",
-                                         "dyn_loss", "rep_loss", "dyn_scale", "rep_scale",
-                                         "prior_ent", "post_ent")),
-            ("Heads   ", lambda k: k.endswith("_loss") and k not in ("model_loss",
-                                         "actor_loss", "value_loss", "dyn_loss", "rep_loss")),
-            ("Actor   ", lambda k: k.startswith("actor") or k.startswith("imag")
-                                   or k.startswith("normed") or k.startswith("EMA")
-                                   or k in ("value_mean", "value_std", "value_min", "value_max",
-                                            "target_mean", "target_std", "target_min", "target_max")),
+            (
+                "Episode ",
+                lambda k: (
+                    k
+                    in (
+                        "dataset_size",
+                        "train_return",
+                        "train_length",
+                        "train_episodes",
+                        "eval_return",
+                        "eval_length",
+                        "eval_episodes",
+                        "fps",
+                        "update_count",
+                    )
+                ),
+            ),
+            (
+                "World   ",
+                lambda k: (
+                    k
+                    in (
+                        "model_loss",
+                        "model_grad_norm",
+                        "kl",
+                        "kl_free",
+                        "dyn_loss",
+                        "rep_loss",
+                        "dyn_scale",
+                        "rep_scale",
+                        "prior_ent",
+                        "post_ent",
+                    )
+                ),
+            ),
+            (
+                "Heads   ",
+                lambda k: (
+                    k.endswith("_loss") and k not in ("model_loss", "actor_loss", "value_loss", "dyn_loss", "rep_loss")
+                ),
+            ),
+            (
+                "Actor   ",
+                lambda k: (
+                    k.startswith("actor")
+                    or k.startswith("imag")
+                    or k.startswith("normed")
+                    or k.startswith("EMA")
+                    or k
+                    in (
+                        "value_mean",
+                        "value_std",
+                        "value_min",
+                        "value_max",
+                        "target_mean",
+                        "target_std",
+                        "target_min",
+                        "target_max",
+                    )
+                ),
+            ),
             ("Critic  ", lambda k: k.startswith("value_loss") or k == "value_grad_norm"),
         ]
         used = set()
@@ -208,9 +257,7 @@ _State = tuple[int, int, np.ndarray, np.ndarray, list[dict[str, np.ndarray] | No
 _Episode = dict[str, np.ndarray | list[np.ndarray]]
 _Cache = collections.OrderedDict[str, _Episode]
 _SampleShape = torch.Size | list[int] | tuple[int, ...]
-_ScanState = (
-    dict[str, torch.Tensor] | Sequence[dict[str, torch.Tensor] | torch.Tensor | None]
-)
+_ScanState = dict[str, torch.Tensor] | Sequence[dict[str, torch.Tensor] | torch.Tensor | None]
 
 
 def simulate(
@@ -258,6 +305,7 @@ def simulate(
         Either steps or episodes should be non-zero to determine simulation length.
         The cache is cleared to keep only the last item when in evaluation mode.
     """
+
     def reset_envs():
         results = [env.reset() for env in envs]
         results = [r() for r in results]
@@ -307,10 +355,7 @@ def simulate(
         if _pause is not None:
             _pause(False)
         if isinstance(action, dict):
-            action = [
-                {k: np.array(action[k][i].detach().cpu()) for k in action}
-                for i in range(len(envs))
-            ]
+            action = [{k: np.array(action[k][i].detach().cpu()) for k in action} for i in range(len(envs))]
         else:
             action = np.array(action)
         assert len(action) == len(envs)
@@ -359,9 +404,7 @@ def simulate(
                 # record logs given from environments
                 for key in list(cache[eid].keys()):
                     if "log_" in key:
-                        logger.scalar(
-                            key, float(np.array(cache[eid][key]).sum())
-                        )
+                        logger.scalar(key, float(np.array(cache[eid][key]).sum()))
                         # log items won't be used later
                         cache[eid].pop(key)
 
@@ -406,9 +449,7 @@ def simulate(
     return (step - steps, episode - episodes, done, length, obs, agent_state, reward)
 
 
-def add_to_cache(
-    cache: dict[str, _Episode], id: str, transition: Mapping[str, ArrayLike]
-):
+def add_to_cache(cache: dict[str, _Episode], id: str, transition: Mapping[str, ArrayLike]):
     """Add a transition to a cache dictionary using an ID as key.
 
     This function adds transition data to a cache dictionary, organizing it by ID. If the ID
@@ -464,10 +505,7 @@ def erase_over_episodes(cache: dict[str, _Episode], dataset_size: int | None) ->
     """
     step_in_dataset = 0
     for key, ep in reversed(sorted(cache.items(), key=lambda x: x[0])):
-        if (
-            not dataset_size
-            or step_in_dataset + (len(ep["reward"]) - 1) <= dataset_size
-        ):
+        if not dataset_size or step_in_dataset + (len(ep["reward"]) - 1) <= dataset_size:
             step_in_dataset += len(ep["reward"]) - 1
         else:
             del cache[key]
@@ -509,9 +547,7 @@ def convert(value: ArrayLike, precision: int = 32) -> np.ndarray:
     return value.astype(dtype)
 
 
-def save_episodes(
-    directory: str | pathlib.Path, episodes: Mapping[str, _Episode]
-) -> bool:
+def save_episodes(directory: str | pathlib.Path, episodes: Mapping[str, _Episode]) -> bool:
     """Save episodes data to compressed NPZ files in the specified directory.
 
     This function saves episode data in NPZ format, where each episode file is named with
@@ -576,16 +612,11 @@ def from_generator(
     """
     while True:
         batch = [next(generator) for _ in range(batch_size)]
-        data = {
-            key: np.stack([sample[key] for sample in batch], axis=0)
-            for key in batch[0].keys()
-        }
+        data = {key: np.stack([sample[key] for sample in batch], axis=0) for key in batch[0].keys()}
         yield data
 
 
-def sample_episodes(
-    episodes: Mapping[str, _Episode], length: int, seed: int = 0
-) -> Generator[_Episode, None, None]:
+def sample_episodes(episodes: Mapping[str, _Episode], length: int, seed: int = 0) -> Generator[_Episode, None, None]:
     """
     Sample fixed-length sequences from a collection of episodes.
 
@@ -615,9 +646,7 @@ def sample_episodes(
     while True:
         size = 0
         ret = None
-        p = np.array(
-            [len(next(iter(episode.values()))) for episode in episodes.values()]
-        )
+        p = np.array([len(next(iter(episode.values()))) for episode in episodes.values()])
         p = p / np.sum(p)
         while size < length:
             episode = np_random.choice(list(episodes.values()), p=p)
@@ -627,11 +656,7 @@ def sample_episodes(
                 continue
             if not ret:
                 index = int(np_random.randint(0, total - 1))
-                ret = {
-                    k: v[index : min(index + length, total)].copy()
-                    for k, v in episode.items()
-                    if "log_" not in k
-                }
+                ret = {k: v[index : min(index + length, total)].copy() for k, v in episode.items() if "log_" not in k}
                 if "is_first" in ret:
                     ret["is_first"][0] = True
             else:
@@ -639,9 +664,7 @@ def sample_episodes(
                 index = 0
                 possible = length - size
                 ret = {
-                    k: np.append(
-                        ret[k], v[index : min(index + possible, total)].copy(), axis=0
-                    )
+                    k: np.append(ret[k], v[index : min(index + possible, total)].copy(), axis=0)
                     for k, v in episode.items()
                     if "log_" not in k
                 }
@@ -651,9 +674,7 @@ def sample_episodes(
         yield ret
 
 
-def load_episodes(
-    directory: str | pathlib.Path, limit: int | None = None, reverse: bool = True
-) -> _Cache:
+def load_episodes(directory: str | pathlib.Path, limit: int | None = None, reverse: bool = True) -> _Cache:
     """Load episode data from a directory containing .npz files.
 
     This function loads episode data stored in .npz files from a specified directory. Each episode
@@ -802,14 +823,10 @@ class OneHotDist(torchd.one_hot_categorical.OneHotCategorical):
             super().__init__(logits=logits, probs=probs)
 
     def mode(self) -> torch.Tensor:
-        _mode = F.one_hot(
-            torch.argmax(super().logits, axis=-1), super().logits.shape[-1]
-        )
+        _mode = F.one_hot(torch.argmax(super().logits, axis=-1), super().logits.shape[-1])
         return _mode.detach() + super().logits - super().logits.detach()
 
-    def sample(
-        self, sample_shape: _SampleShape = (), seed: int | None = None
-    ) -> torch.Tensor:
+    def sample(self, sample_shape: _SampleShape = (), seed: int | None = None) -> torch.Tensor:
         if seed is not None:
             raise ValueError("need to check")
         sample = super().sample(sample_shape).detach()
@@ -883,9 +900,7 @@ class DiscDist:
         x = self.transfwd(x)
         # x(time, batch, 1)
         below = torch.sum((self.buckets <= x[..., None]).to(torch.int32), dim=-1) - 1
-        above = len(self.buckets) - torch.sum(
-            (self.buckets > x[..., None]).to(torch.int32), dim=-1
-        )
+        above = len(self.buckets) - torch.sum((self.buckets > x[..., None]).to(torch.int32), dim=-1)
         # this is implemented using clip at the original repo as the gradients are not backpropagated for the out of limits.
         below = torch.clip(below, 0, len(self.buckets) - 1)
         above = torch.clip(above, 0, len(self.buckets) - 1)
@@ -985,9 +1000,7 @@ class SymlogDist:
         symmetric logarithmic transformations.
     """
 
-    def __init__(
-        self, mode: torch.Tensor, dist: str = "mse", agg: str = "sum", tol: float = 1e-8
-    ):
+    def __init__(self, mode: torch.Tensor, dist: str = "mse", agg: str = "sum", tol: float = 1e-8):
         self._mode = mode
         self._dist = dist
         self._agg = agg
@@ -1043,9 +1056,7 @@ class ContDist:
         to the range [-absmax, absmax] while preserving the direction of the vectors.
     """
 
-    def __init__(
-        self, dist: torchd.Distribution, absmax: float | None = None
-    ):
+    def __init__(self, dist: torchd.Distribution, absmax: float | None = None):
         super().__init__()
         self._dist = dist
         self.mean = dist.mean
@@ -1154,9 +1165,7 @@ class UnnormalizedHuber(torchd.normal.Normal):
         self._threshold = threshold
 
     def log_prob(self, event: torch.Tensor) -> torch.Tensor:
-        return -(
-            torch.sqrt((event - self.mean) ** 2 + self._threshold**2) - self._threshold
-        )
+        return -(torch.sqrt((event - self.mean) ** 2 + self._threshold**2) - self._threshold)
 
     def mode(self) -> torch.Tensor:
         return self.mean
@@ -1238,9 +1247,7 @@ class TanhBijector(torchd.Transform):
         return torch.tanh(x)
 
     def _inverse(self, y: torch.Tensor) -> torch.Tensor:
-        y = torch.where(
-            (torch.abs(y) <= 1.0), torch.clamp(y, -0.99999997, 0.99999997), y
-        )
+        y = torch.where((torch.abs(y) <= 1.0), torch.clamp(y, -0.99999997, 0.99999997), y)
         y = torch.atanh(y)
         return y
 
@@ -1542,39 +1549,26 @@ def static_scan(
         last = fn(last, *inp(index))
         if flag:
             if type(last) is dict:
-                outputs = {
-                    key: value.clone().unsqueeze(0) for key, value in last.items()
-                }
+                outputs = {key: value.clone().unsqueeze(0) for key, value in last.items()}
             else:
                 outputs = []
                 for _last in last:
                     if type(_last) is dict:
-                        outputs.append(
-                            {
-                                key: value.clone().unsqueeze(0)
-                                for key, value in _last.items()
-                            }
-                        )
+                        outputs.append({key: value.clone().unsqueeze(0) for key, value in _last.items()})
                     else:
                         outputs.append(_last.clone().unsqueeze(0))
             flag = False
         else:
             if type(last) is dict:
                 for key in last.keys():
-                    outputs[key] = torch.cat(
-                        [outputs[key], last[key].unsqueeze(0)], dim=0
-                    )
+                    outputs[key] = torch.cat([outputs[key], last[key].unsqueeze(0)], dim=0)
             else:
                 for j in range(len(outputs)):
                     if type(last[j]) is dict:
                         for key in last[j].keys():
-                            outputs[j][key] = torch.cat(
-                                [outputs[j][key], last[j][key].unsqueeze(0)], dim=0
-                            )
+                            outputs[j][key] = torch.cat([outputs[j][key], last[j][key].unsqueeze(0)], dim=0)
                     else:
-                        outputs[j] = torch.cat(
-                            [outputs[j], last[j].unsqueeze(0)], dim=0
-                        )
+                        outputs[j] = torch.cat([outputs[j], last[j].unsqueeze(0)], dim=0)
     if type(last) is dict:
         outputs = [outputs]
     return outputs
@@ -1695,9 +1689,7 @@ def weight_init(m: nn.Module):
         denoms = (in_num + out_num) / 2.0
         scale = 1.0 / denoms
         std = np.sqrt(scale) / 0.87962566103423978
-        nn.init.trunc_normal_(
-            m.weight.data, mean=0.0, std=std, a=-2.0 * std, b=2.0 * std
-        )
+        nn.init.trunc_normal_(m.weight.data, mean=0.0, std=std, a=-2.0 * std, b=2.0 * std)
         if m.bias is not None:
             m.bias.data.fill_(0.0)
     elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
@@ -1707,9 +1699,7 @@ def weight_init(m: nn.Module):
         denoms = (in_num + out_num) / 2.0
         scale = 1.0 / denoms
         std = np.sqrt(scale) / 0.87962566103423978
-        nn.init.trunc_normal_(
-            m.weight.data, mean=0.0, std=std, a=-2.0 * std, b=2.0 * std
-        )
+        nn.init.trunc_normal_(m.weight.data, mean=0.0, std=std, a=-2.0 * std, b=2.0 * std)
         if m.bias is not None:
             m.bias.data.fill_(0.0)
     elif isinstance(m, nn.LayerNorm):
@@ -1769,9 +1759,7 @@ def uniform_weight_init(given_scale: float) -> Callable[[nn.Module], None]:
     return f
 
 
-def tensorstats(
-    tensor: torch.Tensor, prefix: str | None = None
-) -> dict[str, np.ndarray]:
+def tensorstats(tensor: torch.Tensor, prefix: str | None = None) -> dict[str, np.ndarray]:
     metrics = {
         "mean": to_np(torch.mean(tensor)),
         "std": to_np(torch.std(tensor)),
@@ -1838,25 +1826,19 @@ def recursively_collect_optim_state_dict(
         visited.add(id(obj))
     attrs = obj.__dict__
     if isinstance(obj, torch.nn.Module):
-        attrs.update(
-            {k: attr for k, attr in obj.named_modules() if "." not in k and obj != attr}
-        )
+        attrs.update({k: attr for k, attr in obj.named_modules() if "." not in k and obj != attr})
     for name, attr in attrs.items():
         new_path = path + "." + name if path else name
         if isinstance(attr, torch.optim.Optimizer):
             optimizers_state_dicts[new_path] = attr.state_dict()
         elif hasattr(attr, "__dict__"):
             optimizers_state_dicts.update(
-                recursively_collect_optim_state_dict(
-                    attr, new_path, optimizers_state_dicts, visited
-                )
+                recursively_collect_optim_state_dict(attr, new_path, optimizers_state_dicts, visited)
             )
     return optimizers_state_dicts
 
 
-def recursively_load_optim_state_dict(
-    obj: object, optimizers_state_dicts: Mapping[str, dict[str, Any]]
-):
+def recursively_load_optim_state_dict(obj: object, optimizers_state_dicts: Mapping[str, dict[str, Any]]):
     """
     Recursively loads optimizer state dictionaries into nested objects.
 

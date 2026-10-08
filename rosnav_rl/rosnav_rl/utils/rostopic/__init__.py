@@ -23,11 +23,7 @@ class Namespace:
     """
 
     def __init__(self, name: str | Namespace):
-        self.name: list[str] = (
-            name.name
-            if isinstance(name, Namespace)
-            else [ns for ns in name.split("/") if ns]
-        )
+        self.name: list[str] = name.name if isinstance(name, Namespace) else [ns for ns in name.split("/") if ns]
 
     def __str__(self) -> str:
         return f"/{'/'.join(self.name)}"
@@ -78,7 +74,6 @@ class Namespace:
         return Namespace(self.name[index])
 
 
-
 class Topic:
     """
     Represents a ROS topic.
@@ -103,9 +98,7 @@ class Topic:
         self.name, additional_namespaces = self._process_name(str(name))
         self.namespaces.extend(additional_namespaces)
 
-    def _process_namespaces(
-        self, namespaces: str | list[str | Namespace] | Namespace | None
-    ) -> list[Namespace]:
+    def _process_namespaces(self, namespaces: str | list[str | Namespace] | Namespace | None) -> list[Namespace]:
         """
         Process the namespaces associated with the topic.
 
@@ -157,9 +150,7 @@ class Topic:
             new_name = f"{self.name}/{other}" if self.name else other
             return Topic(new_name, namespaces=self.namespaces)
         elif isinstance(other, Namespace):
-            return Topic(
-                self.name, namespaces=self.namespaces + ([other] if other.name else [])
-            )
+            return Topic(self.name, namespaces=self.namespaces + ([other] if other.name else []))
         elif isinstance(other, Topic):
             if self.name:
                 raise ValueError("Cannot append a topic to a non-root topic")
@@ -177,9 +168,7 @@ class Topic:
 
     def prepend_namespace(self, namespace: str | Namespace) -> Topic:
         if not isinstance(namespace, Namespace) or not isinstance(namespace, str):
-            raise TypeError(
-                f"Unsupported operand type for prepend_namespace: '{type(namespace)}'"
-            )
+            raise TypeError(f"Unsupported operand type for prepend_namespace: '{type(namespace)}'")
 
         if isinstance(namespace, str):
             namespace = Namespace(namespace)

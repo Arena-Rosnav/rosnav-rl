@@ -95,16 +95,12 @@ def apply_params(config_dict: dict[str, Any], params: dict[str, Any]) -> dict[st
         for key in keys[:-1]:
             if key not in obj:
                 raise KeyError(
-                    f"Key '{key}' not found while traversing path '{path}'. "
-                    f"Available keys: {list(obj.keys())}"
+                    f"Key '{key}' not found while traversing path '{path}'. Available keys: {list(obj.keys())}"
                 )
             obj = obj[key]
 
         final_key = keys[-1]
         if final_key not in obj:
-            raise KeyError(
-                f"Final key '{final_key}' not found in path '{path}'. "
-                f"Available keys: {list(obj.keys())}"
-            )
+            raise KeyError(f"Final key '{final_key}' not found in path '{path}'. Available keys: {list(obj.keys())}")
         obj[final_key] = value
     return result

@@ -35,10 +35,7 @@ class PrunerCfg(BaseModel):
     )
     n_warmup_steps: int = Field(
         10,
-        description=(
-            "Number of intermediate reports to collect per trial before "
-            "the pruner may prune."
-        ),
+        description=("Number of intermediate reports to collect per trial before the pruner may prune."),
     )
     percentile: float = Field(
         50.0,
@@ -118,8 +115,7 @@ class TuningCfg(BaseModel):
         None,
         ge=1,
         description=(
-            "Override total_timesteps per trial for faster exploration. "
-            "If None, uses the value from the base config."
+            "Override total_timesteps per trial for faster exploration. If None, uses the value from the base config."
         ),
     )
 

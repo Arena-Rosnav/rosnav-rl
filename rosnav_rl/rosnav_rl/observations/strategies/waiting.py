@@ -56,9 +56,7 @@ class WaitingStrategy:
                 success_count += 1
             # Continue trying other collectors even if one times out
 
-        self._logger.debug(
-            f"Successfully updated {success_count}/{len(collectors)} stale collectors"
-        )
+        self._logger.debug(f"Successfully updated {success_count}/{len(collectors)} stale collectors")
         return success_count
 
     def _wait_for_observation(self, collector_name: str, collector_dict: dict[str, Collector]) -> bool:
@@ -87,9 +85,7 @@ class WaitingStrategy:
         except TimeoutError as err:
             n = self._consecutive_failures.get(collector_name, 0) + 1
             self._consecutive_failures[collector_name] = n
-            self._logger.warn(
-                f"Timeout waiting for '{collector_name}' after {timeout}s"
-            )
+            self._logger.warn(f"Timeout waiting for '{collector_name}' after {timeout}s")
             if collector.up_to_date_required and n >= self._STALL_THRESHOLD:
                 raise RuntimeError(
                     f"Sensor stall: '{collector_name}' timed out {n} consecutive "
@@ -101,9 +97,7 @@ class WaitingStrategy:
             self._logger.error(f"Exception while waiting for '{collector_name}': {e}")
             return False
 
-    def _poll_for_update_with_timeout(
-        self, collector: Collector, timeout: float
-    ) -> None:
+    def _poll_for_update_with_timeout(self, collector: Collector, timeout: float) -> None:
         """
         Poll for a collector update using wall-clock time for both sleeping and
         timeout tracking.
@@ -136,12 +130,8 @@ class WaitingStrategy:
             elapsed = time.monotonic() - start
 
             if elapsed >= timeout:
-                raise TimeoutError(
-                    f"Timeout after {timeout}s waiting for collector update"
-                )
+                raise TimeoutError(f"Timeout after {timeout}s waiting for collector update")
 
             # Yield briefly so the OS can deliver incoming messages
             time.sleep(sleep_interval)
-            sleep_interval = min(
-                sleep_interval * sleep_increase_factor, max_sleep_interval
-            )
+            sleep_interval = min(sleep_interval * sleep_increase_factor, max_sleep_interval)

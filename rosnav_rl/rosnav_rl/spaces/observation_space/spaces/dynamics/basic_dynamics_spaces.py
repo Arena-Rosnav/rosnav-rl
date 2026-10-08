@@ -41,7 +41,7 @@ class LastActionSpace(BaseObservationSpace):
         min_translational_vel: float = 0.0,
         max_translational_vel: float = 0.0,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         self._min_linear_vel = min_linear_vel
         self._max_linear_vel = max_linear_vel
@@ -87,9 +87,7 @@ class LastActionSpace(BaseObservationSpace):
             )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(
-        self, last_action: RobotActionVector, *args: Any, **kwargs: Any
-    ) -> RobotActionVector:
+    def encode_observation(self, last_action: RobotActionVector, *args: Any, **kwargs: Any) -> RobotActionVector:
         """
         Encodes the last action observation.
 

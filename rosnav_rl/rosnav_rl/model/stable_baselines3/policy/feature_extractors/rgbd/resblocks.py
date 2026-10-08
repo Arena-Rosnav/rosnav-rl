@@ -8,9 +8,7 @@ from torch import Tensor
 # since the torchvision package has incompatible dependencies with arena rosnav dependencies.
 
 
-def conv3x3(
-    in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1
-) -> nn.Conv2d:
+def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
     """3x3 convolution with padding"""
     return nn.Conv2d(
         in_planes,

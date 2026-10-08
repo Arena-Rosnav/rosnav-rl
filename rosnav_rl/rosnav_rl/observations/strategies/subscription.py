@@ -81,22 +81,16 @@ class SubscriptionManager:
         sync_collectors = {}
         if self._enable_synchronization:
             sync_collectors = {
-                name: collector
-                for name, collector in collectors.items()
-                if collector.up_to_date_required
+                name: collector for name, collector in collectors.items() if collector.up_to_date_required
             }
 
         self._sync_collector_names = list(sync_collectors.keys())
-        non_sync_collector_names = [
-            name for name in collectors if name not in self._sync_collector_names
-        ]
+        non_sync_collector_names = [name for name in collectors if name not in self._sync_collector_names]
 
         # Setup for non-synchronized collectors
         for collector_name in non_sync_collector_names:
             collector = collectors[collector_name]
-            self._setup_individual_collector(
-                collector_name, collector, observation_callback
-            )
+            self._setup_individual_collector(collector_name, collector, observation_callback)
 
         # Setup for synchronized collectors using message_filters
         if sync_collectors:
@@ -112,11 +106,7 @@ class SubscriptionManager:
 
         callback = partial(observation_callback, collector=collector)
 
-        topic = (
-            str(self._ns(collector.topic))
-            if collector.topic[0] != "/"
-            else collector.topic
-        )
+        topic = str(self._ns(collector.topic)) if collector.topic[0] != "/" else collector.topic
 
         self._subscribers[name] = self._node.create_subscription(
             collector.message_type,
@@ -136,11 +126,7 @@ class SubscriptionManager:
             if collector.qos_profile is None:
                 collector.set_qos_profile(self._qos_profile)
 
-            topic = (
-                str(self._ns(collector.topic))
-                if collector.topic[0] != "/"
-                else collector.topic
-            )
+            topic = str(self._ns(collector.topic)) if collector.topic[0] != "/" else collector.topic
 
             subscriber = message_filters.Subscriber(
                 self._node,

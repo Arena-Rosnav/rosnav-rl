@@ -111,9 +111,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Returns:
             spaces.Space: The gymnasium space representing this observation.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement get_gym_space()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must implement get_gym_space()")
 
     @abstractmethod
     def encode_observation(self, *args: Any, **kwargs: Any) -> np.ndarray | bool:
@@ -126,9 +124,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Returns:
             np.ndarray: The encoded observation array.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement encode_observation()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must implement encode_observation()")
 
     # ==========================================
     # Public API Methods
@@ -156,9 +152,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
             result = self.encode_observation(*args, **kwargs)
             if result is not None:
                 return result
-            self._report_warning(
-                f"encode_observation() returned None. {ERROR_MESSAGE_SUFFIX}"
-            )
+            self._report_warning(f"encode_observation() returned None. {ERROR_MESSAGE_SUFFIX}")
         except KeyError as e:
             self._report_error(
                 f"Missing observation data key {e}. {ERROR_MESSAGE_SUFFIX}",
@@ -195,8 +189,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
             return self._create_null_dict_observation()
         else:
             self._report_warning(
-                f"Unsupported observation space type: {type(self._space)}. "
-                "Returning zero-filled array."
+                f"Unsupported observation space type: {type(self._space)}. Returning zero-filled array."
             )
             # Fallback for unknown space types
             return np.array([0.0], dtype=np.float32)
@@ -213,9 +206,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
                 null_dict[key] = np.array([0.0], dtype=np.float32)
         return null_dict
 
-    def _setup_normalizer(
-        self, normalize: bool, normalizer_name: str, **kwargs: Any
-    ) -> Normalizer:
+    def _setup_normalizer(self, normalize: bool, normalizer_name: str, **kwargs: Any) -> Normalizer:
         """Set up the normalizer instance."""
         if not normalize:
             return get_normalizer("identity")
@@ -223,9 +214,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         try:
             return get_normalizer(normalizer_name, **kwargs)
         except ValueError as e:
-            self._report_warning(
-                f"Error setting up normalizer '{normalizer_name}': {e}. Using identity normalizer."
-            )
+            self._report_warning(f"Error setting up normalizer '{normalizer_name}': {e}. Using identity normalizer.")
             return get_normalizer("identity")
 
     def _apply_normalization(self, observation_arr: np.ndarray) -> np.ndarray:
@@ -238,9 +227,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
             np.ndarray: Normalized array if normalization is enabled, otherwise unchanged.
         """
         if self._can_normalize:
-            return self._normalizer.normalize(
-                observation_arr, self._norm_low, self._norm_high
-            )
+            return self._normalizer.normalize(observation_arr, self._norm_low, self._norm_high)
         return observation_arr
 
     def _validate_observation(self, observation_arr: np.ndarray) -> np.ndarray:
@@ -252,13 +239,8 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Returns:
             np.ndarray: Validated and potentially corrected observation array.
         """
-        if (
-            not np.isfinite(observation_arr).all()
-            or not np.isreal(observation_arr).all()
-        ):
-            self._report_warning(
-                "Invalid observation array detected, replacing with zeros."
-            )
+        if not np.isfinite(observation_arr).all() or not np.isreal(observation_arr).all():
+            self._report_warning("Invalid observation array detected, replacing with zeros.")
             return np.zeros_like(observation_arr, dtype=np.float32)
         return observation_arr
 

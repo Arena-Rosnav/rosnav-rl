@@ -9,6 +9,7 @@ from ..dreamerv3 import tools
 if TYPE_CHECKING:
     from ..dreamerv3 import cfg
 
+
 def count_steps(folder: Path) -> int:
     """
     Counts the total number of steps in a given folder containing .npz files.
@@ -32,9 +33,7 @@ def count_steps(folder: Path) -> int:
     return sum(int(str(n).split("-")[-1][:-4]) - 1 for n in folder.glob("*.npz"))
 
 
-def make_dataset(
-    episodes: tools._Cache, config: "cfg.DreamerV3Cfg"
-) -> Generator[dict[str, np.ndarray], None, None]:
+def make_dataset(episodes: tools._Cache, config: "cfg.DreamerV3Cfg") -> Generator[dict[str, np.ndarray], None, None]:
     """Creates a dataset from a collection of episodes.
 
     This function converts episodic data into a dataset format suitable for training.

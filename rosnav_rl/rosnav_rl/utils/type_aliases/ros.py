@@ -18,7 +18,7 @@ class _Ros2Message(Protocol):
 
 
 # TypeVar for any ROS2 message
-_Ros2Message_T = TypeVar('_Ros2Message_T', bound=_Ros2Message)
+_Ros2Message_T = TypeVar("_Ros2Message_T", bound=_Ros2Message)
 
 
 class _Ros2ServiceType(Protocol):
@@ -29,4 +29,4 @@ class _Ros2ServiceType(Protocol):
 
 
 # TypeVar for any ROS2 service type
-_Ros2ServiceType_T = TypeVar('_Ros2ServiceType_T', bound=_Ros2ServiceType)
+_Ros2ServiceType_T = TypeVar("_Ros2ServiceType_T", bound=_Ros2ServiceType)

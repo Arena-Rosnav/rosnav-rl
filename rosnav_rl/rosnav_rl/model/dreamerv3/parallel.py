@@ -161,9 +161,7 @@ class PMessage(enum.Enum):
 class Worker:
     initializers = []
 
-    def __init__(
-        self, fn: Callable[..., object], strategy: Literal["process", "daemon"], state: bool = False
-    ):
+    def __init__(self, fn: Callable[..., object], strategy: Literal["process", "daemon"], state: bool = False):
         """
         Initialize a parallel worker.
 
@@ -267,9 +265,7 @@ class ProcessPipeWorker:
         self._pipe, pipe = self._context.Pipe()
         fn = cloudpickle.dumps(fn)
         initializers = cloudpickle.dumps(initializers)
-        self._process = self._context.Process(
-            target=self._loop, args=(pipe, fn, initializers), daemon=daemon
-        )
+        self._process = self._context.Process(target=self._loop, args=(pipe, fn, initializers), daemon=daemon)
         self._process.start()
         self._nextid = 0
         self._results = {}

@@ -17,9 +17,7 @@ if __name__ == "__main__":
     print(topic2)  # Output: /sim_2/robot_2/odom
 
     # You can also mix and match
-    mixed_topic = (
-        Namespace("sim_3") / Namespace("") / Topic("cmd_vel", namespaces=["custom_ns"])
-    )
+    mixed_topic = Namespace("sim_3") / Namespace("") / Topic("cmd_vel", namespaces=["custom_ns"])
     print(mixed_topic)  # Output: /sim_3/custom_ns/robot_3/status
 
     t1 = Topic("odom", namespaces="/sim_1//robot_1")

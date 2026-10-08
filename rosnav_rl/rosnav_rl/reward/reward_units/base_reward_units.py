@@ -82,9 +82,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
         Uses unified error reporting instead of raising exceptions directly.
         """
         if not isinstance(self.requires, dict):
-            self._report_critical(
-                f"'requires' must be a dictionary, got {type(self.requires)}"
-            )
+            self._report_critical(f"'requires' must be a dictionary, got {type(self.requires)}")
             return
 
         # Cache requirement keys for performance
@@ -93,9 +91,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
         # Validate requirement entries
         for key, _value in self.requires.items():
             if not isinstance(key, str):
-                self._report_error(
-                    f"Requirement key '{key}' must be a string, got {type(key)}"
-                )
+                self._report_error(f"Requirement key '{key}' must be a string, got {type(key)}")
 
     @property
     def on_safe_dist_violation(self) -> bool:
@@ -120,9 +116,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
             return
 
         if abs(value) == float("inf"):
-            self._report_error(
-                "Reward value cannot be infinite", error_type="ValueError"
-            )
+            self._report_error("Reward value cannot be infinite", error_type="ValueError")
             return
 
         self._reward_function.add_reward(value=value, called_by=self.__class__.__name__)
@@ -134,9 +128,7 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
             info (Dict[str, Any]): Information to add to the episode's info dict
         """
         if not isinstance(info, dict):
-            self._report_error(
-                f"Info must be a dictionary, got {type(info)}", error_type="TypeError"
-            )
+            self._report_error(f"Info must be a dictionary, got {type(info)}", error_type="TypeError")
             return
 
         self._reward_function.add_info(info=info)

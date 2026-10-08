@@ -112,9 +112,7 @@ class RewardGoalReached(RewardUnit):
             simulation_state_container: Container with task configuration.
         """
         # Choose which target to check based on _following_subgoal flag
-        target_distance = (
-            dist_angle_to_subgoal[0] if self._follow_subgoal else dist_angle_to_goal[0]
-        )
+        target_distance = dist_angle_to_subgoal[0] if self._follow_subgoal else dist_angle_to_goal[0]
 
         if target_distance < simulation_state_container.goal_radius:
             self.add_reward(self._reward)
@@ -297,10 +295,7 @@ class RewardFactoredSafeDistance(RewardUnit):
             laser_min = np.min(front_laser)
 
             # Calculate proportional penalty based on safety margin violation
-            safety_threshold = (
-                simulation_state_container.safety_distance
-                + simulation_state_container.robot_radius
-            )
+            safety_threshold = simulation_state_container.safety_distance + simulation_state_container.robot_radius
             distance_violation = safety_threshold - laser_min
 
             self.add_reward(self._factor * distance_violation)
@@ -503,9 +498,7 @@ class RewardApproachGoal(RewardUnit):
                 - Example: [1.5, 0.8] (intermediate waypoint relative to robot)
         """
         # Choose target based on configuration
-        target_relative = (
-            subgoal_in_robot_frame if self._follow_subgoal else goal_in_robot_frame
-        )
+        target_relative = subgoal_in_robot_frame if self._follow_subgoal else goal_in_robot_frame
 
         # Calculate current distance to target
         current_distance = np.sqrt(target_relative[0] ** 2 + target_relative[1] ** 2)
@@ -515,18 +508,20 @@ class RewardApproachGoal(RewardUnit):
         yaw = float(robot_pose["yaw"])
         cos_yaw = np.cos(yaw)
         sin_yaw = np.sin(yaw)
-        current_goal_world = np.array([
-            float(robot_pose["x"]) + cos_yaw * target_relative[0] - sin_yaw * target_relative[1],
-            float(robot_pose["y"]) + sin_yaw * target_relative[0] + cos_yaw * target_relative[1],
-        ], dtype=np.float64)
+        current_goal_world = np.array(
+            [
+                float(robot_pose["x"]) + cos_yaw * target_relative[0] - sin_yaw * target_relative[1],
+                float(robot_pose["y"]) + sin_yaw * target_relative[0] + cos_yaw * target_relative[1],
+            ],
+            dtype=np.float64,
+        )
 
         # Detect goal/subgoal reassignment: if the target jumped further than the
         # threshold in world space, the generator updated it → skip this step's
         # reward to avoid a spurious bonus/penalty from the discontinuity.
         goal_jumped = (
             self._last_goal_world is not None
-            and np.sum((current_goal_world - self._last_goal_world) ** 2)
-            > self._goal_update_threshold_sq
+            and np.sum((current_goal_world - self._last_goal_world) ** 2) > self._goal_update_threshold_sq
         )
 
         # Apply reward only when we have a valid previous distance and the goal
@@ -993,14 +988,9 @@ class RewardAbruptVelocityChange(RewardUnit):
 
     def _get_vel_change_fcts(self) -> list[Callable[[np.ndarray], None]]:
         """Create velocity change penalty functions for each configured dimension."""
-        return [
-            self._prepare_reward_function(int(idx), factor)
-            for idx, factor in self._vel_factors.items()
-        ]
+        return [self._prepare_reward_function(int(idx), factor) for idx, factor in self._vel_factors.items()]
 
-    def _prepare_reward_function(
-        self, idx: int, factor: float
-    ) -> Callable[[np.ndarray], None]:
+    def _prepare_reward_function(self, idx: int, factor: float) -> Callable[[np.ndarray], None]:
         """Prepare dimension-specific velocity change penalty function.
 
         Args:
@@ -1345,15 +1335,9 @@ class RewardActiveHeadingDirection(RewardUnit):
                 - Used for: robot radius in velocity obstacle calculations
         """
         # Select goal based on subgoal following preference
-        dist_angle_to_target = (
-            dist_angle_to_subgoal if self._following_subgoal else dist_angle_to_goal
-        )
+        dist_angle_to_target = dist_angle_to_subgoal if self._following_subgoal else dist_angle_to_goal
 
-        if (
-            pedestrian_relative_locations is None
-            or pedestrian_relative_velocities is None
-            or last_action is None
-        ):
+        if pedestrian_relative_locations is None or pedestrian_relative_velocities is None or last_action is None:
             return
 
         # Extract goal direction and robot forward velocity
@@ -1385,10 +1369,7 @@ class RewardActiveHeadingDirection(RewardUnit):
                         ped_theta = np.arctan2(p_y, p_x)
 
                         # Calculate VO cone using robot radius estimation
-                        vector = (
-                            ped_dis**2
-                            - (3 * simulation_state_container.robot_radius) ** 2
-                        )
+                        vector = ped_dis**2 - (3 * simulation_state_container.robot_radius) ** 2
                         if vector < 0:
                             continue  # Robot too close to pedestrian, skip
 
@@ -1397,9 +1378,7 @@ class RewardActiveHeadingDirection(RewardUnit):
                             np.sqrt(vector),
                         )
                         # Check if trajectory intersects with pedestrian's VO cone
-                        theta_rp = np.arctan2(
-                            v_x * np.sin(theta) - p_vy, v_x * np.cos(theta) - p_vx
-                        )
+                        theta_rp = np.arctan2(v_x * np.sin(theta) - p_vy, v_x * np.cos(theta) - p_vx)
                         if (ped_theta - vo_theta) <= theta_rp <= (ped_theta + vo_theta):
                             free = False
                             break
@@ -1478,11 +1457,7 @@ class RewardPedTypeSafetyDistance(RewardUnit):
         self._type = ped_type
         self._reward = reward
         self._safety_distance = safety_distance
-        self._type_reward_pairs = (
-            type_reward_pairs
-            if isinstance(type_reward_pairs, dict)
-            else {ped_type: reward}
-        )
+        self._type_reward_pairs = type_reward_pairs if isinstance(type_reward_pairs, dict) else {ped_type: reward}
 
     def __call__(
         self,
@@ -1577,11 +1552,7 @@ class RewardPedTypeFactoredSafetyDistance(RewardUnit):
         self._type = ped_type
         self._factor = factor
         self._safety_distance = safety_distance
-        self._type_factor_pairs = (
-            type_factor_pairs
-            if isinstance(type_factor_pairs, dict)
-            else {ped_type: factor}
-        )
+        self._type_factor_pairs = type_factor_pairs if isinstance(type_factor_pairs, dict) else {ped_type: factor}
 
     def __call__(
         self,
@@ -1603,9 +1574,7 @@ class RewardPedTypeFactoredSafetyDistance(RewardUnit):
                 - Example: {1: 2.5, 2: 4.1, 3: 1.8} (factored scaling per type)
         """
         if not pedestrian_distances:
-            self._report_warning(
-                "Won't apply reward unit. No pedestrian type distances found."
-            )
+            self._report_warning("Won't apply reward unit. No pedestrian type distances found.")
             return
 
         for ped_type, factor in self._type_factor_pairs.items():
@@ -1615,9 +1584,7 @@ class RewardPedTypeFactoredSafetyDistance(RewardUnit):
 
             # Apply proportional penalty based on safety distance violation
             if pedestrian_distances[ped_type] < self._safety_distance:
-                violation_magnitude = (
-                    self._safety_distance - pedestrian_distances[ped_type]
-                )
+                violation_magnitude = self._safety_distance - pedestrian_distances[ped_type]
                 factored_penalty = factor * violation_magnitude
                 self.add_reward(factored_penalty)
 
@@ -1678,11 +1645,7 @@ class RewardPedTypeCollision(RewardUnit):
             **kwargs: Keyword arguments
         """
         super().__init__(reward_function, True, *args, **kwargs)
-        self._type_reward_pairs = (
-            type_reward_pairs
-            if isinstance(type_reward_pairs, dict)
-            else {ped_type: reward}
-        )
+        self._type_reward_pairs = type_reward_pairs if isinstance(type_reward_pairs, dict) else {ped_type: reward}
         self._bumper_zone = bumper_zone
 
     def __call__(
@@ -1709,15 +1672,11 @@ class RewardPedTypeCollision(RewardUnit):
                 - Used for: robot radius in collision detection calculations
         """
         if not pedestrian_distances:
-            self._report_warning(
-                "Won't apply reward unit. No pedestrian type distances found."
-            )
+            self._report_warning("Won't apply reward unit. No pedestrian type distances found.")
             return
 
         # Calculate collision threshold including robot dimensions
-        collision_threshold = (
-            self._bumper_zone + simulation_state_container.robot_radius
-        )
+        collision_threshold = self._bumper_zone + simulation_state_container.robot_radius
 
         for ped_type, reward in self._type_reward_pairs.items():
             if ped_type not in pedestrian_distances:
@@ -1815,9 +1774,7 @@ class RewardPedTypeVelocityConstraint(RewardUnit):
                 - Example: (0.5, 0.0, 0.2) (forward velocity used for penalty scaling)
         """
         if not pedestrian_distances:
-            self._report_warning(
-                "Won't apply reward unit. No pedestrian type distances found."
-            )
+            self._report_warning("Won't apply reward unit. No pedestrian type distances found.")
             return
 
         if last_action is None:

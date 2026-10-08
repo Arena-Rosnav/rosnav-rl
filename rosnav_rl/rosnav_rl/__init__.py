@@ -21,7 +21,7 @@ __all__ = [
     "RL_Agent",
     # ── Config (single source of truth) ───────────────────
     "AgentConfig",
-    "AgentCfg",   # backward-compat alias for AgentConfig
+    "AgentCfg",  # backward-compat alias for AgentConfig
     "AgentParameters",
     "RewardCfg",
     # ── Typed action spaces ───────────────────────────────
@@ -45,7 +45,6 @@ __all__ = [
     # ── Reward ────────────────────────────────────────────
     "RewardFunction",
     "reward_units",
-
     # ── Utils ─────────────────────────────────────────────
     "SupportedRLFrameworks",
     "tuning",

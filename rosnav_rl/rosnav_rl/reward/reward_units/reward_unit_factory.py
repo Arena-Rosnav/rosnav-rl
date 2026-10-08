@@ -43,9 +43,7 @@ class RewardUnitFactory:
                 raise ValueError(f"RewardUnit '{name}' already exists!")
 
             if not issubclass(wrapped_class, RewardUnit):
-                raise TypeError(
-                    f"Class {wrapped_class.__name__} must inherit from RewardUnit"
-                )
+                raise TypeError(f"Class {wrapped_class.__name__} must inherit from RewardUnit")
 
             cls.registry[name] = wrapped_class
             return wrapped_class

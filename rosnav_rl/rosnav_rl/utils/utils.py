@@ -42,16 +42,12 @@ class _SpaceManagerEnv(gym.Env):
     ) -> tuple[np.ndarray | dict[str, np.ndarray], dict[str, Any]]:
         return self.observation_space.sample(), {}
 
-    def step(
-        self, action: np.ndarray
-    ) -> tuple[np.ndarray | dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
+    def step(self, action: np.ndarray) -> tuple[np.ndarray | dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         obs = self.observation_space.sample()
         return obs, 0.0, False, False, {}
 
 
-def make_mock_env(
-    ns: str, space_manager: BaseSpaceManager, stack_size: int = 1
-) -> VecEnv:
+def make_mock_env(ns: str, space_manager: BaseSpaceManager, stack_size: int = 1) -> VecEnv:
     """Create a minimal DummyVecEnv from a SpaceManager for inference-time
     stacking and normalization support.
 

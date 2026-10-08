@@ -110,8 +110,7 @@ class TrialPrunerBase(ABC):
                     self._report_step,
                 )
             raise optuna.TrialPruned(
-                f"Trial {self._trial.number} pruned at step {self._report_step} "
-                f"({self._metric} = {value:.4f})"
+                f"Trial {self._trial.number} pruned at step {self._report_step} ({self._metric} = {value:.4f})"
             )
 
         return True

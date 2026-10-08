@@ -28,6 +28,7 @@ def _find_agents_dir() -> Path:
     # 2. Try to find via ament_index (arena_training package share)
     try:
         from ament_index_python.packages import get_package_share_directory
+
         at_share = Path(get_package_share_directory("arena_training"))
         # The share dir is in install tree; agents are in source tree.
         # Walk up from share to find the source tree.
@@ -78,9 +79,10 @@ def _resolve_agent_dir(agent_name: str) -> Path:
     )
 
 
-
 class ArenaActionServer(ActionServer):
-    def __init__(self, agent_name: str, namespace: str = "", robot_frame: str = "", base_frame: str = "base_link") -> None:
+    def __init__(
+        self, agent_name: str, namespace: str = "", robot_frame: str = "", base_frame: str = "base_link"
+    ) -> None:
         super().__init__(agent_name, namespace)
         self.robot_frame = robot_frame
         self.base_frame = base_frame
@@ -96,9 +98,7 @@ class ArenaActionServer(ActionServer):
         model_dir = _resolve_agent_dir(self.agent_name)
         self.logger.info(f"Loading agent from: {model_dir}")
 
-        training_cfg = TrainingCfg.model_validate(
-            load_yaml(model_dir / "training_config.yaml")
-        )
+        training_cfg = TrainingCfg.model_validate(load_yaml(model_dir / "training_config.yaml"))
 
         spec = training_cfg.agent_config
         self._agent_spec = spec
