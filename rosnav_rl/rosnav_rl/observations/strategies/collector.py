@@ -49,6 +49,8 @@ class CollectorManager:
                 if stale_collectors is None:
                     stale_collectors = []
                 stale_collectors.append(name)
+            elif not collector._stale:
+                self._waiting_strategy.mark_fresh(name)
 
         # Wait for stale collectors if needed
         if stale_collectors:

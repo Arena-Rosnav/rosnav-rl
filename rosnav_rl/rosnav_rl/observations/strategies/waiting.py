@@ -33,6 +33,10 @@ class WaitingStrategy:
         # Tracks consecutive timeouts per collector name.
         self._consecutive_failures: dict[str, int] = {}
 
+    def mark_fresh(self, collector_name: str) -> None:
+        """Clear the consecutive timeout count of a collector that delivered without a wait."""
+        self._consecutive_failures.pop(collector_name, None)
+
     def wait_for_collectors(self, collectors: list[str], collector_dict: dict[str, Collector]) -> int:
         """
         Wait for multiple collectors to update.
