@@ -43,6 +43,9 @@ build-backend = "setuptools.build_meta"
 # Enable uv to treat this directory as an installable package
 package = true
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 120
