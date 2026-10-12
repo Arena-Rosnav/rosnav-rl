@@ -103,8 +103,10 @@ class RGBSpace(BaseObservationSpace):
         **kwargs
     ) -> None:
 
-        self._sources = sorted(sources or [])
         self.requires = {source : ImageData for source in self._sources}
+        self._sources = sorted(sources or [])
+        self._image_height = image_height
+        self._image_width = image_width
         self._space = spaces.Box(
             low=0,
             high=255,
@@ -114,10 +116,45 @@ class RGBSpace(BaseObservationSpace):
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self):
+        """
+        Returns the Gym observation space for the RGB observation space.
+
+        The space represents a 3-channel image RGB with shape
+        (height, width, 3) and values in range [0, 255].
+
+        Returns:
+            spaces.Space: The Gym observation space.
+        """
         return self._space
+
+    def resize_hwc(self, image: np.ndarray, height: int, width: int) -> np.ndarray:
+        """Resize an (C, H, W) image to (height, width) via bilinear interpolation."""
+        if image.shape[1] == height and image.shape[2] == width:
+            return image
+        import torch
+        import torch.nn.functional as F
+
+        tensor = torch.from_numpy(np.ascontiguousarray(image)).unsqueeze(0).float()
+        resized = F.interpolate(tensor, size=(height, width), mode="bilinear", align_corners=False)
+        return resized.squeeze(0).numpy()
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(self, *args, **obs):
+        out = np.zeros((len(self._sources), 3, self._image_height, self._image_width), np.uint8)
+        for i, s in enumerate(self._sources):
+            img = obs.get(s)
 
+            if img is None or img.size == 0:
+                continue    # no img recieved -> zeros
 
-        pass
+            img = np.asarray(img)
+            if img.ndim == 3 and img.shape[2] in (3, 4):
+                img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
+
+            if img.shape[-1] != 3:  
+                continue    # None RGB format
+
+            img = self.resize_hwc(img, self._image_height, self._image_width)
+            out[i] = np.clip(img, 0, 255).astype(np.uint8).transpose(2, 0, 1)
+            
+        return out

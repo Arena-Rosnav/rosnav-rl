@@ -4,8 +4,7 @@ import gymnasium as gym
 from rosnav_rl.spaces.observation_space.spaces.perception import (
     LaserScanSpace,
     ReducedLaserScanSpace,
-    WristRGBDSpace,
-    ArmBaseRGBDSpace
+    RGBSpace
 )
 from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
 from rosnav_rl.spaces.observation_space.spaces.dynamics import LastActionSpace
@@ -613,18 +612,15 @@ class EXTRACTOR_10(EXTRACTOR_5):
         **kwargs: Arbitrary keyword arguments.
     """    
 
-    IMAGE_SPACES = (WristRGBDSpace.name, ArmBaseRGBDSpace.name)
-
     def __init__(self, observation_space, features_dim=128, stack_size=1, *args, **kwargs):
-        self._image_keys = [k for k in self.IMAGE_SPACES if k in observation_space.spaces]
-        print(f"IMAGE_SPACES contents: {self.IMAGE_SPACES}")
-        print(f"OBSERVATION_SPACE contents: {observation_space}")
-        print(f"IMAGE_KEYS contents: {self._image_keys}")
-        if not self._image_keys:
-            raise ValueError(f"No image spaces. Dict keys: {list(observation_space.spaces.keys())}")
 
-        c, h, w = observation_space[self._image_keys[0]].shape # TODO assumes same size vision spaces fix
-        self._img_h, self._img_w, self._img_c = h, w, c
+        (
+        self._img_num,
+        self._img_c,
+        self._img_h, 
+        self._img_w
+        ) = observation_space[RGBSpace.name].shape
+        
         super().__init__(observation_space, features_dim, stack_size, *args, **kwargs)
 
     def _setup_network(self):
@@ -651,7 +647,7 @@ class EXTRACTOR_10(EXTRACTOR_5):
             n_laser = self.cnn(th.randn(1, self._stack_size, self._laser_size)).shape[-1]
             n_img = self.img_cnn(th.randn(1, self._img_c, self._img_h, self._img_w)).shape[-1]
         self.fc = nn.Sequential(
-            nn.Linear(n_laser + n_img * len(self._image_keys)
+            nn.Linear(n_laser + n_img * self._img_num
                       + (self._goal_size + self._last_action_size) * self._stack_size, 256),
             nn.ReLU(),
             nn.Linear(256, self._features_dim),
@@ -660,13 +656,14 @@ class EXTRACTOR_10(EXTRACTOR_5):
 
     def get_input(self, observations):
         laser, goal, last_action = super().get_input(observations)
-        images = [observations[k] for k in self._image_keys]
+        images = observations[RGBSpace.name]
         return laser, goal, last_action, images
 
     def forward(self, observations):
         laser, goal, last_action, images = self.get_input(observations)
         laser, goal, last_action = self.process_input(laser, goal, last_action)
-        feats = [self.cnn(laser)]
-        feats += [self.img_cnn(img.float()) for img in images]
-        feats += [goal.flatten(1, 2), last_action.flatten(1, 2)]
+        b, n = images.shape[:2]
+        img_feat = self.img_cnn(images.float().reshape(b * n, self._img_c, self._img_h, self._img_w))
+        img_feat = img_feat.reshape(b, n * img_feat.shape[-1])
+        feats = [self.cnn(laser), img_feat, goal.flatten(1, 2), last_action.flatten(1, 2)]
         return self.fc(th.cat(feats, 1))

@@ -334,16 +334,14 @@ class AGENT_7(StableBaselinesPolicyDescription):
         "normalize": True,
         "goal_max_dist": 10,
         "subgoal_max_dist": 10,
-        "reduced_num_beams": 270,
-        "rgbd_image_height": 240,
-        "rgbd_image_width": 320,
+        "reduced_num_beams": 270, # TODO make uneseccary
+        "sources": ["wrist_color", "arm_base_color"],
     }
     observation_spaces = [
         spaces.perception.ReducedLaserScanSpace,
         spaces.navigation.DistAngleToSubgoalSpace,
         spaces.dynamics.LastActionSpace,
-        spaces.perception.WristRGBDSpace,
-        spaces.perception.ArmBaseRGBDSpace,
+        spaces.perception.RGBSpace,
     ]
     features_extractor_class = EXTRACTOR_10
     features_extractor_kwargs = dict(features_dim=256)
