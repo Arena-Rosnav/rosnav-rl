@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, Any
+from collections.abc import Callable
+from typing import Any, ClassVar, Concatenate
 
 import numpy as np
 from gymnasium import spaces
 
-from ..normalization import get_normalizer
+from rosnav_rl.utils.logging import ComponentType, ErrorReportingMixin
 from rosnav_rl.utils.validation import RequiresProtocol
-from rosnav_rl.utils.logging import ErrorReportingMixin, ComponentType
+
+from ..normalization import Normalizer, get_normalizer
 
 ERROR_MESSAGE_SUFFIX = " ---> Using null observation."
 
@@ -35,13 +37,13 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
     """
 
     name: ClassVar[str]
-    requires: ClassVar[Dict[str, Any]] = {}
+    requires: ClassVar[dict[str, Any]] = {}
 
     def __init__(
         self,
         normalize: bool = False,
         normalizer: str = "max_abs",
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Initialize the observation space.
 
@@ -60,12 +62,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         self._normalize = normalize
         self._normalizer = self._setup_normalizer(normalize, normalizer, **kwargs)
 
-        # Pre-cache normalization bounds to avoid hasattr() on every step
-        self._can_normalize = (
-            self._normalize
-            and hasattr(self._space, "low")
-            and hasattr(self._space, "high")
-        )
+        self._can_normalize = self._normalize and isinstance(self._space, spaces.Box)
         if self._can_normalize:
             self._norm_low = self._space.low
             self._norm_high = self._space.high
@@ -89,7 +86,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
     # ==========================================
 
     @property
-    def config(self) -> Dict[str, Any]:
+    def config(self) -> dict[str, Any]:
         """Get the configuration parameters."""
         return self._config.copy()
 
@@ -99,7 +96,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         return self._space
 
     @property
-    def shape(self) -> tuple:
+    def shape(self) -> tuple[int, ...] | None:
         """Get the shape of the observation space."""
         return self._space.shape
 
@@ -114,12 +111,10 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Returns:
             spaces.Space: The gymnasium space representing this observation.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement get_gym_space()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must implement get_gym_space()")
 
     @abstractmethod
-    def encode_observation(self, *args, **kwargs) -> np.ndarray:
+    def encode_observation(self, *args: Any, **kwargs: Any) -> np.ndarray | bool:
         """Encode the observation into a numpy array.
 
         Args:
@@ -129,9 +124,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Returns:
             np.ndarray: The encoded observation array.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement encode_observation()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must implement encode_observation()")
 
     # ==========================================
     # Public API Methods
@@ -146,7 +139,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         """
         pass
 
-    def safe_encode_observation(self, *args, **kwargs) -> np.ndarray:
+    def safe_encode_observation(self, *args: Any, **kwargs: Any) -> np.ndarray | bool | dict[str, np.ndarray]:
         """Safely encode observations with error handling and null fallback.
 
         This method wraps encode_observation() to catch errors and return a properly
@@ -159,9 +152,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
             result = self.encode_observation(*args, **kwargs)
             if result is not None:
                 return result
-            self._report_warning(
-                f"encode_observation() returned None. {ERROR_MESSAGE_SUFFIX}"
-            )
+            self._report_warning(f"encode_observation() returned None. {ERROR_MESSAGE_SUFFIX}")
         except KeyError as e:
             self._report_error(
                 f"Missing observation data key {e}. {ERROR_MESSAGE_SUFFIX}",
@@ -184,7 +175,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
     # Private Helper Methods
     # ==========================================
 
-    def _create_null_observation(self) -> np.ndarray:
+    def _create_null_observation(self) -> np.ndarray | dict[str, np.ndarray]:
         """Create a null observation array with the correct shape.
 
         Returns:
@@ -198,13 +189,12 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
             return self._create_null_dict_observation()
         else:
             self._report_warning(
-                f"Unsupported observation space type: {type(self._space)}. "
-                "Returning zero-filled array."
+                f"Unsupported observation space type: {type(self._space)}. Returning zero-filled array."
             )
             # Fallback for unknown space types
             return np.array([0.0], dtype=np.float32)
 
-    def _create_null_dict_observation(self) -> Dict[str, np.ndarray]:
+    def _create_null_dict_observation(self) -> dict[str, np.ndarray]:
         """Create a null observation for Dict spaces."""
         null_dict = {}
         for key, subspace in self._space.spaces.items():
@@ -216,7 +206,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
                 null_dict[key] = np.array([0.0], dtype=np.float32)
         return null_dict
 
-    def _setup_normalizer(self, normalize: bool, normalizer_name: str, **kwargs):
+    def _setup_normalizer(self, normalize: bool, normalizer_name: str, **kwargs: Any) -> Normalizer:
         """Set up the normalizer instance."""
         if not normalize:
             return get_normalizer("identity")
@@ -224,9 +214,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         try:
             return get_normalizer(normalizer_name, **kwargs)
         except ValueError as e:
-            self._report_warning(
-                f"Error setting up normalizer '{normalizer_name}': {e}. Using identity normalizer."
-            )
+            self._report_warning(f"Error setting up normalizer '{normalizer_name}': {e}. Using identity normalizer.")
             return get_normalizer("identity")
 
     def _apply_normalization(self, observation_arr: np.ndarray) -> np.ndarray:
@@ -239,9 +227,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
             np.ndarray: Normalized array if normalization is enabled, otherwise unchanged.
         """
         if self._can_normalize:
-            return self._normalizer.normalize(
-                observation_arr, self._norm_low, self._norm_high
-            )
+            return self._normalizer.normalize(observation_arr, self._norm_low, self._norm_high)
         return observation_arr
 
     def _validate_observation(self, observation_arr: np.ndarray) -> np.ndarray:
@@ -253,13 +239,8 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Returns:
             np.ndarray: Validated and potentially corrected observation array.
         """
-        if (
-            not np.isfinite(observation_arr).all()
-            or not np.isreal(observation_arr).all()
-        ):
-            self._report_warning(
-                "Invalid observation array detected, replacing with zeros."
-            )
+        if not np.isfinite(observation_arr).all() or not np.isreal(observation_arr).all():
+            self._report_warning("Invalid observation array detected, replacing with zeros.")
             return np.zeros_like(observation_arr, dtype=np.float32)
         return observation_arr
 
@@ -268,7 +249,9 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
     # ==========================================
 
     @staticmethod
-    def apply_normalization(func):
+    def apply_normalization[S: BaseObservationSpace, **P](
+        func: Callable[Concatenate[S, P], np.ndarray],
+    ) -> Callable[Concatenate[S, P], np.ndarray]:
         """Decorator to apply normalization after observation encoding.
 
         Usage:
@@ -277,14 +260,16 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
                 return observation_array
         """
 
-        def wrapper(self: "BaseObservationSpace", *args, **kwargs) -> np.ndarray:
+        def wrapper(self: S, *args: P.args, **kwargs: P.kwargs) -> np.ndarray:
             observation_arr = func(self, *args, **kwargs)
             return self._apply_normalization(observation_arr)
 
         return wrapper
 
     @staticmethod
-    def check_dtype(func):
+    def check_dtype[S: BaseObservationSpace, **P](
+        func: Callable[Concatenate[S, P], np.ndarray],
+    ) -> Callable[Concatenate[S, P], np.ndarray]:
         """Decorator to validate observation array data types.
 
         Usage:
@@ -293,7 +278,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
                 return observation_array
         """
 
-        def wrapper(self: "BaseObservationSpace", *args, **kwargs) -> np.ndarray:
+        def wrapper(self: S, *args: P.args, **kwargs: P.kwargs) -> np.ndarray:
             observation_arr = func(self, *args, **kwargs)
             return self._validate_observation(observation_arr)
 

@@ -3,6 +3,8 @@
 Original goal and subgoal navigation spaces integrated into hierarchical architecture.
 """
 
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
@@ -43,7 +45,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
         "dist_angle_to_goal": DistanceAngleMetrics,  # Distance and angle to navigation goal
     }
 
-    def __init__(self, goal_max_dist: float = 30, *args, **kwargs) -> None:
+    def __init__(self, goal_max_dist: float = 30, *args: Any, **kwargs: Any) -> None:
         self._max_dist = goal_max_dist
         super().__init__(*args, **kwargs)
 
@@ -63,7 +65,7 @@ class DistAngleToGoalSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
-        self, dist_angle_to_goal: DistanceAngleMetrics, *args, **kwargs
+        self, dist_angle_to_goal: DistanceAngleMetrics, *args: Any, **kwargs: Any
     ) -> DistanceAngleMetrics:
         """Encode distance and angle to navigation goal for minimal navigation context.
 
@@ -110,7 +112,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
         "dist_angle_to_subgoal": DistanceAngleMetrics,  # Distance and angle to navigation subgoal
     }
 
-    def __init__(self, subgoal_max_dist: float = 30, *args, **kwargs) -> None:
+    def __init__(self, subgoal_max_dist: float = 30, *args: Any, **kwargs: Any) -> None:
         self._max_dist = subgoal_max_dist
         super().__init__(*args, **kwargs)
 
@@ -130,7 +132,7 @@ class DistAngleToSubgoalSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(
-        self, dist_angle_to_subgoal: DistanceAngleMetrics, *args, **kwargs
+        self, dist_angle_to_subgoal: DistanceAngleMetrics, *args: Any, **kwargs: Any
     ) -> DistanceAngleMetrics:
         """Encode distance and angle to navigation subgoal for hierarchical navigation context.
 

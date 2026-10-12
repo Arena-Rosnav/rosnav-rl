@@ -27,26 +27,28 @@ Example YAML fragment (inside ``arena_cfg:``):
 from __future__ import annotations
 
 import logging as _logging
-from typing import Dict, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
 from rosnav_rl.utils.logging.error_logging import (
     ErrorSeverity,
     get_error_collector,
 )
+
 # ── Type alias ──────────────────────────────────────────────────────────────
 
 _LOG_LEVEL = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 # Mapping: verbose int (from general_cfg.verbose) → stdlib log level
-VERBOSE_TO_LEVEL: Dict[int, int] = {
+VERBOSE_TO_LEVEL: dict[int, int] = {
     0: _logging.WARNING,
     1: _logging.INFO,
     2: _logging.DEBUG,
 }
 
 # Mapping: stdlib log level → ErrorCollector min_severity threshold
-_STDLIB_TO_ERROR_SEVERITY: Dict[int, ErrorSeverity] = {
+_STDLIB_TO_ERROR_SEVERITY: dict[int, ErrorSeverity] = {
     _logging.DEBUG: ErrorSeverity.DEBUG,
     _logging.INFO: ErrorSeverity.INFO,
     _logging.WARNING: ErrorSeverity.WARNING,
@@ -56,6 +58,7 @@ _STDLIB_TO_ERROR_SEVERITY: Dict[int, ErrorSeverity] = {
 
 
 # ── Config model ────────────────────────────────────────────────────────────
+
 
 class LoggingCfg(BaseModel):
     """Per-namespace logging levels for rosnav_rl components and the ROS 2 system.
@@ -73,7 +76,7 @@ class LoggingCfg(BaseModel):
         default="INFO",
         description="Log level applied to the entire 'rosnav_rl' namespace.",
     )
-    overrides: Dict[str, _LOG_LEVEL] = Field(
+    overrides: dict[str, _LOG_LEVEL] = Field(
         default_factory=lambda: {
             "rosnav_rl.observations": "WARNING",
             "rosnav_rl.reward": "WARNING",
@@ -84,7 +87,7 @@ class LoggingCfg(BaseModel):
             "Keys are Python logger names, e.g. 'rosnav_rl.reward'."
         ),
     )
-    ros_level: Optional[_LOG_LEVEL] = Field(
+    ros_level: _LOG_LEVEL | None = Field(
         default=None,
         description=(
             "ROS 2 root logger level (rcutils/rclpy). "
@@ -92,7 +95,7 @@ class LoggingCfg(BaseModel):
             "Equivalent to passing '--log-level <level>' on the CLI."
         ),
     )
-    ros_overrides: Dict[str, _LOG_LEVEL] = Field(
+    ros_overrides: dict[str, _LOG_LEVEL] = Field(
         default_factory=dict,
         description=(
             "Per-node ROS 2 logger level overrides applied after ros_level. "
@@ -104,8 +107,9 @@ class LoggingCfg(BaseModel):
 
 # ── Helper function ─────────────────────────────────────────────────────────
 
+
 def configure_rosnav_rl_logging(
-    logging_cfg: Optional[LoggingCfg],
+    logging_cfg: LoggingCfg | None,
     verbose: int = 0,
 ) -> None:
     """Apply log levels to all ``rosnav_rl.*`` stdlib namespaces and the
@@ -134,17 +138,13 @@ def configure_rosnav_rl_logging(
     import json as _json
     import os as _os
 
-    fallback_level = VERBOSE_TO_LEVEL.get(
-        int(verbose), _logging.INFO if verbose else _logging.WARNING
-    )
+    fallback_level = VERBOSE_TO_LEVEL.get(int(verbose), _logging.INFO if verbose else _logging.WARNING)
 
     if logging_cfg is not None:
         root_level = getattr(_logging, logging_cfg.default_level, _logging.INFO)
         _logging.getLogger("rosnav_rl").setLevel(root_level)
         for ns, lvl_str in logging_cfg.overrides.items():
-            _logging.getLogger(ns).setLevel(
-                getattr(_logging, lvl_str, root_level)
-            )
+            _logging.getLogger(ns).setLevel(getattr(_logging, lvl_str, root_level))
         # ── Propagate to child processes via env vars ──────────────────────
         _os.environ["ROSNAV_RL_LOG_LEVEL"] = logging_cfg.default_level
         _os.environ["ROSNAV_RL_LOG_OVERRIDES"] = _json.dumps(dict(logging_cfg.overrides))
@@ -161,9 +161,7 @@ def configure_rosnav_rl_logging(
     # Sync ErrorCollector threshold to the effective root level so the
     # collect-then-dump report also respects the verbosity setting.
     effective_root = (
-        getattr(_logging, logging_cfg.default_level, _logging.INFO)
-        if logging_cfg is not None
-        else fallback_level
+        getattr(_logging, logging_cfg.default_level, _logging.INFO) if logging_cfg is not None else fallback_level
     )
     error_severity = _STDLIB_TO_ERROR_SEVERITY.get(effective_root, ErrorSeverity.INFO)
     get_error_collector().set_min_severity(error_severity)

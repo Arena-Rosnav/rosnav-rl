@@ -16,14 +16,10 @@ def check_batch_size(n_envs: int, batch_size: int, mn_batch_size: int) -> None:
     errors = []
 
     if batch_size < mn_batch_size:
-        errors.append(
-            f"Mini batch size {mn_batch_size} is bigger than batch size {batch_size}"
-        )
+        errors.append(f"Mini batch size {mn_batch_size} is bigger than batch size {batch_size}")
 
     if batch_size % mn_batch_size != 0:
-        errors.append(
-            f"Batch size {batch_size} isn't divisible by mini batch size {mn_batch_size}"
-        )
+        errors.append(f"Batch size {batch_size} isn't divisible by mini batch size {mn_batch_size}")
 
     if batch_size % n_envs != 0:
         errors.append(f"Batch size {batch_size} isn't divisible by n_envs {n_envs}")

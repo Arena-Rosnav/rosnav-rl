@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import torch
 from torch import nn
 
@@ -25,11 +27,11 @@ class Bottleneck(nn.Module):
         inplanes: int,
         planes: int,
         stride: int = 1,
-        downsample: callable = None,
+        downsample: nn.Module | None = None,
         groups: int = 1,
         base_width: int = 64,
         dilation: int = 1,
-        norm_layer: nn.Module = None,
+        norm_layer: Callable[..., nn.Module] | None = None,
     ):
         """
         The method initializes various layers and parameters including:
@@ -49,7 +51,7 @@ class Bottleneck(nn.Module):
             dilation (int, optional): Dilation rate for dilated convolution. Defaults to 1.
             norm_layer (nn.Module, optional): Normalization layer. Defaults to None.
         """
-        super(Bottleneck, self).__init__()
+        super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         width = int(planes * (base_width / 64.0)) * groups

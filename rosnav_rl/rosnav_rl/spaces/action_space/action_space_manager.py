@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Tuple, TYPE_CHECKING
+from typing import List, Tuple, Any, TYPE_CHECKING
 
 import numpy as np
 from gymnasium import spaces
@@ -39,10 +39,10 @@ class ActionSpaceManager:
         return self._space
 
     @property
-    def shape(self):
+    def shape(self) -> tuple[int, ...] | None:
         return self._space.shape
 
-    def decode_action(self, action) -> np.ndarray:
+    def decode_action(self, action: np.ndarray) -> np.ndarray:
         return self._spec.decode(action)
 
     def decode_split_action(self, action: np.ndarray) -> List[Tuple[str, np.ndarray]]:
@@ -51,5 +51,5 @@ class ActionSpaceManager:
         return [(self._spec.type, self._spec.decode(action))]
 
     @property
-    def config(self) -> dict:
+    def config(self) -> dict[str, Any]:
         return self._spec.model_dump()

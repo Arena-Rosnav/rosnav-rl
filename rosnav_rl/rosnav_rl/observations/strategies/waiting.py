@@ -7,7 +7,6 @@ Handles efficient waiting and polling for collector updates using ROS simulation
 from __future__ import annotations
 
 import time
-from typing import Dict, List
 
 from rclpy.node import Node
 
@@ -32,9 +31,13 @@ class WaitingStrategy:
         self._node = node
         self._logger = node.get_logger()
         # Tracks consecutive timeouts per collector name.
-        self._consecutive_failures: Dict[str, int] = {}
+        self._consecutive_failures: dict[str, int] = {}
 
-    def wait_for_collectors(self, collectors: List[str], collector_dict: dict) -> int:
+    def mark_fresh(self, collector_name: str) -> None:
+        """Clear the consecutive timeout count of a collector that delivered without a wait."""
+        self._consecutive_failures.pop(collector_name, None)
+
+    def wait_for_collectors(self, collectors: list[str], collector_dict: dict[str, Collector]) -> int:
         """
         Wait for multiple collectors to update.
 
@@ -57,12 +60,10 @@ class WaitingStrategy:
                 success_count += 1
             # Continue trying other collectors even if one times out
 
-        self._logger.debug(
-            f"Successfully updated {success_count}/{len(collectors)} stale collectors"
-        )
+        self._logger.debug(f"Successfully updated {success_count}/{len(collectors)} stale collectors")
         return success_count
 
-    def _wait_for_observation(self, collector_name: str, collector_dict: dict) -> bool:
+    def _wait_for_observation(self, collector_name: str, collector_dict: dict[str, Collector]) -> bool:
         """
         Wait for a specific collector to receive new data using ROS simulation time.
 
@@ -78,33 +79,29 @@ class WaitingStrategy:
             return False
 
         collector = collector_dict[collector_name]
-        timeout = getattr(collector, "timeout", 0.1)
+        timeout = collector.timeout
 
         try:
             self._poll_for_update_with_timeout(collector, timeout)
             self._logger.debug(f"Collector '{collector_name}' updated successfully")
             self._consecutive_failures[collector_name] = 0
             return True
-        except TimeoutError:
+        except TimeoutError as err:
             n = self._consecutive_failures.get(collector_name, 0) + 1
             self._consecutive_failures[collector_name] = n
-            self._logger.warn(
-                f"Timeout waiting for '{collector_name}' after {timeout}s"
-            )
+            self._logger.warn(f"Timeout waiting for '{collector_name}' after {timeout}s")
             if collector.up_to_date_required and n >= self._STALL_THRESHOLD:
                 raise RuntimeError(
                     f"Sensor stall: '{collector_name}' timed out {n} consecutive "
                     f"times. Worker will exit so the pool can respawn this env "
                     f"with a fresh Gazebo entity (GPU lidar re-initialisation)."
-                )
+                ) from err
             return False
         except Exception as e:
             self._logger.error(f"Exception while waiting for '{collector_name}': {e}")
             return False
 
-    def _poll_for_update_with_timeout(
-        self, collector: Collector, timeout: float
-    ) -> None:
+    def _poll_for_update_with_timeout(self, collector: Collector, timeout: float) -> None:
         """
         Poll for a collector update using wall-clock time for both sleeping and
         timeout tracking.
@@ -137,12 +134,8 @@ class WaitingStrategy:
             elapsed = time.monotonic() - start
 
             if elapsed >= timeout:
-                raise TimeoutError(
-                    f"Timeout after {timeout}s waiting for collector update"
-                )
+                raise TimeoutError(f"Timeout after {timeout}s waiting for collector update")
 
             # Yield briefly so the OS can deliver incoming messages
             time.sleep(sleep_interval)
-            sleep_interval = min(
-                sleep_interval * sleep_increase_factor, max_sleep_interval
-            )
+            sleep_interval = min(sleep_interval * sleep_increase_factor, max_sleep_interval)

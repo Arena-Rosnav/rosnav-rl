@@ -1,22 +1,25 @@
-from torch import nn, Tensor
+from collections.abc import Callable
+from typing import Any
+
 import torch
-from typing import List, Union, Optional, Callable, Any
+from torch import Tensor, nn
+
 from .resblocks import BasicBlock, Bottleneck, conv1x1
 
 
 class ResNet(nn.Module):
     def __init__(
         self,
-        layer_sizes: List[int],
+        layer_sizes: list[int],
         in_planes: int,
         base_planes: int,
-        block_type: Union[BasicBlock, Bottleneck],
+        block_type: type[BasicBlock] | type[Bottleneck],
         cardinality: int = 1,
-        norm_layer: Optional[Callable] = None,
-        *args,
-        **kwargs
+        norm_layer: Callable[..., nn.Module] | None = None,
+        *args: Any,
+        **kwargs: Any,
     ):
-        super(ResNet, self).__init__()
+        super().__init__()
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -25,25 +28,15 @@ class ResNet(nn.Module):
         self.cardinality = cardinality
         self.base_planes = base_planes
 
-        self.conv1 = nn.Conv2d(
-            in_planes, base_planes, kernel_size=7, stride=2, padding=3, bias=False
-        )
+        self.conv1 = nn.Conv2d(in_planes, base_planes, kernel_size=7, stride=2, padding=3, bias=False)
         self.in_planes = base_planes
         self.norm1 = self.norm_layer(self.in_planes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.res_layer1 = self._make_layer(
-            block_count=layer_sizes[0], planes=self.base_planes
-        )
-        self.res_layer2 = self._make_layer(
-            block_count=layer_sizes[1], planes=self.base_planes * 2, stride=2
-        )
-        self.res_layer3 = self._make_layer(
-            block_count=layer_sizes[2], planes=self.base_planes * 2 * 2, stride=2
-        )
-        self.res_layer4 = self._make_layer(
-            block_count=layer_sizes[3], planes=self.base_planes * 2 * 2 * 2, stride=2
-        )
+        self.res_layer1 = self._make_layer(block_count=layer_sizes[0], planes=self.base_planes)
+        self.res_layer2 = self._make_layer(block_count=layer_sizes[1], planes=self.base_planes * 2, stride=2)
+        self.res_layer3 = self._make_layer(block_count=layer_sizes[2], planes=self.base_planes * 2 * 2, stride=2)
+        self.res_layer4 = self._make_layer(block_count=layer_sizes[3], planes=self.base_planes * 2 * 2 * 2, stride=2)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
 
         self.out_planes = self.in_planes
@@ -53,9 +46,7 @@ class ResNet(nn.Module):
             ]
         )
 
-    def _make_layer(
-        self, block_count: int, planes: int, stride: int = 1
-    ) -> nn.Sequential:
+    def _make_layer(self, block_count: int, planes: int, stride: int = 1) -> nn.Sequential:
         # first block
         # downsample
         if stride != 1 or self.in_planes != planes * self.block_type.expansion:
@@ -110,7 +101,7 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet50_groupnorm(input_channels: int, num_groups, **kwargs):
+def resnet50_groupnorm(input_channels: int, num_groups: int, **kwargs: Any) -> ResNet:
     """Instantiates a ResNet50 with GroupNorm as normalization layer.
 
     Args:
@@ -142,14 +133,8 @@ class RgbdPerceptionNet(nn.Module):
             This method will be given the given kwargs.
     """
 
-    def __init__(
-        self,
-        out_dim: int,
-        input_channels: int,
-        network_factory: Callable[..., ResNet],
-        **kwargs: Any
-    ):
-        super(RgbdPerceptionNet, self).__init__()
+    def __init__(self, out_dim: int, input_channels: int, network_factory: Callable[..., ResNet], **kwargs: Any):
+        super().__init__()
 
         self.input_channels = input_channels
         self.output = out_dim
@@ -158,7 +143,7 @@ class RgbdPerceptionNet(nn.Module):
         self.fc = nn.Linear(in_features=self.net.out_planes, out_features=out_dim)
         self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, x: Tensor):
+    def forward(self, x: Tensor) -> Tensor:
         x = self.net(x)
         x = self.fc(x)
         x = self.relu(x)

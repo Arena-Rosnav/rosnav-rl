@@ -13,18 +13,15 @@ Legacy Spaces:
     - EpisodeStepSpace: Episode step counter
 """
 
-# Basic spaces
-from .basic_meta_spaces import (
-    IsFirstStepSpace,
-    IsTerminalStepSpace,
-    EpisodeStepSpace,
-)
-
-# Advanced spaces
 from .advanced_meta_spaces import (
     MissionContextSpace,
     PerformanceContextSpace,
     SafetyContextSpace,
+)
+from .basic_meta_spaces import (
+    EpisodeStepSpace,
+    IsFirstStepSpace,
+    IsTerminalStepSpace,
 )
 
 __all__ = [

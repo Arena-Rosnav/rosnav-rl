@@ -21,7 +21,7 @@ __all__ = [
     "RL_Agent",
     # ── Config (single source of truth) ───────────────────
     "AgentConfig",
-    "AgentCfg",   # backward-compat alias for AgentConfig
+    "AgentCfg",  # backward-compat alias for AgentConfig
     "AgentParameters",
     "RewardCfg",
     # ── Typed action spaces ───────────────────────────────
@@ -45,13 +45,22 @@ __all__ = [
     # ── Reward ────────────────────────────────────────────
     "RewardFunction",
     "reward_units",
-
     # ── Utils ─────────────────────────────────────────────
     "SupportedRLFrameworks",
     "tuning",
 ]
 
 
+from .cfg import (
+    ActionSpaceSpec,
+    AgentConfig,
+    AgentParameters,
+    DifferentialDriveActionSpace,
+    DiscretizationCfg,
+    DiscretizationStrategy,
+    OmnidirectionalActionSpace,
+    RewardCfg,
+)
 from .model import (
     DreamerV3Model,
     RL_Model,
@@ -63,15 +72,6 @@ from .observations import ObservationManager
 from .reward import RewardFunction, reward_units
 from .rl_agent import RL_Agent
 from .spaces import ActionSpaceManager, BaseSpaceManager, ObservationSpaceManager
-from .cfg import (
-    AgentConfig,
-    AgentParameters,
-    RewardCfg,
-    ActionSpaceSpec,
-    DifferentialDriveActionSpace,
-    OmnidirectionalActionSpace,
-    DiscretizationCfg,
-    DiscretizationStrategy,
-)
-AgentCfg = AgentConfig  # backward-compat alias
 from .utils.type_aliases import SupportedRLFrameworks
+
+AgentCfg = AgentConfig  # backward-compat alias

@@ -43,9 +43,7 @@ def _make_sb3_framework():
 
 class TestDifferentialDrive:
     def test_continuous_space(self):
-        spec = DifferentialDriveActionSpace(
-            linear_range=(-0.5, 1.0), angular_range=(-1.0, 1.0)
-        )
+        spec = DifferentialDriveActionSpace(linear_range=(-0.5, 1.0), angular_range=(-1.0, 1.0))
         assert spec.num_dof == 2
         assert not spec.is_discrete
         space = spec.get_gym_space()
@@ -288,12 +286,8 @@ class TestAgentConfig:
         defaults = dict(
             name="test_agent",
             robot="turtlebot3",
-            action_space=DifferentialDriveActionSpace(
-                linear_range=(0.0, 0.22), angular_range=(-2.84, 2.84)
-            ),
-            parameters=AgentParameters(
-                laser_num_beams=360, laser_max_range=3.5
-            ),
+            action_space=DifferentialDriveActionSpace(linear_range=(0.0, 0.22), angular_range=(-2.84, 2.84)),
+            parameters=AgentParameters(laser_num_beams=360, laser_max_range=3.5),
             framework=_make_sb3_framework(),
         )
         defaults.update(overrides)

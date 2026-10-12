@@ -5,11 +5,11 @@ This module contains validators that extend the base functionality
 for specific use cases like generators and observation spaces.
 """
 
-from typing import Dict, Any
+from typing import Any
 
 from .base import BaseSchemaValidator
-from .protocols import RequiresProtocol
 from .exceptions import MissingObservationError
+from .protocols import RequiresProtocol
 
 
 class SchemaValidator(BaseSchemaValidator):
@@ -33,7 +33,7 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
 
     @staticmethod
     def validate_configuration_dependencies(
-        generators: Dict[str, RequiresProtocol], collectors: Dict[str, Any]
+        generators: dict[str, RequiresProtocol], collectors: dict[str, Any]
     ) -> None:
         """
         Validate that all generator dependencies exist in the configuration.
@@ -50,9 +50,6 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
 
         missing_dependencies = {}
         for name, generator in generators.items():
-            if not hasattr(generator, "requires"):
-                continue
-
             missing_keys = []
             for dep_key in generator.requires.keys():
                 if dep_key not in all_available_keys:
@@ -65,15 +62,9 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
                 }
 
         if missing_dependencies:
-            error_msg = BaseSchemaValidator._format_error_message(
-                {}, missing_dependencies, "Generator"
-            )
+            error_msg = BaseSchemaValidator._format_error_message({}, missing_dependencies, "Generator")
 
-            missing_keys_list = [
-                key
-                for info in missing_dependencies.values()
-                for key in info["missing_keys"]
-            ]
+            missing_keys_list = [key for info in missing_dependencies.values() for key in info["missing_keys"]]
 
             raise MissingObservationError(
                 f"Generator dependency configuration validation failed:\n{error_msg}",
@@ -81,9 +72,7 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
             )
 
     @staticmethod
-    def validate_root_generators(
-        observations: Dict[str, Any], generators: Dict[str, RequiresProtocol]
-    ) -> None:
+    def validate_root_generators(observations: dict[str, Any], generators: dict[str, RequiresProtocol]) -> None:
         """
         Validate generators that only depend on collectors (root generators).
         These can be validated upfront since their dependencies should be available.
@@ -95,9 +84,6 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
         root_generators = {}
 
         for name, generator in generators.items():
-            if not hasattr(generator, "requires"):
-                continue
-
             # Check if all dependencies are collectors (not other generators)
             is_root_generator = True
             for dep_key in generator.requires.keys():
@@ -109,13 +95,11 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
                 root_generators[name] = generator
 
         if root_generators:
-            BaseSchemaValidator.validate_requirements(
-                observations, root_generators, "Generator"
-            )
+            BaseSchemaValidator.validate_requirements(observations, root_generators, "Generator")
 
     @staticmethod
     def validate_single_generator(
-        observations: Dict[str, Any], generator_name: str, generator: RequiresProtocol
+        observations: dict[str, Any], generator_name: str, generator: RequiresProtocol
     ) -> None:
         """
         Validate a single generator's requirements against current observation state.
@@ -129,9 +113,6 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
         Raises:
             MissingObservationError: If required dependencies are missing
         """
-        if not hasattr(generator, "requires"):
-            return
-
         missing_keys = []
         for key in generator.requires.keys():
             if key not in observations:
@@ -146,9 +127,7 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
                 }
             }
 
-            error_msg = BaseSchemaValidator._format_error_message(
-                observations, missing_components, "Generator"
-            )
+            error_msg = BaseSchemaValidator._format_error_message(observations, missing_components, "Generator")
 
             raise MissingObservationError(
                 f"Generator '{generator_name}' validation failed:\n{error_msg}",

@@ -11,11 +11,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from .search_space import SearchParam, SearchSpace
+from .search_space import SearchParam
 
 
 class PrunerCfg(BaseModel):
@@ -35,10 +35,7 @@ class PrunerCfg(BaseModel):
     )
     n_warmup_steps: int = Field(
         10,
-        description=(
-            "Number of intermediate reports to collect per trial before "
-            "the pruner may prune."
-        ),
+        description=("Number of intermediate reports to collect per trial before the pruner may prune."),
     )
     percentile: float = Field(
         50.0,
@@ -114,17 +111,16 @@ class TuningCfg(BaseModel):
     )
 
     # ── Trial settings ────────────────────────────────────────────────────
-    trial_timesteps: Optional[int] = Field(
+    trial_timesteps: int | None = Field(
         None,
         ge=1,
         description=(
-            "Override total_timesteps per trial for faster exploration. "
-            "If None, uses the value from the base config."
+            "Override total_timesteps per trial for faster exploration. If None, uses the value from the base config."
         ),
     )
 
     # ── Output ────────────────────────────────────────────────────────────
-    agents_dir: Optional[Path] = Field(
+    agents_dir: Path | None = Field(
         None,
         description=(
             "Custom base directory for trial agent artifacts. "
@@ -135,7 +131,7 @@ class TuningCfg(BaseModel):
     )
 
     # ── Persistence ───────────────────────────────────────────────────────
-    storage: Optional[str] = Field(
+    storage: str | None = Field(
         None,
         description=(
             "Optuna storage URL for persistent studies. "
@@ -151,7 +147,7 @@ class TuningCfg(BaseModel):
     )
 
     # ── Search space ──────────────────────────────────────────────────────
-    search_space: Dict[str, SearchParam] = Field(
+    search_space: dict[str, SearchParam] = Field(
         ...,
         description=(
             "Dot-notation config paths mapped to search-space parameters. "

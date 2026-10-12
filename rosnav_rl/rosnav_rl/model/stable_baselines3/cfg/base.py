@@ -1,6 +1,6 @@
-from typing import ClassVar, Literal, Optional, Union
-
 from abc import ABC
+from collections.abc import Callable
+from typing import ClassVar, Literal
 
 import torch as th
 from pydantic import BaseModel, Field
@@ -35,18 +35,18 @@ class SBAlgorithmParameters(BaseModel, ABC):
         _init_setup_model: Build the network on construction.
     """
 
-    algorithm_name: ClassVar[str] = None
+    algorithm_name: ClassVar[str | None] = None
 
     total_timesteps: int = Field(10_000_000, ge=1)
-    learning_rate: Union[float, callable, LearningRateSchedulerCfg] = 0.0005
+    learning_rate: float | Callable[[float], float] | LearningRateSchedulerCfg = 0.0005
     batch_size: int = 256
-    n_steps: Optional[int] = None
+    n_steps: int | None = None
     gamma: float = 0.99
     stats_window_size: int = 100
-    tensorboard_log: Optional[str] = None
+    tensorboard_log: str | None = None
     verbose: int = 0
-    seed: Optional[int] = None
-    device: Union[th.device, str] = "auto"
+    seed: int | None = None
+    device: th.device | str = "auto"
     show_progress_bar: bool = False
     _init_setup_model: bool = True
 
@@ -117,7 +117,7 @@ class OffPolicyParameters(SBAlgorithmParameters, ABC):
     buffer_size: int = 1_000_000
     learning_starts: int = 100
     tau: float = 0.005
-    train_freq: Union[int, tuple] = 1
+    train_freq: int | tuple[int, str] = 1
     gradient_steps: int = 1
     optimize_memory_usage: bool = False
     use_sde: bool = False
@@ -155,8 +155,8 @@ class SBAlgorithmCfg(BaseModel):
 
     type: Literal["generic"] = "generic"
     architecture_name: str
-    checkpoint: Optional[str] = "last_model"
-    transfer_weights: Optional[TransferWeightsCfg] = None
+    checkpoint: str | None = "last_model"
+    transfer_weights: TransferWeightsCfg | None = None
     parameters: SBAlgorithmParameters
-    normalization: Optional[NormalizationCfg] = None
+    normalization: NormalizationCfg | None = None
     callbacks: CallbacksCfg = CallbacksCfg()

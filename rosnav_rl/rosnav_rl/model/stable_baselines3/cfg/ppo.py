@@ -1,4 +1,5 @@
-from typing import Literal, Optional, Union
+from collections.abc import Callable
+from typing import Literal
 
 from stable_baselines3.ppo import PPO
 
@@ -19,9 +20,9 @@ class PPO_Algorithm_Cfg(OnPolicyParameters):
     """
 
     algorithm_name = PPO.__name__
-    clip_range: Union[float, callable] = 0.2
-    clip_range_vf: Union[None, float, callable] = None
-    target_kl: Optional[float] = None
+    clip_range: float | Callable[[float], float] = 0.2
+    clip_range_vf: float | Callable[[float], float] | None = None
+    target_kl: float | None = None
 
 
 class PPO_Cfg(SBAlgorithmCfg):

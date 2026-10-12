@@ -1,4 +1,5 @@
-from typing import Literal, Optional, Union
+from collections.abc import Callable
+from typing import Literal
 
 from stable_baselines3.sac import SAC
 
@@ -22,18 +23,18 @@ class SAC_Algorithm_Cfg(OffPolicyParameters):
     algorithm_name = SAC.__name__
 
     # SAC defaults
-    learning_rate: Union[float, callable] = 3e-4
+    learning_rate: float | Callable[[float], float] = 3e-4
     batch_size: int = 256
     buffer_size: int = 1_000_000
     learning_starts: int = 100
     tau: float = 0.005
     gamma: float = 0.99
-    train_freq: Union[int, tuple] = 1
+    train_freq: int | tuple[int, str] = 1
     gradient_steps: int = 1
 
-    ent_coef: Union[str, float] = "auto"
+    ent_coef: str | float = "auto"
     target_update_interval: int = 1
-    target_entropy: Union[str, float] = "auto"
+    target_entropy: str | float = "auto"
 
 
 class SAC_Cfg(SBAlgorithmCfg):

@@ -5,27 +5,29 @@ Collectors are data sources that subscribe to external sources (e.g., ROS topics
 and preprocess the raw data into a clean, usable format.
 """
 
+from typing import Any
+
+import arena_people_msgs.msg as arena_people_msgs
 import geometry_msgs.msg as geometry_msgs
+import nav2_msgs.msg as nav2_msgs
 import nav_msgs.msg as nav_msgs
 import numpy as np
-import sensor_msgs.msg as sensor_msgs
-import nav2_msgs.msg as nav2_msgs
 import people_msgs.msg as people_msgs
-import arena_people_msgs.msg as arena_people_msgs
+import sensor_msgs.msg as sensor_msgs
 
 from ..utils.pose import Pose2DType, pose3d_to_pose2d
-from .base import Collector
 from ..utils.types import (
-    Pose2D,
-    LidarRanges,
-    RobotVelocity,
-    NavigationPath,
-    ImageData,
-    PedestrianDetections,
     ArenaPedestrianDetections,
+    ImageData,
+    LidarRanges,
+    NavigationPath,
+    PedestrianDetections,
+    Pose2D,
+    RobotVelocity,
     SafetyStatus,
     JointStates,
 )
+from .base import Collector
 
 
 class LaserScanCollector(Collector[sensor_msgs.LaserScan, LidarRanges]):
@@ -48,7 +50,7 @@ class OdometryCollector(Collector[nav_msgs.Odometry, Pose2D]):
     """
 
     def _preprocess(self, msg: nav_msgs.Odometry) -> Pose2D:
-        pose3d: geometry_msgs.PoseWithCovariance = msg.pose.pose
+        pose3d: geometry_msgs.Pose = msg.pose.pose
         pose2d: geometry_msgs.Pose2D = pose3d_to_pose2d(pose3d)
         return np.array((pose2d.x, pose2d.y, pose2d.theta), dtype=Pose2DType)
 
@@ -73,14 +75,12 @@ class TwistCollector(Collector[geometry_msgs.Twist, RobotVelocity]):
         return np.array((msg.linear.x, msg.linear.y, msg.angular.z))
 
 
-class CollisionMonitorStateCollector(
-    Collector[nav2_msgs.CollisionMonitorState, SafetyStatus]
-):
+class CollisionMonitorStateCollector(Collector[nav2_msgs.CollisionMonitorState, SafetyStatus]):
     """
     Collects the collision monitor state.
     """
 
-    def __init__(self, name: str, topic: str, state_key: str, **kwargs):
+    def __init__(self, name: str, topic: str, state_key: str, **kwargs: Any):
         self.state_key = state_key
         super().__init__(name, topic, **kwargs)
 
@@ -160,9 +160,7 @@ class PeopleCollector(Collector[people_msgs.People, PedestrianDetections]):
         return msg
 
 
-class ArenaPedestrianCollector(
-    Collector[arena_people_msgs.Pedestrians, ArenaPedestrianDetections]
-):
+class ArenaPedestrianCollector(Collector[arena_people_msgs.Pedestrians, ArenaPedestrianDetections]):
     """A class that collects information about pedestrians from Arena simulator.
 
     Processes arena_people_msgs/Pedestrians messages which include:
@@ -175,9 +173,7 @@ class ArenaPedestrianCollector(
       - animation_state: Behavioral state (IDLE, WALKING, RUNNING, etc.)
     """
 
-    def _preprocess(
-        self, msg: arena_people_msgs.Pedestrians
-    ) -> arena_people_msgs.Pedestrians:
+    def _preprocess(self, msg: arena_people_msgs.Pedestrians) -> arena_people_msgs.Pedestrians:
         return msg
 
 class JointStateCollector(Collector[sensor_msgs.JointState, JointStates]):  

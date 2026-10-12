@@ -25,7 +25,10 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import optuna
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +52,7 @@ class TrialPrunerBase(ABC):
 
     def __init__(
         self,
-        trial: "optuna.trial.Trial",
+        trial: optuna.trial.Trial,
         metric: str = "mean_reward",
         verbose: int = 0,
     ):
@@ -58,7 +61,7 @@ class TrialPrunerBase(ABC):
         self._report_step = 0
         self.verbose = verbose
 
-        self.best_metric: Optional[float] = None
+        self.best_metric: float | None = None
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -107,8 +110,7 @@ class TrialPrunerBase(ABC):
                     self._report_step,
                 )
             raise optuna.TrialPruned(
-                f"Trial {self._trial.number} pruned at step {self._report_step} "
-                f"({self._metric} = {value:.4f})"
+                f"Trial {self._trial.number} pruned at step {self._report_step} ({self._metric} = {value:.4f})"
             )
 
         return True
@@ -133,7 +135,7 @@ class TrialPrunerBase(ABC):
     # ── Abstract interface ────────────────────────────────────────────────
 
     @abstractmethod
-    def read_metric(self) -> Optional[float]:
+    def read_metric(self) -> float | None:
         """Return the current metric value from the RL framework.
 
         Implementations should return ``None`` when no data is available yet

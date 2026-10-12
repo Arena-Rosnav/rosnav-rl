@@ -3,6 +3,8 @@
 Meta-information and high-level context spaces with reliable features.
 """
 
+from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
@@ -14,6 +16,7 @@ from rosnav_rl.observations.utils.types import (
     RobotActionVector,
     SafetyContextVector,
 )
+
 from ...observation_space_factory import SpaceFactory
 from ...space_categories import SpaceCategory
 from ..base_observation_space import BaseObservationSpace
@@ -56,9 +59,9 @@ class MissionContextSpace(BaseObservationSpace):
         self,
         max_mission_time: float = 300.0,  # 5 minutes
         progress_smoothing: float = 0.9,
-        phase_distance_thresholds: list = None,
-        *args,
-        **kwargs
+        phase_distance_thresholds: list[float] | None = None,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize mission context space.
 
@@ -113,8 +116,7 @@ class MissionContextSpace(BaseObservationSpace):
 
         # Apply smoothing
         self.smoothed_progress = (
-            self.progress_smoothing * self.smoothed_progress
-            + (1.0 - self.progress_smoothing) * raw_progress
+            self.progress_smoothing * self.smoothed_progress + (1.0 - self.progress_smoothing) * raw_progress
         )
 
         return self.smoothed_progress
@@ -137,9 +139,7 @@ class MissionContextSpace(BaseObservationSpace):
     def _compute_urgency(self, progress: float, time_normalized: float) -> float:
         """Compute urgency based on progress and time."""
         # Urgency increases if time is passing but progress is slow
-        expected_progress = (
-            time_normalized * 0.8
-        )  # Expected 80% progress by end of time
+        expected_progress = time_normalized * 0.8  # Expected 80% progress by end of time
 
         if progress < expected_progress:
             urgency = min(1.0, (expected_progress - progress) * 2.0)
@@ -149,7 +149,7 @@ class MissionContextSpace(BaseObservationSpace):
         return urgency
 
     def encode_observation(
-        self, dist_angle_to_goal: DistanceAngleMetrics, *args, **kwargs
+        self, dist_angle_to_goal: DistanceAngleMetrics, *args: Any, **kwargs: Any
     ) -> MissionContextVector:
         """Encode comprehensive mission context with progress tracking and temporal awareness.
 
@@ -246,9 +246,7 @@ class PerformanceContextSpace(BaseObservationSpace):
         "last_action": RobotActionVector,
     }
 
-    def __init__(
-        self, efficiency_window: int = 50, max_velocity: float = 2.0, *args, **kwargs
-    ):
+    def __init__(self, efficiency_window: int = 50, max_velocity: float = 2.0, *args: Any, **kwargs: Any):
         """Initialize performance context space.
 
         Args:
@@ -284,7 +282,7 @@ class PerformanceContextSpace(BaseObservationSpace):
             dtype=np.float32,
         )
 
-    def _update_tracking(self, goal_distance: float, velocity: tuple):
+    def _update_tracking(self, goal_distance: float, velocity: tuple[float, float]):
         """Update performance tracking."""
         # Track goal distance
         self.distance_history.append(goal_distance)
@@ -339,9 +337,7 @@ class PerformanceContextSpace(BaseObservationSpace):
         # Lower acceleration variance = higher smoothness
         if len(acceleration_magnitudes) > 0:
             avg_acceleration = np.mean(acceleration_magnitudes)
-            max_expected_acceleration = (
-                self.max_velocity * 0.5
-            )  # Assume reasonable acceleration
+            max_expected_acceleration = self.max_velocity * 0.5  # Assume reasonable acceleration
 
             smoothness = 1.0 - min(1.0, avg_acceleration / max_expected_acceleration)
         else:
@@ -349,24 +345,16 @@ class PerformanceContextSpace(BaseObservationSpace):
 
         return smoothness
 
-    def _compute_overall_performance(
-        self, path_eff: float, energy_eff: float, smoothness: float
-    ) -> float:
+    def _compute_overall_performance(self, path_eff: float, energy_eff: float, smoothness: float) -> float:
         """Compute overall performance score."""
         # Weighted combination of metrics
         weights = [0.5, 0.3, 0.2]  # Path efficiency most important
-        overall = (
-            weights[0] * path_eff + weights[1] * energy_eff + weights[2] * smoothness
-        )
+        overall = weights[0] * path_eff + weights[1] * energy_eff + weights[2] * smoothness
 
         return overall
 
     def encode_observation(
-        self,
-        dist_angle_to_goal: DistanceAngleMetrics,
-        last_action: RobotActionVector,
-        *args,
-        **kwargs
+        self, dist_angle_to_goal: DistanceAngleMetrics, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> PerformanceContextVector:
         """Encode comprehensive performance context with efficiency analysis and smoothness assessment.
 
@@ -413,9 +401,7 @@ class PerformanceContextSpace(BaseObservationSpace):
         path_efficiency = self._compute_path_efficiency()
         energy_efficiency = self._compute_energy_efficiency()
         smoothness = self._compute_smoothness()
-        overall_performance = self._compute_overall_performance(
-            path_efficiency, energy_efficiency, smoothness
-        )
+        overall_performance = self._compute_overall_performance(path_efficiency, energy_efficiency, smoothness)
 
         result = [path_efficiency, energy_efficiency, smoothness, overall_performance]
 
@@ -460,8 +446,8 @@ class SafetyContextSpace(BaseObservationSpace):
         safety_distance: float = 1.0,
         critical_distance: float = 0.3,
         risk_history_length: int = 20,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize safety context space.
 
@@ -498,7 +484,7 @@ class SafetyContextSpace(BaseObservationSpace):
             dtype=np.float32,
         )
 
-    def _compute_collision_risk(self, laser_data: np.ndarray, velocity: tuple) -> float:
+    def _compute_collision_risk(self, laser_data: np.ndarray, velocity: tuple[float, float]) -> float:
         """Compute current collision risk."""
         # Filter valid laser readings
         valid_mask = laser_data > 0.0
@@ -515,9 +501,7 @@ class SafetyContextSpace(BaseObservationSpace):
             distance_risk = 1.0
         elif min_distance <= self.safety_distance:
             # Linear risk increase as distance decreases
-            distance_risk = (self.safety_distance - min_distance) / (
-                self.safety_distance - self.critical_distance
-            )
+            distance_risk = (self.safety_distance - min_distance) / (self.safety_distance - self.critical_distance)
         else:
             distance_risk = 0.0
 
@@ -542,7 +526,7 @@ class SafetyContextSpace(BaseObservationSpace):
         if current_risk > 0.7:  # Threshold for violation
             self.violation_count += 1
 
-    def _compute_safety_metrics(self, current_risk: float):
+    def _compute_safety_metrics(self, current_risk: float) -> dict[str, float]:
         """Compute safety metrics."""
         # Average risk
         if len(self.risk_history) > 0:
@@ -565,7 +549,7 @@ class SafetyContextSpace(BaseObservationSpace):
     @BaseObservationSpace.apply_normalization
     @BaseObservationSpace.check_dtype
     def encode_observation(
-        self, front_laser: LidarRanges, last_action: RobotActionVector, *args, **kwargs
+        self, front_laser: LidarRanges, last_action: RobotActionVector, *args: Any, **kwargs: Any
     ) -> SafetyContextVector:
         """Encode comprehensive safety context with collision risk assessment and violation tracking.
 

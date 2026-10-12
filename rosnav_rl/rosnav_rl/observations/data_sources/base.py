@@ -7,25 +7,27 @@ The components are:
 - Generator: A data source that derives new data from other data sources.
 """
 
+import types
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, Type, Union, Optional
-from rclpy.client import TypeVar
-from rclpy.clock import Clock, ClockType
-from rclpy.time import Time
-from rclpy.qos import QoSProfile
+from typing import Any, get_args, get_origin
 
+from rclpy.clock import Clock, ClockType
+from rclpy.node import Node
+from rclpy.qos import QoSProfile
+from rclpy.time import Time
+
+from rosnav_rl.utils.logging import ComponentType, ErrorReportingMixin
 from rosnav_rl.utils.validation import RequiresProtocol
-from rosnav_rl.utils.logging import ErrorReportingMixin, ComponentType
 
 
 class DataSource(ABC):
     """Abstract base class for all observation data sources."""
 
-    def __init__(self, name: str, **kwargs):
+    def __init__(self, name: str, **kwargs: Any):
         self.name = name
 
     @abstractmethod
-    def get_observation(self, obs_dict: Dict[str, Any], **kwargs) -> Any:
+    def get_observation(self, obs_dict: dict[str, Any], **kwargs: Any) -> object:
         """
         Returns the observation data.
         For Generators, obs_dict provides access to dependencies.
@@ -37,15 +39,7 @@ class DataSource(ABC):
         return f"{self.__class__.__name__}(name='{self.name}')"
 
 
-# Define a generic type for ROS messages
-RosMessageType = TypeVar("RosMessageType")
-# Define a generic type for the processed output
-ProcessedDataType = TypeVar("ProcessedDataType")
-
-
-class Collector(
-    Generic[RosMessageType, ProcessedDataType], DataSource, ErrorReportingMixin
-):
+class Collector[RosMessageType, ProcessedDataType](DataSource, ErrorReportingMixin):
     """
     Collector is a generic data source class for collecting and processing data from external sources, such as ROS topics.
 
@@ -103,42 +97,38 @@ class Collector(
     """
 
     # The ROS message type this collector handles (e.g., sensor_msgs.LaserScan)
-    message_type: Type[RosMessageType]
+    message_type: type[RosMessageType]
 
     # The data type of the output after preprocessing
-    data_class: Type[ProcessedDataType]
+    data_class: type[ProcessedDataType]
 
     # Configuration
     timeout: float = 0.1
-    fallback_value: Union[ProcessedDataType, None] = None
+    fallback_value: ProcessedDataType | None = None
     up_to_date_required: bool = False  # Whether this collector requires fresh data
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs: Any):
         """Automatically extract generic type parameters and set class variables."""
         super().__init_subclass__(**kwargs)
 
         # Extract the generic type arguments from the class
-        if hasattr(cls, "__orig_bases__"):
-            for base in cls.__orig_bases__:
-                if hasattr(base, "__origin__") and base.__origin__ is Collector:
-                    if hasattr(base, "__args__") and len(base.__args__) == 2:
-                        cls.message_type = base.__args__[0]
-                        cls.data_class = base.__args__[1]
-                        break
+        for base in types.get_original_bases(cls):
+            if get_origin(base) is Collector:
+                if len(get_args(base)) == 2:
+                    cls.message_type, cls.data_class = get_args(base)
+                    break
 
     def __init__(
         self,
         name: str,
         topic: str,
-        node=None,
+        node: Node | None = None,
         up_to_date_required: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
         super().__init__(name, **kwargs)
         # Unified error reporting
-        ErrorReportingMixin.__init__(
-            self, component_type=ComponentType.COLLECTOR, component_name=name
-        )
+        ErrorReportingMixin.__init__(self, component_type=ComponentType.COLLECTOR, component_name=name)
 
         self.topic = topic
         self._node = node
@@ -146,13 +136,13 @@ class Collector(
 
         # Initialize observation state (formerly GenericObservation functionality)
         self._clock = Clock(clock_type=ClockType.ROS_TIME) if node else None
-        self._value: Optional[ProcessedDataType] = self._preprocess(
+        self._value: ProcessedDataType | None = self._preprocess(
             self.message_type()  # Initialize with a default message type instance
         )
         self._stale: bool = True
-        self._timestamp: Optional[Time] = None
-        self._qos_profile: Optional[QoSProfile] = None
-        self._latest_msg: Optional[RosMessageType] = self.message_type()
+        self._timestamp: Time | None = None
+        self._qos_profile: QoSProfile | int | None = None
+        self._latest_msg: RosMessageType | None = self.message_type()
 
         # Health tracking
         self.update_count: int = 0
@@ -176,9 +166,7 @@ class Collector(
             self.update_count += 1
         except Exception as e:
             self.error_count += 1
-            self._report_error(
-                f"Failed to update from message: {e}", error_type=type(e).__name__
-            )
+            self._report_error(f"Failed to update from message: {e}", error_type=type(e).__name__)
             raise e
 
     @property
@@ -202,20 +190,20 @@ class Collector(
         return duration.nanoseconds / 1e9
 
     @property
-    def timestamp(self) -> Optional[Time]:
+    def timestamp(self) -> Time | None:
         """Get the timestamp of the last update."""
         return self._timestamp
 
-    def set_qos_profile(self, profile: QoSProfile) -> None:
+    def set_qos_profile(self, profile: QoSProfile | int) -> None:
         """Set the QoS profile for ROS subscriptions."""
         self._qos_profile = profile
 
     @property
-    def qos_profile(self) -> Optional[QoSProfile]:
+    def qos_profile(self) -> QoSProfile | int | None:
         """Get the QoS profile."""
         return self._qos_profile
 
-    def get_observation(self) -> Optional[ProcessedDataType]:
+    def get_observation(self) -> ProcessedDataType | None:
         """
         Implementation of DataSource.get_observation for collectors.
         Simply returns the current processed value.
@@ -223,9 +211,7 @@ class Collector(
         return self._value
 
 
-class Generator(
-    DataSource, RequiresProtocol, Generic[ProcessedDataType], ErrorReportingMixin
-):
+class Generator[ProcessedDataType](DataSource, RequiresProtocol, ErrorReportingMixin):
     """
     A base class for data sources that generate new data from one or more other data sources.
 
@@ -264,28 +250,25 @@ class Generator(
         Specify required dependencies via the `requires` class attribute.
     """
 
-    requires: Dict[str, str] = {}
+    requires: dict[str, Any] = {}
     # Output data type - automatically set via generics
-    data_class: Type[ProcessedDataType]
+    data_class: type[ProcessedDataType]
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs: Any):
         """Automatically extract generic type parameters and set class variables."""
         super().__init_subclass__(**kwargs)
 
         # Extract the output data type from generics
-        if hasattr(cls, "__orig_bases__"):
-            for base in cls.__orig_bases__:
-                if hasattr(base, "__origin__") and base.__origin__ is Generator:
-                    if hasattr(base, "__args__") and len(base.__args__) == 1:
-                        cls.data_class = base.__args__[0]
-                        break
+        for base in types.get_original_bases(cls):
+            if get_origin(base) is Generator:
+                if len(get_args(base)) == 1:
+                    cls.data_class = get_args(base)[0]
+                    break
 
-    def __init__(self, name: str, **kwargs):
+    def __init__(self, name: str, **kwargs: Any):
         super().__init__(name, **kwargs)
         # Set up error reporting
-        ErrorReportingMixin.__init__(
-            self, component_type=ComponentType.GENERATOR, component_name=name
-        )
+        ErrorReportingMixin.__init__(self, component_type=ComponentType.GENERATOR, component_name=name)
         self.required_keys = list(self.requires.keys())
 
     @abstractmethod
@@ -297,11 +280,9 @@ class Generator(
         """
         pass
 
-    def get_observation(self, obs_dict: Dict[str, Any], **kwargs) -> ProcessedDataType:
+    def get_observation(self, obs_dict: dict[str, Any], **kwargs: Any) -> ProcessedDataType | None:
         try:
-            return self._generate(
-                **{k: obs_dict[k] for k in self.required_keys}, **kwargs
-            )
+            return self._generate(**{k: obs_dict[k] for k in self.required_keys}, **kwargs)
         except KeyError as e:
             missing = e.args[0]
             error_msg = (
@@ -312,12 +293,10 @@ class Generator(
             return None
         except TypeError as e:
             # This can catch missing or unexpected arguments
-            self._report_error(
-                self._format_type_error(e, obs_dict), error_type="TypeError"
-            )
+            self._report_error(self._format_type_error(e, obs_dict), error_type="TypeError")
             return None
 
-    def _format_type_error(self, error: TypeError, obs_dict: Dict[str, Any]) -> str:
+    def _format_type_error(self, error: TypeError, obs_dict: dict[str, Any]) -> str:
         """Format a detailed error message for type/argument errors."""
         return (
             f"Type mismatch in '_generate' method: {str(error)}. "

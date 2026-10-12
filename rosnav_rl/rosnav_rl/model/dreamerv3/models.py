@@ -1,6 +1,9 @@
 import copy
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
+import gymnasium
+import numpy as np
 import torch
 from torch import nn
 
@@ -10,27 +13,27 @@ to_np = lambda x: x.detach().cpu().numpy()
 
 if TYPE_CHECKING:
     from ..dreamerv3 import cfg
-    
+
 
 class RewardEMA:
     """Reward Exponential Moving Average (EMA) normalization class.
-    
+
     This class computes the quantiles of reward values and uses them to normalize rewards
     through an exponential moving average approach. It helps stabilize learning by adaptively
     scaling rewards based on their distribution.
-    
+
     Attributes:
         device (torch.device): The device where the tensors are stored.
         alpha (float): The smoothing factor for the exponential moving average (default: 1e-2).
         range (torch.Tensor): A tensor containing the quantile values [0.05, 0.95] used for normalization.
     """
 
-    def __init__(self, device, alpha=1e-2):
+    def __init__(self, device: str | torch.device, alpha: float = 1e-2):
         self.device = device
         self.alpha = alpha
         self.range = torch.tensor([0.05, 0.95], device=device)
 
-    def __call__(self, x, ema_vals):
+    def __call__(self, x: torch.Tensor, ema_vals: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Compute the quantile of the input tensor and update the exponential moving average (EMA) values in-place.
 
@@ -52,11 +55,11 @@ class RewardEMA:
 
 class WorldModel(nn.Module):
     """World model that combines neural network components for prediction and planning in reinforcement learning.
-    
+
     This class implements a world model that integrates encoders, decoders, dynamics models, and prediction heads
-    to learn an internal representation of the environment. It serves as the foundation for model-based 
+    to learn an internal representation of the environment. It serves as the foundation for model-based
     reinforcement learning algorithms in the DreamerV3 framework.
-    
+
         encoder (MultiEncoder): Encodes observations into latent embeddings.
         embed_size (int): Size of the encoder's output embedding.
         dynamics (RSSM): Recurrent state-space model for predicting state transitions.
@@ -67,14 +70,20 @@ class WorldModel(nn.Module):
         _step (int): Current training step.
         _use_amp (bool): Whether to use automatic mixed precision.
         _config (DreamerV3Cfg): Configuration object with model hyperparameters.
-    
+
     Methods:
         _train(data): Trains the model on a batch of data, computing losses and updating parameters.
         preprocess(obs): Preprocesses observations for model input.
         video_pred(data): Generates video prediction based on input data for visualization.
     """
-    
-    def __init__(self, obs_space, act_space, step, config: "cfg.DreamerV3Cfg"):
+
+    def __init__(
+        self,
+        obs_space: gymnasium.spaces.Dict,
+        act_space: gymnasium.Space,
+        step: int,
+        config: "cfg.DreamerV3Cfg",
+    ):
         """Initialize the WorldModel class.
 
         This class represents a world model that combines various neural network components
@@ -103,14 +112,12 @@ class WorldModel(nn.Module):
             _scales (dict): Loss scaling factors for different model components.
         """
 
-        super(WorldModel, self).__init__()
+        super().__init__()
         self._step = step
         self._use_amp = True if config.general.precision == 16 else False
         self._config = config
         shapes = {k: tuple(v.shape) for k, v in obs_space.spaces.items()}
-        self.encoder = networks.MultiEncoder(
-            shapes, device=config.general.device, **config.model.encoder.model_dump()
-        )
+        self.encoder = networks.MultiEncoder(shapes, device=config.general.device, **config.model.encoder.model_dump())
         self.embed_size = self.encoder.outdim
         self.dynamics = networks.RSSM(
             config.model.dyn_stoch,
@@ -125,16 +132,13 @@ class WorldModel(nn.Module):
             config.model.dyn_min_std,
             config.model.unimix_ratio,
             config.model.initial,
-            (act_space.n if hasattr(act_space, "n") else act_space.shape[0]),
+            (int(act_space.n) if isinstance(act_space, gymnasium.spaces.Discrete) else act_space.shape[0]),
             self.embed_size,
             config.general.device,
         )
         self.heads = nn.ModuleDict()
         if config.model.dyn_discrete:
-            feat_size = (
-                config.model.dyn_stoch * config.model.dyn_discrete
-                + config.model.dyn_deter
-            )
+            feat_size = config.model.dyn_stoch * config.model.dyn_discrete + config.model.dyn_deter
         else:
             feat_size = config.model.dyn_stoch + config.model.dyn_deter
         self.heads["decoder"] = networks.MultiDecoder(
@@ -179,16 +183,20 @@ class WorldModel(nn.Module):
             opt=config.training.opt,
             use_amp=self._use_amp,
         )
-        print(
-            f"Optimizer model_opt has {sum(param.numel() for param in self.parameters())} variables."
-        )
+        print(f"Optimizer model_opt has {sum(param.numel() for param in self.parameters())} variables.")
         # other losses are scaled by 1.0.
         self._scales = dict(
             reward=config.model.reward_head.loss_scale,
             cont=config.model.cont_head.loss_scale,
         )
 
-    def _train(self, data):
+    def _train(
+        self, data: dict[str, np.ndarray]
+    ) -> tuple[
+        networks.RSSMState,
+        dict[str, torch.Tensor],
+        dict[str, float | np.ndarray],
+    ]:
         """
         Train the model on a batch of data.
 
@@ -228,9 +236,7 @@ class WorldModel(nn.Module):
         with tools.RequiresGrad(self):
             with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=self._use_amp):
                 embed = self.encoder(data)
-                post, prior = self.dynamics.observe(
-                    embed, data["action"], data["is_first"]
-                )
+                post, prior = self.dynamics.observe(embed, data["action"], data["is_first"])
                 kl_free = self._config.model.kl_free
                 dyn_scale = self._config.model.dyn_scale
                 rep_scale = self._config.model.rep_scale
@@ -253,10 +259,7 @@ class WorldModel(nn.Module):
                     loss = -pred.log_prob(data[name])
                     assert loss.shape == embed.shape[:2], (name, loss.shape)
                     losses[name] = loss
-                scaled = {
-                    key: value * self._scales.get(key, 1.0)
-                    for key, value in losses.items()
-                }
+                scaled = {key: value * self._scales.get(key, 1.0) for key, value in losses.items()}
                 model_loss = sum(scaled.values()) + kl_loss
             metrics = self._model_opt(torch.mean(model_loss), self.parameters())
 
@@ -268,12 +271,8 @@ class WorldModel(nn.Module):
         metrics["rep_loss"] = to_np(rep_loss)
         metrics["kl"] = to_np(torch.mean(kl_value))
         with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=self._use_amp):
-            metrics["prior_ent"] = to_np(
-                torch.mean(self.dynamics.get_dist(prior).entropy())
-            )
-            metrics["post_ent"] = to_np(
-                torch.mean(self.dynamics.get_dist(post).entropy())
-            )
+            metrics["prior_ent"] = to_np(torch.mean(self.dynamics.get_dist(prior).entropy()))
+            metrics["post_ent"] = to_np(torch.mean(self.dynamics.get_dist(post).entropy()))
             context = dict(
                 embed=embed,
                 feat=self.dynamics.get_feat(post),
@@ -284,7 +283,7 @@ class WorldModel(nn.Module):
         return post, context, metrics
 
     # this function is called during both rollout and training
-    def preprocess(self, obs):
+    def preprocess(self, obs: dict[str, np.ndarray]) -> dict[str, torch.Tensor]:
         """
         Preprocesses the observation dictionary by converting values to tensors and normalizing data.
 
@@ -308,10 +307,7 @@ class WorldModel(nn.Module):
             - 'is_terminal' is required for continuation head training
         """
 
-        obs = {
-            k: torch.tensor(v, device=self._config.general.device, dtype=torch.float32)
-            for k, v in obs.items()
-        }
+        obs = {k: torch.tensor(v, device=self._config.general.device, dtype=torch.float32) for k, v in obs.items()}
         if "image" in obs:
             obs["image"] = obs["image"] / 255.0
         if "discount" in obs:
@@ -325,7 +321,7 @@ class WorldModel(nn.Module):
         obs["cont"] = (1.0 - obs["is_terminal"]).unsqueeze(-1)
         return obs
 
-    def video_pred(self, data):
+    def video_pred(self, data: dict[str, np.ndarray]) -> torch.Tensor:
         """
         Generate video prediction based on input data.
 
@@ -341,17 +337,11 @@ class WorldModel(nn.Module):
         data = self.preprocess(data)
         embed = self.encoder(data)
 
-        states, _ = self.dynamics.observe(
-            embed[:6, :5], data["action"][:6, :5], data["is_first"][:6, :5]
-        )
-        recon = self.heads["decoder"](self.dynamics.get_feat(states))["image"].mode()[
-            :6
-        ]
-        reward_post = self.heads["reward"](self.dynamics.get_feat(states)).mode()[:6]
+        states, _ = self.dynamics.observe(embed[:6, :5], data["action"][:6, :5], data["is_first"][:6, :5])
+        recon = self.heads["decoder"](self.dynamics.get_feat(states))["image"].mode()[:6]
         init = {k: v[:, -1] for k, v in states.items()}
         prior = self.dynamics.imagine_with_action(data["action"][:6, 5:], init)
         openl = self.heads["decoder"](self.dynamics.get_feat(prior))["image"].mode()
-        reward_prior = self.heads["reward"](self.dynamics.get_feat(prior)).mode()
         # observed image is given until 5 steps
         model = torch.cat([recon[:, :5], openl], 1)
         truth = data["image"][:6]
@@ -364,8 +354,8 @@ class WorldModel(nn.Module):
 class ImagBehavior(nn.Module):
     """ImagBehavior is a neural network module for imagination-based behavior generation in the DreamerV3 model.
 
-    This class implements a behavior model that uses world model predictions to generate actions and 
-    estimate values through imagination-based planning. The model consists of actor and value networks 
+    This class implements a behavior model that uses world model predictions to generate actions and
+    estimate values through imagination-based planning. The model consists of actor and value networks
     that are trained using imagined trajectories from the world model.
 
     Attributes:
@@ -383,9 +373,14 @@ class ImagBehavior(nn.Module):
         _compute_target(imag_feat, imag_state, reward): Compute target values using lambda returns
         _compute_actor_loss(imag_feat, imag_action, target, weights, base): Calculate actor loss
         _update_slow_target(): Update parameters of the slow target value network
-    """    
-        
-    def __init__(self, config: "cfg.DreamerV3Cfg", world_model, act_space):
+    """
+
+    def __init__(
+        self,
+        config: "cfg.DreamerV3Cfg",
+        world_model: WorldModel,
+        act_space: gymnasium.Space,
+    ):
         """
         Initialize the ImagBehavior class for imagination-based behavior generation.
 
@@ -417,20 +412,17 @@ class ImagBehavior(nn.Module):
             reward_ema (RewardEMA): Reward EMA calculator if enabled
         """
 
-        super(ImagBehavior, self).__init__()
+        super().__init__()
         self._use_amp = True if config.general.precision == 16 else False
         self._config = config
         self._world_model = world_model
         if config.model.dyn_discrete:
-            feat_size = (
-                config.model.dyn_stoch * config.model.dyn_discrete
-                + config.model.dyn_deter
-            )
+            feat_size = config.model.dyn_stoch * config.model.dyn_discrete + config.model.dyn_deter
         else:
             feat_size = config.model.dyn_stoch + config.model.dyn_deter
         self.actor = networks.MLP(
             feat_size,
-            ((act_space.n if hasattr(act_space, "n") else act_space.shape[0]),),
+            ((int(act_space.n) if isinstance(act_space, gymnasium.spaces.Discrete) else act_space.shape[0]),),
             config.model.actor.layers,
             config.model.units,
             config.model.act,
@@ -473,9 +465,7 @@ class ImagBehavior(nn.Module):
             config.model.actor.grad_clip,
             **kw,
         )
-        print(
-            f"Optimizer actor_opt has {sum(param.numel() for param in self.actor.parameters())} variables."
-        )
+        print(f"Optimizer actor_opt has {sum(param.numel() for param in self.actor.parameters())} variables.")
         self._value_opt = tools.Optimizer(
             "value",
             self.value.parameters(),
@@ -484,21 +474,23 @@ class ImagBehavior(nn.Module):
             config.model.critic.grad_clip,
             **kw,
         )
-        print(
-            f"Optimizer value_opt has {sum(param.numel() for param in self.value.parameters())} variables."
-        )
+        print(f"Optimizer value_opt has {sum(param.numel() for param in self.value.parameters())} variables.")
         if self._config.environment.reward_EMA:
             # register ema_vals to nn.Module for enabling torch.save and torch.load
-            self.register_buffer(
-                "ema_vals", torch.zeros((2,), device=self._config.general.device)
-            )
+            self.register_buffer("ema_vals", torch.zeros((2,), device=self._config.general.device))
             self.reward_ema = RewardEMA(device=self._config.general.device)
 
     def _train(
         self,
-        start,
-        objective,
-    ):
+        start: networks.RSSMState,
+        objective: Callable[[torch.Tensor, networks.RSSMState, torch.Tensor], torch.Tensor],
+    ) -> tuple[
+        torch.Tensor,
+        networks.RSSMState,
+        torch.Tensor,
+        torch.Tensor,
+        dict[str, float | np.ndarray],
+    ]:
         """Train the actor and value networks using imagined trajectories.
 
         Args:
@@ -536,11 +528,8 @@ class ImagBehavior(nn.Module):
                 )
                 reward = objective(imag_feat, imag_state, imag_action)
                 actor_ent = self.actor(imag_feat).entropy()
-                state_ent = self._world_model.dynamics.get_dist(imag_state).entropy()
                 # this target is not scaled by ema or sym_log.
-                target, weights, base = self._compute_target(
-                    imag_feat, imag_state, reward
-                )
+                target, weights, base = self._compute_target(imag_feat, imag_state, reward)
                 actor_loss, mets = self._compute_actor_loss(
                     imag_feat,
                     imag_action,
@@ -548,9 +537,7 @@ class ImagBehavior(nn.Module):
                     weights,
                     base,
                 )
-                actor_loss -= (
-                    self._config.model.actor.entropy * actor_ent[:-1, ..., None]
-                )
+                actor_loss -= self._config.model.actor.entropy * actor_ent[:-1, ..., None]
                 actor_loss = torch.mean(actor_loss)
                 metrics.update(mets)
                 value_input = imag_feat
@@ -571,11 +558,7 @@ class ImagBehavior(nn.Module):
         metrics.update(tools.tensorstats(target, "target"))
         metrics.update(tools.tensorstats(reward, "imag_reward"))
         if self._config.model.actor.dist in ["onehot"]:
-            metrics.update(
-                tools.tensorstats(
-                    torch.argmax(imag_action, dim=-1).float(), "imag_action"
-                )
-            )
+            metrics.update(tools.tensorstats(torch.argmax(imag_action, dim=-1).float(), "imag_action"))
         else:
             metrics.update(tools.tensorstats(imag_action, "imag_action"))
         metrics["actor_entropy"] = to_np(torch.mean(actor_ent))
@@ -584,7 +567,9 @@ class ImagBehavior(nn.Module):
             metrics.update(self._value_opt(value_loss, self.value.parameters()))
         return imag_feat, imag_state, imag_action, weights, metrics
 
-    def _imagine(self, start, policy, horizon):
+    def _imagine(
+        self, start: networks.RSSMState, policy: networks.MLP, horizon: int
+    ) -> tuple[torch.Tensor, networks.RSSMState, torch.Tensor]:
         """
         Simulates the imagination process over a given horizon using the provided policy.
 
@@ -603,7 +588,10 @@ class ImagBehavior(nn.Module):
         flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
         start = {k: flatten(v) for k, v in start.items()}
 
-        def step(prev, _):
+        def step(
+            prev: tuple[networks.RSSMState, torch.Tensor | None, torch.Tensor | None],
+            _: torch.Tensor,
+        ) -> tuple[networks.RSSMState, torch.Tensor, torch.Tensor]:
             state, _, _ = prev
             feat = dynamics.get_feat(state)
             inp = feat.detach()
@@ -611,14 +599,17 @@ class ImagBehavior(nn.Module):
             succ = dynamics.img_step(state, action)
             return succ, feat, action
 
-        succ, feats, actions = tools.static_scan(
-            step, [torch.arange(horizon)], (start, None, None)
-        )
+        succ, feats, actions = tools.static_scan(step, [torch.arange(horizon)], (start, None, None))
         states = {k: torch.cat([start[k][None], v[:-1]], 0) for k, v in succ.items()}
 
         return feats, states, actions
 
-    def _compute_target(self, imag_feat, imag_state, reward):
+    def _compute_target(
+        self,
+        imag_feat: torch.Tensor,
+        imag_state: networks.RSSMState,
+        reward: torch.Tensor,
+    ) -> tuple[tuple[torch.Tensor, ...], torch.Tensor, torch.Tensor]:
         """
         Compute the target values for training.
 
@@ -639,10 +630,7 @@ class ImagBehavior(nn.Module):
         """
         if "cont" in self._world_model.heads:
             inp = self._world_model.dynamics.get_feat(imag_state)
-            discount = (
-                self._config.model.behavior.discount
-                * self._world_model.heads["cont"](inp).mean
-            )
+            discount = self._config.model.behavior.discount * self._world_model.heads["cont"](inp).mean
         else:
             discount = self._config.model.behavior.discount * torch.ones_like(reward)
         value = self.value(imag_feat).mode()
@@ -654,19 +642,17 @@ class ImagBehavior(nn.Module):
             lambda_=self._config.model.behavior.discount_lambda,
             axis=0,
         )
-        weights = torch.cumprod(
-            torch.cat([torch.ones_like(discount[:1]), discount[:-1]], 0), 0
-        ).detach()
+        weights = torch.cumprod(torch.cat([torch.ones_like(discount[:1]), discount[:-1]], 0), 0).detach()
         return target, weights, value[:-1]
 
     def _compute_actor_loss(
         self,
-        imag_feat,
-        imag_action,
-        target,
-        weights,
-        base,
-    ):
+        imag_feat: torch.Tensor,
+        imag_action: torch.Tensor,
+        target: Sequence[torch.Tensor],
+        weights: torch.Tensor,
+        base: torch.Tensor,
+    ) -> tuple[torch.Tensor, dict[str, float | np.ndarray]]:
         """
         Compute the actor loss for the DreamerV3 model.
 
@@ -702,13 +688,11 @@ class ImagBehavior(nn.Module):
             actor_target = adv
         elif self._config.model.behavior.imag_gradient == "reinforce":
             actor_target = (
-                policy.log_prob(imag_action)[:-1][:, :, None]
-                * (target - self.value(imag_feat[:-1]).mode()).detach()
+                policy.log_prob(imag_action)[:-1][:, :, None] * (target - self.value(imag_feat[:-1]).mode()).detach()
             )
         elif self._config.model.behavior.imag_gradient == "both":
             actor_target = (
-                policy.log_prob(imag_action)[:-1][:, :, None]
-                * (target - self.value(imag_feat[:-1]).mode()).detach()
+                policy.log_prob(imag_action)[:-1][:, :, None] * (target - self.value(imag_feat[:-1]).mode()).detach()
             )
             mix = self._config.model.behavior.imag_gradient_mix
             actor_target = mix * target + (1 - mix) * actor_target
@@ -748,6 +732,6 @@ class ImagBehavior(nn.Module):
         if self._config.model.critic.slow_target:
             if self._updates % self._config.model.critic.slow_target_update == 0:
                 mix = self._config.model.critic.slow_target_fraction
-                for s, d in zip(self.value.parameters(), self._slow_value.parameters()):
+                for s, d in zip(self.value.parameters(), self._slow_value.parameters(), strict=True):
                     d.data = mix * s.data + (1 - mix) * d.data
             self._updates += 1

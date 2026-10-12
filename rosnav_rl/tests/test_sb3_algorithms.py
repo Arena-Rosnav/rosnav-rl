@@ -341,9 +341,7 @@ class TestSB3AgentCreation:
         )
         agent.initialize_model(mock_env)
 
-        assert agent.model._model is not None, (
-            f"SB3 model was not created for algorithm {arch_name}"
-        )
+        assert agent.model._model is not None, f"SB3 model was not created for algorithm {arch_name}"
 
 
 # ── Dict-parsing / auto-discovery tests ──────────────────────────────────────
@@ -415,27 +413,17 @@ class TestSB3DictParsing:
     ``type`` discriminator field.
     """
 
-    @pytest.mark.parametrize(
-        "type_tag,cfg_cls,param_cls,arch_name,param_overrides", _DICT_CASES
-    )
-    def test_algorithm_params_from_dict(
-        self, type_tag, cfg_cls, param_cls, arch_name, param_overrides
-    ):
+    @pytest.mark.parametrize("type_tag,cfg_cls,param_cls,arch_name,param_overrides", _DICT_CASES)
+    def test_algorithm_params_from_dict(self, type_tag, cfg_cls, param_cls, arch_name, param_overrides):
         """Algorithm parameter config parses correctly from a plain dict."""
         cfg = param_cls.model_validate(param_overrides)
         assert isinstance(cfg, param_cls)
         # spot-check one representative override per parametrize case
         for key, val in param_overrides.items():
-            assert getattr(cfg, key) == val, (
-                f"{param_cls.__name__}.{key} expected {val}, got {getattr(cfg, key)}"
-            )
+            assert getattr(cfg, key) == val, f"{param_cls.__name__}.{key} expected {val}, got {getattr(cfg, key)}"
 
-    @pytest.mark.parametrize(
-        "type_tag,cfg_cls,param_cls,arch_name,param_overrides", _DICT_CASES
-    )
-    def test_algorithm_cfg_from_dict(
-        self, type_tag, cfg_cls, param_cls, arch_name, param_overrides
-    ):
+    @pytest.mark.parametrize("type_tag,cfg_cls,param_cls,arch_name,param_overrides", _DICT_CASES)
+    def test_algorithm_cfg_from_dict(self, type_tag, cfg_cls, param_cls, arch_name, param_overrides):
         """Full *_Cfg envelope parses correctly from a plain dict including ``type``."""
         raw = {
             "type": type_tag,
@@ -448,9 +436,7 @@ class TestSB3DictParsing:
         assert cfg.architecture_name == arch_name
         assert cfg.type == type_tag
 
-    @pytest.mark.parametrize(
-        "type_tag,cfg_cls,param_cls,arch_name,param_overrides", _DICT_CASES
-    )
+    @pytest.mark.parametrize("type_tag,cfg_cls,param_cls,arch_name,param_overrides", _DICT_CASES)
     def test_stable_baselines_cfg_auto_discovers_algorithm(
         self, type_tag, cfg_cls, param_cls, arch_name, param_overrides
     ):
@@ -470,12 +456,8 @@ class TestSB3DictParsing:
         )
         assert isinstance(framework_cfg.algorithm.parameters, param_cls)
 
-    @pytest.mark.parametrize(
-        "type_tag,cfg_cls,param_cls,arch_name,param_overrides", _DICT_CASES
-    )
-    def test_agent_cfg_from_full_dict(
-        self, type_tag, cfg_cls, param_cls, arch_name, param_overrides, agent_state
-    ):
+    @pytest.mark.parametrize("type_tag,cfg_cls,param_cls,arch_name,param_overrides", _DICT_CASES)
+    def test_agent_cfg_from_full_dict(self, type_tag, cfg_cls, param_cls, arch_name, param_overrides, agent_state):
         """Complete AgentConfig → RL_Agent pipeline works when the entire config
         originates from a nested dict (simulating YAML file loading).
         """
@@ -499,3 +481,14 @@ class TestSB3DictParsing:
         assert agent.model is not None
         assert agent.space_manager is not None
 
+
+class TestSB3ModelStateIsolation:
+    def test_state_is_not_shared_between_instances(self, agent_state):
+        agent_a = RL_Agent(agent_state.model_copy(update={"name": "state_isolation_a"}))
+        agent_b = RL_Agent(agent_state.model_copy(update={"name": "state_isolation_b"}))
+        state_a = agent_a.model._StableBaselinesModel__state
+        state_b = agent_b.model._StableBaselinesModel__state
+
+        assert state_a is not state_b
+        assert state_a.reset_state is True
+        assert state_b.reset_state is True

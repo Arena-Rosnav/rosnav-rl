@@ -1,7 +1,14 @@
 """Resolve where trained agents live on disk."""
 
+from __future__ import annotations
+
+import importlib.resources
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rosnav_rl.cfg.agent import AgentConfig
 
 
 def find_agents_dir() -> Path:
@@ -16,6 +23,7 @@ def find_agents_dir() -> Path:
     # 2. Try to find via ament_index (arena_training package share)
     try:
         from ament_index_python.packages import get_package_share_directory
+
         at_share = Path(get_package_share_directory("arena_training"))
         # install/<pkg>/share/<pkg> -> 4 levels up is the workspace root
         ws_root = at_share.parents[3]
@@ -58,3 +66,17 @@ def resolve_agent_dir(agent_name: str) -> Path:
         f"Available agents: {[d.name for d in agents_dir.iterdir() if d.is_dir()] if agents_dir.is_dir() else '(agents dir not found)'}\n"
         f"Set ROSNAV_AGENTS_DIR environment variable to override."
     )
+
+
+def resolve_observations_config_path(spec: AgentConfig) -> Path:
+    """Resolve the observations YAML the agent was trained with, or raise FileNotFoundError."""
+    if spec.observations_config is None:
+        return Path(str(importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml"))
+
+    path = Path(spec.observations_config)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Agent '{spec.name}' was trained with observations_config='{spec.observations_config}', "
+            f"which does not exist."
+        )
+    return path

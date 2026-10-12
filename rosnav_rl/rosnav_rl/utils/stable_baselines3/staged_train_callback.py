@@ -1,10 +1,12 @@
 """StableBaselines3-specific curriculum learning callback."""
 
-from typing import Optional
-from stable_baselines3.common.callbacks import BaseCallback
-from rclpy.node import Node
+from typing import Any
 
-from rosnav_rl.utils.curriculum.curriculum_base import CurriculumBase
+from rclpy.node import Node
+from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
+
+from rosnav_rl.utils.curriculum.curriculum_base import CurriculumBase, StageInput
+from rosnav_rl.utils.stable_baselines3.callbacks import RosnavEvalCallback
 
 
 class StagedTrainCallback(CurriculumBase, BaseCallback):
@@ -20,7 +22,7 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
     def __init__(
         self,
         node: Node,
-        train_stages: dict,
+        train_stages: StageInput,
         threshold_type: str,
         upper_threshold: float,
         lower_threshold: float,
@@ -29,6 +31,7 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
         timeout: float = 5.0,
         starting_stage: int = 0,
         verbose: int = 0,
+        tm_dict: dict[str, Any] | None = None,
     ):
         """Initialize the staged training callback.
 
@@ -43,6 +46,7 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
             timeout: Timeout for ROS2 parameter service calls
             starting_stage: Initial curriculum stage index
             verbose: Verbosity level
+            tm_dict: Task modes queued before the initial stage is applied
         """
         # Initialize CurriculumBase first to satisfy its required args and
         # avoid BaseCallback.__init__ accidentally invoking CurriculumBase.__init__
@@ -58,40 +62,29 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
             timeout=timeout,
             starting_stage=starting_stage,
             verbose=verbose,
+            tm_dict=tm_dict,
         )
 
         BaseCallback.__init__(self, verbose=verbose)
 
-    def get_current_performance(self) -> Optional[float]:
+    def get_current_performance(self) -> float | None:
         """Get current performance from the parent EvalCallback.
 
         Returns:
             Current performance metric or None if not available
         """
-        if not hasattr(self, "parent") or self.parent is None:
-            return None
-
-        eval_callback = self.parent
-
-        if self.threshold_type == "rew":
-            return eval_callback.best_mean_reward
-        elif self.threshold_type == "succ":
-            return getattr(eval_callback, "last_success_rate", 0.0)
-        else:
-            return None
+        if self.threshold_type == "rew" and isinstance(self.parent, EvalCallback):
+            return self.parent.best_mean_reward
+        if self.threshold_type == "succ" and isinstance(self.parent, RosnavEvalCallback):
+            return self.parent.last_success_rate
+        return None
 
     def reset_performance_tracking(self) -> None:
         """Reset performance tracking in the parent EvalCallback."""
-        if not hasattr(self, "parent") or self.parent is None:
-            return
-
-        eval_callback = self.parent
-
-        if self.threshold_type == "rew":
-            eval_callback.best_mean_reward = float("-inf")
-        elif self.threshold_type == "succ":
-            if hasattr(eval_callback, "last_success_rate"):
-                eval_callback.last_success_rate = 0.0
+        if self.threshold_type == "rew" and isinstance(self.parent, EvalCallback):
+            self.parent.best_mean_reward = float("-inf")
+        elif self.threshold_type == "succ" and isinstance(self.parent, RosnavEvalCallback):
+            self.parent.last_success_rate = 0.0
 
     def _on_step(self) -> bool:
         """Called on each training step. Checks thresholds and updates curriculum."""

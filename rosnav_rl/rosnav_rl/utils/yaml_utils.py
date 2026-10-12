@@ -1,13 +1,16 @@
 """YAML serialisation helpers for rosnav_rl config models."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ruamel.yaml.comments import CommentedMap
+
     from rosnav_rl.cfg.agent import AgentConfig
 
 
-def agent_config_to_commented_map(agent_cfg: "AgentConfig"):
+def agent_config_to_commented_map(agent_cfg: AgentConfig) -> CommentedMap:
     """Build a structured ``ruamel.yaml`` :class:`CommentedMap` for an :class:`AgentConfig`.
 
     Extracted here so both :meth:`AgentConfig.to_yaml` and
@@ -33,9 +36,7 @@ def agent_config_to_commented_map(agent_cfg: "AgentConfig"):
     # action space
     if "action_space" in data:
         root["action_space"] = data["action_space"]
-        root.yaml_set_comment_before_after_key(
-            "action_space", before="\nAction space (derived from robot description)"
-        )
+        root.yaml_set_comment_before_after_key("action_space", before="\nAction space (derived from robot description)")
 
     # unified parameters (observation pipeline + environment/reward constants)
     if "parameters" in data:
@@ -51,9 +52,7 @@ def agent_config_to_commented_map(agent_cfg: "AgentConfig"):
 
     # framework
     root["framework"] = data["framework"]
-    root.yaml_set_comment_before_after_key(
-        "framework", before="\nRL framework configuration"
-    )
+    root.yaml_set_comment_before_after_key("framework", before="\nRL framework configuration")
 
     # reward
     if "reward" in data:

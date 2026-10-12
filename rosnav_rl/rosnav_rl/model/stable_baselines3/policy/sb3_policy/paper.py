@@ -1,19 +1,19 @@
-from typing import Type
+from typing import Any
 
+from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.base_class import BaseAlgorithm
 from torch import nn
 
 import rosnav_rl.spaces.observation_space.spaces as spaces
+from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
+    BaseObservationSpace,
+)
 
 from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
-from ..feature_extractors.classic import *
+from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_5_extended
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR
-
-from sb3_contrib import RecurrentPPO
-
-from rosnav_rl.utils.type_aliases import ObservationSpaceList, ObservationSpaceKwargs
 
 
 @AgentFactory.register("AGENT_1")
@@ -41,14 +41,14 @@ class AGENT_1(StableBaselinesPolicyDescription):
         activation_fn: The activation function used in the neural network, which is ReLU.
     """
 
-    algorithm_class: Type[BaseAlgorithm] = PPO
-    observation_space_kwargs: ObservationSpaceKwargs = {
+    algorithm_class: type[BaseAlgorithm] = PPO
+    observation_space_kwargs: dict[str, Any] = {
         "normalize": True,
         "goal_max_dist": 10,
         "subgoal_max_dist": 10,
         "reduced_num_beams": 360,
     }
-    observation_spaces: ObservationSpaceList = [
+    observation_spaces: list[type[BaseObservationSpace]] = [
         spaces.perception.ReducedLaserScanSpace,
         spaces.navigation.DistAngleToSubgoalSpace,
         spaces.dynamics.LastActionSpace,
@@ -89,7 +89,7 @@ class AGENT_2(StableBaselinesPolicyDescription):
         log_std_init (float): Initial value for the log standard deviation of the policy.
     """
 
-    algorithm_class: Type[BaseAlgorithm] = RecurrentPPO
+    algorithm_class: type[BaseAlgorithm] = RecurrentPPO
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
@@ -139,7 +139,7 @@ class AGENT_3(StableBaselinesPolicyDescription):
         log_std_init (float): Initial value for the log standard deviation, defaults to -2.0.
     """
 
-    algorithm_class: Type[BaseAlgorithm] = PPO
+    algorithm_class: type[BaseAlgorithm] = PPO
     stack_size = 10
     observation_space_kwargs = {
         "normalize": True,
@@ -190,7 +190,7 @@ class AGENT_4(StableBaselinesPolicyDescription):
         log_std_init (float): Initial value for the log standard deviation of the policy.
     """
 
-    algorithm_class: Type[BaseAlgorithm] = RecurrentPPO
+    algorithm_class: type[BaseAlgorithm] = RecurrentPPO
     stack_size = 10
     observation_space_kwargs = {
         "normalize": True,
@@ -239,7 +239,7 @@ class AGENT_5(StableBaselinesPolicyDescription):
         activation_fn (Type[nn.Module]): The activation function used in the neural network, which is ReLU.
     """
 
-    algorithm_class: Type[BaseAlgorithm] = PPO
+    algorithm_class: type[BaseAlgorithm] = PPO
     observation_spaces = [
         spaces.environment.StackedLaserMapSpace,
         spaces.environment.PedestrianVelXSpace,
@@ -296,7 +296,7 @@ class AGENT_6(StableBaselinesPolicyDescription):
         enable_critic_lstm (bool): Whether to enable LSTM for the critic.
     """
 
-    algorithm_class: Type[BaseAlgorithm] = RecurrentPPO
+    algorithm_class: type[BaseAlgorithm] = RecurrentPPO
     observation_spaces = [
         spaces.environment.StackedLaserMapSpace,
         spaces.environment.PedestrianVelXSpace,

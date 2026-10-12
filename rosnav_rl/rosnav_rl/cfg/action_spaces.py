@@ -61,16 +61,25 @@ the strategy config into a concrete ``discrete_actions`` list.  Until that call
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from collections.abc import Sequence, Sized
+from enum import StrEnum
+from typing import Annotated, Any, Literal, Protocol, List, Tuple, Optional
 
 import numpy as np
 from gymnasium import spaces
 from pydantic import BaseModel, Discriminator, Field
-from typing_extensions import Annotated
 
 
-class DiscretizationStrategy(str, Enum):
+class RobotDiscreteAction(Protocol):
+    """One entry of a robot description's ``actions.discrete`` list."""
+
+    name: str
+    linear: float
+    angular: float
+    lateral: float
+
+
+class DiscretizationStrategy(StrEnum):
     """Supported auto-discretization strategies for mobile action spaces.
 
     Attributes:
@@ -111,7 +120,6 @@ class DiscretizationCfg(BaseModel):
     strategy: DiscretizationStrategy = DiscretizationStrategy.ROBOT_DEFINED
     buckets_linear: int = Field(7, ge=2, description="Linear velocity buckets (UNIFORM / EXPONENTIAL)")
     buckets_angular: int = Field(9, ge=2, description="Angular velocity buckets (UNIFORM / EXPONENTIAL)")
-
 
 
 class BaseActionSpace(BaseModel):
@@ -169,10 +177,10 @@ class DifferentialDriveActionSpace(BaseActionSpace):
     """
 
     type: Literal["differential_drive"] = "differential_drive"
-    linear_range: Tuple[float, float] = (-0.5, 1.0)
-    angular_range: Tuple[float, float] = (-1.0, 1.0)
-    discrete_actions: Optional[List[Dict[str, Any]]] = None
-    discretization: Optional[DiscretizationCfg] = Field(
+    linear_range: tuple[float, float] = (-0.5, 1.0)
+    angular_range: tuple[float, float] = (-1.0, 1.0)
+    discrete_actions: list[dict[str, Any]] | None = None
+    discretization: DiscretizationCfg | None = Field(
         None,
         description="Auto-discretization config. Set strategy here; resolved at training time.",
     )
@@ -195,15 +203,15 @@ class DifferentialDriveActionSpace(BaseActionSpace):
 
     def decode(self, action: np.ndarray) -> np.ndarray:
         if self.is_discrete:
-            idx = int(action[0]) if hasattr(action, "__len__") else int(action)
+            idx = int(action[0]) if isinstance(action, Sized) else int(action)
             a = self.discrete_actions[idx]
             return np.array([a["linear"], 0.0, a["angular"]], dtype=np.float32)
         return np.array([action[0], 0.0, action[1]], dtype=np.float32)
 
     def resolve_discretization(
         self,
-        robot_discrete_actions: Optional[List] = None,
-    ) -> "DifferentialDriveActionSpace":
+        robot_discrete_actions: Sequence[RobotDiscreteAction] | None = None,
+    ) -> DifferentialDriveActionSpace:
         """Resolve ``discretization`` config into a concrete ``discrete_actions`` list.
 
         Called by ``_populate_agent_spec`` at training startup.  Returns a new
@@ -231,9 +239,8 @@ class DifferentialDriveActionSpace(BaseActionSpace):
 
         if strategy == DiscretizationStrategy.ROBOT_DEFINED:
             if robot_discrete_actions:
-                actions = [
-                    a.model_dump() if hasattr(a, "model_dump") else dict(a)
-                    for a in robot_discrete_actions
+                actions: list[dict[str, Any]] = [
+                    {"name": a.name, "linear": a.linear, "angular": a.angular} for a in robot_discrete_actions
                 ]
             else:
                 # No robot-defined actions — fall back to UNIFORM
@@ -262,25 +269,25 @@ class DifferentialDriveActionSpace(BaseActionSpace):
 
         return self.model_copy(update={"discrete_actions": actions, "discretization": None})
 
-    def to_discrete(
-        self, buckets_linear: int = 12, buckets_angular: int = 16
-    ) -> DifferentialDriveActionSpace:
+    def to_discrete(self, buckets_linear: int = 12, buckets_angular: int = 16) -> DifferentialDriveActionSpace:
         """Return a discretised copy using a uniform grid (legacy helper).
 
         Prefer setting ``discretization=DiscretizationCfg(strategy=...)`` in
         your config and calling ``resolve_discretization()`` instead.
         """
         return self.model_copy(
-            update={"discretization": DiscretizationCfg(
-                strategy=DiscretizationStrategy.UNIFORM,
-                buckets_linear=buckets_linear,
-                buckets_angular=buckets_angular,
-            )}
+            update={
+                "discretization": DiscretizationCfg(
+                    strategy=DiscretizationStrategy.UNIFORM,
+                    buckets_linear=buckets_linear,
+                    buckets_angular=buckets_angular,
+                )
+            }
         ).resolve_discretization()
 
     # -- legacy bridge -----------------------------------------------------
 
-    def _to_legacy_actions(self) -> Union[list, dict]:
+    def _to_legacy_actions(self) -> list[dict[str, Any]] | dict[str, Any]:
         """Convert to the format expected by the old ``ActionSpaceManager``."""
         if self.discrete_actions:
             return self.discrete_actions
@@ -300,11 +307,11 @@ class OmnidirectionalActionSpace(BaseActionSpace):
     """
 
     type: Literal["omnidirectional"] = "omnidirectional"
-    linear_range_x: Tuple[float, float] = (-1.0, 1.0)
-    linear_range_y: Tuple[float, float] = (-1.0, 1.0)
-    angular_range: Tuple[float, float] = (-1.0, 1.0)
-    discrete_actions: Optional[List[Dict[str, Any]]] = None
-    discretization: Optional[DiscretizationCfg] = Field(
+    linear_range_x: tuple[float, float] = (-1.0, 1.0)
+    linear_range_y: tuple[float, float] = (-1.0, 1.0)
+    angular_range: tuple[float, float] = (-1.0, 1.0)
+    discrete_actions: list[dict[str, Any]] | None = None
+    discretization: DiscretizationCfg | None = Field(
         None,
         description="Auto-discretization config. Set strategy here; resolved at training time.",
     )
@@ -333,17 +340,15 @@ class OmnidirectionalActionSpace(BaseActionSpace):
 
     def decode(self, action: np.ndarray) -> np.ndarray:
         if self.is_discrete:
-            idx = int(action[0]) if hasattr(action, "__len__") else int(action)
+            idx = int(action[0]) if isinstance(action, Sized) else int(action)
             a = self.discrete_actions[idx]
-            return np.array(
-                [a["linear_x"], a["linear_y"], a["angular"]], dtype=np.float32
-            )
+            return np.array([a["linear_x"], a["linear_y"], a["angular"]], dtype=np.float32)
         return np.asarray(action[:3], dtype=np.float32)
 
     def resolve_discretization(
         self,
-        robot_discrete_actions: Optional[List] = None,
-    ) -> "OmnidirectionalActionSpace":
+        robot_discrete_actions: Sequence[RobotDiscreteAction] | None = None,
+    ) -> OmnidirectionalActionSpace:
         """Resolve ``discretization`` config into a concrete ``discrete_actions`` list.
 
         For omnidirectional robots only ROBOT_DEFINED and UNIFORM are meaningful;
@@ -360,21 +365,23 @@ class OmnidirectionalActionSpace(BaseActionSpace):
 
         if strategy == DiscretizationStrategy.ROBOT_DEFINED and robot_discrete_actions:
             actions = [
-                a.model_dump() if hasattr(a, "model_dump") else dict(a)
+                {"name": a.name, "linear_x": a.linear, "linear_y": a.lateral, "angular": a.angular}
                 for a in robot_discrete_actions
             ]
         else:
-            # For omni, use uniform grid over x-range (y is treated symmetrically)
-            actions = generate_discrete_action_dict(
-                self.linear_range_x,
-                self.angular_range,
-                self.discretization.buckets_linear,
-                self.discretization.buckets_angular,
-            )
+            actions = [
+                {"name": a["name"], "linear_x": a["linear"], "linear_y": 0.0, "angular": a["angular"]}
+                for a in generate_discrete_action_dict(
+                    self.linear_range_x,
+                    self.angular_range,
+                    self.discretization.buckets_linear,
+                    self.discretization.buckets_angular,
+                )
+            ]
 
         return self.model_copy(update={"discrete_actions": actions, "discretization": None})
 
-    def _to_legacy_actions(self) -> Union[list, dict]:
+    def _to_legacy_actions(self) -> list[dict[str, Any]] | dict[str, Any]:
         if self.discrete_actions:
             return self.discrete_actions
         return {
@@ -456,8 +463,8 @@ class HumanoidActionSpace(BaseActionSpace):
 
     type: Literal["humanoid"] = "humanoid"
     locomotion_dof: int = 6
-    locomotion_range: Tuple[float, float] = (-1.0, 1.0)
-    upper_body_joint_limits: List[Tuple[float, float]] = []
+    locomotion_range: tuple[float, float] = (-1.0, 1.0)
+    upper_body_joint_limits: list[tuple[float, float]] = []
 
     @property
     def num_dof(self) -> int:
@@ -478,7 +485,7 @@ class HumanoidActionSpace(BaseActionSpace):
     def decode(self, action: np.ndarray) -> np.ndarray:
         return np.asarray(action, dtype=np.float32)
 
-    def _to_legacy_actions(self) -> dict:
+    def _to_legacy_actions(self) -> dict[str, Any]:
         return {
             "locomotion_dof": self.locomotion_dof,
             "locomotion_range": list(self.locomotion_range),
@@ -559,12 +566,6 @@ class CompositeActionSpace(BaseActionSpace):
 # =====================================================================
 
 ActionSpaceSpec = Annotated[
-    Union[
-        DifferentialDriveActionSpace,
-        OmnidirectionalActionSpace,
-        ManipulatorActionSpace,
-        HumanoidActionSpace,
-        CompositeActionSpace,
-    ],
+    DifferentialDriveActionSpace | OmnidirectionalActionSpace | ManipulatorActionSpace | HumanoidActionSpace | CompositeActionSpace,
     Discriminator("type"),
 ]

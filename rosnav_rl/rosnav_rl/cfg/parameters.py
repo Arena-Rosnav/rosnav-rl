@@ -25,7 +25,7 @@ Usage::
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -159,38 +159,23 @@ class AgentParameters(BaseModel, frozen=True):
     )
     ped_min_speed_x: float = Field(
         0.0,
-        description=(
-            "Minimum pedestrian speed along x-axis (m/s). "
-            "Used by: PedestrianSpeedXSpace (space low bound)."
-        ),
+        description=("Minimum pedestrian speed along x-axis (m/s). Used by: PedestrianSpeedXSpace (space low bound)."),
     )
     ped_max_speed_x: float = Field(
         2.0,
-        description=(
-            "Maximum pedestrian speed along x-axis (m/s). "
-            "Used by: PedestrianSpeedXSpace (space high bound)."
-        ),
+        description=("Maximum pedestrian speed along x-axis (m/s). Used by: PedestrianSpeedXSpace (space high bound)."),
     )
     ped_min_speed_y: float = Field(
         0.0,
-        description=(
-            "Minimum pedestrian speed along y-axis (m/s). "
-            "Used by: PedestrianSpeedYSpace (space low bound)."
-        ),
+        description=("Minimum pedestrian speed along y-axis (m/s). Used by: PedestrianSpeedYSpace (space low bound)."),
     )
     ped_max_speed_y: float = Field(
         2.0,
-        description=(
-            "Maximum pedestrian speed along y-axis (m/s). "
-            "Used by: PedestrianSpeedYSpace (space high bound)."
-        ),
+        description=("Maximum pedestrian speed along y-axis (m/s). Used by: PedestrianSpeedYSpace (space high bound)."),
     )
     ped_social_state_num: int = Field(
-        5,
-        description=(
-            "Number of social-state categories for pedestrian modelling. "
-            "Used by: SocialStateFeaturesSpace."
-        ),
+        6,
+        description=("Number of social-state categories for pedestrian modelling. Used by: SocialStateFeaturesSpace."),
     )
 
     # ------------------------------------------------------------------
@@ -291,7 +276,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
 
-    def observation_kwargs(self) -> dict:
+    def observation_kwargs(self) -> dict[str, Any]:
         """Return the subset of fields required by observation space constructors.
 
         Excludes fields tagged ``json_schema_extra={"group": "reward"}`` —
@@ -318,7 +303,7 @@ class AgentParameters(BaseModel, frozen=True):
         }
 
     @classmethod
-    def from_spec(cls, spec: "AgentConfig") -> "AgentParameters":
+    def from_spec(cls, spec: AgentConfig) -> AgentParameters:
         """Return the parameters from a saved :class:`~rosnav_rl.cfg.agent.AgentConfig`.
 
         Convenience method for inference-time reconstruction::

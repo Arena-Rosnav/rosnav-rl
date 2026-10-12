@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar, Type, Union
+from typing import TYPE_CHECKING, Any
 
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 
-from rosnav_rl.utils.validation import GeneratorSchemaValidator
 from rosnav_rl.utils.rostopic import Namespace
+from rosnav_rl.utils.validation import GeneratorSchemaValidator
+
 from ..data_sources.base import Collector, DataSource, Generator
 from ..factory.resolver import DependencyResolver
 from ..strategies.collector import CollectorManager
@@ -18,10 +19,10 @@ from .pipeline import ObservationPipeline
 if TYPE_CHECKING:
     from rosnav_rl.cfg.parameters import AgentParameters
 
-T = TypeVar("T")
+    from ..factory.factory import ObservationFactory
 
 
-def _import_observation_factory():
+def _import_observation_factory() -> type[ObservationFactory]:
     """Lazy import to avoid circular dependencies."""
     from ..factory.factory import ObservationFactory
 
@@ -115,16 +116,16 @@ class ObservationManager:
         - SubscriptionManager: Manages ROS subscriptions and synchronization
     """
 
-    observation_pipeline: Type[ObservationPipeline] = ObservationPipeline
+    observation_pipeline: type[ObservationPipeline] = ObservationPipeline
 
     def __init__(
         self,
         node: Node,
-        ns: Union[str, Namespace],
-        data_sources: Dict[str, DataSource],
-        simulation_state_container: AgentParameters = None,
+        ns: str | Namespace,
+        data_sources: dict[str, DataSource],
+        simulation_state_container: AgentParameters | None = None,
         wait_for_obs: bool = True,
-        qos_profile: Optional[QoSProfile] = 10,
+        qos_profile: QoSProfile | int = 10,
         enable_synchronization: bool = True,
         sync_tolerance_seconds: float = 0.1,
         buffer_size: int = 50,
@@ -149,6 +150,7 @@ class ObservationManager:
         """
         if simulation_state_container is None:
             from rosnav_rl.cfg.parameters import AgentParameters  # noqa: PLC0415
+
             simulation_state_container = AgentParameters()
             logging.getLogger(__name__).warning(
                 "No AgentParameters provided to ObservationManager. "
@@ -163,23 +165,15 @@ class ObservationManager:
         self._validate_generators = validate_generators
 
         # Separate collectors and generators
-        self._collectors = {
-            name: ds for name, ds in data_sources.items() if isinstance(ds, Collector)
-        }
-        self._generators = {
-            name: ds for name, ds in data_sources.items() if isinstance(ds, Generator)
-        }
+        self._collectors = {name: ds for name, ds in data_sources.items() if isinstance(ds, Collector)}
+        self._generators = {name: ds for name, ds in data_sources.items() if isinstance(ds, Generator)}
 
         # Dependency resolver for generators
-        self._dependency_resolver = DependencyResolver(
-            self._generators, self._collectors
-        )
+        self._dependency_resolver = DependencyResolver(self._generators, self._collectors)
 
         # Validate generator dependencies during initialization
         if self._validate_generators:
-            GeneratorSchemaValidator.validate_configuration_dependencies(
-                self._generators, self._collectors
-            )
+            GeneratorSchemaValidator.validate_configuration_dependencies(self._generators, self._collectors)
 
         # Initialize strategy components
         self._subscription_manager = SubscriptionManager(
@@ -215,12 +209,12 @@ class ObservationManager:
     @classmethod
     def from_config(
         cls,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         node: Node,
-        ns: Union[str, Namespace],
-        simulation_state_container: AgentParameters = None,
-        **manager_kwargs,
-    ) -> "ObservationManager":
+        ns: str | Namespace,
+        simulation_state_container: AgentParameters | None = None,
+        **manager_kwargs: Any,
+    ) -> ObservationManager:
         """
         Create an ObservationManager from a configuration dictionary.
 
@@ -349,24 +343,21 @@ class ObservationManager:
     def _setup_collectors(self) -> None:
         """Set up ROS2 subscribers for collector data sources."""
 
-        def _observation_callback(msg: Any, collector: Collector) -> None:
+        def _observation_callback(msg: object, collector: Collector) -> None:
             """Process incoming messages for individual collectors."""
             try:
                 with self._subscription_manager.lock:
                     collector.update(msg)
                     self._logger.debug(
-                        f"✓ Collector '{collector.name}' updated successfully "
-                        f"(count={collector.update_count})"
+                        f"✓ Collector '{collector.name}' updated successfully (count={collector.update_count})"
                     )
             except Exception as e:
                 self._logger.error(f"Error updating collector '{collector.name}': {e}")
 
-        def _synchronized_callback(*msgs: Any) -> None:
+        def _synchronized_callback(*msgs: object) -> None:
             """Callback for synchronized messages from message_filters."""
             with self._subscription_manager.lock:
-                for collector_name, msg in zip(
-                    self._subscription_manager.sync_collector_names, msgs
-                ):
+                for collector_name, msg in zip(self._subscription_manager.sync_collector_names, msgs, strict=True):
                     try:
                         collector = self._collectors[collector_name]
                         collector.update(msg)
@@ -375,9 +366,7 @@ class ObservationManager:
                             f"(count={collector.update_count})"
                         )
                     except Exception as e:
-                        self._logger.error(
-                            f"Error updating synchronized collector '{collector_name}': {e}"
-                        )
+                        self._logger.error(f"Error updating synchronized collector '{collector_name}': {e}")
 
         self._subscription_manager.setup_collectors(
             self._collectors,
@@ -385,7 +374,7 @@ class ObservationManager:
             _synchronized_callback,
         )
 
-    def get_observations(self, **extra_observations) -> Dict[str, Any]:
+    def get_observations(self, **extra_observations: Any) -> dict[str, Any]:
         """
         Collect all observations from collectors and generators using the elegant pipeline.
 
@@ -401,7 +390,7 @@ class ObservationManager:
             extra_observations=extra_observations,
         )
 
-    def get_health_status(self) -> Dict[str, Dict[str, Any]]:
+    def get_health_status(self) -> dict[str, dict[str, Any]]:
         """Get health status for all collectors."""
         health_status = {}
         for name, collector in self._collectors.items():
@@ -420,15 +409,15 @@ class ObservationManager:
         self._logger.info("ObservationManager shutdown complete")
 
     @property
-    def collectors(self) -> List[str]:
+    def collectors(self) -> list[str]:
         """Returns the names of all collectors."""
         return list(self._collectors.keys())
 
     @property
-    def generators(self) -> List[str]:
+    def generators(self) -> list[str]:
         """Returns the names of all generators."""
         return list(self._generators.keys())
 
-    def get_dependency_info(self) -> Dict[str, Any]:
+    def get_dependency_info(self) -> dict[str, Any]:
         """Get debugging information about generator dependencies."""
         return self._dependency_resolver.get_dependency_info()

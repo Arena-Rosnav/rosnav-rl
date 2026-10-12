@@ -1,4 +1,5 @@
-from typing import Dict, Any, List
+from typing import Any
+
 from ..data_sources.base import Collector, Generator
 
 
@@ -11,16 +12,14 @@ class DependencyMissingError(Exception):
 class DependencyResolver:
     """Handles dependency resolution and execution ordering for generators."""
 
-    def __init__(
-        self, generators: Dict[str, Generator], collectors: Dict[str, Collector]
-    ):
+    def __init__(self, generators: dict[str, Generator], collectors: dict[str, Collector]):
         self.generators = generators
         self.collectors = collectors
 
         self._validate_configuration()
         self.execution_order = self._resolve_dependencies()
 
-    def get_dependency_info(self) -> Dict[str, Any]:
+    def get_dependency_info(self) -> dict[str, Any]:
         """Get debugging information about dependencies."""
         info = {
             "execution_order": self.execution_order,
@@ -42,7 +41,7 @@ class DependencyResolver:
 
         return info
 
-    def _resolve_dependencies(self) -> List[str]:
+    def _resolve_dependencies(self) -> list[str]:
         """Resolve generator dependencies using topological sorting."""
         # Build dependency graph: generator_name -> set of generators it depends on
         dependencies = {name: set() for name in self.generators.keys()}
@@ -76,9 +75,7 @@ class DependencyResolver:
         # Check for circular dependencies
         if len(result) != len(self.generators):
             remaining = set(self.generators.keys()) - set(result)
-            raise ValueError(
-                f"Circular dependency detected among generators: {remaining}"
-            )
+            raise ValueError(f"Circular dependency detected among generators: {remaining}")
 
         return result
 
@@ -89,13 +86,8 @@ class DependencyResolver:
                 # Validate required dependencies exist
                 missing_deps = []
                 for req_key in ds.requires.keys():
-                    if (
-                        req_key not in self.collectors
-                        and req_key not in self.generators
-                    ):
+                    if req_key not in self.collectors and req_key not in self.generators:
                         missing_deps.append(req_key)
 
                 if missing_deps:
-                    raise DependencyMissingError(
-                        f"Generator '{name}' missing dependencies: {missing_deps}"
-                    )
+                    raise DependencyMissingError(f"Generator '{name}' missing dependencies: {missing_deps}")

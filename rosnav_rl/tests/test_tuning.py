@@ -13,6 +13,7 @@ Tests cover:
 from __future__ import annotations
 
 import copy
+import importlib.util
 from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import MagicMock
@@ -33,24 +34,21 @@ from rosnav_rl.tuning.search_space import (
 )
 
 
+requires_optuna = pytest.mark.skipif(
+    importlib.util.find_spec("optuna") is None, reason="optuna is in the tuning dependency group"
+)
+
+
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
 def sample_search_space() -> SearchSpace:
     return {
-        "agent_cfg.framework.algorithm.parameters.learning_rate": FloatParam(
-            low=1e-5, high=1e-3, log=True
-        ),
-        "agent_cfg.framework.algorithm.parameters.n_steps": IntParam(
-            low=128, high=4096, step=128
-        ),
-        "agent_cfg.framework.algorithm.parameters.gamma": FloatParam(
-            low=0.9, high=0.9999
-        ),
-        "agent_cfg.framework.algorithm.parameters.batch_size": CategoricalParam(
-            choices=[64, 128, 256, 512]
-        ),
+        "agent_cfg.framework.algorithm.parameters.learning_rate": FloatParam(low=1e-5, high=1e-3, log=True),
+        "agent_cfg.framework.algorithm.parameters.n_steps": IntParam(low=128, high=4096, step=128),
+        "agent_cfg.framework.algorithm.parameters.gamma": FloatParam(low=0.9, high=0.9999),
+        "agent_cfg.framework.algorithm.parameters.batch_size": CategoricalParam(choices=[64, 128, 256, 512]),
     }
 
 
@@ -142,9 +140,7 @@ class TestSearchSpaceModels:
         from rosnav_rl.tuning.search_space import SearchParam
 
         adapter = TypeAdapter(SearchParam)
-        result = adapter.validate_python(
-            {"type": "categorical", "choices": [1, 2, 3]}
-        )
+        result = adapter.validate_python({"type": "categorical", "choices": [1, 2, 3]})
         assert isinstance(result, CategoricalParam)
 
 
@@ -199,9 +195,7 @@ class TestTuningCfg:
         }
         cfg = TuningCfg.model_validate(data)
         assert cfg.n_trials == 10
-        lr_param = cfg.search_space[
-            "agent_cfg.framework.algorithm.parameters.learning_rate"
-        ]
+        lr_param = cfg.search_space["agent_cfg.framework.algorithm.parameters.learning_rate"]
         assert isinstance(lr_param, FloatParam)
         assert lr_param.log is True
 
@@ -287,19 +281,9 @@ class TestApplyParams:
             "agent_cfg.framework.algorithm.parameters.learning_rate": 1e-4,
         }
         result = apply_params(nested_config, params)
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"][
-                "learning_rate"
-            ]
-            == 1e-4
-        )
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["learning_rate"] == 1e-4
         # Original should be unchanged
-        assert (
-            nested_config["agent_cfg"]["framework"]["algorithm"]["parameters"][
-                "learning_rate"
-            ]
-            == 3e-4
-        )
+        assert nested_config["agent_cfg"]["framework"]["algorithm"]["parameters"]["learning_rate"] == 3e-4
 
     def test_multiple_overrides(self, nested_config):
         params = {
@@ -308,32 +292,16 @@ class TestApplyParams:
             "agent_cfg.framework.algorithm.parameters.gamma": 0.999,
         }
         result = apply_params(nested_config, params)
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"][
-                "learning_rate"
-            ]
-            == 1e-4
-        )
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_steps"]
-            == 512
-        )
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["gamma"]
-            == 0.999
-        )
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["learning_rate"] == 1e-4
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_steps"] == 512
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["gamma"] == 0.999
 
     def test_nested_reward_override(self, nested_config):
         params = {
             "agent_cfg.reward.reward_function_dict.goal_reached.reward": 20.0,
         }
         result = apply_params(nested_config, params)
-        assert (
-            result["agent_cfg"]["reward"]["reward_function_dict"]["goal_reached"][
-                "reward"
-            ]
-            == 20.0
-        )
+        assert result["agent_cfg"]["reward"]["reward_function_dict"]["goal_reached"]["reward"] == 20.0
 
     def test_deep_copy(self, nested_config):
         """Ensure apply_params does not mutate the original config."""
@@ -347,17 +315,13 @@ class TestApplyParams:
 
     def test_missing_intermediate_key_raises(self, nested_config):
         with pytest.raises(KeyError, match="nonexistent"):
-            apply_params(
-                nested_config, {"agent_cfg.nonexistent.key": "value"}
-            )
+            apply_params(nested_config, {"agent_cfg.nonexistent.key": "value"})
 
     def test_missing_final_key_raises(self, nested_config):
         with pytest.raises(KeyError, match="nonexistent_param"):
             apply_params(
                 nested_config,
-                {
-                    "agent_cfg.framework.algorithm.parameters.nonexistent_param": 42
-                },
+                {"agent_cfg.framework.algorithm.parameters.nonexistent_param": 42},
             )
 
     def test_empty_params(self, nested_config):
@@ -371,10 +335,7 @@ class TestApplyParams:
         }
         result = apply_params(nested_config, params)
         # n_epochs should still be 10
-        assert (
-            result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_epochs"]
-            == 10
-        )
+        assert result["agent_cfg"]["framework"]["algorithm"]["parameters"]["n_epochs"] == 10
 
 
 # ── TrialPrunerBase ───────────────────────────────────────────────────────────
@@ -412,6 +373,7 @@ class TestTrialPrunerBase:
         pruner = _DummyPruner(trial)
         assert pruner.best_metric is None
 
+    @requires_optuna
     def test_report_metric_updates_best(self):
         trial = self._make_trial()
         pruner = _DummyPruner(trial)
@@ -425,6 +387,7 @@ class TestTrialPrunerBase:
         pruner.report_metric(7.0)
         assert pruner.best_metric == 7.0
 
+    @requires_optuna
     def test_report_metric_calls_trial_report(self):
         trial = self._make_trial()
         pruner = _DummyPruner(trial)
@@ -436,6 +399,7 @@ class TestTrialPrunerBase:
         assert trial.report.call_count == 2
         trial.report.assert_called_with(43.0, step=1)
 
+    @requires_optuna
     def test_report_metric_increments_step(self):
         trial = self._make_trial()
         pruner = _DummyPruner(trial)
@@ -445,6 +409,7 @@ class TestTrialPrunerBase:
 
         assert pruner._report_step == 5
 
+    @requires_optuna
     def test_report_metric_raises_on_prune(self):
         import optuna
 
@@ -462,6 +427,7 @@ class TestTrialPrunerBase:
         assert result is True
         trial.report.assert_not_called()
 
+    @requires_optuna
     def test_check_and_report_reports_value(self):
         trial = self._make_trial()
         pruner = _DummyPruner(trial)
@@ -556,6 +522,7 @@ class TestSB3TrialPruner:
 
         assert pruner.read_metric() is None
 
+    @requires_optuna
     def test_on_rollout_end_reports(self):
         """_on_rollout_end triggers check_and_report when report_freq=0."""
         import optuna
@@ -601,36 +568,40 @@ class TestDreamerV3TrialPruner:
         pruner = DreamerV3TrialPruner(trial)
         assert pruner.read_metric() is None
 
+    @requires_optuna
     def test_after_eval_hook_stores_value(self):
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(123.4)
+        pruner.after_eval_hook({"eval_return": 123.4})
         assert pruner.read_metric() == 123.4
 
+    @requires_optuna
     def test_after_eval_hook_reports_to_optuna(self):
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(10.0)
+        pruner.after_eval_hook({"eval_return": 10.0})
         trial.report.assert_called_once_with(10.0, step=0)
 
-        pruner.after_eval_hook(20.0)
+        pruner.after_eval_hook({"eval_return": 20.0})
         trial.report.assert_called_with(20.0, step=1)
 
+    @requires_optuna
     def test_after_eval_hook_tracks_best(self):
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(5.0)
+        pruner.after_eval_hook({"eval_return": 5.0})
         assert pruner.best_metric == 5.0
 
-        pruner.after_eval_hook(3.0)
+        pruner.after_eval_hook({"eval_return": 3.0})
         assert pruner.best_metric == 5.0
 
-        pruner.after_eval_hook(8.0)
+        pruner.after_eval_hook({"eval_return": 8.0})
         assert pruner.best_metric == 8.0
 
+    @requires_optuna
     def test_after_eval_hook_prunes(self):
         import optuna
 
@@ -638,38 +609,63 @@ class TestDreamerV3TrialPruner:
         pruner = DreamerV3TrialPruner(trial)
 
         with pytest.raises(optuna.TrialPruned):
-            pruner.after_eval_hook(1.0)
+            pruner.after_eval_hook({"eval_return": 1.0})
 
+    @requires_optuna
     def test_multiple_evals_increment_step(self):
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
         for i in range(5):
-            pruner.after_eval_hook(float(i))
+            pruner.after_eval_hook({"eval_return": float(i)})
 
         assert pruner._report_step == 5
         # Last call should have step=4
         trial.report.assert_called_with(4.0, step=4)
 
+    @requires_optuna
     def test_negative_returns(self):
         """Pruner handles negative eval_return correctly."""
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(-10.0)
+        pruner.after_eval_hook({"eval_return": -10.0})
         assert pruner.best_metric == -10.0
 
-        pruner.after_eval_hook(-5.0)
+        pruner.after_eval_hook({"eval_return": -5.0})
         assert pruner.best_metric == -5.0  # -5 > -10
 
+    @requires_optuna
     def test_check_and_report_after_hook(self):
         """check_and_report returns the stored hook value."""
         trial = self._make_trial()
         pruner = DreamerV3TrialPruner(trial)
 
-        pruner.after_eval_hook(42.0)
+        pruner.after_eval_hook({"eval_return": 42.0})
         # Manually call check_and_report — should use the stored value
         result = pruner.check_and_report()
         assert result is True
         # report called twice: once from after_eval_hook, once from check_and_report
         assert trial.report.call_count == 2
+
+    @requires_optuna
+    def test_after_eval_hook_reports_configured_metric(self):
+        import optuna
+
+        study = optuna.create_study(direction="maximize")
+        pruner = DreamerV3TrialPruner(study.ask(), metric="eval_success_rate")
+
+        pruner.after_eval_hook({"eval_return": 42.0, "eval_success_rate": 0.75})
+
+        assert pruner.read_metric() == 0.75
+        assert pruner.best_metric == 0.75
+        assert study.trials[0].intermediate_values == {0: 0.75}
+
+    @requires_optuna
+    def test_after_eval_hook_raises_on_missing_metric(self):
+        import optuna
+
+        pruner = DreamerV3TrialPruner(optuna.create_study().ask(), metric="eval_success_rate")
+
+        with pytest.raises(KeyError):
+            pruner.after_eval_hook({"eval_return": 42.0})

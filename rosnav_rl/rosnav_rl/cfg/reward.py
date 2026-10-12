@@ -1,8 +1,9 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any
+
 from pydantic import BaseModel
 
-RewardUnitDict = Dict[str, Any]
-RewardFunctionDict = Dict[str, RewardUnitDict]
+RewardUnitDict = dict[str, Any]
+RewardFunctionDict = dict[str, RewardUnitDict]
 
 
 class RewardCfg(BaseModel):
@@ -22,5 +23,5 @@ class RewardCfg(BaseModel):
     """
 
     reward_function_dict: RewardFunctionDict
-    reward_unit_kwargs: Optional[dict] = None
-    verbose: Optional[Union[bool, int]] = False
+    reward_unit_kwargs: dict[str, Any] | None = None
+    verbose: bool | int = 0

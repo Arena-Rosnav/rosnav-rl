@@ -47,6 +47,7 @@ from rosnav_rl.observations.data_sources.generators import (
 #  Helper — create structured numpy pose
 # =====================================================================
 
+
 def make_pose(x, y, yaw):
     """Create structured numpy array with Pose2DType dtype."""
     p = np.zeros(1, dtype=Pose2DType)[0]
@@ -59,6 +60,7 @@ def make_pose(x, y, yaw):
 # =====================================================================
 #  get_relative_pos_to_robot  (utility function)
 # =====================================================================
+
 
 class TestGetRelativePosToRobot:
     def test_identity_transform(self):
@@ -115,11 +117,13 @@ class TestGetRelativePosToRobot:
     def test_multiple_points(self):
         """Multiple points transformed at once."""
         robot = make_pose(0.0, 0.0, 0.0)
-        points = np.array([
-            [1.0, 0.0, 1.0],
-            [0.0, 1.0, 1.0],
-            [-1.0, -1.0, 1.0],
-        ])
+        points = np.array(
+            [
+                [1.0, 0.0, 1.0],
+                [0.0, 1.0, 1.0],
+                [-1.0, -1.0, 1.0],
+            ]
+        )
 
         result = get_relative_pos_to_robot(robot, points)
 
@@ -150,6 +154,7 @@ class TestGetRelativePosToRobot:
 # =====================================================================
 #  get_relative_vel_to_robot  (utility function)
 # =====================================================================
+
 
 class TestGetRelativeVelToRobot:
     def test_identity_rotation(self):
@@ -192,6 +197,7 @@ class TestGetRelativeVelToRobot:
 # =====================================================================
 #  GoalLocationInRobotFrameGenerator
 # =====================================================================
+
 
 class TestGoalLocationInRobotFrameGenerator:
     def test_goal_ahead(self):
@@ -243,6 +249,7 @@ class TestGoalLocationInRobotFrameGenerator:
 #  SubgoalLocationInRobotFrameGenerator
 # =====================================================================
 
+
 class TestSubgoalLocationInRobotFrameGenerator:
     def test_subgoal_transform(self):
         gen = SubgoalLocationInRobotFrameGenerator(name="test_subgoal")
@@ -263,6 +270,7 @@ class TestSubgoalLocationInRobotFrameGenerator:
 # =====================================================================
 #  DistAngleToGoalGenerator
 # =====================================================================
+
 
 class TestDistAngleToGoalGenerator:
     def test_goal_ahead(self):
@@ -335,6 +343,7 @@ class TestDistAngleToGoalGenerator:
 #  DistAngleToSubgoalGenerator
 # =====================================================================
 
+
 class TestDistAngleToSubgoalGenerator:
     def test_subgoal_metrics(self):
         gen = DistAngleToSubgoalGenerator(name="test_dist_angle_sub")
@@ -353,6 +362,7 @@ class TestDistAngleToSubgoalGenerator:
 # =====================================================================
 #  LaserSafeDistanceGenerator
 # =====================================================================
+
 
 class TestLaserSafeDistanceGenerator:
     def test_safe(self):
@@ -408,6 +418,7 @@ class TestLaserSafeDistanceGenerator:
 #  PedestrianRelativeLocationGenerator
 # =====================================================================
 
+
 class TestPedestrianRelativeLocationGenerator:
     def test_basic_transform(self):
         gen = PedestrianRelativeLocationGenerator(name="test_ped_rel")
@@ -446,10 +457,12 @@ class TestPedestrianRelativeLocationGenerator:
         robot_pose = make_pose(0.0, 0.0, 0.0)
         sim = SimulationStateContainerStub()
 
-        people_data = People(people=[
-            Person(position=Point(x=1.0, y=2.0)),
-            Person(position=Point(x=-1.0, y=3.0)),
-        ])
+        people_data = People(
+            people=[
+                Person(position=Point(x=1.0, y=2.0)),
+                Person(position=Point(x=-1.0, y=3.0)),
+            ]
+        )
 
         result = gen._generate(
             robot_pose=robot_pose,
@@ -464,18 +477,18 @@ class TestPedestrianRelativeLocationGenerator:
         robot_pose = make_pose(0.0, 0.0, 0.0)
         sim = SimulationStateContainerStub()
 
-        people_data = People(people=[
-            Person(position=Point(x=1.0, y=0.0)),
-        ])
+        people_data = People(
+            people=[
+                Person(position=Point(x=1.0, y=0.0)),
+            ]
+        )
 
         # First call creates buffers
-        gen._generate(robot_pose=robot_pose, people_data=people_data,
-                      simulation_state_container=sim)
+        gen._generate(robot_pose=robot_pose, people_data=people_data, simulation_state_container=sim)
         buf1 = gen._pose_buffer
 
         # Second call with same number should reuse buffers
-        gen._generate(robot_pose=robot_pose, people_data=people_data,
-                      simulation_state_container=sim)
+        gen._generate(robot_pose=robot_pose, people_data=people_data, simulation_state_container=sim)
         buf2 = gen._pose_buffer
 
         assert buf1 is buf2
@@ -498,15 +511,18 @@ class TestPedestrianRelativeLocationGenerator:
 #  PedestrianLocationGenerator
 # =====================================================================
 
+
 class TestPedestrianLocationGenerator:
     def test_world_locations(self):
         gen = PedestrianLocationGenerator(name="test_ped_world")
         sim = SimulationStateContainerStub()
 
-        people_data = People(people=[
-            Person(position=Point(x=1.0, y=2.0)),
-            Person(position=Point(x=3.0, y=4.0)),
-        ])
+        people_data = People(
+            people=[
+                Person(position=Point(x=1.0, y=2.0)),
+                Person(position=Point(x=3.0, y=4.0)),
+            ]
+        )
 
         result = gen._generate(people_data=people_data, simulation_state_container=sim)
 
@@ -525,6 +541,7 @@ class TestPedestrianLocationGenerator:
 # =====================================================================
 #  PedestrianRelativeVelGenerator
 # =====================================================================
+
 
 class TestPedestrianRelativeVelGenerator:
     def test_velocity_transform(self):
@@ -561,6 +578,7 @@ class TestPedestrianRelativeVelGenerator:
 # =====================================================================
 #  PedestrianRelativeVelXGenerator / VelYGenerator
 # =====================================================================
+
 
 class TestPedestrianVelComponentGenerators:
     def test_vel_x_extraction(self):
@@ -614,16 +632,19 @@ class TestPedestrianVelComponentGenerators:
 #  PedestrianDistanceGenerator
 # =====================================================================
 
+
 class TestPedestrianDistanceGenerator:
     def test_basic_distances(self):
         gen = PedestrianDistanceGenerator(name="test_ped_dist")
         sim = SimulationStateContainerStub()
 
         locations = np.array([[3.0, 4.0], [1.0, 0.0]])
-        people = People(people=[
-            Person(name="a", tags=["1"], tagnames=["group_id"]),
-            Person(name="b", tags=["2"], tagnames=["group_id"]),
-        ])
+        people = People(
+            people=[
+                Person(name="a", tags=["1"], tagnames=["group_id"]),
+                Person(name="b", tags=["2"], tagnames=["group_id"]),
+            ]
+        )
 
         result = gen._generate(
             pedestrian_relative_locations=locations,
@@ -641,10 +662,12 @@ class TestPedestrianDistanceGenerator:
         sim = SimulationStateContainerStub()
 
         locations = np.array([[3.0, 4.0], [1.0, 0.0]])  # dist: 5.0, 1.0
-        people = People(people=[
-            Person(name="a", tags=["1"], tagnames=["group_id"]),
-            Person(name="b", tags=["1"], tagnames=["group_id"]),
-        ])
+        people = People(
+            people=[
+                Person(name="a", tags=["1"], tagnames=["group_id"]),
+                Person(name="b", tags=["1"], tagnames=["group_id"]),
+            ]
+        )
 
         result = gen._generate(
             pedestrian_relative_locations=locations,
@@ -671,9 +694,11 @@ class TestPedestrianDistanceGenerator:
         sim = SimulationStateContainerStub()
 
         locations = np.array([[1.0, 0.0]])
-        people = People(people=[
-            Person(name="a", tags=["foo"], tagnames=["other_tag"]),
-        ])
+        people = People(
+            people=[
+                Person(name="a", tags=["foo"], tagnames=["other_tag"]),
+            ]
+        )
 
         result = gen._generate(
             pedestrian_relative_locations=locations,
@@ -689,6 +714,7 @@ class TestPedestrianDistanceGenerator:
 #  Integration: goal transform pipeline
 # =====================================================================
 
+
 class TestGoalPipeline:
     """Test the full pipeline: pose → relative position → dist/angle."""
 
@@ -701,7 +727,8 @@ class TestGoalPipeline:
         # Step 1: Goal in robot frame
         gen1 = GoalLocationInRobotFrameGenerator(name="goal_rf")
         goal_rf = gen1._generate(
-            robot_pose=robot_pose, goal_pose=goal_pose,
+            robot_pose=robot_pose,
+            goal_pose=goal_pose,
             simulation_state_container=sim,
         )
 
@@ -723,7 +750,8 @@ class TestGoalPipeline:
 
         gen1 = GoalLocationInRobotFrameGenerator(name="goal_rf")
         goal_rf = gen1._generate(
-            robot_pose=robot_pose, goal_pose=goal_pose,
+            robot_pose=robot_pose,
+            goal_pose=goal_pose,
             simulation_state_container=sim,
         )
 

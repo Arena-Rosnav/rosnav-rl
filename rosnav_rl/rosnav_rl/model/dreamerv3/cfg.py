@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import ClassVar, List, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel
-from typing_extensions import Literal
 
 from rosnav_rl.cfg.framework import FrameworkCfg
 from rosnav_rl.utils.type_aliases.rl_frameworks import SupportedRLFrameworks
@@ -31,11 +30,11 @@ class GeneralCfg(BaseModel):
         video_pred_log (bool): Whether to log video predictions. Defaults to True.
     """
 
-    logdir: Optional[Union[str, Path]] = None  # Set by trainer; override for custom path
-    traindir: Optional[Union[str, Path]] = None
-    evaldir: Optional[Union[str, Path]] = None
-    offline_traindir: Union[str, Path] = ""
-    offline_evaldir: Union[str, Path] = ""
+    logdir: str | Path | None = None  # Set by trainer; override for custom path
+    traindir: Path | None = None
+    evaldir: Path | None = None
+    offline_traindir: str = ""
+    offline_evaldir: str = ""
     seed: int = 0
     deterministic_run: bool = False
     parallel: bool = True
@@ -75,8 +74,8 @@ class EncoderCfg(BaseModel):
     which can process both MLP and CNN inputs.
 
     Attributes:
-        mlp_keys (str): Observation Keys from EncodedObsDict considered for MLP inputs. Default: "$^" (empty pattern)
-        cnn_keys (str): Observation Keys from EncodedObsDict considered for CNN inputs. Default: "image"
+        mlp_keys (str): Observation Keys from EncodedObsDict considered for MLP inputs.
+        cnn_keys (str): Observation Keys from EncodedObsDict considered for CNN inputs.
         act (str): Activation function to use. Default: "SiLU"
         norm (bool): Whether to use normalization. Default: True
         cnn_depth (int): Number of channels in CNN layers. Default: 32
@@ -87,9 +86,9 @@ class EncoderCfg(BaseModel):
         symlog_inputs (bool): Whether to apply symmetric log transformation to inputs. Default: True
     """
 
-    mlp_keys: str = "DIST_ANGLE_TO_SUBGOAL"
+    mlp_keys: str = "DistAngleToGoalSpace|LastActionSpace"
     cnn_keys: str = (
-        "PEDESTRIAN_SOCIAL_STATE|PEDESTRIAN_TYPE|PEDESTRIAN_VEL_X|PEDESTRIAN_VEL_Y|STACKED_LASER_MAP"
+        "LaserCartesianMapSpace|PedestrianVelXSpace|PedestrianVelYSpace|PedestrianTypeSpace|PedestrianSocialStateSpace"
     )
     act: str = "SiLU"
     norm: bool = True
@@ -109,8 +108,8 @@ class DecoderCfg(BaseModel):
     both CNN-based (image) and MLP-based (vector) inputs.
 
     Attributes:
-        mlp_keys (str): Observation Keys from EncodedObsDict considered for MLP inputs. Default: "$^" (empty pattern)
-        cnn_keys (str): Observation Keys from EncodedObsDict considered for CNN inputs. Default: "image"
+        mlp_keys (str): Observation Keys from EncodedObsDict considered for MLP inputs.
+        cnn_keys (str): Observation Keys from EncodedObsDict considered for CNN inputs.
         act (str): Activation function, default "SiLU".
         norm (bool): Whether to use normalization, default True.
         cnn_depth (int): Base depth for CNN layers, default 32.
@@ -124,9 +123,9 @@ class DecoderCfg(BaseModel):
         outscale (float): Output scaling factor, default 1.0.
     """
 
-    mlp_keys: str = "DIST_ANGLE_TO_SUBGOAL"
+    mlp_keys: str = "DistAngleToGoalSpace"
     cnn_keys: str = (
-        "PEDESTRIAN_SOCIAL_STATE|PEDESTRIAN_TYPE|PEDESTRIAN_VEL_X|PEDESTRIAN_VEL_Y|STACKED_LASER_MAP"
+        "LaserCartesianMapSpace|PedestrianVelXSpace|PedestrianVelYSpace|PedestrianTypeSpace|PedestrianSocialStateSpace"
     )
     act: str = "SiLU"
     norm: bool = True
@@ -328,7 +327,7 @@ class ModelCfg(BaseModel):
     dyn_mean_act: str = "none"
     dyn_std_act: str = "sigmoid2"
     dyn_min_std: float = 0.1
-    grad_heads: List[str] = ["decoder", "reward", "cont"]
+    grad_heads: list[str] = ["decoder", "reward", "cont"]
     units: int = 128
     act: str = "SiLU"
     norm: bool = True

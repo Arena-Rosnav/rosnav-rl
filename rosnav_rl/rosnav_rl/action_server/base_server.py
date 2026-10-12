@@ -13,7 +13,7 @@ from rosnav_rl.utils.type_aliases import ObservationDict
 
 
 class ObservationCollector(Protocol):
-    def get_observations(self, *args, **kwargs) -> ObservationDict: ...
+    def get_observations(self) -> ObservationDict: ...
 
 
 class ActionServer(ABC):
@@ -24,10 +24,10 @@ class ActionServer(ABC):
         observation_collector (ObservationCollector): The observation collector for gathering environment observations.
     """
 
-    agent: RL_Agent = None
-    observation_collector: ObservationCollector = None
+    agent: RL_Agent | None = None
+    observation_collector: ObservationCollector | None = None
 
-    def __init__(self, agent_name: str, namespace: str = "", node: Node = None) -> None:
+    def __init__(self, agent_name: str, namespace: str = "", node: Node | None = None) -> None:
         """
         Initializes the BaseServer.
 
@@ -67,7 +67,7 @@ class ActionServer(ABC):
             "get_command",
             self.__handle_next_action_srv,
         )
-        #TODO: Adjust episode reset trigger
+        # TODO: Adjust episode reset trigger
         self._sub_reset_stacked_obs = self.node.create_subscription(
             Int16,
             "/scenario_reset",
@@ -77,7 +77,7 @@ class ActionServer(ABC):
 
     def __handle_next_action_srv(
         self, request: GetCommand.Request, response: GetCommand.Response
-    ):
+    ) -> GetCommand.Response:
         """
         Handles the service request to get the next action.
 
@@ -97,15 +97,12 @@ class ActionServer(ABC):
         response.action_type = action_space_spec.type
 
         try:
-            action = self.agent.get_action(
-                self.observation_collector.get_observations()
-            )
+            action = self.agent.get_action(self.observation_collector.get_observations())
         except Exception as exc:
             # Gracefully handle transient observation failures (e.g. missing
             # topic data at startup) instead of crashing the whole node.
             self.logger.warn(
-                f"[Rosnav-RL] get_action failed — returning empty command. "
-                f"Reason: {type(exc).__name__}: {exc}"
+                f"[Rosnav-RL] get_action failed — returning empty command. Reason: {type(exc).__name__}: {exc}"
             )
             return response
 
@@ -124,7 +121,7 @@ class ActionServer(ABC):
         if self.agent is None:
             self.logger.info("Agent not initialized yet.")
             return
-        self.agent.model.reset()
+        self.agent.reset()
 
     def start(self):
         """
@@ -141,9 +138,7 @@ class ActionServer(ABC):
         self.agent = self._initialize_agent()
         self.logger.info("[Rosnav-RL | Action Server] Agent initialized.")
         self.observation_collector = self._initialize_observation_collector()
-        self.logger.info(
-            "[Rosnav-RL | Action Server] Observation collector initialized."
-        )
+        self.logger.info("[Rosnav-RL | Action Server] Observation collector initialized.")
 
         self.logger.info("[Rosnav-RL | Action Server] Spinning...")
         rclpy.spin(self.node)

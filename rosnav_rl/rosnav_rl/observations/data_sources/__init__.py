@@ -1,11 +1,12 @@
 """Data source interfaces and implementations."""
 
+from . import collectors, generators
 from .base import Collector, DataSource, Generator
-from .collectors import *
-from .generators import *
 
 __all__ = [
     "Collector",
     "DataSource",
     "Generator",
+    "collectors",
+    "generators",
 ]

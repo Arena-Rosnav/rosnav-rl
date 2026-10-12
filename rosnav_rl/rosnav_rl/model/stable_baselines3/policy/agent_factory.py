@@ -1,18 +1,24 @@
-from typing import Callable, Type, Union
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from stable_baselines3.common.policies import BasePolicy
 
 from .base_policy import StableBaselinesPolicyDescription
 
+_AgentClassT = TypeVar(
+    "_AgentClassT",
+    bound=type[StableBaselinesPolicyDescription] | type[BasePolicy],
+)
+
 
 class AgentFactory:
     """The factory class for creating agents"""
 
-    registry = {}
+    registry: dict[str, type[StableBaselinesPolicyDescription] | type[BasePolicy]] = {}
     """ Internal registry for available agents """
 
     @classmethod
-    def register(cls, name: str) -> Callable:
+    def register(cls, name: str) -> Callable[[_AgentClassT], _AgentClassT]:
         """Class method to register agent class to the internal registry.
 
         Args:
@@ -22,13 +28,13 @@ class AgentFactory:
             The agent class itself.
         """
 
-        def inner_wrapper(wrapped_class) -> Callable:
+        def inner_wrapper(wrapped_class: _AgentClassT) -> _AgentClassT:
             assert name not in cls.registry, f"Agent '{name}' already exists!"
-            assert issubclass(
-                wrapped_class, StableBaselinesPolicyDescription
-            ) or issubclass(
+            assert issubclass(wrapped_class, StableBaselinesPolicyDescription) or issubclass(
                 wrapped_class, BasePolicy
-            ), f"Wrapped class {wrapped_class.__name__} is neither of type 'StableBaselinesPolicyDescription' nor 'BasePolicy!'"
+            ), (
+                f"Wrapped class {wrapped_class.__name__} is neither of type 'StableBaselinesPolicyDescription' nor 'BasePolicy!'"
+            )
             cls.registry[name] = wrapped_class
             return wrapped_class
 
@@ -37,9 +43,7 @@ class AgentFactory:
     # end register()
 
     @classmethod
-    def instantiate(
-        cls, name: str, **kwargs
-    ) -> Union[Type[StableBaselinesPolicyDescription], Type[BasePolicy]]:
+    def instantiate(cls, name: str, **kwargs: Any) -> StableBaselinesPolicyDescription | type[BasePolicy]:
         """Factory command to create the agent.
         This method gets the appropriate agent class from the registry
         and creates an instance of it, while passing in the parameters
@@ -60,12 +64,12 @@ class AgentFactory:
             return agent_class
 
 
-def _auto_load(cls: AgentFactory):
+def _auto_load(cls: type[AgentFactory]) -> None:
     """Automatically import and register all agent classes in the sb3_policy directory."""
     import importlib
-    import pkgutil
     import inspect
-    import sys
+    import pkgutil
+
     from . import sb3_policy
 
     # Find all modules in the sb3_policy package
@@ -81,9 +85,7 @@ def _auto_load(cls: AgentFactory):
         for name, obj in inspect.getmembers(module, inspect.isclass):
             if obj.__module__ != module.__name__:
                 continue
-            if issubclass(obj, StableBaselinesPolicyDescription) or issubclass(
-                obj, BasePolicy
-            ):
+            if issubclass(obj, StableBaselinesPolicyDescription) or issubclass(obj, BasePolicy):
                 # Use class name as registry key if not already registered
                 if name not in cls.registry:
                     cls.registry[name] = obj

@@ -1,13 +1,13 @@
 import inspect
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from rosnav_rl.spaces import BaseObservationSpace
 
 
 def extract_init_arguments(
-    classes: List["BaseObservationSpace"],
-) -> Dict[str, Dict[str, str]]:
+    classes: list[type["BaseObservationSpace"]],
+) -> dict[str, dict[str, str]]:
     """
     Extracts the arguments and their types from the __init__ method of each class in the provided list.
 
@@ -29,18 +29,14 @@ def extract_init_arguments(
         params = {}
         for param in signature.parameters.values():
             if param.name != "self":  # Skip 'self'
-                params[param.name] = (
-                    str(param.annotation)
-                    if param.annotation is not inspect.Parameter.empty
-                    else "Any"
-                )
+                params[param.name] = str(param.annotation) if param.annotation is not inspect.Parameter.empty else "Any"
 
         init_args[cls.__name__] = params
 
     return init_args
 
 
-def find_missing_keys(lead_dict: Dict, target_dict: Dict) -> List[str]:
+def find_missing_keys(lead_dict: dict[str, Any], target_dict: dict[str, Any]) -> list[str]:
     """
     Compares the keys of two dictionaries and identifies which keys from the lead
     dictionary are missing in the target dictionary.

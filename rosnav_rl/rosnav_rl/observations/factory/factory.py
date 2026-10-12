@@ -6,11 +6,23 @@ YAML configuration files or dictionaries, bridging the gap between
 configuration and instantiated data sources.
 """
 
-from typing import Dict, Any, Type, List
-from ..data_sources.base import DataSource, Collector, Generator
+from __future__ import annotations
+
+import posixpath
+from typing import TYPE_CHECKING, Any
+
+from ..data_sources.base import Collector, DataSource, Generator
+
+if TYPE_CHECKING:
+    from rclpy.node import Node
+
+    from rosnav_rl.cfg.parameters import AgentParameters
+    from rosnav_rl.utils.rostopic import Namespace
+
+    from ..core.manager import ObservationManager
 
 
-def _ros_msg_type_string(msg_cls) -> str:
+def _ros_msg_type_string(msg_cls: type) -> str:
     """Derive 'package/MsgClass' string from a ROS message class.
 
     Examples
@@ -44,12 +56,12 @@ class ObservationFactory:
 
     def __init__(self):
         # Registry keyed by class name  →  Type[Collector / Generator]
-        self._collectors: Dict[str, Type[Collector]] = {}
-        self._generators: Dict[str, Type[Generator]] = {}
+        self._collectors: dict[str, type[Collector]] = {}
+        self._generators: dict[str, type[Generator]] = {}
         # Registry keyed by 'pkg/Msg'  →  Type[Collector]
-        self._msg_type_to_collector: Dict[str, Type[Collector]] = {}
+        self._msg_type_to_collector: dict[str, type[Collector]] = {}
         # Track conflicts: message types claimed by more than one collector
-        self._msg_type_conflicts: Dict[str, List[str]] = {}
+        self._msg_type_conflicts: dict[str, list[str]] = {}
 
         # Auto-register all available classes
         self._register_collectors()
@@ -58,6 +70,7 @@ class ObservationFactory:
     def _register_collectors(self):
         """Register all available collector classes."""
         import inspect
+
         from ..data_sources import collectors
 
         for name, obj in inspect.getmembers(collectors):
@@ -65,11 +78,7 @@ class ObservationFactory:
                 continue
             self._collectors[name] = obj
 
-            # Build the ROS-message-type index if message_type is available
-            msg_cls = getattr(obj, "message_type", None)
-            if msg_cls is None:
-                continue
-            key = _ros_msg_type_string(msg_cls)
+            key = _ros_msg_type_string(obj.message_type)
             if key in self._msg_type_to_collector:
                 # Record the conflict but don't clobber the existing entry
                 self._msg_type_conflicts.setdefault(key, [self._msg_type_to_collector[key].__name__])
@@ -80,15 +89,14 @@ class ObservationFactory:
     def _register_generators(self):
         """Register all available generator classes."""
         import inspect
+
         from ..data_sources import generators
 
         for name, obj in inspect.getmembers(generators):
             if inspect.isclass(obj) and issubclass(obj, Generator) and obj is not Generator:
                 self._generators[name] = obj
 
-    def create_data_sources(
-        self, config: Dict[str, Any], **kwargs
-    ) -> Dict[str, DataSource]:
+    def create_data_sources(self, config: dict[str, Any], **kwargs: Any) -> dict[str, DataSource]:
         """
         Create data sources from configuration.
 
@@ -123,9 +131,7 @@ class ObservationFactory:
 
         return data_sources
 
-    def _create_data_source(
-        self, name: str, config: Dict[str, Any], **kwargs
-    ) -> DataSource:
+    def _create_data_source(self, name: str, config: dict[str, Any], **kwargs: Any) -> DataSource:
         """Create a single data source from configuration.
 
         The ``type`` field accepts either:
@@ -179,7 +185,7 @@ class ObservationFactory:
             f"or a ROS message type (e.g. 'sensor_msgs/LaserScan')."
         )
 
-    def list_available_types(self) -> Dict[str, Dict[str, Type]]:
+    def list_available_types(self) -> dict[str, dict[str, type[Collector]] | dict[str, type[Generator]]]:
         """List all available collector and generator types."""
         return {
             "collectors": self._collectors.copy(),
@@ -187,9 +193,31 @@ class ObservationFactory:
         }
 
 
+def set_robot_pose_frames(config: dict[str, Any], robot_frame: str, base_frame: str) -> None:
+    """Point every RobotPoseTFGenerator in *config* at the robot's base and odom frames under *robot_frame*."""
+    for ds in config.get("datasources", {}).values():
+        if ds.get("type") == "RobotPoseTFGenerator":
+            params = ds.setdefault("params", {})
+            params["source_frame"] = posixpath.join(robot_frame, base_frame)
+            params["target_frame"] = posixpath.join(robot_frame, "odom")
+
+
+def set_pedestrians_topic(config: dict[str, Any], robot_ns: str) -> None:
+    """Point every Arena pedestrian collector in *config* at the arena_peds topic of the env that owns *robot_ns*."""
+    for ds in config.get("datasources", {}).values():
+        if ds.get("type") in ("arena_people_msgs/Pedestrians", "ArenaPedestrianCollector"):
+            ds.setdefault("params", {})["topic"] = posixpath.join(
+                posixpath.dirname(posixpath.dirname(robot_ns)), "arena_peds"
+            )
+
+
 def create_observation_manager_from_config(
-    config: Dict[str, Any], node, ns, simulation_state_container=None, **manager_kwargs
-):
+    config: dict[str, Any],
+    node: Node,
+    ns: str | Namespace,
+    simulation_state_container: AgentParameters | None = None,
+    **manager_kwargs: Any,
+) -> ObservationManager:
     """
     Convenience function to create an ObservationManager from configuration.
 

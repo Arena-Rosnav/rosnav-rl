@@ -1,7 +1,8 @@
 import os
 import pathlib
 import sys
-from typing import TYPE_CHECKING, Dict, Generator
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 sys.path.append(str(pathlib.Path(__file__).parent))
 
@@ -9,25 +10,27 @@ import gymnasium
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
+from ...utils.type_aliases import TensorDict
 from ..dreamerv3 import exploration as expl
-from ..dreamerv3 import models, tools
+from ..dreamerv3 import models, networks, tools
 
 if TYPE_CHECKING:
     from .cfg import DreamerV3Cfg
 
 to_np = lambda x: x.detach().cpu().numpy()
 
+PolicyState = tuple[networks.RSSMState, torch.Tensor]
+
 
 class Dreamer(nn.Module):
     def __init__(
         self,
-        obs_space: gymnasium.Space,
+        obs_space: gymnasium.spaces.Dict,
         act_space: gymnasium.Space,
         config: "DreamerV3Cfg",
         logger: tools.Logger,
-        dataset: Generator,
+        dataset: Generator[dict[str, np.ndarray], None, None] | None,
     ):
         """Initialize the Dreamer agent.
 
@@ -56,7 +59,7 @@ class Dreamer(nn.Module):
             _expl_behavior: Exploration strategy (random, greedy, or plan2explore)
         """
 
-        super(Dreamer, self).__init__()
+        super().__init__()
         self._config = config
         self._logger = logger
         self._should_log = tools.Every(config.general.log_every)
@@ -64,9 +67,7 @@ class Dreamer(nn.Module):
         self._should_train = tools.Every(batch_steps / config.training.train_ratio)
         self._should_pretrain = tools.Once()
         self._should_reset = tools.Every(config.environment.reset_every)
-        self._should_expl = tools.Until(
-            int(config.model.exploration.until / config.environment.action_repeat)
-        )
+        self._should_expl = tools.Until(int(config.model.exploration.until / config.environment.action_repeat))
         self._metrics = {}
 
         # this is update step
@@ -79,13 +80,11 @@ class Dreamer(nn.Module):
         self._obs_space = obs_space
         self._act_space = act_space
 
-        if (
-            config.general.compile and os.name != "nt"
-        ):  # compilation is not supported on windows
+        if config.general.compile and os.name != "nt":  # compilation is not supported on windows
             self._wm = torch.compile(self._wm)
             self._task_behavior = torch.compile(self._task_behavior)
 
-        def reward(f, s, a):
+        def reward(f: torch.Tensor, s: networks.RSSMState, a: torch.Tensor) -> torch.Tensor:
             """
             Calculate reward based on world model predictions.
 
@@ -102,12 +101,16 @@ class Dreamer(nn.Module):
         self._expl_behavior = dict(
             greedy=lambda: self._task_behavior,
             random=lambda: expl.Random(config, act_space),
-            plan2explore=lambda: expl.Plan2Explore(
-                config, self._wm, reward, self._act_space
-            ),
+            plan2explore=lambda: expl.Plan2Explore(config, self._wm, reward, self._act_space),
         )[config.model.exploration.behavior]().to(self._config.general.device)
 
-    def __call__(self, obs, reset, state=None, training=True):
+    def __call__(
+        self,
+        obs: dict[str, np.ndarray],
+        reset: np.ndarray,
+        state: PolicyState | None = None,
+        training: bool = True,
+    ) -> tuple[TensorDict, PolicyState]:
         """Executes the main training and inference loop of the agent.
 
         This method handles both training and inference modes, managing the training steps,
@@ -132,11 +135,7 @@ class Dreamer(nn.Module):
         """
         step = self._step
         if training:
-            steps = (
-                self._config.training.pretrain_steps
-                if self._should_pretrain()
-                else self._should_train(step)
-            )
+            steps = self._config.training.pretrain_steps if self._should_pretrain() else self._should_train(step)
             for _ in range(steps):
                 self._train(next(self._dataset))
                 self._update_count += 1
@@ -157,7 +156,9 @@ class Dreamer(nn.Module):
             self._logger.step = self._config.environment.action_repeat * self._step
         return policy_output, state
 
-    def _policy(self, obs, state, training):
+    def _policy(
+        self, obs: dict[str, np.ndarray], state: PolicyState | None, training: bool
+    ) -> tuple[TensorDict, PolicyState]:
         """
         Executes the policy to determine the next action based on current observation and state.
 
@@ -209,8 +210,8 @@ class Dreamer(nn.Module):
             action = torch.one_hot(
                 torch.argmax(action, dim=-1),
                 (
-                    self._act_space.n
-                    if hasattr(self._act_space, "n")
+                    int(self._act_space.n)
+                    if isinstance(self._act_space, gymnasium.spaces.Discrete)
                     else self._act_space.shape[0]
                 ),
             )
@@ -218,7 +219,7 @@ class Dreamer(nn.Module):
         state = (latent, action)
         return policy_output, state
 
-    def _train(self, data):
+    def _train(self, data: dict[str, np.ndarray]):
         """
         Trains the Dreamer agent using provided data.
 
@@ -248,7 +249,7 @@ class Dreamer(nn.Module):
         metrics.update(mets)
         start = post
 
-        def reward(f, s, a):
+        def reward(f: torch.Tensor, s: networks.RSSMState, a: torch.Tensor) -> torch.Tensor:
             """
             Calculate the reward based on feature, state, and action.
 
@@ -265,25 +266,25 @@ class Dreamer(nn.Module):
 
         metrics.update(self._task_behavior._train(start, reward)[-1])
         if self._config.model.exploration.behavior != "greedy":
-            mets = self._expl_behavior.train(start, context, data)[-1]
+            mets = self._expl_behavior._train(start, context, data)[-1]
             metrics.update({"expl_" + key: value for key, value in mets.items()})
         for name, value in metrics.items():
-            if not name in self._metrics.keys():
+            if name not in self._metrics.keys():
                 self._metrics[name] = [value]
             else:
                 self._metrics[name].append(value)
 
     @property
-    def metrics(self) -> Dict[str, float]:
+    def metrics(self) -> dict[str, list[float | np.ndarray] | int]:
         """Return the current metrics tracked by the agent."""
         return self._metrics
-    
+
     @property
-    def dataset(self) -> Generator:
+    def dataset(self) -> Generator[dict[str, np.ndarray], None, None] | None:
         """Return the current dataset used by the agent."""
         return self._dataset
-    
+
     @dataset.setter
-    def dataset(self, dataset: Generator) -> None:
+    def dataset(self, dataset: Generator[dict[str, np.ndarray], None, None] | None) -> None:
         """Set the dataset used by the agent."""
         self._dataset = dataset

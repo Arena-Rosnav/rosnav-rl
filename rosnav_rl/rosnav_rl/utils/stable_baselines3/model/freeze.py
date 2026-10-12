@@ -1,16 +1,13 @@
 import re
-from typing import List
 from warnings import warn
-
-import torch
 
 from stable_baselines3.common.policies import ActorCriticPolicy
 
 
 def freeze_weights(
     model: ActorCriticPolicy,
-    include: List[str] = None,
-    exclude: List[str] = None,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
 ) -> ActorCriticPolicy:
     """
     Freeze weights of a torch.nn.Module model based on include/exclude patterns.
@@ -24,7 +21,7 @@ def freeze_weights(
         PPO model with frozen weights
     """
     if include is None:
-        warn("No include list provided. Skipping weight freezing.")
+        warn("No include list provided. Skipping weight freezing.", stacklevel=2)
         return model
 
     exclude = exclude or ["---"]
@@ -34,8 +31,7 @@ def freeze_weights(
     weights_dict = {
         key: value
         for key, value in state_dict_model.items()
-        if any(re.match(_key, key) for _key in include)
-        and not any(item in key for item in exclude)
+        if any(re.match(_key, key) for _key in include) and not any(item in key for item in exclude)
     }
 
     print(f"Freezing weights for {len(weights_dict.keys())} keys!")
