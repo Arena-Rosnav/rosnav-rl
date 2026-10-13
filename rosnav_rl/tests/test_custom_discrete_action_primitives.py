@@ -73,9 +73,12 @@ def test_navigational_forward_speeds_start_from_a_positive_minimum():
     np.testing.assert_allclose(motions(actions)[5], (0.72, 0.65))
 
 
-@pytest.mark.xfail(
-    strict=True, reason="custom_discrete_action navigational back-up action duplicates stop when reverse is not allowed"
-)
+def test_grid_translational_values_keep_their_configured_endpoints():
+    actions = generate_discrete_action_dict((0.0, 0.2), (-1.0, 1.0), 2, 2, (-2.84, 0.22), 2)
+
+    assert sorted({a["translational"] for a in actions}) == [-2.84, 0.22]
+
+
 def test_navigational_actions_are_unique_without_reverse():
     actions = generate_navigational_actions((0.0, 1.0), (-1.0, 1.0))
 
