@@ -91,7 +91,7 @@ class RobustGoalSpace(BaseObservationSpace):
             return np.clip(distance / self.max_distance, 0.0, 1.0)
         elif self.distance_scaling == "log":
             # Logarithmic scaling for wide distance ranges
-            return np.log(1 + distance) / np.log(1 + self.max_distance)
+            return np.clip(np.log(1 + distance) / np.log(1 + self.max_distance), 0.0, 1.0)
         else:
             raise ValueError(f"Unknown distance scaling: {self.distance_scaling}")
 

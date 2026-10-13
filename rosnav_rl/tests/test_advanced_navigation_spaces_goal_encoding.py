@@ -39,7 +39,6 @@ def test_robust_goal_encoding_at_the_max_distance(scaling):
     np.testing.assert_allclose(space.encode_observation(np.array([50.0, -np.pi / 4])), [expected, -0.25], rtol=1e-6)
 
 
-@pytest.mark.xfail(strict=True, reason="advanced_navigation_spaces RobustGoalSpace log scaling exceeds the space bound")
 def test_robust_goal_log_scaling_stays_inside_the_space_beyond_max_distance():
     space = RobustGoalSpace(goal_max_dist=50.0, distance_scaling="log")
 
