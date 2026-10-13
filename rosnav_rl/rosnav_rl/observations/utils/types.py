@@ -16,6 +16,7 @@ import arena_people_msgs.msg as arena_people_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
 
+from typing import Dict
 
 # Schema-based data requirement specification (inspired by Albumentations)
 @dataclass(frozen=True)
