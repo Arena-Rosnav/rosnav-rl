@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Type
 
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
@@ -12,7 +12,7 @@ from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
 
 from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
-from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_5_extended
+from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_10, EXTRACTOR_5_extended
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR
 
 
@@ -335,7 +335,7 @@ class AGENT_7(StableBaselinesPolicyDescription):
         "goal_max_dist": 10,
         "subgoal_max_dist": 10,
         "reduced_num_beams": 270, # TODO make uneseccary
-        "sources": ["wrist_color", "arm_base_color"],
+        "rgb_sources": ["wrist_color", "arm_base_color"],
     }
     observation_spaces = [
         spaces.perception.ReducedLaserScanSpace,

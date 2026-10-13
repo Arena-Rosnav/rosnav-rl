@@ -231,13 +231,8 @@ datasources:
   pedestrian_vel_x:
     type: PedestrianRelativeVelXGenerator        # Forward/backward velocity component
 
-<<<<<<< HEAD
   # pedestrian_vel_y:
   #   type: PedestrianRelativeVelYGenerator        # Left/right velocity component
-=======
-  pedestrian_vel_y:
-    type: PedestrianRelativeVelYGenerator        # Left/right velocity component  
->>>>>>> 12ae3c9
 
   # Pedestrian classification and social states
   # pedestrian_distances:

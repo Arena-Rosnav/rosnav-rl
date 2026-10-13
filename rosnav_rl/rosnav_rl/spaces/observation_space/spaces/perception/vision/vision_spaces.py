@@ -96,15 +96,15 @@ class RGBSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        sources: list[str] | None = None,
+        rgb_sources: list[str] | None = None,
         image_height: int = 128,
         image_width: int = 128,
         *args,
         **kwargs
     ) -> None:
 
+        self._sources = sorted(rgb_sources or [])
         self.requires = {source : ImageData for source in self._sources}
-        self._sources = sorted(sources or [])
         self._image_height = image_height
         self._image_width = image_width
         self._space = spaces.Box(
