@@ -840,21 +840,16 @@ class PedestrianSocialStateGenerator(Generator[PedestrianSocialStates]):
 
         current_ped_ids = [p.name for p in people_data.people]
         num_peds = len(people_data.people)
-        if (
-            self._ped_social_states_buffer is None
-            or self._last_num_peds != num_peds
-            or current_ped_ids != self._ped_ids
-        ):
-            try:
-                behavior_idx = people_data.people[0].tagnames.index("behavior")
-                self._ped_social_states_buffer = np.empty(num_peds, dtype=int)
-                for i, data in enumerate(people_data.people):
-                    self._ped_social_states_buffer[i] = int(data.tags[behavior_idx])
-            except (ValueError, AttributeError, IndexError):
-                warn("Pedestrian social state not found in the data. Returning empty array.", stacklevel=2)
-                self._ped_social_states_buffer = np.array([])
-            self._ped_ids = current_ped_ids
-            self._last_num_peds = num_peds
+        try:
+            behavior_idx = people_data.people[0].tagnames.index("behavior")
+            self._ped_social_states_buffer = np.empty(num_peds, dtype=int)
+            for i, data in enumerate(people_data.people):
+                self._ped_social_states_buffer[i] = int(data.tags[behavior_idx])
+        except (ValueError, AttributeError, IndexError):
+            warn("Pedestrian social state not found in the data. Returning empty array.", stacklevel=2)
+            self._ped_social_states_buffer = np.array([])
+        self._ped_ids = current_ped_ids
+        self._last_num_peds = num_peds
         return self._ped_social_states_buffer[:num_peds] if self._ped_social_states_buffer is not None else np.array([])
 
 

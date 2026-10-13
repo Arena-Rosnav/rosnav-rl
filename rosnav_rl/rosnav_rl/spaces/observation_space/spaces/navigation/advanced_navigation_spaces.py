@@ -357,7 +357,7 @@ class SubgoalContextSpace(BaseObservationSpace):
         if self.include_goal_subgoal_relation:
             # Calculate relational features
             distance_diff = np.tanh((distances[1] - distances[0]) * inv_max_dist)
-            angle_diff = np.clip((angles[1] - angles[0]) * inv_pi, -1.0, 1.0)
+            angle_diff = np.arctan2(np.sin(angles[1] - angles[0]), np.cos(angles[1] - angles[0])) * inv_pi
             result_list.extend([distance_diff, angle_diff])
 
         return np.array(result_list, dtype=np.float32)

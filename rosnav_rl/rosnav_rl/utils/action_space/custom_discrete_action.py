@@ -41,8 +41,8 @@ def generate_discrete_action_dict(
         - 'translational': The translational velocity value (None if not specified).
     """
     # Generate linear and angular actions
-    linear_actions = np.linspace(linear_range[0], linear_range[1], num_linear_actions, dtype=np.float16)
-    angular_actions = np.linspace(angular_range[0], angular_range[1], num_angular_actions, dtype=np.float16)
+    linear_actions = np.linspace(linear_range[0], linear_range[1], num_linear_actions)
+    angular_actions = np.linspace(angular_range[0], angular_range[1], num_angular_actions)
 
     # Initialize discrete action space
     discrete_action_space = [
