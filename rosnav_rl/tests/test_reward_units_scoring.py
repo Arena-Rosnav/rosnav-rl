@@ -216,9 +216,6 @@ def test_reverse_drive_threshold_only_fires_below_it(holder):
     assert score(holder) == pytest.approx(-0.3)
 
 
-@pytest.mark.xfail(
-    strict=True, reason="reward_units RewardReverseDrive default reward is positive so reversing is rewarded"
-)
 def test_reverse_drive_defaults_penalize_reversing(holder):
     unit = RewardReverseDrive(holder)
 
