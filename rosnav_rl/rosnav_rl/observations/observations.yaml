@@ -69,7 +69,7 @@ datasources:
   front_laser:
     type: sensor_msgs/LaserScan        # → LidarRanges
     params:
-      topic: "lidar"                    # Primary lidar topic
+      topic: "lidar"                   # Primary lidar topic
       up_to_date_required: true        # Critical for obstacle avoidance
 
   # Cameras
@@ -87,20 +87,20 @@ datasources:
   # Navigation target collectors 
 
   goal_pose:
-    type: geometry_msgs/PoseStamped   # → Pose2D
+    type: geometry_msgs/PoseStamped    # → Pose2D
     params:
-      topic: "goal_pose"                # Navigation goal from planner (relative to namespace)
+      topic: "goal_pose"               # Navigation goal from planner (relative to namespace)
       up_to_date_required: false       # Goal updates less frequently
 
   subgoal_pose:
-    type: geometry_msgs/PoseStamped   # → Pose2D
+    type: geometry_msgs/PoseStamped    # → Pose2D
     params:
-      topic: "subgoal"                # Intermediate waypoint
+      topic: "subgoal"                 # Intermediate waypoint
       up_to_date_required: false       # Subgoal updates less frequently
 
   # Robot control and action data
   last_action:
-    type: geometry_msgs/Twist         # → RobotVelocity
+    type: geometry_msgs/Twist          # → RobotVelocity
     params:
       topic: "cmd_vel"                 # Robot velocity commands
       # up_to_date_required: true
@@ -116,7 +116,7 @@ datasources:
   arena_pedestrian_detections:
     type: arena_people_msgs/Pedestrians  # → ArenaPedestrianDetections
     params:
-      topic: "arena_peds"              # Rebased onto the env namespace at load
+      topic: "arena_peds"                # Rebased onto the env namespace at load
       up_to_date_required: false
 
   collision_monitor:
