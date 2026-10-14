@@ -303,11 +303,11 @@ datasources:
 #
 # Additional collectors:
 #   rear_laser:
-#     type: sensor_msgs/Image 
+#     type: sensor_msgs/LaserScan
 #     params:
 #       topic: "scan_rear"
 #   left_laser:
-#     type: sensor_msgs/Image
+#     type: sensor_msgs/LaserScan
 #     params:
 #       topic: "scan_left"
 #
