@@ -35,7 +35,7 @@ aliases:
   # nav_path: navigation_path          # Planned trajectory
   
   # Social navigation - pedestrian data
-  # people_data: people_detections          # Raw pedestrian detections (people_msgs)
+  people_data: people_detections          # Raw pedestrian detections (people_msgs)
   arena_people_data: arena_pedestrian_detections  # Arena pedestrian detections (arena_people_msgs)
   pedestrian_relative_locations: arena_pedestrian_relative_locations
   pedestrian_relative_velocities: arena_pedestrian_relative_velocities
@@ -58,7 +58,7 @@ datasources:
   #     up_to_date_required: true      # Require fresh data for temporal synchronization
 
   robot_pose_from_tf:
-    type: RobotPoseTFGenerator         # Generator (no ROS topic) → Pose2D
+    type: RobotPoseTFGenerator         # Listens to TF tree → Pose2D 
     params: {}                         # Uses simulation_state_container for frame config
 
   end_effector_pose_from_tf:
@@ -69,7 +69,7 @@ datasources:
   front_laser:
     type: sensor_msgs/LaserScan        # → LidarRanges
     params:
-      topic: "scan"                    # Primary lidar topic
+      topic: "lidar"                    # Primary lidar topic
       up_to_date_required: true        # Critical for obstacle avoidance
 
   # Cameras
@@ -110,7 +110,7 @@ datasources:
   #   type: people_msgs/People          # → PedestrianDetections
   #   params:
   #     topic: "/task_generator_node/people"                  # People tracker output
-  #     up_to_date_required: false
+  #     up_to_date_required: true
 
   # Arena pedestrian detection (arena_people_msgs)
   arena_pedestrian_detections:
@@ -123,7 +123,7 @@ datasources:
     type: nav2_msgs/CollisionMonitorState  # → SafetyStatus
     params:
       topic: "collision_monitor_state"
-      state_key: "StopPolygon"              # Specific collision state to monitor
+      state_key: "StopPolygon"             # Specific collision state to monitor
 
   # Visual perception
   # front_camera:
@@ -231,10 +231,11 @@ datasources:
   pedestrian_vel_x:
     type: PedestrianRelativeVelXGenerator        # Forward/backward velocity component
 
-  # pedestrian_vel_y:
-  #   type: PedestrianRelativeVelYGenerator        # Left/right velocity component
+  pedestrian_vel_y:
+    type: PedestrianRelativeVelYGenerator        # Left/right velocity component
 
   # Pedestrian classification and social states
+
   # pedestrian_distances:
   #   type: PedestrianDistanceGenerator            # Minimum distances to each pedestrian group
 
@@ -286,7 +287,7 @@ datasources:
 #
 # Additional collectors:
 #   rear_camera:
-#     type: ImageColorCollector
+#     type: sensor_msgs/Image
 #     params:
 #       topic: "camera_rear/image_raw"
 #
@@ -302,11 +303,11 @@ datasources:
 #
 # Additional collectors:
 #   rear_laser:
-#     type: LaserScanCollector  
+#     type: sensor_msgs/Image 
 #     params:
 #       topic: "scan_rear"
 #   left_laser:
-#     type: LaserScanCollector
+#     type: sensor_msgs/Image
 #     params:
 #       topic: "scan_left"
 #

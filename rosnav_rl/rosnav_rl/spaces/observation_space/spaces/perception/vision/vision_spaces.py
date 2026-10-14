@@ -64,8 +64,7 @@ class RGBDSpace(BaseObservationSpace):
         """
         Encodes RGBD observation by combining color and depth images.
 
-        Args:e):
-
+        Args:
             color_image (ImageData): RGB color image, shape (H, W, 3) or (3, H, W)
             depth_image (ImageData): Depth image, shape (H, W) or (H, W, 1)
 
@@ -127,7 +126,7 @@ class RGBSpace(BaseObservationSpace):
         """
         return self._space
 
-    def resize_hwc(self, image: np.ndarray, height: int, width: int) -> np.ndarray:
+    def resize_chw(self, image: np.ndarray, height: int, width: int) -> np.ndarray:
         """Resize an (C, H, W) image to (height, width) via bilinear interpolation."""
         if image.shape[1] == height and image.shape[2] == width:
             return image

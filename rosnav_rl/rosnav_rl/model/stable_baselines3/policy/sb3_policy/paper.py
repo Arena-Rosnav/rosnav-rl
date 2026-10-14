@@ -334,7 +334,7 @@ class AGENT_7(StableBaselinesPolicyDescription):
         "normalize": True,
         "goal_max_dist": 10,
         "subgoal_max_dist": 10,
-        "reduced_num_beams": 270, # TODO make uneseccary
+        "reduced_num_beams": 270,
         "rgb_sources": ["wrist_color", "arm_base_color"],
     }
     observation_spaces = [
