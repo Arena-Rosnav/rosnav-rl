@@ -645,8 +645,8 @@ class EXTRACTOR_10(EXTRACTOR_5):
     def forward(self, observations):
         laser, goal, last_action, images = self.get_input(observations)
         laser, goal, last_action = self.process_input(laser, goal, last_action)
-        b, n = images.shape[:2]
-        img_feat = self.img_cnn(images.float().reshape(b * n, self._img_c, self._img_h, self._img_w))
-        img_feat = img_feat.reshape(b, n * img_feat.shape[-1])
+        n, c = images.shape[:2]
+        img_feat = self.img_cnn(images.float().reshape(n * c, self._img_c, self._img_h, self._img_w))
+        img_feat = img_feat.reshape(n, c * img_feat.shape[-1])
         feats = [self.cnn(laser), img_feat, goal.flatten(1, 2), last_action.flatten(1, 2)]
         return self.fc(th.cat(feats, 1))
