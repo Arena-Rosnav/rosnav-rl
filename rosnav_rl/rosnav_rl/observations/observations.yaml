@@ -69,7 +69,7 @@ datasources:
   front_laser:
     type: sensor_msgs/LaserScan        # → LidarRanges
     params:
-      topic: "lidar"                   # Primary lidar topic
+      topic: "scan"                   # Primary lidar topic
       up_to_date_required: true        # Critical for obstacle avoidance
 
   # Cameras
@@ -144,11 +144,11 @@ datasources:
   #     topic: "collision_monitor_state"
   #     state_key: "collision"            # Specific collision state to monitor
 
-  # Arm state 
+  # Arm state
   joint_states:
-    type: sensor_msgs/JointState     # → JointState
+    type: control_msgs/JointTrajectoryControllerState     # → JointState
     params:
-      topic: "joint_states"
+      topic: "arm_controller/controller_state"
       up_to_date_required: true
 
   # ---------------------------------------------------------------------------

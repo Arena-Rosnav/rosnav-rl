@@ -14,6 +14,7 @@ import nav_msgs.msg as nav_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
 import sensor_msgs.msg as sensor_msgs
+from control_msgs.msg import JointTrajectoryControllerState
 
 from ..utils.pose import Pose2DType, pose3d_to_pose2d
 from ..utils.types import (
@@ -176,22 +177,34 @@ class ArenaPedestrianCollector(Collector[arena_people_msgs.Pedestrians, ArenaPed
     def _preprocess(self, msg: arena_people_msgs.Pedestrians) -> arena_people_msgs.Pedestrians:
         return msg
 
-class JointStateCollector(Collector[sensor_msgs.JointState, JointStates]):  
+class JointStateCollector(Collector[JointTrajectoryControllerState, JointStates]):  
 
     """
     Collects and preprocesses joint state data from a ROS topic.
     """   
 
-    def _preprocess(self, msg: sensor_msgs.JointState) -> JointStates:
+    def _preprocess(self, msg: JointTrajectoryControllerState) -> JointStates:
 
-        velocities = msg.velocity if len(msg.velocity) == len(msg.name) else [0.0] * len(msg.name)
-        efforts = msg.effort if len(msg.effort) == len(msg.name) else [0.0] * len(msg.name)
+        names = msg.joint_names
+        positions = msg.feedback.positions
 
+        velocities = (
+            msg.feedback.velocities
+            if len(msg.feedback.velocities) == len(names)
+            else [0.0] * len(names)
+        )
+
+        efforts = (
+            msg.feedback.effort
+            if len(msg.feedback.effort) == len(names)
+            else [0.0] * len(names)
+        )
+        
         return {
             name : {
                 "position" : float(pos),
                 "velocity" : float(vel),
                 "effort"   : float(eff),
             }
-            for name, pos, vel, eff in zip(msg.name, msg.position, velocities, efforts)
+            for name, pos, vel, eff in zip(names, positions, velocities, efforts)
         }
