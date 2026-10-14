@@ -74,12 +74,12 @@ datasources:
 
   # Cameras
 
-  wrist_rgb:
+  wrist_color:
     type: ImageColorCollector
     params:
       topic: "wrist_camera/image"
 
-  base_rgb:
+  arm_base_color:
     type: ImageColorCollector
     params:
       topic: "arm_base_camera/image"
