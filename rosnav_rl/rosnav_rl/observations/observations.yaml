@@ -74,10 +74,7 @@ datasources:
       up_to_date_required: false       # Goal updates less frequently
 
   subgoal_pose:
-    type: geometry_msgs/PoseStamped    # → Pose2D
-    params:
-      topic: "subgoal"                # Intermediate waypoint
-      up_to_date_required: false       # Subgoal updates less frequently
+    type: StraightLineSubgoalGenerator  # Lookahead on the robot-to-goal line from the last command
 
   # Robot control and action data
   last_action:

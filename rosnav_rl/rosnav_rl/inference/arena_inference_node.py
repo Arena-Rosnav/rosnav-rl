@@ -1,10 +1,10 @@
 """Standalone in-process rosnav_rl inference node.
 
 Runs the policy at a fixed rate, publishes `subgoal` (lookahead along the
-straight robot→goal line) for the observation pipeline, and emits the
+straight robot-to-goal line, the formula of StraightLineSubgoalGenerator) for display, and emits the
 decoded command as `Twist` on `~/cmd_vel`.
 
-When `train_mode=true`, only the subgoal pipeline runs; the agent, ObservationManager,
+When `train_mode=true`, only the subgoal display runs; the agent, ObservationManager,
 and cmd_vel publisher are skipped — the training loop owns the policy in that case.
 """
 
@@ -28,6 +28,7 @@ from rosnav_rl.observations.factory.factory import (
     set_pedestrians_topic,
     set_robot_pose_frames,
 )
+from rosnav_rl.observations.utils.semantic import straight_line_subgoal
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.utils.agent_paths import resolve_agent_dir, resolve_observations_config_path
 from rosnav_rl.utils.rostopic import Namespace
@@ -101,6 +102,7 @@ class ArenaInferenceNode:
             self.observation_manager = self._load_observation_manager()
             self.logger.info("[rosnav_rl] observation manager ready")
         else:
+            self._cmd_vel_sub = node.create_subscription(Twist, "cmd_vel", self._on_cmd_vel, 1)
             self.logger.info("[rosnav_rl] subgoal-only mode (train_mode=true); agent and cmd_vel publisher skipped")
 
         period = 1.0 / max(self.control_rate, 1e-3)
@@ -136,6 +138,9 @@ class ArenaInferenceNode:
     def _on_goal(self, msg: PoseStamped) -> None:
         self._goal = msg
 
+    def _on_cmd_vel(self, msg: Twist) -> None:
+        self._last_speed = math.hypot(msg.linear.x, msg.linear.y)
+
     def _on_task_reset(self, _msg: Int16) -> None:
         self.agent.reset()
         self._last_speed = 0.0
@@ -159,6 +164,7 @@ class ArenaInferenceNode:
         except Exception as exc:
             self.logger.warn(f"[rosnav_rl] get_observations failed: {type(exc).__name__}: {exc}")
             return
+        observations["is_terminal"] = False
 
         try:
             cmd = self.agent.get_action(observations)
@@ -180,16 +186,9 @@ class ArenaInferenceNode:
         return tf.transform.translation.x, tf.transform.translation.y
 
     def _publish_subgoal(self, robot_xy: tuple[float, float], goal_xy: tuple[float, float]) -> None:
-        dx = goal_xy[0] - robot_xy[0]
-        dy = goal_xy[1] - robot_xy[1]
-        dist = math.hypot(dx, dy)
-        lookahead = max(self.min_lookahead, min(self.max_lookahead, self._last_speed * self.lookahead_time))
-        if dist <= lookahead or dist < 1e-6:
-            sx, sy = goal_xy
-        else:
-            scale = lookahead / dist
-            sx = robot_xy[0] + dx * scale
-            sy = robot_xy[1] + dy * scale
+        sx, sy = straight_line_subgoal(
+            robot_xy, goal_xy, self._last_speed, self.min_lookahead, self.max_lookahead, self.lookahead_time
+        )
 
         msg = PoseStamped()
         msg.header.frame_id = self._goal.header.frame_id

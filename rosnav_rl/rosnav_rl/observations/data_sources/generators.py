@@ -7,6 +7,7 @@ calculations on data from other `DataSource`s.
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 from warnings import warn
@@ -21,7 +22,7 @@ from tf_transformations import euler_from_quaternion
 if TYPE_CHECKING:
     from rosnav_rl.cfg.parameters import AgentParameters
 from ..utils.pose import Pose2DType
-from ..utils.semantic import get_relative_pos_to_robot, get_relative_vel_to_robot
+from ..utils.semantic import get_relative_pos_to_robot, get_relative_vel_to_robot, straight_line_subgoal
 from ..utils.types import (
     ArenaPedestrianDetections,
     ArenaPedestrianStates,
@@ -38,6 +39,7 @@ from ..utils.types import (
     PedestrianWorldLocations,
     Pose2D,
     RobotRelativePosition,
+    RobotVelocity,
     SafetyStatus,
     SubgoalLocation,
 )
@@ -182,6 +184,47 @@ class GoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
             [2.5, -1.0]
         """
         return get_relative_pos_to_robot(robot_pose, np.array([[goal_pose["x"], goal_pose["y"], 1]])).squeeze(0)
+
+
+class StraightLineSubgoalGenerator(Generator[SubgoalLocation]):
+    """Subgoal on the robot-to-goal line, looking ahead in proportion to the last commanded speed."""
+
+    requires = {
+        "robot_pose": Pose2D,
+        "goal_pose": GoalLocation,
+        "last_action": RobotVelocity,
+    }
+
+    def __init__(
+        self,
+        name: str,
+        min_lookahead_dist: float = 0.5,
+        max_lookahead_dist: float = 2.5,
+        lookahead_time: float = 1.5,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        self._min_lookahead = min_lookahead_dist
+        self._max_lookahead = max_lookahead_dist
+        self._lookahead_time = lookahead_time
+
+    def _generate(
+        self,
+        robot_pose: Pose2D,
+        goal_pose: GoalLocation,
+        last_action: RobotVelocity,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> SubgoalLocation:
+        x, y = straight_line_subgoal(
+            (float(robot_pose["x"]), float(robot_pose["y"])),
+            (float(goal_pose["x"]), float(goal_pose["y"])),
+            math.hypot(float(last_action[0]), float(last_action[1])),
+            self._min_lookahead,
+            self._max_lookahead,
+            self._lookahead_time,
+        )
+        return np.array((x, y, 0.0), dtype=Pose2DType)
 
 
 class SubgoalLocationInRobotFrameGenerator(Generator[RobotRelativePosition]):
