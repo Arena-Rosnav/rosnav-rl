@@ -682,6 +682,7 @@ class StableBaselinesModel(RL_Model):
             if value.shape == observation_space[key].shape:
                 observation[key] = np.expand_dims(value, axis=0)
 
+        self._model.policy.set_training_mode(False)
         with th.no_grad():
             actions = (
                 self._model.policy._predict(obs_as_tensor(observation, self._model.device), deterministic).cpu().numpy()
