@@ -8,6 +8,7 @@ from .classic import (
     EXTRACTOR_7,
     EXTRACTOR_8,
     EXTRACTOR_9,
+    EXTRACTOR_10,
     EXTRACTOR_5_extended,
 )
 from .resnet import (
@@ -31,6 +32,7 @@ __all__ = [
     "EXTRACTOR_7",
     "EXTRACTOR_8",
     "EXTRACTOR_9",
+    "EXTRACTOR_10",
     "RESNET_MID_FUSION_EXTRACTOR_1",
     "RESNET_MID_FUSION_EXTRACTOR_2",
     "RESNET_MID_FUSION_EXTRACTOR_3",

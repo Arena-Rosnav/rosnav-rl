@@ -37,6 +37,8 @@ __all__ = [
     "RewardRootVelocityDifference",
     "RewardTwoFactorVelocityDifference",
     "RewardActiveHeadingDirection",
+    "RewardArmGoalReached",
+    "RewardArmApproachGoal",
 ]
 
 
@@ -2036,3 +2038,163 @@ class RewardLinearVelBoost(RewardUnit):
     def reset(self):
         """Reset internal state for new episode."""
         pass
+
+@RewardUnitFactory.register("arm_goal_reached")
+class RewardArmGoalReached(RewardUnit):
+    """Reward unit for calculating the reward when arm reaches goal"""
+
+    requires = {
+        "arm_dist_angle_to_goal": DistanceAngleMetrics,
+        "simulation_state_container": AgentParameters,
+    }
+
+    DONE_INFO = {
+        "is_done": True,
+        "done_reason": DONE_REASONS.SUCCESS,
+        "is_success": True,
+    }
+    NOT_DONE_INFO = {"is_done": False}
+
+    @check_params
+    def __init__(
+        self,
+        reward_function: RewardFunction,
+        reward: float = DEFAULTS.GOAL_REACHED.REWARD,
+        _on_safe_dist_violation: bool = DEFAULTS.GOAL_REACHED._ON_SAFE_DIST_VIOLATION,
+        *args,
+        **kwargs,
+    ) -> None:
+
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+        self._reward = reward
+
+    def check_parameters(self, *args, **kwargs):
+        if self._reward < 0.0:
+            warn_msg = (
+                f"Reconsider this reward. "
+                f"Negative rewards may lead to unfavorable behaviors. "
+                f"Current value: {self._reward}"
+            )
+            self._report_warning(warn_msg)
+        
+    def __call__(
+        self,
+        arm_dist_angle_to_goal: DistanceAngleMetrics,
+        simulation_state_container: AgentParameters,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Calculates the reward and updates the information when the goal is reached.
+
+        Args:
+            goal_in_robot_frame: Distance and angle to goal in robot frame.
+            simulation_state_container: Container with task configuration.
+        """
+        target_distance = arm_dist_angle_to_goal[0]
+        rotational_error = arm_dist_angle_to_goal[1]
+
+        # TODO create these params for arms
+        DEFAULT_ARM_GOAL_RADIUS = 0.05  
+        DEFAULT_ARM_ANGLE_TOLERANCE = 0.20   
+
+        goal_radius = getattr(
+            simulation_state_container, "goal_radius", DEFAULT_ARM_GOAL_RADIUS
+        )
+        goal_angle_tolerance = getattr(
+            simulation_state_container, "goal_angle_tolerance", DEFAULT_ARM_ANGLE_TOLERANCE
+        )
+
+        position_reached = target_distance < goal_radius
+        orientation_reached = rotational_error < goal_angle_tolerance
+
+        if position_reached and orientation_reached:
+            self.add_reward(self._reward)
+            self.add_info(self.DONE_INFO)
+        else:
+            self.add_info(self.NOT_DONE_INFO)
+
+
+@RewardUnitFactory.register("arm_approach_goal")
+class RewardArmApproachGoal(RewardUnit):
+    """Reward unit for arm goal approach behavior with distance-based computation.
+
+    Provides a positive delta-reward for moving the end-effector closer to the target
+    and a negative delta-reward for moving away. This creates a potential field that
+    guides the arm toward the goal without punishing it just for starting far away.
+
+    Technical Specifications:
+    - Distance-Based Reward: Delta potential field using step-by-step position differences
+    - Adaptive Thresholds: Distance-jump detection to prevent reward noise if goal teleports
+
+    Configuration:
+    - pos_factor: Positive reward scaling for moving closer
+    - neg_factor: Negative reward scaling for moving away (should be > pos_factor)
+    - _goal_update_threshold: Maximum allowed single-step distance change before ignoring (jump detection)
+    """
+
+    requires = {
+        "arm_dist_angle_to_goal": DistanceAngleMetrics,
+    }
+
+    @check_params
+    def __init__(
+        self,
+        reward_function: 'RewardFunction',
+        pos_factor: float = 1.0,  # TODO Replace with DEFAULTS.ARM_APPROACH.POS_FACTOR
+        neg_factor: float = 1.2,  # TODO Replace with DEFAULTS.ARM_APPROACH.NEG_FACTOR
+        _goal_update_threshold: float = 0.5, # TODO Replace with DEFAULTS.ARM_APPROACH._GOAL_UPDATE_THRESHOLD
+        _on_safe_dist_violation: bool = False,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+        self._pos_factor = pos_factor
+        self._neg_factor = neg_factor
+        self._goal_update_threshold = _goal_update_threshold
+
+        self.last_distance = None
+
+    def check_parameters(self, *args, **kwargs):
+        if self._pos_factor < 0 or self._neg_factor < 0:
+            warn_msg = (
+                f"Both factors should be positive. "
+                f"Current values: [pos_factor={self._pos_factor}], "
+                f"[neg_factor={self._neg_factor}]"
+            )
+            self._report_warning(warn_msg)
+        if self._pos_factor >= self._neg_factor:
+            warn_msg = (
+                "'pos_factor' should be smaller than 'neg_factor' otherwise "
+                "oscillatory/rotary trajectories will get exploited for positive net reward. "
+                f"Current values: [pos_factor={self._pos_factor}], "
+                f"[neg_factor={self._neg_factor}]"
+            )
+            self._report_warning(warn_msg)
+
+    def __call__(
+        self,
+        arm_dist_angle_to_goal: np.ndarray, 
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Calculate reward based on change in end-effector distance.
+
+        Args:
+            arm_dist_angle_to_goal: np.ndarray (2,) [distance_m, rotation_error_rad]
+        """
+        current_distance = float(arm_dist_angle_to_goal[0])
+
+        if self.last_distance is not None:
+            distance_change = self.last_distance - current_distance
+            
+            if abs(distance_change) < self._goal_update_threshold:
+                factor = self._pos_factor if distance_change > 0 else self._neg_factor
+                self.add_reward(float(factor * distance_change))
+
+        self.last_distance = current_distance
+        
+        self.add_info({"is_done": False})
+
+    def reset(self):
+        """Reset internal state for a new episode."""
+        self.last_distance = None

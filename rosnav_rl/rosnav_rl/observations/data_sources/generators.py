@@ -13,7 +13,9 @@ from typing import TYPE_CHECKING, Any
 from warnings import warn
 
 import arena_people_msgs.msg as arena_people_msgs
+from scipy.spatial.transform import Rotation as R
 import numpy as np
+import yaml
 import people_msgs.msg as people_msgs
 import rclpy
 import tf2_ros
@@ -38,6 +40,8 @@ from ..utils.types import (
     PedestrianTypeMinDistances,
     PedestrianWorldLocations,
     Pose2D,
+    Pose3D,
+    RelativePose3D,
     RobotRelativePosition,
     RobotVelocity,
     SafetyStatus,
@@ -1195,6 +1199,186 @@ class ArenaPedestrianStateGenerator(Generator[ArenaPedestrianStates]):
 
         return self._animation_states_buffer
 
+class EndEffectorPoseTFGenerator(Generator[Pose3D]):
+
+    requires = {}
+
+    def __init__(
+        self,
+        name: str,
+        node: rclpy.Node | None = None,
+        source_frame_suffix: str = "tool0",
+        target_frame: str = "map",
+        **kwargs,
+    ):
+        super().__init__(name, **kwargs)
+
+        if not node:
+            raise ValueError("EndEffectorPoseTFGenerator requires a ROS 2 node.")
+
+        self._node = node
+        self._tf_buffer = tf2_ros.Buffer(node=self._node)
+        self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self._node)
+
+        self._source_frame_suffix = source_frame_suffix
+        self.SOURCE_FRAME: str | None = None
+        self.TARGET_FRAME: str = target_frame
+
+        self._last_pose = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+        self._is_initialized = False
+
+    def _resolve_source_frame(self) -> str | None:
+        try:
+            frames_yaml = self._tf_buffer.all_frames_as_yaml()
+            if not frames_yaml:
+                return None
+
+            frames_dict: dict = yaml.safe_load(frames_yaml)
+            if not frames_dict:
+                return None
+
+            for frame in frames_dict.keys():
+                if frame.endswith(self._source_frame_suffix):
+                    return frame
+                
+        except Exception as e:
+            self._node.get_logger().warn(f"Failed to parse TF frames YAML: {e}")
+
+        return None
+
+    def _generate(self, **kwargs):
+
+        if self.SOURCE_FRAME is None:
+            self.SOURCE_FRAME = self._resolve_source_frame()
+            if self.SOURCE_FRAME is None:
+                self._node.get_logger().warn(
+                    f"Waiting for frame ending in '{self._source_frame_suffix}' in TF tree..."
+                )
+                return self._last_pose
+
+        if not self._is_initialized:
+            try:
+                if not self._tf_buffer.can_transform(
+                    self.TARGET_FRAME,
+                    self.SOURCE_FRAME,
+                    rclpy.time.Time(),
+                    timeout=rclpy.duration.Duration(seconds=1.0),
+                ):
+                    return self._last_pose
+                self._is_initialized = True
+            except tf2_ros.TransformException as e:
+                self._node.get_logger().warn(
+                    f"Could not get transform from '{self.SOURCE_FRAME}' to '{self.TARGET_FRAME}': {e}"
+                )
+                return self._last_pose
+
+        try:
+            transform_stamped = self._tf_buffer.lookup_transform(
+                self.TARGET_FRAME,
+                self.SOURCE_FRAME,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.1),
+            )
+            trans = transform_stamped.transform.translation
+            rot = transform_stamped.transform.rotation
+
+            self._last_pose = np.array(
+                [trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w],
+                dtype=np.float32,
+            )
+        except tf2_ros.TransformException as e:
+            self._node.get_logger().warn(
+                f"Could not transform '{self.SOURCE_FRAME}' to '{self.TARGET_FRAME}': {e}"
+            )
+
+        return self._last_pose
+
+class ArmGoalLocationInEndEffectorFrameGenerator(Generator[RelativePose3D]):
+    """Goal Location in Robot Base Frame Generator
+
+    Transforms a global 3D goal pose into the robot's local base coordinate frame 
+    for manipulation planning.
+
+    Technical Specifications:
+    - Input: Global goal Pose3D, Robot base Pose3D
+    - Output: Goal Pose3D in robot-centric frame
+
+    Output Format: np.ndarray of shape (7,) [x, y, z, qx, qy, qz, qw]
+    """
+
+    requires = {
+        "end_effector_pose": Pose3D,
+        #"end_effector_goal_pose": Pose3D,
+    }
+    
+    def _generate(
+        self,
+        end_effector_pose: Pose3D,
+        #end_effector_goal_pose: Pose3D,
+        **kwargs,
+    ) -> RelativePose3D:
+
+        # TODO make proper publisher for goal pose (subgoals?)
+        end_effector_goal_pose = np.array([0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+
+        ee_pos = end_effector_pose[:3]
+        goal_pos = end_effector_goal_pose[:3]
+
+        ee_quat = end_effector_pose[3:]
+        goal_quat = end_effector_goal_pose[3:]
+
+        r_ee = R.from_quat(ee_quat)
+        r_goal = R.from_quat(goal_quat)
+        
+        r_ee_inv = r_ee.inv()
+
+        rel_pos = r_ee_inv.apply(goal_pos - ee_pos)
+
+        rel_rot = r_ee_inv * r_goal
+        rel_quat = rel_rot.as_quat()
+
+        return np.concatenate([rel_pos, rel_quat]).astype(np.float32)
+    
+
+
+class ArmDistAngleToGoalGenerator(Generator[DistanceAngleMetrics]):
+    """3D Distance and Angular Error to Goal Generator
+
+    Computes the scalar 3D translational distance (meters) and rotational 
+    angular error (radians) between the end-effector and the target pose.
+
+    Technical Specifications:
+    - Input: Goal pose relative to end-effector frame (RelativePose3D)
+    - Output: [translational_distance, rotational_error_radians]
+
+    Output Format: np.ndarray of shape (2,)
+    """
+
+    requires = {
+        "arm_goal_in_ee_frame": RelativePose3D,
+    }
+
+    def _generate(
+        self,
+        arm_goal_in_ee_frame: RelativePose3D,
+        simulation_state_container: AgentParameters,
+        **kwargs,
+    ) -> DistanceAngleMetrics:
+        """Computes 3D distance and scalar rotational error.
+
+        Args:
+            arm_goal_in_ee_frame (RelativePose3D): [x, y, z, qx, qy, qz, qw] relative array
+
+        Returns:
+            DistanceAngleMetrics: np.ndarray (2,) [distance_m, rotation_error_rad]
+        """
+
+        dist_m = np.linalg.norm(arm_goal_in_ee_frame[:3])
+
+        w = np.clip(abs(arm_goal_in_ee_frame[6]), 0.0, 1.0)
+        rot_error_rad = 2.0 * np.arccos(w)
+
+        return np.array([dist_m, rot_error_rad], dtype=np.float32)
 
 class ArenaPedestrianTypeGenerator(Generator[PedestrianTypeArray]):
     """Type code per Arena pedestrian, all of type 0."""

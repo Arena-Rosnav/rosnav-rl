@@ -7,6 +7,7 @@ from .action_spaces import (
     HumanoidActionSpace,
     ManipulatorActionSpace,
     OmnidirectionalActionSpace,
+    CompositeActionSpace,
 )
 from .agent import AgentConfig
 from .framework import FrameworkCfg

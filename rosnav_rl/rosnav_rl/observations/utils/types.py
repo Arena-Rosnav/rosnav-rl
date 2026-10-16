@@ -16,6 +16,7 @@ import arena_people_msgs.msg as arena_people_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
 
+from typing import Dict
 
 # Schema-based data requirement specification (inspired by Albumentations)
 @dataclass(frozen=True)
@@ -47,6 +48,30 @@ Pose2D = Annotated[
         source="odometry or SLAM",
         constraints="theta ∈ [-π, π]",
         example="[2.5, 1.2, 0.785]",
+    ),
+]
+
+Pose3D = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="Pose 3D in world coordinates (translation + orientation)",
+        shape="(7,)",
+        units="meters, meters, meters, quaternion x, quaternion y, quaternion z, quaternion w",
+        source="TF tree lookup (tf2_ros)",
+        constraints="quaternion must be normalized (x² + y² + z² + w² = 1)",
+        example="[1.0, 0.5, 0.8, 0.0, 0.0, 0.0, 1.0]",
+    ),
+]
+
+RelativePose3D = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="3D goal pose relative to reference frame (e.g., end-effector)",
+        shape="(7,)",
+        units="meters, meters, meters, quaternion x, quaternion y, quaternion z, quaternion w",
+        source="quaternion represents relative rotation delta",
+        constraints="quaternion must be normalized (x² + y² + z² + w² = 1)",
+        example="[1.0, 0.5, 0.8, 0.0, 0.0, 0.0, 1.0]",
     ),
 ]
 
@@ -329,7 +354,7 @@ RobotActionVector = Annotated[
 GoalRelativePosition = Annotated[
     np.ndarray,
     DataSpec(
-        description="Subgoal position in robot's local coordinate frame",
+        description="Goal position in robot's local coordinate frame",
         shape="(2,)",
         units="meters",
         constraints="x: forward/backward, y: left/right from robot perspective",
@@ -524,6 +549,22 @@ LocalizationQualityVector = Annotated[
         constraints="[pose_uncertainty, velocity_consistency, position_drift, angular_drift, "
         "filter_confidence, measurement_quality]",
         example="[0.1, 0.95, 0.02, 0.01, 0.98, 0.88]",
+    ),
+]
+
+JointStates = Annotated[
+    Dict[str, Dict[str, float]],
+    DataSpec(
+        description="Dictionary mapping joint names to their current kinematic states (position, velocity, effort)",
+        source="/joint_states topic (sensor_msgs/JointState)",
+        units="position: rad, velocity: rad/s, effort: N·m",
+        constraints="keys: joint names (str), values: {'position': rad, 'velocity': rad/s, 'effort': N·m}",
+        example=(
+            "{"
+            "'shoulder_pan_joint': {'position': 0.0, 'velocity': 0.01, 'effort': 1.2}, "
+            "'elbow_joint': {'position': 1.57, 'velocity': 0.0, 'effort': 0.5}"
+            "}"
+        ),
     ),
 ]
 
