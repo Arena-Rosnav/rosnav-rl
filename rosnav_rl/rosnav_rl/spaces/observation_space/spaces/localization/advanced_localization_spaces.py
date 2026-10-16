@@ -303,7 +303,7 @@ class PoseStabilizedSpace(BaseObservationSpace):
                 - Example: [0.5, 0.2, 0.707, 0.707] (normalized pose at 45° orientation)
                 - Example with confidence: [0.5, 0.2, 0.707, 0.707, 0.9] (high confidence estimate)
         """
-        pose_data = robot_pose
+        pose_data = robot_pose[()] if isinstance(robot_pose, np.ndarray) and robot_pose.ndim == 0 else robot_pose
 
         x = float(pose_data[0])
         y = float(pose_data[1])
@@ -416,6 +416,11 @@ class LocalizationCombinedSpace(BaseObservationSpace):
         )
 
         super().__init__(*args, **kwargs)
+
+    def reset(self) -> None:
+        """Reset the pose and odometry sub-spaces."""
+        self.pose_space.reset()
+        self.odom_space.reset()
 
     def get_gym_space(self) -> spaces.Space:
         """Return gym space for combined localization."""

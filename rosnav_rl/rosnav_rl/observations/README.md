@@ -92,6 +92,7 @@ DataSource (ABC)
 └── Generator[OutputType]
     ├── RobotPoseTFGenerator                    TF tree → Pose2D
     ├── GoalLocationInRobotFrameGenerator       → RobotRelativePosition
+    ├── StraightLineSubgoalGenerator            goal, pose, last command -> SubgoalLocation
     ├── SubgoalLocationInRobotFrameGenerator    → RobotRelativePosition
     ├── DistAngleToGoalGenerator                → DistanceAngleMetrics
     ├── DistAngleToSubgoalGenerator             → DistanceAngleMetrics

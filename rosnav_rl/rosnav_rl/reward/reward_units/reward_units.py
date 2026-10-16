@@ -1381,7 +1381,7 @@ class RewardActiveHeadingDirection(RewardUnit):
                         )
                         # Check if trajectory intersects with pedestrian's VO cone
                         theta_rp = np.arctan2(v_x * np.sin(theta) - p_vy, v_x * np.cos(theta) - p_vx)
-                        if (ped_theta - vo_theta) <= theta_rp <= (ped_theta + vo_theta):
+                        if abs(np.arctan2(np.sin(theta_rp - ped_theta), np.cos(theta_rp - ped_theta))) <= vo_theta:
                             free = False
                             break
 

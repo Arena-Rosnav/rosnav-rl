@@ -109,7 +109,7 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         Returns:
             Tuple of (grid_x, grid_y, valid_mask) where valid_mask filters in-bounds indices.
         """
-        grid_coords = (positions * self._inv_grid_resolution + self._grid_center).astype(np.intp)
+        grid_coords = np.floor(positions * self._inv_grid_resolution + self._grid_center).astype(np.intp)
         grid_x = grid_coords[:, 0]
         grid_y = grid_coords[:, 1]
         valid = (grid_x >= 0) & (grid_x < self._feature_map_size) & (grid_y >= 0) & (grid_y < self._feature_map_size)
@@ -531,7 +531,7 @@ class PedestrianLocationSpace(BaseFeatureMapSpace):
             grid_x, grid_y, valid = self._get_map_indices_vectorized(pedestrian_relative_locations)
             feature_map[grid_y[valid], grid_x[valid]] = 1.0
 
-        return feature_map.flatten() if self._flatten else feature_map
+        return feature_map.flatten() if self._flatten else feature_map.copy()
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.ENVIRONMENT)
@@ -825,4 +825,4 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
 
         feature_map = self._create_feature_map()  # zeros from pre-allocated buffer
         feature_map[grid_y[valid], grid_x[valid]] = values
-        return feature_map.flatten() if self._flatten else feature_map
+        return feature_map.flatten() if self._flatten else feature_map.copy()

@@ -307,6 +307,7 @@ class KinematicStateSpace(BaseObservationSpace):
                   (moderate position, 45° orientation, slow forward motion)
         """
         # Extract values once to avoid repeated indexing and casting
+        robot_pose = robot_pose[()] if isinstance(robot_pose, np.ndarray) and robot_pose.ndim == 0 else robot_pose
         x, y, yaw = robot_pose[0], robot_pose[1], robot_pose[2]
         linear_vel, angular_vel = last_action[0], last_action[-1]
 
@@ -514,6 +515,7 @@ class TrajectoryStateSpace(BaseObservationSpace):
                   (moderate position, 30° heading, medium speed, smooth curved path, high consistency)
         """
         # Extract values once (avoid repeated float() calls)
+        robot_pose = robot_pose[()] if isinstance(robot_pose, np.ndarray) and robot_pose.ndim == 0 else robot_pose
         x, y, yaw = robot_pose[0], robot_pose[1], robot_pose[2]
         linear_vel, angular_vel = last_action[0], last_action[-1]
 

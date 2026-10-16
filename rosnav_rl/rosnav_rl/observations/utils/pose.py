@@ -40,7 +40,7 @@ def get_goal_pose_in_robot_frame(goal_pos: Pose2D, robot_pos: Pose2D) -> tuple[D
     y_relative = goal_pos.y - robot_pos.y
     x_relative = goal_pos.x - robot_pos.x
     rho = (x_relative**2 + y_relative**2) ** 0.5
-    theta = (np.arctan2(y_relative, x_relative) - robot_pos.theta + 4 * np.pi) % (2 * np.pi) - np.pi
+    theta = (np.arctan2(y_relative, x_relative) - robot_pos.theta + np.pi) % (2 * np.pi) - np.pi
     return rho, theta
 
 

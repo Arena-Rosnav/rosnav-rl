@@ -86,8 +86,7 @@ class CollisionMonitorStateCollector(Collector[nav2_msgs.CollisionMonitorState, 
         super().__init__(name, topic, **kwargs)
 
     def _preprocess(self, msg: nav2_msgs.CollisionMonitorState) -> SafetyStatus:
-        # polygon_name is a list[str]; check membership rather than equality
-        return self.state_key in msg.polygon_name
+        return self.state_key == msg.polygon_name
 
 
 class PathCollector(Collector[nav_msgs.Path, NavigationPath]):

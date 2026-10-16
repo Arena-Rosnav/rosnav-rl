@@ -1488,10 +1488,23 @@ class DRL_VO_DEEP(DRL_VO_NAV_EXTRACTOR_TEST):
     ]
 
 
+class FusionScale(nn.Module):
+    """LayerNorms the leading `size` features to unit L2 norm per sample, passing the rest unchanged."""
+
+    def __init__(self, size: int):
+        super().__init__()
+        self.size = size
+        self.norm = nn.LayerNorm(size)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.cat((self.norm(x[:, : self.size]) / self.size**0.5, x[:, self.size :]), dim=1)
+
+
 class DRL_VO_ROSNAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
     def _setup_network(self, inplanes: int = 64):
         super()._setup_network(inplanes)
         self.linear_fc = nn.Sequential(
+            FusionScale(256 * self._block.expansion),
             nn.Linear(
                 256 * self._block.expansion + self._goal_size + self._last_action_size,
                 self._features_dim,

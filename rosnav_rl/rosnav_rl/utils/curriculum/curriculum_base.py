@@ -293,7 +293,8 @@ class CurriculumBase(ABC):
         """Partition param_dict into (obstacles_params, robots_params, plain_dict).
 
         Keys of the form ``task.<mode>.<leaf>`` are routed to obstacles_params
-        with leaf ``<leaf>`` (the node prepends ``task.<active_mode>.`` at apply time).
+        with leaf ``<leaf>`` (the node prepends ``task.<active_mode>.`` at apply time),
+        ``task.episode.*`` node parameters go to plain_dict.
         Robot-side curriculum keys are not currently produced by any config.
         """
         obstacles: list[Parameter] = []
@@ -302,7 +303,7 @@ class CurriculumBase(ABC):
 
         for key, val in param_dict.items():
             parts = key.split(".", 2)
-            if len(parts) == 3 and parts[0] == "task":
+            if len(parts) == 3 and parts[0] == "task" and parts[1] != "episode":
                 leaf = parts[2]
                 if isinstance(val, list) and not val:
                     continue

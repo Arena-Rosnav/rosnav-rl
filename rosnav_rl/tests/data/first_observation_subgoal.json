@@ -1,0 +1,23 @@
+{
+ "recorded": "flatsim training stack, world demo, env 1, first observation of episode 4",
+ "robot_pose": [
+  34.15,
+  11.45,
+  -2.31
+ ],
+ "goal_pose": [
+  27.8,
+  8.75,
+  -1.74
+ ],
+ "previous_subgoal": [
+  28.8,
+  12.15,
+  0.0
+ ],
+ "previous_goal": [
+  28.75,
+  13.05,
+  1.33
+ ]
+}

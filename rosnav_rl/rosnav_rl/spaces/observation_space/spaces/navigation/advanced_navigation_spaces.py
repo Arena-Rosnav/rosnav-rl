@@ -91,7 +91,7 @@ class RobustGoalSpace(BaseObservationSpace):
             return np.clip(distance / self.max_distance, 0.0, 1.0)
         elif self.distance_scaling == "log":
             # Logarithmic scaling for wide distance ranges
-            return np.log(1 + distance) / np.log(1 + self.max_distance)
+            return np.clip(np.log(1 + distance) / np.log(1 + self.max_distance), 0.0, 1.0)
         else:
             raise ValueError(f"Unknown distance scaling: {self.distance_scaling}")
 
@@ -357,7 +357,7 @@ class SubgoalContextSpace(BaseObservationSpace):
         if self.include_goal_subgoal_relation:
             # Calculate relational features
             distance_diff = np.tanh((distances[1] - distances[0]) * inv_max_dist)
-            angle_diff = np.clip((angles[1] - angles[0]) * inv_pi, -1.0, 1.0)
+            angle_diff = np.arctan2(np.sin(angles[1] - angles[0]), np.cos(angles[1] - angles[0])) * inv_pi
             result_list.extend([distance_diff, angle_diff])
 
         return np.array(result_list, dtype=np.float32)

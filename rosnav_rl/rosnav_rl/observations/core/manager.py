@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
+from rclpy.time import Time
 
 from rosnav_rl.utils.rostopic import Namespace
 from rosnav_rl.utils.validation import GeneratorSchemaValidator
@@ -373,6 +375,18 @@ class ObservationManager:
             _observation_callback,
             _synchronized_callback,
         )
+
+    def wait_for_stamp(self, stamp: Time, timeout: float | None) -> bool:
+        """Blocks until every up-to-date collector holds a message stamped at or after `stamp`, False on timeout."""
+        deadline = None if timeout is None else time.monotonic() + timeout
+        pending = [collector for collector in self._collectors.values() if collector.up_to_date_required]
+        while True:
+            pending = [collector for collector in pending if Time.from_msg(collector.latest_msg.header.stamp) < stamp]
+            if not pending:
+                return True
+            if deadline is not None and time.monotonic() > deadline:
+                return False
+            time.sleep(0.002)
 
     def get_observations(self, **extra_observations: Any) -> dict[str, Any]:
         """

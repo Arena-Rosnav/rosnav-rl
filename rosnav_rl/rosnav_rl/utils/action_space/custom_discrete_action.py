@@ -41,8 +41,8 @@ def generate_discrete_action_dict(
         - 'translational': The translational velocity value (None if not specified).
     """
     # Generate linear and angular actions
-    linear_actions = np.linspace(linear_range[0], linear_range[1], num_linear_actions, dtype=np.float16)
-    angular_actions = np.linspace(angular_range[0], angular_range[1], num_angular_actions, dtype=np.float16)
+    linear_actions = np.linspace(linear_range[0], linear_range[1], num_linear_actions)
+    angular_actions = np.linspace(angular_range[0], angular_range[1], num_angular_actions)
 
     # Initialize discrete action space
     discrete_action_space = [
@@ -56,14 +56,13 @@ def generate_discrete_action_dict(
         discrete_action_space.append((0, 0))
 
     # Generate translational actions if specified
-    translational_actions: list[np.float16 | None] = [None]
+    translational_actions: list[np.float64 | None] = [None]
     if translational_range is not None and num_translational_actions > 0:
         translational_actions = list(
             np.linspace(
                 translational_range[0],
                 translational_range[1],
                 num_translational_actions,
-                dtype=np.float16,
             )
         )
 
@@ -125,8 +124,9 @@ def generate_navigational_actions(
         (0.0, -w_max),  # spin right
         (v_slow, w_max),  # creep + spin left
         (v_slow, -w_max),  # creep + spin right
-        (v_back, 0.0),  # back up
     ]
+    if v_back != 0.0:
+        primitives.append((v_back, 0.0))
 
     return [
         {"name": _random_name(), "linear": float(lin), "angular": float(ang), "translational": None}

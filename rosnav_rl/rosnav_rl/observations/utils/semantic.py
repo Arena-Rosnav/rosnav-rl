@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 
 # Pre-allocated 3x3 buffer to avoid per-call allocation in get_relative_pos_to_robot
@@ -90,3 +92,22 @@ def get_relative_vel_to_robot(
     rel_vy = -sin_yaw * vx + cos_yaw * vy
 
     return np.column_stack((rel_vx, rel_vy))
+
+
+def straight_line_subgoal(
+    robot_xy: tuple[float, float],
+    goal_xy: tuple[float, float],
+    speed: float,
+    min_lookahead: float,
+    max_lookahead: float,
+    lookahead_time: float,
+) -> tuple[float, float]:
+    """Point on the robot-to-goal line `speed * lookahead_time` ahead, clamped to [min_lookahead, max_lookahead], the goal itself when closer."""
+    dx = goal_xy[0] - robot_xy[0]
+    dy = goal_xy[1] - robot_xy[1]
+    dist = math.hypot(dx, dy)
+    lookahead = max(min_lookahead, min(max_lookahead, speed * lookahead_time))
+    if dist <= lookahead or dist < 1e-6:
+        return goal_xy[0], goal_xy[1]
+    scale = lookahead / dist
+    return robot_xy[0] + dx * scale, robot_xy[1] + dy * scale

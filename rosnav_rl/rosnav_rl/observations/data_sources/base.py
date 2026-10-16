@@ -194,6 +194,11 @@ class Collector[RosMessageType, ProcessedDataType](DataSource, ErrorReportingMix
         """Get the timestamp of the last update."""
         return self._timestamp
 
+    @property
+    def latest_msg(self) -> RosMessageType | None:
+        """The last message received."""
+        return self._latest_msg
+
     def set_qos_profile(self, profile: QoSProfile | int) -> None:
         """Set the QoS profile for ROS subscriptions."""
         self._qos_profile = profile
