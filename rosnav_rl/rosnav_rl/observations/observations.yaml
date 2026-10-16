@@ -224,7 +224,7 @@ datasources:
   # pedestrian_world_locations:
   #   type: PedestrianLocationGenerator            # Extracts world coordinates of pedestrians
 
-  # Pedestrian motion analysis
+  # # Pedestrian motion analysis
   # pedestrian_relative_velocities:
   #   type: PedestrianRelativeVelGenerator         # Computes pedestrian velocities in robot frame
 
@@ -234,11 +234,11 @@ datasources:
   pedestrian_vel_y:
     type: PedestrianRelativeVelYGenerator        # Left/right velocity component
 
-  # Pedestrian classification and social states
-
+  # # Social navigation metrics
   # pedestrian_distances:
   #   type: PedestrianDistanceGenerator            # Minimum distances to each pedestrian group
 
+  # # Pedestrian classification and social states
   # pedestrian_types:
   #   type: PedestrianTypeGenerator                # Extracts pedestrian group/type classifications
 
