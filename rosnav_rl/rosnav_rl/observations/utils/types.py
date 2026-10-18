@@ -16,8 +16,6 @@ import arena_people_msgs.msg as arena_people_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
 
-from typing import Dict
-
 
 # Schema-based data requirement specification (inspired by Albumentations)
 @dataclass(frozen=True)
@@ -554,7 +552,7 @@ LocalizationQualityVector = Annotated[
 ]
 
 JointStates = Annotated[
-    Dict[str, Dict[str, float]],
+    dict[str, dict[str, float]],
     DataSpec(
         description="Dictionary mapping joint names to their current kinematic states (position, velocity, effort)",
         source="/joint_states topic (sensor_msgs/JointState)",

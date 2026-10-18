@@ -99,7 +99,7 @@ class RGBSpace(BaseObservationSpace):
         image_height: int = 128,
         image_width: int = 128,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
 
         self._sources = sorted(rgb_sources or [])

@@ -592,13 +592,13 @@ class EXTRACTOR_10(EXTRACTOR_5):
     """
 
     def __init__(
-            self,
-            observation_space: gym.spaces.Dict,
-            features_dim: int = 128,
-            stack_size: int = 1,
-            *args: Any,
-            **kwargs: Any,
-        ):
+        self,
+        observation_space: gym.spaces.Dict,
+        features_dim: int = 128,
+        stack_size: int = 1,
+        *args: Any,
+        **kwargs: Any,
+    ):
 
         (self._img_num, self._img_c, self._img_h, self._img_w) = observation_space[RGBSpace.name].shape
 

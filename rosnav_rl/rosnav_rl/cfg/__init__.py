@@ -28,7 +28,7 @@ __all__ = [
     "LoggingCfg",
     "ManipulatorActionSpace",
     "OmnidirectionalActionSpace",
-    "CompositeActionSpace",""
+    "CompositeActionSpace",
     "RewardCfg",
     "VERBOSE_TO_LEVEL",
     "configure_rosnav_rl_logging",

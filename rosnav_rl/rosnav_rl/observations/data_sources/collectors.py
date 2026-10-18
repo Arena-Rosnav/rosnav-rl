@@ -20,13 +20,13 @@ from ..utils.pose import Pose2DType, pose3d_to_pose2d
 from ..utils.types import (
     ArenaPedestrianDetections,
     ImageData,
+    JointStates,
     LidarRanges,
     NavigationPath,
     PedestrianDetections,
     Pose2D,
     RobotVelocity,
     SafetyStatus,
-    JointStates,
 )
 from .base import Collector
 
@@ -197,5 +197,5 @@ class JointStateCollector(Collector[JointTrajectoryControllerState, JointStates]
                 "velocity": float(vel),
                 "effort": float(eff),
             }
-            for name, pos, vel, eff in zip(names, positions, velocities, efforts)
+            for name, pos, vel, eff in zip(names, positions, velocities, efforts, strict=False)
         }
