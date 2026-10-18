@@ -6,11 +6,7 @@ from torch import nn
 
 from rosnav_rl.spaces.observation_space.spaces.dynamics import LastActionSpace
 from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
-from rosnav_rl.spaces.observation_space.spaces.perception import (
-    LaserScanSpace,
-    ReducedLaserScanSpace,
-    RGBSpace
-)
+from rosnav_rl.spaces.observation_space.spaces.perception import LaserScanSpace, ReducedLaserScanSpace, RGBSpace
 
 from .base_extractor import RosnavBaseExtractor, TensorDict
 
@@ -581,8 +577,8 @@ class EXTRACTOR_9(EXTRACTOR_1):
             nn.ReLU(),
         )
 
-class EXTRACTOR_10(EXTRACTOR_5):
 
+class EXTRACTOR_10(EXTRACTOR_5):
     """
     Feature extractor class that implements a specific network architecture (EXTRACTOR_10).
 
@@ -593,35 +589,30 @@ class EXTRACTOR_10(EXTRACTOR_5):
         stack_size (bool, optional): Whether to use stacked observations. Defaults to False.
         *args: Variable length argument list.
         **kwargs: Arbitrary keyword arguments.
-    """    
+    """
 
     def __init__(self, observation_space, features_dim=128, stack_size=1, *args, **kwargs):
 
-        (
-        self._img_num,
-        self._img_c,
-        self._img_h, 
-        self._img_w
-        ) = observation_space[RGBSpace.name].shape
-        
+        (self._img_num, self._img_c, self._img_h, self._img_w) = observation_space[RGBSpace.name].shape
+
         super().__init__(observation_space, features_dim, stack_size, *args, **kwargs)
 
     def _setup_network(self):
         self.cnn = nn.Sequential(
-            nn.Conv1d(self._stack_size, 32, 8, 4), 
+            nn.Conv1d(self._stack_size, 32, 8, 4),
             nn.ReLU(),
-            nn.Conv1d(32, 64, 4, 2), 
+            nn.Conv1d(32, 64, 4, 2),
             nn.ReLU(),
-            nn.Conv1d(64, 64, 3, 1), 
+            nn.Conv1d(64, 64, 3, 1),
             nn.ReLU(),
             nn.Flatten(),
         )
         self.img_cnn = nn.Sequential(
-            nn.Conv2d(self._img_c, 32, 8, 4), 
+            nn.Conv2d(self._img_c, 32, 8, 4),
             nn.ReLU(),
-            nn.Conv2d(32, 64, 4, 2), 
+            nn.Conv2d(32, 64, 4, 2),
             nn.ReLU(),
-            nn.Conv2d(64, 64, 3, 1), 
+            nn.Conv2d(64, 64, 3, 1),
             nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Flatten(),
@@ -630,8 +621,9 @@ class EXTRACTOR_10(EXTRACTOR_5):
             n_laser = self.cnn(th.randn(1, self._stack_size, self._laser_size)).shape[-1]
             n_img = self.img_cnn(th.randn(1, self._img_c, self._img_h, self._img_w)).shape[-1]
         self.fc = nn.Sequential(
-            nn.Linear(n_laser + n_img * self._img_num
-                      + (self._goal_size + self._last_action_size) * self._stack_size, 256),
+            nn.Linear(
+                n_laser + n_img * self._img_num + (self._goal_size + self._last_action_size) * self._stack_size, 256
+            ),
             nn.ReLU(),
             nn.Linear(256, self._features_dim),
             nn.ReLU(),

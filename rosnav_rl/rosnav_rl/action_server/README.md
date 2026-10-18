@@ -106,8 +106,8 @@ future = client.call_async(GetCommand.Request())
 rclpy.spin_until_future_complete(node, future)
 
 response = future.result()
-print(response.action_type)   # e.g. "differential_drive"
-print(response.action)        # e.g. [0.5, 0.0, -0.3]
+print(response.action_type)  # e.g. "differential_drive"
+print(response.action)  # e.g. [0.5, 0.0, -0.3]
 
 node.destroy_node()
 rclpy.shutdown()
@@ -132,6 +132,7 @@ To create a server for a non-Arena environment:
 from rosnav_rl.action_server.base_server import ActionServer, ObservationCollector
 from rosnav_rl.rl_agent import RL_Agent
 
+
 class MyActionServer(ActionServer):
     def _initialize_agent(self) -> RL_Agent:
         # Load your agent however you need
@@ -143,6 +144,7 @@ class MyActionServer(ActionServer):
     def _initialize_observation_collector(self) -> ObservationCollector:
         # Return any object with get_observations() → ObservationDict
         return MyObservationCollector(node=self.node, namespace=self.namespace)
+
 
 # Start the server
 server = MyActionServer(agent_name="my_agent", namespace="/robot0")

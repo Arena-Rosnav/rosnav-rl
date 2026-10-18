@@ -270,9 +270,9 @@ rosnav_rl/
 ```python
 class RL_Agent:
     def __init__(self, spec: AgentConfig):
-        self._initialize_model(spec)          # → ModelFactory.create_model_instance()
-        self._initialize_space_manager(spec)   # → BaseSpaceManager(...)
-        self._initialize_reward_function(spec) # → RewardFunction(...) if reward config exists
+        self._initialize_model(spec)  # → ModelFactory.create_model_instance()
+        self._initialize_space_manager(spec)  # → BaseSpaceManager(...)
+        self._initialize_reward_function(spec)  # → RewardFunction(...) if reward config exists
 ```
 
 `AgentConfig` is a Pydantic v2 model that serves as the **single source of truth** for the entire agent configuration — framework, typed action space, observation spec, environment spec, reward, and logging.
@@ -365,7 +365,7 @@ See [observations/README.md](rosnav_rl/observations/README.md) for the full Data
 
 ```python
 encoded = space_manager.encode_observation(obs_dict)  # → np.ndarray or Dict
-cmd     = space_manager.decode_action(raw_action)      # → [linear.x, linear.y, angular.z]
+cmd = space_manager.decode_action(raw_action)  # → [linear.x, linear.y, angular.z]
 ```
 
 **`ObservationSpaceManager`** features:
@@ -442,8 +442,8 @@ All configs are **Pydantic v2 `BaseModel`** instances supporting `model_validate
 
 ```python
 AgentConfig(
-    name="my_agent",           # auto-generated if omitted
-    robot="jackal",             # one has to specifyaction_space/observation/environment manually
+    name="my_agent",  # auto-generated if omitted
+    robot="jackal",  # one has to specifyaction_space/observation/environment manually
     observations_config="path/to/observations.yaml",  # optional; relative to config file
     discretization=DiscretizationCfg(strategy="navigational"),  # optional; omit for continuous
     framework=StableBaselinesCfg(...),  # discriminated union on framework.name
@@ -598,16 +598,18 @@ Each algorithm params class is wrapped in an `SBAlgorithmCfg` envelope holding:
 `StableBaselinesCfg` is a discriminated union of all `*_Cfg` classes:
 
 ```python
-cfg = StableBaselinesCfg.model_validate({
-    "name": "stable_baselines3",
-    "algorithm": {
-        "architecture_name": "AGENT_1",
-        "parameters": {
-            "algorithm_name": "PPO",
-            "total_timesteps": 5_000_000,
-        }
+cfg = StableBaselinesCfg.model_validate(
+    {
+        "name": "stable_baselines3",
+        "algorithm": {
+            "architecture_name": "AGENT_1",
+            "parameters": {
+                "algorithm_name": "PPO",
+                "total_timesteps": 5_000_000,
+            },
+        },
     }
-})
+)
 ```
 
 ### Recurrent Models

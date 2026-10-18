@@ -2039,6 +2039,7 @@ class RewardLinearVelBoost(RewardUnit):
         """Reset internal state for new episode."""
         pass
 
+
 @RewardUnitFactory.register("arm_goal_reached")
 class RewardArmGoalReached(RewardUnit):
     """Reward unit for calculating the reward when arm reaches goal"""
@@ -2076,7 +2077,7 @@ class RewardArmGoalReached(RewardUnit):
                 f"Current value: {self._reward}"
             )
             self._report_warning(warn_msg)
-        
+
     def __call__(
         self,
         arm_dist_angle_to_goal: DistanceAngleMetrics,
@@ -2136,7 +2137,7 @@ class RewardArmApproachGoal(RewardUnit):
     def __init__(
         self,
         reward_function: "RewardFunction",
-        pos_factor: float = DEFAULTS.ARM_APPROACH_GOAL.POS_FACTOR, 
+        pos_factor: float = DEFAULTS.ARM_APPROACH_GOAL.POS_FACTOR,
         neg_factor: float = DEFAULTS.ARM_APPROACH_GOAL.NEG_FACTOR,
         _goal_update_threshold: float = DEFAULTS.ARM_APPROACH_GOAL._GOAL_UPDATE_THRESHOLD,
         _on_safe_dist_violation: bool = DEFAULTS.ARM_APPROACH_GOAL._ON_SAFE_DIST_VIOLATION,
@@ -2182,13 +2183,13 @@ class RewardArmApproachGoal(RewardUnit):
 
         if self.last_distance is not None:
             distance_change = self.last_distance - current_distance
-            
+
             if abs(distance_change) < self._goal_update_threshold:
                 factor = self._pos_factor if distance_change > 0 else self._neg_factor
                 self.add_reward(float(factor * distance_change))
 
         self.last_distance = current_distance
-        
+
         self.add_info({"is_done": False})
 
     def reset(self):

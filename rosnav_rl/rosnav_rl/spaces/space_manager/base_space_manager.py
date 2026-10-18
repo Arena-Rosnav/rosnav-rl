@@ -62,7 +62,7 @@ class BaseSpaceManager:
 
     def decode_split_action(self, action: np.ndarray) -> List[Tuple[str, np.ndarray]]:
         return self._action_space_manager.decode_split_action(action)
-    
+
     def reset_spaces(self) -> None:
         """Reset the internal state of all observation spaces for a new episode."""
         self._observation_space_manager.reset_spaces()

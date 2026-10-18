@@ -38,15 +38,15 @@ from rosnav_rl.reward.reward_function import RewardFunction
 
 reward_fn = RewardFunction(
     function_dict={
-        "goal_reached":  {"reward": 15.0},
-        "collision":     {"reward": -10.0},
+        "goal_reached": {"reward": 15.0},
+        "collision": {"reward": -10.0},
         "approach_goal": {"pos_factor": 0.3, "neg_factor": 0.5},
         "safe_distance": {"reward": -0.15},
     },
-    parallel=True,          # Enable ThreadPoolExecutor
-    max_workers=4,          # Worker threads
-    timeout=0.1,            # Per-step timeout (seconds)
-    verbose=1,              # Detailed logging
+    parallel=True,  # Enable ThreadPoolExecutor
+    max_workers=4,  # Worker threads
+    timeout=0.1,  # Per-step timeout (seconds)
+    verbose=1,  # Detailed logging
 )
 
 # On each step:
@@ -71,6 +71,7 @@ from rosnav_rl.reward.utils import check_params
 from rosnav_rl.observations.utils.types import DistanceAngleMetrics
 from rosnav_rl.states import SimulationStateContainer
 
+
 @RewardUnitFactory.register("my_approach_reward")
 class MyApproachReward(RewardUnit):
     """Example reward unit with schema-based typed dependencies."""
@@ -87,7 +88,8 @@ class MyApproachReward(RewardUnit):
         pos_factor: float = 0.3,
         neg_factor: float = 0.5,
         _on_safe_dist_violation: bool = True,
-        *args, **kwargs,
+        *args,
+        **kwargs,
     ):
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._pos_factor = pos_factor
@@ -118,8 +120,8 @@ Registry-based factory with a `@register("name")` decorator. No if/elif branchin
 ```python
 # Registration (at import time)
 @RewardUnitFactory.register("collision")
-class RewardCollision(RewardUnit):
-    ...
+class RewardCollision(RewardUnit): ...
+
 
 # Instantiation (at runtime, by RewardFunction)
 unit = RewardUnitFactory.instantiate("collision", reward_function=self, reward=-10.0)

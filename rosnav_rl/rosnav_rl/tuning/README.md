@@ -149,6 +149,7 @@ search_space:
 import optuna
 from rosnav_rl.tuning.sb3_pruner import SB3TrialPruner
 
+
 def objective(trial: optuna.Trial) -> float:
     pruner = SB3TrialPruner(trial, metric="mean_reward", verbose=1)
     model.learn(total_timesteps=500_000, callback=[eval_cb, pruner])
@@ -161,12 +162,13 @@ def objective(trial: optuna.Trial) -> float:
 import optuna
 from rosnav_rl.tuning.dreamerv3_pruner import DreamerV3TrialPruner
 
+
 def objective(trial: optuna.Trial) -> float:
     pruner = DreamerV3TrialPruner(trial, verbose=1)
     model.train(
         train_envs=train_envs,
         eval_envs=eval_envs,
-        after_eval_fn=pruner.after_eval_hook,   # ← inject here
+        after_eval_fn=pruner.after_eval_hook,  # ← inject here
     )
     return pruner.best_metric or 0.0
 ```
@@ -177,6 +179,7 @@ Subclass `TrialPrunerBase` and implement exactly one method:
 
 ```python
 from rosnav_rl.tuning.pruner_base import TrialPrunerBase
+
 
 class MyFrameworkPruner(TrialPrunerBase):
     """Pruner for MyAwesomeRL."""
@@ -194,7 +197,7 @@ pruner = MyFrameworkPruner(trial, metric="episode_reward")
 
 for epoch in range(n_epochs):
     train_one_epoch(...)
-    pruner.check_and_report()   # reports to Optuna; raises TrialPruned if needed
+    pruner.check_and_report()  # reports to Optuna; raises TrialPruned if needed
 ```
 
 ---

@@ -30,7 +30,6 @@ class CustomAgent(StableBaselinesPolicyDescription):
     }
     net_arch = dict(pi=[64, 64], vf=[64, 64])
     activation_fn = nn.ReLU
-
 ```
 
 
@@ -48,31 +47,31 @@ Specify which Stable-Baselines3 algorithm to use:
 Define which observation spaces your agent requires:
 
 ```python
-  observation_spaces = [
+observation_spaces = [
     spaces.StackedLaserMapSpace,
     spaces.DistAngleToSubgoalSpace,
-  # Add more observation spaces as needed
-  ]
+    # Add more observation spaces as needed
+]
 ```
 
 
 ### Network Architecture
 Configure the policy and value function networks:
 ```python
-  net_arch = dict(
-    pi=[64, 64], # Policy network architecture
-    vf=[64, 64] # Value function network architecture
-  )
+net_arch = dict(
+    pi=[64, 64],  # Policy network architecture
+    vf=[64, 64],  # Value function network architecture
+)
 ```
 
 ### Feature Extraction
 Specify how raw observations should be processed:
 ```python
-  features_extractor_class = CustomFeatureExtractor
-  features_extractor_kwargs = {
+features_extractor_class = CustomFeatureExtractor
+features_extractor_kwargs = {
     "features_dim": 256,
     # Additional extractor parameters
-  }
+}
 ```
 
 
@@ -82,11 +81,11 @@ Specify how raw observations should be processed:
 Customize observation space parameters:
 
 ```python
-  observation_space_kwargs = {
+observation_space_kwargs = {
     "roi_in_m": 20,
     "feature_map_size": 80,
     "normalize": True,
-  }
+}
 ```
 
 
@@ -106,28 +105,28 @@ Here's a more sophisticated example using RecurrentPPO:
 ```python
 @AgentFactory.register("RecurrentNavigationAgent")
 class RecurrentNavigationAgent(StableBaselinesPolicyDescription):
-  algorithm_class = RecurrentPPO
-  observation_spaces = [
-    spaces.StackedLaserMapSpace,
-    spaces.PedestrianVelXSpace,
-    spaces.PedestrianVelYSpace,
-    spaces.DistAngleToSubgoalSpace,
-  ]
-  observation_space_kwargs = {
-    "roi_in_m": 20,
-    "feature_map_size": 80,
-    "laser_stack_size": 10,
-    "normalize": True,
-    "goal_max_dist": 10,
-  }
-  features_extractor_class = CustomRecurrentExtractor
-  features_extractor_kwargs = {
-    "features_dim": 512,
-    "lstm_hidden_size": 128,
-    "n_lstm_layers": 2,
-  }
-  net_arch = dict(pi=[256, 128], vf=[256, 64])
-  activation_fn = nn.GELU
+    algorithm_class = RecurrentPPO
+    observation_spaces = [
+        spaces.StackedLaserMapSpace,
+        spaces.PedestrianVelXSpace,
+        spaces.PedestrianVelYSpace,
+        spaces.DistAngleToSubgoalSpace,
+    ]
+    observation_space_kwargs = {
+        "roi_in_m": 20,
+        "feature_map_size": 80,
+        "laser_stack_size": 10,
+        "normalize": True,
+        "goal_max_dist": 10,
+    }
+    features_extractor_class = CustomRecurrentExtractor
+    features_extractor_kwargs = {
+        "features_dim": 512,
+        "lstm_hidden_size": 128,
+        "n_lstm_layers": 2,
+    }
+    net_arch = dict(pi=[256, 128], vf=[256, 64])
+    activation_fn = nn.GELU
 ```
 
 

@@ -141,7 +141,9 @@ import rosnav_rl
 from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.stable_baselines3.cfg import (
-    StableBaselinesCfg, PPO_Cfg, PPO_Algorithm_Cfg,
+    StableBaselinesCfg,
+    PPO_Cfg,
+    PPO_Algorithm_Cfg,
 )
 
 spec = rosnav_rl.AgentConfig(
@@ -174,8 +176,8 @@ spec = rosnav_rl.AgentConfig(
     ),
     reward=rosnav_rl.RewardCfg(
         reward_function_dict={
-            "goal_reached":  {"reward": 15.0},
-            "collision":     {"reward": -10.0},
+            "goal_reached": {"reward": 15.0},
+            "collision": {"reward": -10.0},
             "approach_goal": {"pos_factor": 0.3, "neg_factor": 0.5},
             "safe_distance": {"reward": -0.15},
         },

@@ -43,7 +43,7 @@ manager = BaseSpaceManager(agent_state_container=agent_state_container)
 
 # During each step:
 encoded_obs = manager.encode_observation(obs_dict)  # → np.ndarray or dict
-action_cmd  = manager.decode_action(raw_action)      # → np.ndarray [linear.x, linear.y, angular.z]
+action_cmd = manager.decode_action(raw_action)  # → np.ndarray [linear.x, linear.y, angular.z]
 ```
 
 **Initialization flow:**
@@ -65,16 +65,18 @@ Manages a collection of `BaseObservationSpace` modules and produces encoded obse
 from rosnav_rl.spaces.observation_space.observation_space_manager import ObservationSpaceManager
 
 manager = ObservationSpaceManager(parallel_encoding=True)
-manager.load_configuration({
-    "ReliableLaserSpace": {"laser_num_beams": 360, "laser_max_range": 30.0},
-    "DistAngleToGoalSpace": {"goal_max_dist": 10.0},
-    "LastActionSpace": {},
-})
+manager.load_configuration(
+    {
+        "ReliableLaserSpace": {"laser_num_beams": 360, "laser_max_range": 30.0},
+        "DistAngleToGoalSpace": {"goal_max_dist": 10.0},
+        "LastActionSpace": {},
+    }
+)
 
 # Properties
-manager.observation_space       # → gymnasium.spaces.Dict or single Space
-manager.space_list              # → list of BaseObservationSpace instances
-manager.required_observations   # → {"ReliableLaserSpace": ["front_laser"], ...}
+manager.observation_space  # → gymnasium.spaces.Dict or single Space
+manager.space_list  # → list of BaseObservationSpace instances
+manager.required_observations  # → {"ReliableLaserSpace": ["front_laser"], ...}
 manager.get_available_spaces_by_category()  # → {"perception": [...], "navigation": [...], ...}
 ```
 
@@ -88,14 +90,19 @@ Registry-based factory with flexible naming and categorization.
 @SpaceFactory.register("laser_scan")
 class LaserScanSpace(BaseObservationSpace): ...
 
+
 # 2. Auto-derived names (PascalCase primary + snake_case alias)
 @SpaceFactory.register(auto_name=True)
 class MotionStateSpace(BaseObservationSpace): ...
+
+
 # Registered as: "MotionStateSpace" (primary) + "motion_state" (alias)
+
 
 # 3. Explicit name with aliases
 @SpaceFactory.register("motion", aliases=["motion_state", "MotionStateSpace"])
 class MotionSpace(BaseObservationSpace): ...
+
 
 # 4. With category tag
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
@@ -246,6 +253,7 @@ from rosnav_rl.observations.utils.types import LidarRanges
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from rosnav_rl.spaces.observation_space.spaces.base_observation_space import BaseObservationSpace
+
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
 class MyCustomLaserSpace(BaseObservationSpace):

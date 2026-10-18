@@ -123,7 +123,7 @@ from rosnav_rl.model.dreamerv3.envs.wrappers import (
     SelectAction,
     UUID,
     ResetWoInfo,
-    ChannelFirsttoLast
+    ChannelFirsttoLast,
 )
 ```
 
@@ -147,14 +147,15 @@ from rosnav_rl.model.dreamerv3 import (
     UUID,
     ResetWoInfo,
     ChannelFirsttoLast,
-    Parallel
+    Parallel,
 )
+
 
 # Define environment creation function
 def make_env(mode, idx):
     # Create your ROS environment here
     env = YourROSEnvironment()
-    
+
     # Apply wrappers
     env = WoTruncatedFlag(env)
     env = TimeLimit(env, duration=max_steps)
@@ -163,6 +164,7 @@ def make_env(mode, idx):
     env = ResetWoInfo(env)
     env = ChannelFirsttoLast(env)
     return env
+
 
 # Create parallel environments
 train_env_fncs = [lambda: make_env("train", i) for i in range(n_envs)]
@@ -180,6 +182,7 @@ In your agent configuration, specify which observation spaces to use:
 ```python
 from rosnav_rl.spaces import observation_space as spaces
 
+
 class DreamerV3Model(RL_Model):
     # Define which observation spaces the model uses
     @property
@@ -193,7 +196,7 @@ class DreamerV3Model(RL_Model):
             spaces.IsFirstStepSpace,
             spaces.IsTerminalStepSpace,
         ]
-    
+
     # Define parameters for observation spaces
     @property
     def observation_space_kwargs(self) -> Dict[str, Any]:
@@ -226,23 +229,20 @@ To customize training behavior, modify the training configuration:
 ```python
 training_config = TrainingConfig(
     # Environment interaction
-    batch_size=16,          # Batch size for training
-    batch_length=64,        # Sequence length for recurrent processing
-    train_ratio=512,        # Ratio of model updates to environment steps
-    
+    batch_size=16,  # Batch size for training
+    batch_length=64,  # Sequence length for recurrent processing
+    train_ratio=512,  # Ratio of model updates to environment steps
     # Optimization parameters
-    learning_rate=1e-4,     # Learning rate for all components
-    grad_clip=1000,         # Gradient clipping value
-    
+    learning_rate=1e-4,  # Learning rate for all components
+    grad_clip=1000,  # Gradient clipping value
     # Actor-critic parameters
-    discount=0.997,         # Discount factor for returns
-    horizon=15,             # Planning horizon for imagination
-    actor_entropy=1e-4,     # Entropy regularization coefficient
-    
+    discount=0.997,  # Discount factor for returns
+    horizon=15,  # Planning horizon for imagination
+    actor_entropy=1e-4,  # Entropy regularization coefficient
     # Target network settings
-    slow_target=True,       # Use slow-moving target networks
-    slow_target_fraction=1, # Target network update rate
-    slow_target_update=100, # Target network update frequency
+    slow_target=True,  # Use slow-moving target networks
+    slow_target_fraction=1,  # Target network update rate
+    slow_target_update=100,  # Target network update frequency
 )
 ```
 

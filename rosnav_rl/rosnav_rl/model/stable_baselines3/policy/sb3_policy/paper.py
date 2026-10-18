@@ -327,6 +327,7 @@ class AGENT_6(StableBaselinesPolicyDescription):
     shared_lstm = False
     enable_critic_lstm = True
 
+
 @AgentFactory.register("AGENT_7")
 class AGENT_7(StableBaselinesPolicyDescription):
     algorithm_class: Type[BaseAlgorithm] = PPO

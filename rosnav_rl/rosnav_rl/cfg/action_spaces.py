@@ -434,10 +434,7 @@ class ManipulatorActionSpace(BaseActionSpace):
         limits_dict = raw_limits.get("joint_limits", raw_limits)
 
         for jn in joint_names:
-            jl = limits_dict.get(
-                jn,
-                next((v for k, v in limits_dict.items() if k == jn or jn.endswith(k)), {})
-            )
+            jl = limits_dict.get(jn, next((v for k, v in limits_dict.items() if k == jn or jn.endswith(k)), {}))
 
             if isinstance(jl, dict) and jl.get("has_position_limits", False):
                 min_pos = float(jl["min_position"])
@@ -447,7 +444,6 @@ class ManipulatorActionSpace(BaseActionSpace):
                 position_limits.append((-6.283185307179586, 6.283185307179586))
 
         return cls(joint_names=joint_names, position_limits=position_limits)
-
 
 
 # =====================================================================
@@ -492,14 +488,14 @@ class HumanoidActionSpace(BaseActionSpace):
             "upper_body_joint_limits": [list(lim) for lim in self.upper_body_joint_limits],
         }
 
+
 # =====================================================================
 #  Composite Action Space
 # =====================================================================
 
 
 class CompositeActionSpace(BaseActionSpace):
-    """ Generic Container for the merging of an abitrary amount of action spaces.
-    """
+    """Generic Container for the merging of an abitrary amount of action spaces."""
 
     type: Literal["composite"] = "composite"
     action_spaces: List[ActionSpaceSpec] = Field(default_factory=list)
@@ -526,19 +522,17 @@ class CompositeActionSpace(BaseActionSpace):
             highs.append(gym_space.high)
 
         return spaces.Box(
-            low = np.concatenate(lows).astype(np.float32),
-            high = np.concatenate(highs).astype(np.float32),
-            dtype=np.float32
+            low=np.concatenate(lows).astype(np.float32), high=np.concatenate(highs).astype(np.float32), dtype=np.float32
         )
 
     def decode(self, action: np.ndarray) -> np.ndarray:
         a = np.asarray(action, dtype=np.float32).reshape(-1)
         if a.shape[0] != self.num_dof:
             raise ValueError(f"expected {self.num_dof}, got {a.shape[0]}")
-        
-        out, idx = [], 0 
+
+        out, idx = [], 0
         for s in self.action_spaces:
-            out.append(np.asarray(s.decode(a[idx:idx + s.num_dof]), dtype=np.float32).reshape(-1))
+            out.append(np.asarray(s.decode(a[idx : idx + s.num_dof]), dtype=np.float32).reshape(-1))
             idx += s.num_dof
         return np.concatenate(out)
 
@@ -549,23 +543,33 @@ class CompositeActionSpace(BaseActionSpace):
 
         out, idx = [], 0
         for s in self.action_spaces:
-            out.append((s.type, np.asarray(s.decode(a[idx:idx + s.num_dof]), dtype=np.float32).reshape(-1)))
+            out.append((s.type, np.asarray(s.decode(a[idx : idx + s.num_dof]), dtype=np.float32).reshape(-1)))
             idx += s.num_dof
         return out
 
     def resolve_discretization(self, robot_discrete_actions: Optional[List] = None) -> CompositeActionSpace:
-        return self.model_copy(update={"action_spaces":
-            [s.resolve_discretization(robot_discrete_actions) if hasattr(s, "resolve_discretization") else s
-            for s in self.action_spaces]})
+        return self.model_copy(
+            update={
+                "action_spaces": [
+                    s.resolve_discretization(robot_discrete_actions) if hasattr(s, "resolve_discretization") else s
+                    for s in self.action_spaces
+                ]
+            }
+        )
 
     def _to_legacy_actions(self) -> dict:
         return {f"{s.type}_{i}": s._to_legacy_actions() for i, s in enumerate(self.action_spaces)}
+
 
 # =====================================================================
 #  Discriminated union — auto-selects type from YAML ``type`` field
 # =====================================================================
 
 ActionSpaceSpec = Annotated[
-    DifferentialDriveActionSpace | OmnidirectionalActionSpace | ManipulatorActionSpace | HumanoidActionSpace | CompositeActionSpace,
+    DifferentialDriveActionSpace
+    | OmnidirectionalActionSpace
+    | ManipulatorActionSpace
+    | HumanoidActionSpace
+    | CompositeActionSpace,
     Discriminator("type"),
 ]

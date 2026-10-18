@@ -56,10 +56,10 @@ from rosnav_rl.spaces.observation_space.spaces_new.perception import MultiLaserF
 config = {
     "laser_configs": [
         {"topic": "/scan_front", "weight": 1.0, "angle_offset": 0.0},
-        {"topic": "/scan_rear", "weight": 0.9, "angle_offset": 3.14159}
+        {"topic": "/scan_rear", "weight": 0.9, "angle_offset": 3.14159},
     ],
     "fusion_method": "weighted_average",
-    "confidence_threshold": 0.7
+    "confidence_threshold": 0.7,
 }
 
 fusion_space = MultiLaserFusionSpace(**config)

@@ -72,8 +72,7 @@ New frameworks are registered with a decorator or explicit call:
 
 ```python
 @ModelFactory.register(SupportedRLFrameworks.STABLE_BASELINES3)
-class StableBaselinesModel(RL_Model):
-    ...
+class StableBaselinesModel(RL_Model): ...
 ```
 
 Creating a model instance from a plain dict → Pydantic config → model:
@@ -82,7 +81,7 @@ Creating a model instance from a plain dict → Pydantic config → model:
 from rosnav_rl.model.model_factory import ModelFactory
 
 model = ModelFactory.create_model_instance(
-    framework_cfg=stable_baselines_cfg,   # StableBaselinesCfg
+    framework_cfg=stable_baselines_cfg,  # StableBaselinesCfg
     rl_agent=agent,
 )
 ```
@@ -170,17 +169,19 @@ classes, so plain dicts are automatically parsed to the correct type:
 ```python
 from rosnav_rl.model.stable_baselines3.cfg import StableBaselinesCfg
 
-cfg = StableBaselinesCfg.model_validate({
-    "name": "stable_baselines3",
-    "algorithm": {
-        "architecture_name": "AGENT_1",
-        "parameters": {
-            "algorithm_name": "PPO",
-            "total_timesteps": 5_000_000,
-            "clip_range": 0.15,
-        }
+cfg = StableBaselinesCfg.model_validate(
+    {
+        "name": "stable_baselines3",
+        "algorithm": {
+            "architecture_name": "AGENT_1",
+            "parameters": {
+                "algorithm_name": "PPO",
+                "total_timesteps": 5_000_000,
+                "clip_range": 0.15,
+            },
+        },
     }
-})
+)
 ```
 
 ### Policy Descriptions
@@ -242,9 +243,11 @@ architecture details.
    ```python
    from .base import OnPolicyParameters, SBAlgorithmCfg  # or OffPolicyParameters
 
+
    class MyAlgo_Algorithm_Cfg(OnPolicyParameters):
        algorithm_name = "MyAlgo"
        my_param: float = 0.42
+
 
    class MyAlgo_Cfg(SBAlgorithmCfg):
        parameters: MyAlgo_Algorithm_Cfg
@@ -262,6 +265,7 @@ architecture details.
 
    ```python
    from my_package import MyAlgo
+
    POLICY_TYPE[MyAlgo] = "MultiInputPolicy"
    ```
 

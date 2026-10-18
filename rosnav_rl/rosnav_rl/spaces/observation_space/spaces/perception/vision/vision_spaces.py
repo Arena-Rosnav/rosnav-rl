@@ -88,9 +88,9 @@ class RGBDSpace(BaseObservationSpace):
         rgbd_image = np.concatenate([color_image, depth_image], axis=-1)
         return rgbd_image.astype(np.uint8)
 
+
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
 class RGBSpace(BaseObservationSpace):
-
     name = "RGBSpace"
 
     def __init__(
@@ -142,10 +142,10 @@ class RGBSpace(BaseObservationSpace):
             if img.ndim == 3 and img.shape[2] in (3, 4):
                 img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
 
-            if img.shape[-1] != 3:  
+            if img.shape[-1] != 3:
                 continue  # None RGB format
 
             img = self.resize_hwc(img, self._image_height, self._image_width)
             out[i] = np.clip(img, 0, 255).astype(np.uint8).transpose(2, 0, 1)
-            
+
         return out

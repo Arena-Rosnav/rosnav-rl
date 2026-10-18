@@ -38,6 +38,7 @@ import gymnasium as gym
 from rosnav_rl.observations import ObservationManager
 from rosnav_rl.reward.reward_function import RewardFunction
 
+
 class NavEnv(gym.Env):
     def __init__(self, obs_manager, reward_fn, space_manager):
         self.obs_manager = obs_manager
@@ -74,7 +75,9 @@ class NavEnv(gym.Env):
 import rosnav_rl
 from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
 from rosnav_rl.model.stable_baselines3.cfg import (
-    StableBaselinesCfg, PPO_Cfg, PPO_Algorithm_Cfg,
+    StableBaselinesCfg,
+    PPO_Cfg,
+    PPO_Algorithm_Cfg,
 )
 
 spec = rosnav_rl.AgentConfig(
@@ -96,8 +99,8 @@ spec = rosnav_rl.AgentConfig(
     ),
     reward=rosnav_rl.RewardCfg(
         reward_function_dict={
-            "goal_reached":  {"reward": 15.0},
-            "collision":     {"reward": -10.0},
+            "goal_reached": {"reward": 15.0},
+            "collision": {"reward": -10.0},
             "approach_goal": {"pos_factor": 0.3, "neg_factor": 0.5},
             "safe_distance": {"reward": -0.15},
         },
@@ -118,7 +121,7 @@ agent.initialize_model()
 
 # Create vectorized environments
 train_envs = [make_env("train", i) for i in range(num_envs)]
-eval_envs  = [make_env("eval", i) for i in range(num_eval_envs)]
+eval_envs = [make_env("eval", i) for i in range(num_eval_envs)]
 
 # Train
 agent.train(train_envs=train_envs, eval_envs=eval_envs)
@@ -210,6 +213,7 @@ To deploy outside Arena, implement your own `ActionServer`:
 from rosnav_rl.action_server.base_server import ActionServer, ObservationCollector
 from rosnav_rl.rl_agent import RL_Agent
 
+
 class MyActionServer(ActionServer):
     def _initialize_agent(self) -> RL_Agent:
         spec = rosnav_rl.AgentConfig.from_yaml("path/to/training_config.yaml")
@@ -219,6 +223,7 @@ class MyActionServer(ActionServer):
 
     def _initialize_observation_collector(self) -> ObservationCollector:
         return MyObsCollector(node=self.node, namespace=self.namespace)
+
 
 server = MyActionServer(agent_name="my_agent", namespace="/robot0")
 server.start()  # Blocks — spins the ROS 2 node
@@ -239,9 +244,11 @@ Create a file in `rosnav_rl/model/stable_baselines3/cfg/` (e.g., `myalgo.py`):
 ```python
 from .base import OnPolicyParameters, SBAlgorithmCfg  # or OffPolicyParameters
 
+
 class MyAlgo_Algorithm_Cfg(OnPolicyParameters):
     algorithm_name: str = "MyAlgo"
     my_custom_param: float = 0.42
+
 
 class MyAlgo_Cfg(SBAlgorithmCfg):
     parameters: MyAlgo_Algorithm_Cfg
@@ -266,6 +273,7 @@ algorithm: Union[..., MyAlgo_Cfg, SBAlgorithmCfg]
 In `policy/constants.py`:
 ```python
 from my_sb3_package import MyAlgo
+
 POLICY_TYPE[MyAlgo] = "MultiInputPolicy"
 ```
 
@@ -289,21 +297,18 @@ To integrate a completely new RL library (e.g., CleanRL, RLlib):
 ```python
 from rosnav_rl.model.model import RL_Model
 
+
 class MyFrameworkModel(RL_Model):
     def setup_model(self, *args, **kwargs):
         self._model = ...  # Initialize your algorithm
 
-    def train(self, *args, **kwargs):
-        ...  # Training loop
+    def train(self, *args, **kwargs): ...  # Training loop
 
-    def save(self, path, *args, **kwargs):
-        ...  # Persist weights
+    def save(self, path, *args, **kwargs): ...  # Persist weights
 
-    def load(self, path, *args, **kwargs):
-        ...  # Restore weights
+    def load(self, path, *args, **kwargs): ...  # Restore weights
 
-    def get_action(self, observation, *args, **kwargs):
-        ...  # Inference
+    def get_action(self, observation, *args, **kwargs): ...  # Inference
 
     @classmethod
     def from_framework_cfg(cls, rl_agent, framework_cfg, *args, **kwargs):
@@ -335,6 +340,7 @@ ModelFactory.register_model(SupportedRLFrameworks.MY_FRAMEWORK, MyFrameworkModel
 
 ```python
 from rosnav_rl.cfg.framework import FrameworkCfg
+
 
 class MyFrameworkCfg(FrameworkCfg):
     name: str = "my_framework"
@@ -379,6 +385,7 @@ from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
 
+
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
 class FilteredLaserSpace(BaseObservationSpace):
     """Laser scan with median filtering and range clipping."""
@@ -391,7 +398,8 @@ class FilteredLaserSpace(BaseObservationSpace):
         laser_num_beams: int = 360,
         laser_max_range: float = 30.0,
         kernel_size: int = 5,
-        *args, **kwargs,
+        *args,
+        **kwargs,
     ):
         self._num_beams = laser_num_beams
         self._max_range = laser_max_range
@@ -410,6 +418,7 @@ class FilteredLaserSpace(BaseObservationSpace):
     def encode_observation(self, front_laser: LidarRanges, *args, **kwargs) -> np.ndarray:
         # Typed kwargs match the 'requires' dict — no manual dict unpacking
         from scipy.ndimage import median_filter
+
         filtered = median_filter(front_laser, size=self._kernel)
         return np.clip(filtered, 0, self._max_range).astype(np.float32)
 ```
@@ -474,6 +483,7 @@ import numpy as np
 import sensor_msgs.msg as sensor_msgs
 from rosnav_rl.observations.data_sources.base import Collector
 
+
 class DepthImageCollector(Collector[sensor_msgs.Image, np.ndarray]):
     """Collects depth images and converts to float32 arrays."""
 
@@ -489,6 +499,7 @@ Subclass `Generator[OutputType]`, set `requires`, and implement `_generate()`:
 import numpy as np
 from rosnav_rl.observations.data_sources.base import Generator
 from rosnav_rl.observations.utils.types import LidarRanges
+
 
 class MinObstacleDistGenerator(Generator[float]):
     """Derives the minimum obstacle distance from laser data."""
@@ -548,6 +559,7 @@ from rosnav_rl.reward.reward_units.reward_unit_factory import RewardUnitFactory
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.reward.utils import check_params
 
+
 @RewardUnitFactory.register("proximity_penalty")
 class ProximityPenalty(RewardUnit):
     """Penalizes getting too close to obstacles."""
@@ -565,7 +577,8 @@ class ProximityPenalty(RewardUnit):
         penalty: float = -0.5,
         threshold: float = 0.3,
         _on_safe_dist_violation: bool = False,
-        *args, **kwargs,
+        *args,
+        **kwargs,
     ):
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._penalty = penalty
@@ -659,6 +672,7 @@ from rosnav_rl.model.stable_baselines3.policy.base_policy import (
     StableBaselinesPolicyDescription,
 )
 from rosnav_rl.spaces.observation_space import spaces
+
 
 @AgentFactory.register("MY_CUSTOM_AGENT")
 class MyCustomAgent(StableBaselinesPolicyDescription):
@@ -917,11 +931,10 @@ from rosnav_rl.tuning import TuningCfg, suggest_params, apply_params
 from rosnav_rl.tuning import FloatParam, IntParam
 
 search_space = {
-    "agent_spec.framework.algorithm.parameters.learning_rate":
-        FloatParam(low=1e-5, high=1e-3, log=True),
-    "agent_spec.framework.algorithm.parameters.n_steps":
-        IntParam(low=128, high=4096, step=128),
+    "agent_spec.framework.algorithm.parameters.learning_rate": FloatParam(low=1e-5, high=1e-3, log=True),
+    "agent_spec.framework.algorithm.parameters.n_steps": IntParam(low=128, high=4096, step=128),
 }
+
 
 # Build a custom objective
 def objective(trial):
@@ -929,6 +942,7 @@ def objective(trial):
     config_dict = apply_params(base_config_dict, params)
     # ... validate, train, return metric
     return metric_value
+
 
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=20)

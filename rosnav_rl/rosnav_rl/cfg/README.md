@@ -43,8 +43,8 @@ spec = AgentConfig(
     ),
     reward=RewardCfg(
         reward_function_dict={
-            "goal_reached":  {"reward": 15.0},
-            "collision":     {"reward": -10.0},
+            "goal_reached": {"reward": 15.0},
+            "collision": {"reward": -10.0},
         }
     ),
 )
@@ -166,6 +166,7 @@ Abstract base class for all RL framework configurations. Only requires a `name` 
 ```python
 from rosnav_rl.cfg import FrameworkCfg
 
+
 class MyFrameworkCfg(FrameworkCfg):
     name: str = "my_framework"
     # ... framework-specific fields
@@ -180,19 +181,19 @@ from rosnav_rl.cfg import RewardCfg
 
 cfg = RewardCfg(
     reward_function_dict={
-        "goal_reached":   {"reward": 15.0},
-        "collision":      {"reward": -10.0, "bumper_zone": 0.05},
-        "approach_goal":  {"pos_factor": 0.3, "neg_factor": 0.5, "_on_safe_dist_violation": True},
-        "safe_distance":  {"reward": -0.15},
+        "goal_reached": {"reward": 15.0},
+        "collision": {"reward": -10.0, "bumper_zone": 0.05},
+        "approach_goal": {"pos_factor": 0.3, "neg_factor": 0.5, "_on_safe_dist_violation": True},
+        "safe_distance": {"reward": -0.15},
     },
-    reward_unit_kwargs=None,   # Additional global kwargs for all units
-    verbose=False,             # Enable reward breakdown logging
+    reward_unit_kwargs=None,  # Additional global kwargs for all units
+    verbose=False,  # Enable reward breakdown logging
 )
 ```
 
 **Type aliases:**
 ```python
-RewardUnitDict = Dict[str, Any]           # {"reward": 15.0, "_follow_subgoal": False}
+RewardUnitDict = Dict[str, Any]  # {"reward": 15.0, "_follow_subgoal": False}
 RewardFunctionDict = Dict[str, RewardUnitDict]  # {"goal_reached": {...}, "collision": {...}}
 ```
 
@@ -207,8 +208,8 @@ cfg = LoggingCfg(
     default_level="INFO",
     overrides={
         "rosnav_rl.observations": "WARNING",  # Silence per-step obs noise
-        "rosnav_rl.reward": "WARNING",         # Silence per-step reward breakdown
-        "rosnav_rl.spaces": "WARNING",         # Silence space auto-load info
+        "rosnav_rl.reward": "WARNING",  # Silence per-step reward breakdown
+        "rosnav_rl.spaces": "WARNING",  # Silence space auto-load info
     },
 )
 

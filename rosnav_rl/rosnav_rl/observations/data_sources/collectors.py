@@ -176,34 +176,26 @@ class ArenaPedestrianCollector(Collector[arena_people_msgs.Pedestrians, ArenaPed
     def _preprocess(self, msg: arena_people_msgs.Pedestrians) -> arena_people_msgs.Pedestrians:
         return msg
 
-class JointStateCollector(Collector[JointTrajectoryControllerState, JointStates]):  
 
+class JointStateCollector(Collector[JointTrajectoryControllerState, JointStates]):
     """
     Collects and preprocesses joint state data from a ROS topic.
-    """   
+    """
 
     def _preprocess(self, msg: JointTrajectoryControllerState) -> JointStates:
 
         names = msg.joint_names
         positions = msg.feedback.positions
 
-        velocities = (
-            msg.feedback.velocities
-            if len(msg.feedback.velocities) == len(names)
-            else [0.0] * len(names)
-        )
+        velocities = msg.feedback.velocities if len(msg.feedback.velocities) == len(names) else [0.0] * len(names)
 
-        efforts = (
-            msg.feedback.effort
-            if len(msg.feedback.effort) == len(names)
-            else [0.0] * len(names)
-        )
-        
+        efforts = msg.feedback.effort if len(msg.feedback.effort) == len(names) else [0.0] * len(names)
+
         return {
-            name : {
-                "position" : float(pos),
-                "velocity" : float(vel),
-                "effort"   : float(eff),
+            name: {
+                "position": float(pos),
+                "velocity": float(vel),
+                "effort": float(eff),
             }
             for name, pos, vel, eff in zip(names, positions, velocities, efforts)
         }
