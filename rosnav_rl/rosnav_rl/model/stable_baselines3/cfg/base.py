@@ -46,6 +46,7 @@ class SBAlgorithmParameters(BaseModel, ABC):
     tensorboard_log: str | None = None
     verbose: int = 0
     seed: int | None = None
+    log_std_init: float | None = None
     device: th.device | str = "auto"
     show_progress_bar: bool = False
     _init_setup_model: bool = True

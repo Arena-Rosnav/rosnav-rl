@@ -507,6 +507,7 @@ class StableBaselinesModel(RL_Model):
             "tensorboard_log",
             "total_timesteps",
             "show_progress_bar",
+            "log_std_init",
         }
 
         if isinstance(parameters, OnPolicyParameters):
@@ -525,10 +526,13 @@ class StableBaselinesModel(RL_Model):
         algo_init_params = set(inspect.signature(algo_cls.__init__).parameters) - {"self"}
 
         # Always include these non-config kwargs that come from other sources.
+        policy_kwargs = self._policy_description.get_kwargs()
+        if parameters.log_std_init is not None:
+            policy_kwargs["log_std_init"] = parameters.log_std_init
         base_kwargs = {
             "env": env,
             "policy": POLICY_TYPE[algo_cls],
-            "policy_kwargs": self._policy_description.get_kwargs(),
+            "policy_kwargs": policy_kwargs,
             "tensorboard_log": tensorboard_log_path or parameters.tensorboard_log,
             "device": DEVICE_CPU if no_gpu else DEVICE_AUTO,
         }

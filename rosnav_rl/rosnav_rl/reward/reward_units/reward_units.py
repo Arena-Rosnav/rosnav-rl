@@ -1877,6 +1877,32 @@ class RewardAngularVelocityConstraint(RewardUnit):
         pass
 
 
+@RewardUnitFactory.register("step_cost")
+class RewardStepCost(RewardUnit):
+    """Constant reward on every step, a time cost when negative."""
+
+    requires = {}
+
+    @check_params
+    def __init__(
+        self,
+        reward_function: RewardFunction,
+        reward: float = -0.01,
+        _on_safe_dist_violation: bool = True,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+        self._reward = reward
+
+    def check_parameters(self) -> None:
+        if self._reward > 0.0:
+            self._report_warning(f"Positive step reward: {self._reward}")
+
+    def __call__(self, *args: Any, **kwargs: Any) -> None:
+        self.add_reward(self._reward)
+
+
 @RewardUnitFactory.register("max_steps_exceeded")
 class RewardMaxStepsExceeded(RewardUnit):
     """
