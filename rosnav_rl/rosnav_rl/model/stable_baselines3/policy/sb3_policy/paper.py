@@ -13,7 +13,7 @@ from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
 from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
 from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_5_extended
-from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR
+from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR, DRL_VO_ROSNAV_SCALAR_EXTRACTOR
 
 
 @AgentFactory.register("AGENT_1")
@@ -264,6 +264,14 @@ class AGENT_5(StableBaselinesPolicyDescription):
     }
     net_arch = dict(pi=[256, 128], vf=[256, 64])
     activation_fn = nn.ReLU
+
+
+@AgentFactory.register("AGENT_5_TTC")
+class AGENT_5_TTC(AGENT_5):
+    """AGENT_5 plus the crowd time-to-contact scalars in the head."""
+
+    observation_spaces = [*AGENT_5.observation_spaces, spaces.environment.CrowdTimeToContactSpace]
+    features_extractor_class = DRL_VO_ROSNAV_SCALAR_EXTRACTOR
 
 
 @AgentFactory.register("AGENT_6")

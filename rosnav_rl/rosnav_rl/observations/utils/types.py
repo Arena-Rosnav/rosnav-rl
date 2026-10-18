@@ -280,6 +280,18 @@ ArenaPedestrianStates = Annotated[
     ),
 ]
 
+CrowdTimeToContact = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="Constant-velocity time to contact with the pedestrians around the robot",
+        shape="(4,)",
+        units="seconds, seconds, count, seconds",
+        source="pedestrian relative states and the measured robot velocity",
+        constraints="[minimum, second minimum, count under 3 s, minimum ahead], times capped at the horizon",
+        example="[2.1, 4.8, 1.0, 2.1]",
+    ),
+]
+
 # Additional encoded output types for observation spaces
 MotionStateVector = Annotated[
     np.ndarray,
@@ -550,6 +562,7 @@ __all__ = [
     "PedestrianTypeMinDistances",
     "PedestrianTypeArray",
     "PedestrianSocialStates",
+    "CrowdTimeToContact",
     "MotionStateVector",
     "KinematicStateVector",
     "TrajectoryStateVector",

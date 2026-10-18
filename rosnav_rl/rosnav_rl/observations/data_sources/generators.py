@@ -22,10 +22,16 @@ from tf_transformations import euler_from_quaternion
 if TYPE_CHECKING:
     from rosnav_rl.cfg.parameters import AgentParameters
 from ..utils.pose import Pose2DType
-from ..utils.semantic import get_relative_pos_to_robot, get_relative_vel_to_robot, straight_line_subgoal
+from ..utils.semantic import (
+    get_relative_pos_to_robot,
+    get_relative_vel_to_robot,
+    straight_line_subgoal,
+    time_to_contact,
+)
 from ..utils.types import (
     ArenaPedestrianDetections,
     ArenaPedestrianStates,
+    CrowdTimeToContact,
     DistanceAngleMetrics,
     GoalLocation,
     LidarRanges,
@@ -1230,3 +1236,62 @@ class ArenaPedestrianTypeDistanceGenerator(Generator[PedestrianTypeMinDistances]
         if len(pedestrian_relative_locations) == 0:
             return {}
         return {0: float(np.linalg.norm(pedestrian_relative_locations, axis=1).min())}
+
+
+class CrowdTimeToContactGenerator(Generator[CrowdTimeToContact]):
+    """Time to contact against the measured robot velocity: minimum, second minimum, count under `imminent`, minimum ahead."""
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+        "pedestrian_relative_velocities": PedestrianRelativeVelocities,
+        "robot_twist": RobotVelocity,
+    }
+
+    def __init__(
+        self,
+        name: str,
+        pedestrian_radius: float = 0.3,
+        horizon: float = 10.0,
+        max_range: float = 12.0,
+        imminent: float = 3.0,
+        ahead_half_width: float = 1.5,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        self.pedestrian_radius = pedestrian_radius
+        self.horizon = horizon
+        self.max_range = max_range
+        self.imminent = imminent
+        self.ahead_half_width = ahead_half_width
+
+    def _generate(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        pedestrian_relative_velocities: PedestrianRelativeVelocities,
+        robot_twist: RobotVelocity,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> CrowdTimeToContact:
+        out = np.array([self.horizon, self.horizon, 0.0, self.horizon], dtype=np.float32)
+        if len(pedestrian_relative_locations) == 0 or len(pedestrian_relative_velocities) == 0:
+            return out
+        positions = np.asarray(pedestrian_relative_locations, dtype=np.float64).reshape(-1, 2)
+        velocities = np.asarray(pedestrian_relative_velocities, dtype=np.float64).reshape(-1, 2)
+        in_range = np.hypot(positions[:, 0], positions[:, 1]) <= self.max_range
+        positions, velocities = positions[in_range], velocities[in_range]
+        if len(positions) == 0:
+            return out
+        relative = velocities - np.asarray(robot_twist[:2], dtype=np.float64)
+        ttc = time_to_contact(
+            positions,
+            relative,
+            contact_radius=simulation_state_container.robot_radius + self.pedestrian_radius,
+            horizon=self.horizon,
+        )
+        ordered = np.sort(ttc)
+        ahead = (positions[:, 0] > 0.0) & (np.abs(positions[:, 1]) < self.ahead_half_width)
+        out[0] = ordered[0]
+        out[1] = ordered[1] if len(ordered) > 1 else self.horizon
+        out[2] = float(np.count_nonzero(ttc < self.imminent))
+        out[3] = ttc[ahead].min() if ahead.any() else self.horizon
+        return out

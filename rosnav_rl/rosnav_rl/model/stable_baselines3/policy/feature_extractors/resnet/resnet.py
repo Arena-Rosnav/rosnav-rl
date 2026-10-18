@@ -17,7 +17,7 @@ Details:
 
 from collections.abc import Callable
 from copy import deepcopy
-from typing import Any
+from typing import Any, ClassVar
 
 import gymnasium as gym
 import torch
@@ -28,6 +28,7 @@ from rosnav_rl.spaces.observation_space.spaces.dynamics import (
     SubgoalInRobotFrameSpace,
 )
 from rosnav_rl.spaces.observation_space.spaces.environment import (
+    CrowdTimeToContactSpace,
     PedestrianSocialStateSpace,
     PedestrianTypeSpace,
     PedestrianVelXSpace,
@@ -48,6 +49,7 @@ __all__ = [
     "RESNET_MID_FUSION_EXTRACTOR_5",
     "DRL_VO_NAV_EXTRACTOR",
     "DRL_VO_ROSNAV_EXTRACTOR",
+    "DRL_VO_ROSNAV_SCALAR_EXTRACTOR",
 ]
 
 
@@ -1511,3 +1513,23 @@ class DRL_VO_ROSNAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
             ),
             nn.ReLU(),
         )
+
+
+class DRL_VO_ROSNAV_SCALAR_EXTRACTOR(DRL_VO_ROSNAV_EXTRACTOR):
+    """DRL_VO_ROSNAV_EXTRACTOR with the scalar spaces in SCALAR_SPACES appended to the robot state of the head."""
+
+    SCALAR_SPACES: ClassVar[tuple[str, ...]] = (CrowdTimeToContactSpace.name,)
+
+    def _get_input_sizes(self):
+        super()._get_input_sizes()
+        if self._last_action_size == 0:
+            raise ValueError(f"{type(self).__name__} needs {LastActionSpace.name} to carry its scalar spaces")
+        self._scalar_keys = [key for key in self.SCALAR_SPACES if key in self._observation_space.spaces]
+        self._last_action_size += sum(self._observation_space[key].shape[-1] for key in self._scalar_keys)
+
+    def _get_input(self, observations: TensorDict) -> dict[str, torch.Tensor | None]:
+        inputs = super()._get_input(observations)
+        inputs["last_action"] = torch.cat(
+            [inputs["last_action"], *(observations[key] for key in self._scalar_keys)], dim=1
+        )
+        return inputs
