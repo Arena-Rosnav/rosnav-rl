@@ -96,8 +96,8 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             (x, y) indices in the feature map, with origin at center.
         """
         x, y = position[0], position[1]
-        grid_x = int(x * self._inv_grid_resolution + self._grid_center)
-        grid_y = int(y * self._inv_grid_resolution + self._grid_center)
+        grid_x = int(np.floor(x * self._inv_grid_resolution + self._grid_center))
+        grid_y = int(np.floor(y * self._inv_grid_resolution + self._grid_center))
         return grid_x, grid_y
 
     def _get_map_indices_vectorized(self, positions: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -442,9 +442,14 @@ class StackedLaserMapSpace(BaseObservationSpace):
         # 3. Insert (ring buffer: oldest entry overwritten)
         self._ring_buffer[self._ring_idx] = scan
         self._ring_idx = (self._ring_idx + 1) % self._laser_stack_size
+        return self.render()
 
+    def render(self, beam_order: np.ndarray | None = None) -> LaserFeatureMap:
+        """The map of the scans in the ring buffer, each scan's beams taken in `beam_order` when given."""
         # 4. Read in insertion order (oldest → newest)
         ordered = np.roll(self._ring_buffer, -self._ring_idx, axis=0)
+        if beam_order is not None:
+            ordered = np.take(ordered, beam_order, axis=1)
         reshaped = ordered[:, : self._usable_beams].reshape(
             self._laser_stack_size, self._feature_map_size, self._beams_per_col
         )

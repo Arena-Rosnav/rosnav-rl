@@ -86,11 +86,12 @@ def test_chunked_model_discounts_per_decision_and_acts_a_whole_chunk():
     assert np.all(commands[:, 1] == 0.0)
 
 
-def test_saved_agent_config_keeps_the_chunk(tmp_path):
-    spec = _spec(5)
+def test_saved_agent_config_keeps_chunk_and_mirror(tmp_path):
+    spec = _spec(5).model_copy(update={"mirror": "random"})
     path = tmp_path / "agent.yaml"
 
     spec.to_yaml(path)
     loaded = AgentConfig.from_yaml(path)
 
     assert loaded.action_chunk == 5
+    assert loaded.mirror == "random"

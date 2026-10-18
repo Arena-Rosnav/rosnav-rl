@@ -722,6 +722,10 @@ class StableBaselinesModel(RL_Model):
         return self._policy_description.stack_size
 
     @property
+    def seed(self) -> int | None:
+        return self.algorithm_cfg.parameters.seed
+
+    @property
     def parameter_number(self) -> int:
         return sum(p.numel() for p in self.model.policy.parameters())
 

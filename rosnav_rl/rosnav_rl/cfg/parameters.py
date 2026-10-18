@@ -25,6 +25,7 @@ Usage::
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
@@ -78,6 +79,14 @@ class AgentParameters(BaseModel, frozen=True):
             "MultiScaleLaserSpace, StackedLaserMapSpace. "
             "Set to robot_description.laser.num_beams at training time."
         ),
+    )
+    laser_angle_min: float = Field(
+        -math.pi,
+        description="Angle of the first laser beam (rad). Used by: MirrorSpaceManager, LaserCartesianMapSpace. Set to robot_description.laser.angle.min at training time.",
+    )
+    laser_angle_increment: float | None = Field(
+        None,
+        description="Angle between laser beams (rad). Used by: MirrorSpaceManager. Set to robot_description.laser.angle.increment at training time.",
     )
     laser_max_range: float = Field(
         30.0,

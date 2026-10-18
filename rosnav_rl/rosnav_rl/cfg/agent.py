@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, Discriminator, Field, PrivateAttr, model_validator
 
@@ -56,6 +56,7 @@ class AgentConfig(BaseModel):
             present.
         normalized_actions: Policy actions in [-1, 1], mapped linearly onto the robot limits.
         action_chunk: Commands per policy decision, executed one per control tick.
+        mirror: Observation and action reflection across the forward axis.
         deterministic_inference: Whether the inference node acts on the policy's mean action.
         parameters: Unified observation + environment parameters. Review and override in the training config YAML before
             starting a run.  See :class:`~rosnav_rl.cfg.parameters.AgentParameters`.
@@ -86,6 +87,13 @@ class AgentConfig(BaseModel):
     )
     action_chunk: int = Field(
         1, ge=1, description="Commands the policy emits per decision, executed one per control tick."
+    )
+    mirror: Literal["none", "canonical", "random"] = Field(
+        "none",
+        description=(
+            "Reflection across the robot's forward axis: canonical puts the nearest pedestrian on the left, "
+            "random reflects whole episodes with probability one half."
+        ),
     )
     deterministic_inference: bool = Field(
         True, description="The inference node acts on the policy's mean action, False samples it as training does."
