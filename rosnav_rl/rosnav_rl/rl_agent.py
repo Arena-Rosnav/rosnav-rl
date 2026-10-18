@@ -8,6 +8,7 @@ from gymnasium import spaces
 from rosnav_rl.cfg.agent import AgentConfig
 from rosnav_rl.reward.reward_function import RewardFunction
 from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
+from rosnav_rl.spaces.space_manager.mirror_space_manager import MirrorSpaceManager
 from rosnav_rl.utils.type_aliases import ObservationDict
 
 from .model import RL_Model
@@ -91,11 +92,20 @@ class RL_Agent:
             rl_agent=self,
         )
 
-        self._space_manager = BaseSpaceManager(
-            spec=spec,
-            observation_space_list=self.model.observation_space_list,
-            observation_space_kwargs=self.model.observation_space_kwargs,
-        )
+        if spec.mirror == "none":
+            self._space_manager = BaseSpaceManager(
+                spec=spec,
+                observation_space_list=self.model.observation_space_list,
+                observation_space_kwargs=self.model.observation_space_kwargs,
+            )
+        else:
+            self._space_manager = MirrorSpaceManager(
+                spec=spec,
+                observation_space_list=self.model.observation_space_list,
+                observation_space_kwargs=self.model.observation_space_kwargs,
+                mode=spec.mirror,
+                seed=self.model.seed,
+            )
 
         if spec.reward is not None:
             self._reward_function = RewardFunction(

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, Discriminator, Field, PrivateAttr, model_validator
 
@@ -54,6 +54,10 @@ class AgentConfig(BaseModel):
         action_space: Typed action space.  ``None`` until the trainer populates
             it from the robot description.  In saved agent configs it is always
             present.
+        normalized_actions: Policy actions in [-1, 1], mapped linearly onto the robot limits.
+        action_chunk: Commands per policy decision, executed one per control tick.
+        mirror: Observation and action reflection across the forward axis.
+        deterministic_inference: Whether the inference node acts on the policy's mean action.
         parameters: Unified observation + environment parameters. Review and override in the training config YAML before
             starting a run.  See :class:`~rosnav_rl.cfg.parameters.AgentParameters`.
         framework: RL framework configuration (SB3 or DreamerV3).
@@ -78,6 +82,22 @@ class AgentConfig(BaseModel):
     action_space: ActionSpaceSpec | None = Field(
         None, description="Typed action space. Derived from robot description at training time."
     )
+    normalized_actions: bool = Field(
+        False, description="Policy acts in [-1, 1] per command dimension, mapped linearly onto the action space bounds."
+    )
+    action_chunk: int = Field(
+        1, ge=1, description="Commands the policy emits per decision, executed one per control tick."
+    )
+    mirror: Literal["none", "canonical", "random"] = Field(
+        "none",
+        description=(
+            "Reflection across the robot's forward axis: canonical puts the nearest pedestrian on the left, "
+            "random reflects whole episodes with probability one half."
+        ),
+    )
+    deterministic_inference: bool = Field(
+        True, description="The inference node acts on the policy's mean action, False samples it as training does."
+    )
     parameters: AgentParameters = AgentParameters()
 
     framework: Annotated[
@@ -89,6 +109,12 @@ class AgentConfig(BaseModel):
     # True when the name was auto-generated (not user-supplied).
     # Used by model_copy to know whether to refresh the name when robot changes.
     _name_is_auto: bool = PrivateAttr(default=True)
+
+    @model_validator(mode="after")
+    def _chunk_needs_sb3(self) -> Self:
+        if self.action_chunk > 1 and not isinstance(self.framework, StableBaselinesCfg):
+            raise ValueError("action_chunk > 1 is implemented for the stable_baselines3 framework only")
+        return self
 
     @model_validator(mode="after")
     def _auto_name(self) -> Self:

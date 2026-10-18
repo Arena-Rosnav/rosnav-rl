@@ -39,6 +39,11 @@ class BaseSpaceManager:
     ):
         self._spec = spec
         self._action_space_manager = ActionSpaceManager(spec.action_space)
+        self._action_chunk = spec.action_chunk
+        self._normalized = spec.normalized_actions
+        command_space = self._action_space_manager.action_space
+        if (self._action_chunk > 1 or self._normalized) and not isinstance(command_space, spaces.Box):
+            raise ValueError("action_chunk > 1 and normalized_actions need a continuous (Box) action space")
 
         obs_kwargs = observation_space_kwargs.copy() if observation_space_kwargs else {}
         obs_kwargs.update(spec.parameters.observation_kwargs())
@@ -58,10 +63,19 @@ class BaseSpaceManager:
         return self._observation_space_manager.encode_observation(obs_dict)
 
     def decode_action(self, action: np.ndarray) -> np.ndarray:
+        if self._normalized:
+            space = self._action_space_manager.action_space
+            action = space.low + (np.clip(action, -1.0, 1.0) + 1.0) / 2.0 * (space.high - space.low)
         return self._action_space_manager.decode_action(action)
 
     def decode_split_action(self, action: np.ndarray) -> list[tuple[str, np.ndarray]]:
         return self._action_space_manager.decode_split_action(action)
+
+    def decode_policy_action(self, action: np.ndarray) -> np.ndarray:
+        """One command for a single-step policy, an (action_chunk, 3) array of commands for a chunked one."""
+        if self._action_chunk == 1:
+            return self.decode_action(action)
+        return np.stack([self.decode_action(step) for step in np.reshape(action, (self._action_chunk, -1))])
 
     def reset_spaces(self) -> None:
         """Reset the internal state of all observation spaces for a new episode."""
@@ -87,7 +101,26 @@ class BaseSpaceManager:
 
     @property
     def action_space(self) -> spaces.Space:
-        return self._action_space_manager.action_space
+        space = self._action_space_manager.action_space
+        if self._normalized:
+            return spaces.Box(low=-1.0, high=1.0, shape=space.shape, dtype=space.dtype)
+        return space
+
+    @property
+    def action_chunk(self) -> int:
+        return self._action_chunk
+
+    @property
+    def policy_action_space(self) -> spaces.Space:
+        """The action space the policy emits: action_space tiled action_chunk times."""
+        space = self.action_space
+        if self._action_chunk == 1:
+            return space
+        return spaces.Box(
+            low=np.tile(space.low, self._action_chunk),
+            high=np.tile(space.high, self._action_chunk),
+            dtype=space.dtype,
+        )
 
     @property
     def config(self) -> dict[str, dict[str, Any]]:

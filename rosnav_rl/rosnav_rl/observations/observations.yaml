@@ -102,6 +102,12 @@ datasources:
       topic: "cmd_vel"                 # Robot velocity commands
       # up_to_date_required: true
 
+  robot_twist:
+    type: OdometryTwistCollector       # measured robot velocity in the base frame
+    params:
+      topic: "odom"
+      up_to_date_required: false
+
   # Social navigation - people detection
   # people_detections:
   #   type: people_msgs/People          # → PedestrianDetections
@@ -272,6 +278,9 @@ datasources:
   # # Arena pedestrian animation/behavior states
   arena_pedestrian_states:
     type: ArenaPedestrianStateGenerator    # Extracts animation states (IDLE, WALKING, RUNNING, etc.)
+
+  crowd_ttc:
+    type: CrowdTimeToContactGenerator      # Time to contact against the measured robot velocity
 
 # =============================================================================
 # CONFIGURATION EXAMPLES & USAGE PATTERNS

@@ -76,6 +76,16 @@ class TwistCollector(Collector[geometry_msgs.Twist, RobotVelocity]):
         return np.array((msg.linear.x, msg.linear.y, msg.angular.z))
 
 
+class OdometryTwistCollector(Collector[nav_msgs.Odometry, RobotVelocity]):
+    """
+    Collects the measured robot velocity in the base frame from the odometry topic.
+    """
+
+    def _preprocess(self, msg: nav_msgs.Odometry) -> RobotVelocity:
+        twist = msg.twist.twist
+        return np.array((twist.linear.x, twist.linear.y, twist.angular.z), dtype=np.float32)
+
+
 class CollisionMonitorStateCollector(Collector[nav2_msgs.CollisionMonitorState, SafetyStatus]):
     """
     Collects the collision monitor state.

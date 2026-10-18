@@ -94,6 +94,27 @@ def get_relative_vel_to_robot(
     return np.column_stack((rel_vx, rel_vy))
 
 
+def time_to_contact(
+    relative_positions: np.ndarray,
+    relative_velocities: np.ndarray,
+    contact_radius: float,
+    horizon: float,
+) -> np.ndarray:
+    """Constant-velocity time until each relative disc closes to contact_radius, capped at horizon, 0 when already in contact."""
+    if len(relative_positions) == 0:
+        return np.empty(0, dtype=np.float32)
+    px, py = relative_positions[:, 0], relative_positions[:, 1]
+    vx, vy = relative_velocities[:, 0], relative_velocities[:, 1]
+    a = vx * vx + vy * vy
+    b = 2.0 * (px * vx + py * vy)
+    c = px * px + py * py - contact_radius * contact_radius
+    disc = b * b - 4.0 * a * c
+    hits = (a > 1e-9) & (disc >= 0.0)
+    t = np.where(hits, (-b - np.sqrt(np.maximum(disc, 0.0))) / np.where(hits, 2.0 * a, 1.0), horizon)
+    t = np.where(hits & (t > 0.0), np.minimum(t, horizon), horizon)
+    return np.where(c <= 0.0, 0.0, t).astype(np.float32)
+
+
 def straight_line_subgoal(
     robot_xy: tuple[float, float],
     goal_xy: tuple[float, float],

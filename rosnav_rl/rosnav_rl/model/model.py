@@ -122,6 +122,10 @@ class RL_Model(ABC):
         return 1
 
     @property
+    def seed(self) -> int | None:
+        return None
+
+    @property
     def parameter_number(self) -> int:
         raise NotImplementedError()
 

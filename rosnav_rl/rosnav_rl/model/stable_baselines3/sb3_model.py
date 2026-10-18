@@ -379,7 +379,7 @@ class StableBaselinesModel(RL_Model):
             episode_start=(np.array([True] * self.__env.env.num_envs) if episode_start else None),
         )
 
-        self.__state.last_action = self._rl_agent.space_manager.decode_action(action)
+        self.__state.last_action = self._rl_agent.space_manager.decode_policy_action(action)
         return self.__state.last_action
 
     def train(self, *args: Any, **kwargs: Any) -> bool:
@@ -507,6 +507,7 @@ class StableBaselinesModel(RL_Model):
             "tensorboard_log",
             "total_timesteps",
             "show_progress_bar",
+            "log_std_init",
         }
 
         if isinstance(parameters, OnPolicyParameters):
@@ -525,10 +526,13 @@ class StableBaselinesModel(RL_Model):
         algo_init_params = set(inspect.signature(algo_cls.__init__).parameters) - {"self"}
 
         # Always include these non-config kwargs that come from other sources.
+        policy_kwargs = self._policy_description.get_kwargs()
+        if parameters.log_std_init is not None:
+            policy_kwargs["log_std_init"] = parameters.log_std_init
         base_kwargs = {
             "env": env,
             "policy": POLICY_TYPE[algo_cls],
-            "policy_kwargs": self._policy_description.get_kwargs(),
+            "policy_kwargs": policy_kwargs,
             "tensorboard_log": tensorboard_log_path or parameters.tensorboard_log,
             "device": DEVICE_CPU if no_gpu else DEVICE_AUTO,
         }
@@ -537,6 +541,12 @@ class StableBaselinesModel(RL_Model):
         # drop any None values (so SB3 defaults are used for omitted params).
         config_dump = parameters.model_dump(exclude=dump_exclude)
         filtered_config = {k: v for k, v in config_dump.items() if k in algo_init_params and v is not None}
+
+        chunk = self._rl_agent.spec.action_chunk
+        if chunk > 1:
+            for key in ("gamma", "gae_lambda"):
+                if key in filtered_config:
+                    filtered_config[key] = filtered_config[key] ** chunk
 
         return {**base_kwargs, **filtered_config}
 
@@ -688,7 +698,8 @@ class StableBaselinesModel(RL_Model):
                 self._model.policy._predict(obs_as_tensor(observation, self._model.device), deterministic).cpu().numpy()
             )
 
-        actions = np.clip(actions, self._rl_agent.action_space.low, self._rl_agent.action_space.high)
+        policy_space = self._rl_agent.space_manager.policy_action_space
+        actions = np.clip(actions, policy_space.low, policy_space.high)
 
         return actions.squeeze(axis=0), state
 
@@ -713,6 +724,10 @@ class StableBaselinesModel(RL_Model):
     @property
     def stack_size(self) -> int:
         return self._policy_description.stack_size
+
+    @property
+    def seed(self) -> int | None:
+        return self.algorithm_cfg.parameters.seed
 
     @property
     def parameter_number(self) -> int:

@@ -2,7 +2,8 @@
 
 Runs the policy at a fixed rate, publishes `subgoal` (lookahead along the
 straight robot-to-goal line, the formula of StraightLineSubgoalGenerator) for display, and emits the
-decoded command as `Twist` on `~/cmd_vel`.
+decoded command as `Twist` on `~/cmd_vel`. A chunked policy is queried once per
+chunk, its commands play out one per tick while the observations keep encoding.
 
 When `train_mode=true`, only the subgoal display runs; the agent, ObservationManager,
 and cmd_vel publisher are skipped — the training loop owns the policy in that case.
@@ -14,6 +15,7 @@ import math
 import posixpath
 from typing import TYPE_CHECKING
 
+import numpy as np
 import rclpy
 import tf2_ros
 import yaml
@@ -79,6 +81,7 @@ class ArenaInferenceNode:
 
         self._goal: PoseStamped | None = None
         self._last_speed: float = 0.0
+        self._queued_commands: list[np.ndarray] = []
 
         self._subgoal_pub = node.create_publisher(PoseStamped, "subgoal", 1)
         self._goal_sub = node.create_subscription(
@@ -144,6 +147,7 @@ class ArenaInferenceNode:
     def _on_task_reset(self, _msg: Int16) -> None:
         self.agent.reset()
         self._last_speed = 0.0
+        self._queued_commands = []
 
     def _step(self) -> None:
         if self._goal is None:
@@ -166,11 +170,18 @@ class ArenaInferenceNode:
             return
         observations["is_terminal"] = False
 
-        try:
-            cmd = self.agent.get_action(observations)
-        except Exception as exc:
-            self.logger.warn(f"[rosnav_rl] get_action failed: {type(exc).__name__}: {exc}")
-            return
+        if self._queued_commands:
+            self.agent.space_manager.encode_observation(observations)
+            cmd = self._queued_commands.pop(0)
+        else:
+            try:
+                cmd = self.agent.get_action(observations, deterministic=self._agent_spec.deterministic_inference)
+            except Exception as exc:
+                self.logger.warn(f"[rosnav_rl] get_action failed: {type(exc).__name__}: {exc}")
+                return
+            if cmd.ndim == 2:
+                self._queued_commands = list(cmd[1:])
+                cmd = cmd[0]
 
         self._publish_cmd_vel(float(cmd[0]), float(cmd[1]), float(cmd[2]))
 

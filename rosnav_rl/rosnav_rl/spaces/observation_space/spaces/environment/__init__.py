@@ -14,6 +14,9 @@ Feature Map Spaces:
     - PedestrianLocationSpace: Pedestrian location feature map
     - PedestrianSocialStateSpace: Pedestrian social state feature map
     - PedestrianTypeSpace: Pedestrian type feature map
+
+Crowd Scalar Spaces:
+    - CrowdTimeToContactSpace: Crowd time-to-contact summary
 """
 
 from .advanced_environment_spaces import (
@@ -21,6 +24,7 @@ from .advanced_environment_spaces import (
     ObstacleProximitySpace,
     SpatialAwarenessSpace,
 )
+from .crowd_spaces import CrowdTimeToContactSpace
 from .feature_map_spaces import (
     LaserCartesianMapSpace,
     PedestrianLocationSpace,
@@ -42,4 +46,5 @@ __all__ = [
     "EnvironmentContextSpace",
     "SpatialAwarenessSpace",
     "ObstacleProximitySpace",
+    "CrowdTimeToContactSpace",
 ]

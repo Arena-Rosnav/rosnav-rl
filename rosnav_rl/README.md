@@ -162,7 +162,7 @@ before starting a run.
 
 | Group | Fields | Used by |
 |---|---|---|
-| **Laser** | `laser_num_beams`, `laser_max_range` | `LaserObservationSpace`, `StackedLaserMapSpace` |
+| **Laser** | `laser_num_beams`, `laser_max_range`, `laser_angle_min`, `laser_angle_increment` | `LaserObservationSpace`, `StackedLaserMapSpace`, `MirrorSpaceManager` (beam pairing) |
 | **Velocity** | `min/max_linear_vel`, `min/max_translational_vel`, `min/max_angular_vel` | `VelocityObservationSpace` |
 | **Pedestrian** | `ped_num_types`, `ped_min/max_speed_x/y`, `ped_social_state_num` | `PedestrianObservationSpace` |
 | **Navigation** | `goal_max_dist`, `subgoal_max_dist` | `GoalObservationSpace`, `SubgoalObservationSpace` |
