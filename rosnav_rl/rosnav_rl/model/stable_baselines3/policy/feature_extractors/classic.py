@@ -591,7 +591,14 @@ class EXTRACTOR_10(EXTRACTOR_5):
         **kwargs: Arbitrary keyword arguments.
     """
 
-    def __init__(self, observation_space, features_dim=128, stack_size=1, *args, **kwargs):
+    def __init__(
+            self,
+            observation_space: gym.spaces.Dict,
+            features_dim: int = 128,
+            stack_size: int = 1,
+            *args: Any,
+            **kwargs: Any,
+        ):
 
         (self._img_num, self._img_c, self._img_h, self._img_w) = observation_space[RGBSpace.name].shape
 
@@ -629,12 +636,12 @@ class EXTRACTOR_10(EXTRACTOR_5):
             nn.ReLU(),
         )
 
-    def get_input(self, observations):
+    def get_input(self, observations: TensorDict) -> tuple[th.Tensor, th.Tensor, th.Tensor, th.Tensor]:
         laser, goal, last_action = super().get_input(observations)
         images = observations[RGBSpace.name]
         return laser, goal, last_action, images
 
-    def forward(self, observations):
+    def forward(self, observations: TensorDict) -> th.Tensor:
         laser, goal, last_action, images = self.get_input(observations)
         laser, goal, last_action = self.process_input(laser, goal, last_action)
         n, c = images.shape[:2]

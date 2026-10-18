@@ -13,12 +13,12 @@ from typing import TYPE_CHECKING, Any
 from warnings import warn
 
 import arena_people_msgs.msg as arena_people_msgs
-from scipy.spatial.transform import Rotation as R
 import numpy as np
-import yaml
 import people_msgs.msg as people_msgs
 import rclpy
 import tf2_ros
+import yaml
+from scipy.spatial.transform import Rotation as R
 from tf_transformations import euler_from_quaternion
 
 if TYPE_CHECKING:
@@ -1209,7 +1209,7 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
         node: rclpy.Node | None = None,
         source_frame_suffix: str = "tool0",
         target_frame: str = "map",
-        **kwargs,
+        **kwargs: Any,
     ):
         super().__init__(name, **kwargs)
 
@@ -1246,7 +1246,7 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
 
         return None
 
-    def _generate(self, **kwargs):
+    def _generate(self, **kwargs: Any):
 
         if self.SOURCE_FRAME is None:
             self.SOURCE_FRAME = self._resolve_source_frame()
@@ -1312,7 +1312,7 @@ class ArmGoalLocationInEndEffectorFrameGenerator(Generator[RelativePose3D]):
         self,
         end_effector_pose: Pose3D,
         # end_effector_goal_pose: Pose3D,
-        **kwargs,
+        **kwargs: Any,
     ) -> RelativePose3D:
 
         # TODO make proper publisher for goal pose (subgoals?)
@@ -1358,7 +1358,7 @@ class ArmDistAngleToGoalGenerator(Generator[DistanceAngleMetrics]):
         self,
         arm_goal_in_ee_frame: RelativePose3D,
         simulation_state_container: AgentParameters,
-        **kwargs,
+        **kwargs: Any,
     ) -> DistanceAngleMetrics:
         """Computes 3D distance and scalar rotational error.
 

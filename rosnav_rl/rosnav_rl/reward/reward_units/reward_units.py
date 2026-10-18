@@ -2062,14 +2062,14 @@ class RewardArmGoalReached(RewardUnit):
         reward_function: RewardFunction,
         reward: float = DEFAULTS.GOAL_REACHED.REWARD,
         _on_safe_dist_violation: bool = DEFAULTS.GOAL_REACHED._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
 
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._reward = reward
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self, *args: Any, **kwargs: Any):
         if self._reward < 0.0:
             warn_msg = (
                 f"Reconsider this reward. "
@@ -2141,8 +2141,8 @@ class RewardArmApproachGoal(RewardUnit):
         neg_factor: float = DEFAULTS.ARM_APPROACH_GOAL.NEG_FACTOR,
         _goal_update_threshold: float = DEFAULTS.ARM_APPROACH_GOAL._GOAL_UPDATE_THRESHOLD,
         _on_safe_dist_violation: bool = DEFAULTS.ARM_APPROACH_GOAL._ON_SAFE_DIST_VIOLATION,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._pos_factor = pos_factor
@@ -2151,7 +2151,7 @@ class RewardArmApproachGoal(RewardUnit):
 
         self.last_distance = None
 
-    def check_parameters(self, *args, **kwargs):
+    def check_parameters(self, *args: Any, **kwargs: Any):
         if self._pos_factor < 0 or self._neg_factor < 0:
             warn_msg = (
                 f"Both factors should be positive. "

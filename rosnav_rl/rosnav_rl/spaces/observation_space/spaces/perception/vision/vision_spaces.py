@@ -94,7 +94,12 @@ class RGBSpace(BaseObservationSpace):
     name = "RGBSpace"
 
     def __init__(
-        self, rgb_sources: list[str] | None = None, image_height: int = 128, image_width: int = 128, *args, **kwargs
+        self,
+        rgb_sources: list[str] | None = None,
+        image_height: int = 128,
+        image_width: int = 128,
+        *args: Any,
+        **kwargs: Any
     ) -> None:
 
         self._sources = sorted(rgb_sources or [])
@@ -106,7 +111,7 @@ class RGBSpace(BaseObservationSpace):
         )
         super().__init__(*args, **kwargs)
 
-    def get_gym_space(self):
+    def get_gym_space(self) -> spaces.Space:
         """
         Returns the Gym observation space for the RGB observation space.
 
@@ -130,7 +135,7 @@ class RGBSpace(BaseObservationSpace):
         return resized.squeeze(0).numpy()
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, *args, **obs):
+    def encode_observation(self, *args: Any, **obs: Any):
         out = np.zeros((len(self._sources), 3, self._image_height, self._image_width), np.uint8)
         for i, s in enumerate(self._sources):
             img = obs.get(s)

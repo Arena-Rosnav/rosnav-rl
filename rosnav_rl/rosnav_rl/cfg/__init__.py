@@ -1,13 +1,13 @@
 from .action_spaces import (
     ActionSpaceSpec,
     BaseActionSpace,
+    CompositeActionSpace,
     DifferentialDriveActionSpace,
     DiscretizationCfg,
     DiscretizationStrategy,
     HumanoidActionSpace,
     ManipulatorActionSpace,
     OmnidirectionalActionSpace,
-    CompositeActionSpace,
 )
 from .agent import AgentConfig
 from .framework import FrameworkCfg
@@ -28,6 +28,7 @@ __all__ = [
     "LoggingCfg",
     "ManipulatorActionSpace",
     "OmnidirectionalActionSpace",
+    "CompositeActionSpace",""
     "RewardCfg",
     "VERBOSE_TO_LEVEL",
     "configure_rosnav_rl_logging",

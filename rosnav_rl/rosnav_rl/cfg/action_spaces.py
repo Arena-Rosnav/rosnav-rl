@@ -63,7 +63,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence, Sized
 from enum import StrEnum
-from typing import Annotated, Any, Literal, Protocol, List, Tuple, Optional
+from typing import Annotated, Any, Literal, Protocol
 
 import numpy as np
 from gymnasium import spaces
@@ -406,8 +406,8 @@ class ManipulatorActionSpace(BaseActionSpace):
     """
 
     type: Literal["arm"] = "arm"
-    joint_names: List[str]
-    position_limits: List[Tuple[float, float]]
+    joint_names: list[str]
+    position_limits: list[tuple[float, float]]
 
     @property
     def num_dof(self) -> int:
@@ -498,14 +498,14 @@ class CompositeActionSpace(BaseActionSpace):
     """Generic Container for the merging of an abitrary amount of action spaces."""
 
     type: Literal["composite"] = "composite"
-    action_spaces: List[ActionSpaceSpec] = Field(default_factory=list)
+    action_spaces: list[ActionSpaceSpec] = Field(default_factory=list)
 
     @property
     def is_discrete(self) -> bool:
         return any(space.is_discrete for space in self.action_spaces)
 
     @property
-    def is_holonomic(self):
+    def is_holonomic(self) -> bool:
         return any(space.is_holonomic for space in self.action_spaces)
 
     @property
@@ -536,7 +536,7 @@ class CompositeActionSpace(BaseActionSpace):
             idx += s.num_dof
         return np.concatenate(out)
 
-    def decode_split(self, action: np.ndarray) -> List[Tuple[str, np.ndarray]]:
+    def decode_split(self, action: np.ndarray) -> list[tuple[str, np.ndarray]]:
         a = np.asarray(action, dtype=np.float32).reshape(-1)
         if a.shape[0] != self.num_dof:
             raise ValueError(f"expected {self.num_dof}, got {a.shape[0]}")
@@ -547,7 +547,7 @@ class CompositeActionSpace(BaseActionSpace):
             idx += s.num_dof
         return out
 
-    def resolve_discretization(self, robot_discrete_actions: Optional[List] = None) -> CompositeActionSpace:
+    def resolve_discretization(self, robot_discrete_actions: list | None = None) -> CompositeActionSpace:
         return self.model_copy(
             update={
                 "action_spaces": [

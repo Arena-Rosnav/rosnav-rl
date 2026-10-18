@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Any
 
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
@@ -330,7 +330,7 @@ class AGENT_6(StableBaselinesPolicyDescription):
 
 @AgentFactory.register("AGENT_7")
 class AGENT_7(StableBaselinesPolicyDescription):
-    algorithm_class: Type[BaseAlgorithm] = PPO
+    algorithm_class: type[BaseAlgorithm] = PPO
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
