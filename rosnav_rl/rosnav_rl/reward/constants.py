@@ -31,6 +31,13 @@ class DEFAULTS:
         _TERM_THRESHOLD: float = 2.0
         _ON_SAFE_DIST_VIOLATION: bool = True
 
+    class ARM_APPROACH_GOAL:
+        POS_FACTOR: float = 0.3
+        NEG_FACTOR: float = 0.5
+        _GOAL_UPDATE_THRESHOLD: float = 0.5
+        _TERM_THRESHOLD: float = 2.0
+        _ON_SAFE_DIST_VIOLATION: bool = True
+
     class COLLISION:
         REWARD: float = -10.0
         BUMPER_ZONE: float = 0.05

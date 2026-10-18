@@ -2094,15 +2094,11 @@ class RewardArmGoalReached(RewardUnit):
         rotational_error = arm_dist_angle_to_goal[1]
 
         # TODO create these params for arms
-        DEFAULT_ARM_GOAL_RADIUS = 0.05  
-        DEFAULT_ARM_ANGLE_TOLERANCE = 0.20   
+        DEFAULT_ARM_GOAL_RADIUS = 0.05
+        DEFAULT_ARM_ANGLE_TOLERANCE = 0.20
 
-        goal_radius = getattr(
-            simulation_state_container, "goal_radius", DEFAULT_ARM_GOAL_RADIUS
-        )
-        goal_angle_tolerance = getattr(
-            simulation_state_container, "goal_angle_tolerance", DEFAULT_ARM_ANGLE_TOLERANCE
-        )
+        goal_radius = getattr(simulation_state_container, "goal_radius", DEFAULT_ARM_GOAL_RADIUS)
+        goal_angle_tolerance = getattr(simulation_state_container, "goal_angle_tolerance", DEFAULT_ARM_ANGLE_TOLERANCE)
 
         position_reached = target_distance < goal_radius
         orientation_reached = rotational_error < goal_angle_tolerance
@@ -2139,11 +2135,11 @@ class RewardArmApproachGoal(RewardUnit):
     @check_params
     def __init__(
         self,
-        reward_function: 'RewardFunction',
-        pos_factor: float = 1.0,  # TODO Replace with DEFAULTS.ARM_APPROACH.POS_FACTOR
-        neg_factor: float = 1.2,  # TODO Replace with DEFAULTS.ARM_APPROACH.NEG_FACTOR
-        _goal_update_threshold: float = 0.5, # TODO Replace with DEFAULTS.ARM_APPROACH._GOAL_UPDATE_THRESHOLD
-        _on_safe_dist_violation: bool = False,
+        reward_function: "RewardFunction",
+        pos_factor: float = DEFAULTS.ARM_APPROACH_GOAL.POS_FACTOR, 
+        neg_factor: float = DEFAULTS.ARM_APPROACH_GOAL.NEG_FACTOR,
+        _goal_update_threshold: float = DEFAULTS.ARM_APPROACH_GOAL._GOAL_UPDATE_THRESHOLD,
+        _on_safe_dist_violation: bool = DEFAULTS.ARM_APPROACH_GOAL._ON_SAFE_DIST_VIOLATION,
         *args,
         **kwargs,
     ):
@@ -2173,7 +2169,7 @@ class RewardArmApproachGoal(RewardUnit):
 
     def __call__(
         self,
-        arm_dist_angle_to_goal: np.ndarray, 
+        arm_dist_angle_to_goal: np.ndarray,
         *args: Any,
         **kwargs: Any,
     ) -> None:

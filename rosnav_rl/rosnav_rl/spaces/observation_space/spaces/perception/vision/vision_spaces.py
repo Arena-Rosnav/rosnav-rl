@@ -94,23 +94,15 @@ class RGBSpace(BaseObservationSpace):
     name = "RGBSpace"
 
     def __init__(
-        self,
-        rgb_sources: list[str] | None = None,
-        image_height: int = 128,
-        image_width: int = 128,
-        *args,
-        **kwargs
+        self, rgb_sources: list[str] | None = None, image_height: int = 128, image_width: int = 128, *args, **kwargs
     ) -> None:
 
         self._sources = sorted(rgb_sources or [])
-        self.requires = {source : ImageData for source in self._sources}
+        self.requires = {source: ImageData for source in self._sources}
         self._image_height = image_height
         self._image_width = image_width
         self._space = spaces.Box(
-            low=0,
-            high=255,
-            shape=(len(self._sources), 3, image_height, image_width),
-            dtype=np.uint8
+            low=0, high=255, shape=(len(self._sources), 3, image_height, image_width), dtype=np.uint8
         )
         super().__init__(*args, **kwargs)
 
@@ -144,14 +136,14 @@ class RGBSpace(BaseObservationSpace):
             img = obs.get(s)
 
             if img is None or img.size == 0:
-                continue    # no img recieved -> zeros
+                continue  # no img recieved -> zeros
 
             img = np.asarray(img)
             if img.ndim == 3 and img.shape[2] in (3, 4):
                 img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
 
             if img.shape[-1] != 3:  
-                continue    # None RGB format
+                continue  # None RGB format
 
             img = self.resize_hwc(img, self._image_height, self._image_width)
             out[i] = np.clip(img, 0, 255).astype(np.uint8).transpose(2, 0, 1)
