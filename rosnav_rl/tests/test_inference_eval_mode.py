@@ -71,7 +71,7 @@ def test_a_loaded_agent_acts_on_the_trained_batch_statistics(tmp_path):
     for _ in range(3):
         agent.get_action(_scene())
 
-    np.testing.assert_allclose(command, agent.space_manager.decode_action(expected), atol=1e-5)
+    np.testing.assert_allclose(command, agent.space_manager.decode_policy_action(expected), atol=1e-5)
     assert all(
         torch.equal(norm.running_mean, before)
         for norm, before in zip(_batch_norms(agent.model.model.policy), saved, strict=True)

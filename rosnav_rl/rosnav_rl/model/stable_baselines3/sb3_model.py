@@ -379,7 +379,7 @@ class StableBaselinesModel(RL_Model):
             episode_start=(np.array([True] * self.__env.env.num_envs) if episode_start else None),
         )
 
-        self.__state.last_action = self._rl_agent.space_manager.decode_action(action)
+        self.__state.last_action = self._rl_agent.space_manager.decode_policy_action(action)
         return self.__state.last_action
 
     def train(self, *args: Any, **kwargs: Any) -> bool:
@@ -538,6 +538,12 @@ class StableBaselinesModel(RL_Model):
         config_dump = parameters.model_dump(exclude=dump_exclude)
         filtered_config = {k: v for k, v in config_dump.items() if k in algo_init_params and v is not None}
 
+        chunk = self._rl_agent.spec.action_chunk
+        if chunk > 1:
+            for key in ("gamma", "gae_lambda"):
+                if key in filtered_config:
+                    filtered_config[key] = filtered_config[key] ** chunk
+
         return {**base_kwargs, **filtered_config}
 
     def _initialize_model(self, algorithm_parameters: dict[str, Any]) -> None:
@@ -688,7 +694,8 @@ class StableBaselinesModel(RL_Model):
                 self._model.policy._predict(obs_as_tensor(observation, self._model.device), deterministic).cpu().numpy()
             )
 
-        actions = np.clip(actions, self._rl_agent.action_space.low, self._rl_agent.action_space.high)
+        policy_space = self._rl_agent.space_manager.policy_action_space
+        actions = np.clip(actions, policy_space.low, policy_space.high)
 
         return actions.squeeze(axis=0), state
 

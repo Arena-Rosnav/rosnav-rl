@@ -35,7 +35,7 @@ class _SpaceManagerEnv(gym.Env):
     def __init__(self, space_manager: BaseSpaceManager):
         super().__init__()
         self.observation_space = space_manager.observation_space
-        self.action_space = space_manager.action_space
+        self.action_space = space_manager.policy_action_space
 
     def reset(
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
