@@ -135,7 +135,7 @@ class RGBSpace(BaseObservationSpace):
         return resized.squeeze(0).numpy()
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, *args: Any, **obs: Any):
+    def encode_observation(self, *args: Any, **obs: Any) -> np.ndarray:
         out = np.zeros((len(self._sources), 3, self._image_height, self._image_width), np.uint8)
         for i, s in enumerate(self._sources):
             img = obs.get(s)
@@ -147,10 +147,10 @@ class RGBSpace(BaseObservationSpace):
             if img.ndim == 3 and img.shape[2] in (3, 4):
                 img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
 
-            if img.shape[-1] != 3:
+            if img.shape[0] != 3:
                 continue  # None RGB format
 
-            img = self.resize_hwc(img, self._image_height, self._image_width)
-            out[i] = np.clip(img, 0, 255).astype(np.uint8).transpose(2, 0, 1)
+            img = self.resize_chw(img, self._image_height, self._image_width)
+            out[i] = np.clip(img, 0, 255).astype(np.uint8)
 
         return out

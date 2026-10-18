@@ -1246,7 +1246,7 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
 
         return None
 
-    def _generate(self, **kwargs: Any):
+    def _generate(self, **kwargs: Any) -> np.ndarray:
 
         if self.SOURCE_FRAME is None:
             self.SOURCE_FRAME = self._resolve_source_frame()

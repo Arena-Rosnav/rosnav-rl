@@ -21,7 +21,6 @@ from .laser import (
     ReducedLaserScanSpace,
     ReliableLaserSpace,
 )
-
 from .vision import (
     RGBDSpace,
     RGBSpace,

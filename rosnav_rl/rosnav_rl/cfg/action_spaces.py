@@ -66,6 +66,7 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal, Protocol
 
 import numpy as np
+from arena_robots.caps import ArmSpec
 from gymnasium import spaces
 from pydantic import BaseModel, Discriminator, Field
 
@@ -426,7 +427,7 @@ class ManipulatorActionSpace(BaseActionSpace):
         return {"joint_limits": [list(lim) for lim in self.position_limits]}
 
     @classmethod
-    def from_config(cls, arm_spec) -> ManipulatorActionSpace:
+    def from_config(cls, arm_spec: ArmSpec) -> ManipulatorActionSpace:
         joint_names = arm_spec.chain
         position_limits = []
 
