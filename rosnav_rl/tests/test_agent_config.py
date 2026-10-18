@@ -368,3 +368,10 @@ class TestAgentConfig:
         actions = [{"linear": 0.3, "angular": 0.0}]
         spec = self._make_spec(action_space=DifferentialDriveActionSpace(discrete_actions=actions))
         assert spec.action_space.is_discrete
+
+
+def test_inference_acts_on_the_mean_action_unless_the_saved_config_asks_to_sample():
+    sampled = AgentConfig(framework=_make_sb3_framework(), deterministic_inference=False)
+
+    assert AgentConfig(framework=_make_sb3_framework()).deterministic_inference is True
+    assert AgentConfig.model_validate(sampled.model_dump()).deterministic_inference is False

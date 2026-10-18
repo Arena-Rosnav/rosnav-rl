@@ -167,7 +167,7 @@ class ArenaInferenceNode:
         observations["is_terminal"] = False
 
         try:
-            cmd = self.agent.get_action(observations)
+            cmd = self.agent.get_action(observations, deterministic=self._agent_spec.deterministic_inference)
         except Exception as exc:
             self.logger.warn(f"[rosnav_rl] get_action failed: {type(exc).__name__}: {exc}")
             return

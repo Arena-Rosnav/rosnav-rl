@@ -55,6 +55,7 @@ class AgentConfig(BaseModel):
             it from the robot description.  In saved agent configs it is always
             present.
         normalized_actions: Policy actions in [-1, 1], mapped linearly onto the robot limits.
+        deterministic_inference: Whether the inference node acts on the policy's mean action.
         parameters: Unified observation + environment parameters. Review and override in the training config YAML before
             starting a run.  See :class:`~rosnav_rl.cfg.parameters.AgentParameters`.
         framework: RL framework configuration (SB3 or DreamerV3).
@@ -81,6 +82,9 @@ class AgentConfig(BaseModel):
     )
     normalized_actions: bool = Field(
         False, description="Policy acts in [-1, 1] per command dimension, mapped linearly onto the action space bounds."
+    )
+    deterministic_inference: bool = Field(
+        True, description="The inference node acts on the policy's mean action, False samples it as training does."
     )
     parameters: AgentParameters = AgentParameters()
 
