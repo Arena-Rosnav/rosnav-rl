@@ -39,6 +39,10 @@ class BaseSpaceManager:
     ):
         self._spec = spec
         self._action_space_manager = ActionSpaceManager(spec.action_space)
+        self._normalized = spec.normalized_actions
+        command_space = self._action_space_manager.action_space
+        if self._normalized and not isinstance(command_space, spaces.Box):
+            raise ValueError("normalized_actions needs a continuous (Box) action space")
 
         obs_kwargs = observation_space_kwargs.copy() if observation_space_kwargs else {}
         obs_kwargs.update(spec.parameters.observation_kwargs())
@@ -58,6 +62,9 @@ class BaseSpaceManager:
         return self._observation_space_manager.encode_observation(obs_dict)
 
     def decode_action(self, action: np.ndarray) -> np.ndarray:
+        if self._normalized:
+            space = self._action_space_manager.action_space
+            action = space.low + (np.clip(action, -1.0, 1.0) + 1.0) / 2.0 * (space.high - space.low)
         return self._action_space_manager.decode_action(action)
 
     def reset_spaces(self) -> None:
@@ -84,7 +91,10 @@ class BaseSpaceManager:
 
     @property
     def action_space(self) -> spaces.Space:
-        return self._action_space_manager.action_space
+        space = self._action_space_manager.action_space
+        if self._normalized:
+            return spaces.Box(low=-1.0, high=1.0, shape=space.shape, dtype=space.dtype)
+        return space
 
     @property
     def config(self) -> dict[str, dict[str, Any]]:

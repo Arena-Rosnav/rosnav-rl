@@ -27,6 +27,7 @@ def _spec() -> AgentConfig:
         framework=StableBaselinesCfg(
             algorithm=PPO_Cfg(architecture_name="AGENT_5", parameters=PPO_Algorithm_Cfg(device="cpu", seed=3))
         ),
+        normalized_actions=True,
     )
 
 

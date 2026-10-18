@@ -54,6 +54,7 @@ class AgentConfig(BaseModel):
         action_space: Typed action space.  ``None`` until the trainer populates
             it from the robot description.  In saved agent configs it is always
             present.
+        normalized_actions: Policy actions in [-1, 1], mapped linearly onto the robot limits.
         parameters: Unified observation + environment parameters. Review and override in the training config YAML before
             starting a run.  See :class:`~rosnav_rl.cfg.parameters.AgentParameters`.
         framework: RL framework configuration (SB3 or DreamerV3).
@@ -77,6 +78,9 @@ class AgentConfig(BaseModel):
 
     action_space: ActionSpaceSpec | None = Field(
         None, description="Typed action space. Derived from robot description at training time."
+    )
+    normalized_actions: bool = Field(
+        False, description="Policy acts in [-1, 1] per command dimension, mapped linearly onto the action space bounds."
     )
     parameters: AgentParameters = AgentParameters()
 
