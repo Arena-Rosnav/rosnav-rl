@@ -8,6 +8,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
 from rosnav_rl.utils.stable_baselines3.staged_train_callback import StagedTrainCallback
+from rosnav_rl.utils.stable_baselines3.tick_callbacks import TickScheduledCurriculum
 
 TOLERANCE = "task.episode.goto_pose.tolerance.radius"
 
@@ -38,6 +39,21 @@ def test_stage_zero_sets_the_episode_tolerance_on_the_task_generator(task_genera
         threshold_type="succ",
         upper_threshold=0.9,
         lower_threshold=0.3,
+        num_envs=1,
+        parameter_node_template="/curriculum_test/env_{i}/task_generator_node",
+        timeout=5.0,
+    )
+    assert target.get_parameter(TOLERANCE).value == pytest.approx(1.5)
+
+
+def test_tick_scheduled_stage_zero_sets_the_episode_tolerance_on_the_task_generator(task_generator):
+    target, trainer = task_generator
+    stage = {"task.random.static.n": [0, 0], TOLERANCE: 1.5}
+    TickScheduledCurriculum(
+        node=trainer,
+        train_stages=[stage, {**stage, TOLERANCE: 1.2}],
+        stage_ticks=[0, 50000],
+        ticks_per_step=1,
         num_envs=1,
         parameter_node_template="/curriculum_test/env_{i}/task_generator_node",
         timeout=5.0,
