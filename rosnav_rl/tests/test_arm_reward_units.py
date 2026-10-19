@@ -41,3 +41,27 @@ def test_arm_angle_tolerance_comes_from_the_unit_params():
 
     assert _step(loose, 0.01, 0.3)[1].get("is_done") is True
     assert _step(tight, 0.01, 0.3)[1].get("is_done", False) is False
+
+
+@pytest.mark.parametrize(
+    "units",
+    [
+        ("collision", "arm_approach_goal", "arm_goal_reached"),
+        ("arm_approach_goal", "arm_goal_reached", "collision"),
+    ],
+)
+def test_a_collision_still_ends_the_episode_next_to_the_arm_units(units):
+    reward_function = RewardFunction({name: {} for name in units})
+    laser = np.full(360, 5.0, dtype=np.float32)
+
+    _step(reward_function, 1.0, 1.0, front_laser=laser, collision_monitor=False)
+    _, info = _step(reward_function, 0.9, 1.0, front_laser=laser, collision_monitor=True)
+
+    assert info["is_done"] is True
+    assert info["done_reason"] == DONE_REASONS.COLLISION
+
+
+def test_arm_units_leave_the_done_flag_unset_while_the_goal_is_far():
+    _, info = _step(RewardFunction({"arm_approach_goal": {}, "arm_goal_reached": {}}), 1.0, 1.0)
+
+    assert "is_done" not in info

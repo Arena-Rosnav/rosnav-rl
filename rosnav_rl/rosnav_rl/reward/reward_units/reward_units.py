@@ -2079,7 +2079,6 @@ class RewardArmGoalReached(RewardUnit):
         "done_reason": DONE_REASONS.SUCCESS,
         "is_success": True,
     }
-    NOT_DONE_INFO = {"is_done": False}
 
     @check_params
     def __init__(
@@ -2127,8 +2126,6 @@ class RewardArmGoalReached(RewardUnit):
         if position_reached and orientation_reached:
             self.add_reward(self._reward)
             self.add_info(self.DONE_INFO)
-        else:
-            self.add_info(self.NOT_DONE_INFO)
 
 
 @RewardUnitFactory.register("arm_approach_goal")
@@ -2209,8 +2206,6 @@ class RewardArmApproachGoal(RewardUnit):
                 self.add_reward(float(factor * distance_change))
 
         self.last_distance = current_distance
-
-        self.add_info({"is_done": False})
 
     def reset(self):
         """Reset internal state for a new episode."""
