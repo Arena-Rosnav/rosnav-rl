@@ -1,6 +1,7 @@
 """RGBSpace stacks collected camera images channels first at the configured size."""
 
 import numpy as np
+import pytest
 from sensor_msgs.msg import Image
 
 from rosnav_rl.observations.data_sources.collectors import ImageColorCollector
@@ -71,3 +72,31 @@ def test_single_channel_images_are_skipped():
     out = space.encode_observation(wrist_color=np.full((8, 10), 200, dtype=np.uint8))
 
     assert (out == 0).all()
+
+
+@pytest.mark.parametrize(
+    ("normalizer", "low", "high", "expected"),
+    [
+        ("max_abs", -1.0, 1.0, [-1.0, 2 * 128 / 255 - 1, 2 * 200 / 255 - 1]),
+        ("min_max", 0.0, 1.0, [0.0, 128 / 255, 200 / 255]),
+    ],
+)
+def test_normalized_images_scale_in_float_without_wrapping(normalizer, low, high, expected):
+    space = RGBSpace(rgb_sources=["wrist_color"], image_height=8, image_width=10, normalize=True, normalizer=normalizer)
+    gym_space = space.get_gym_space()
+
+    out = space.encode_observation(wrist_color=_collected("rgb8", _solid(8, 10, (0, 128, 200))))
+
+    assert gym_space.dtype == np.float32
+    np.testing.assert_allclose(gym_space.low, low)
+    np.testing.assert_allclose(gym_space.high, high)
+    assert out.dtype == np.float32
+    np.testing.assert_allclose(out[0, :, 0, 0], expected, atol=1e-6)
+    assert gym_space.contains(out)
+
+
+def test_unnormalized_images_keep_the_uint8_space():
+    space = RGBSpace(rgb_sources=["wrist_color"], image_height=8, image_width=10, normalize=False)
+
+    assert space.get_gym_space().dtype == np.uint8
+    assert space.encode_observation(wrist_color=_solid(8, 10, (0, 128, 200))).dtype == np.uint8

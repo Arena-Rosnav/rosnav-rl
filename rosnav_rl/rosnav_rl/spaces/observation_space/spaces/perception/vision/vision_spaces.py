@@ -110,17 +110,15 @@ class RGBSpace(BaseObservationSpace):
             low=0, high=255, shape=(len(self._sources), 3, image_height, image_width), dtype=np.uint8
         )
         super().__init__(*args, **kwargs)
+        if self._can_normalize:
+            self._space = spaces.Box(
+                low=self._apply_normalization(self._space.low),
+                high=self._apply_normalization(self._space.high),
+                dtype=np.float32,
+            )
 
     def get_gym_space(self) -> spaces.Space:
-        """
-        Returns the Gym observation space for the RGB observation space.
-
-        The space represents a 3-channel image RGB with shape
-        (height, width, 3) and values in range [0, 255].
-
-        Returns:
-            spaces.Space: The Gym observation space.
-        """
+        """Box of shape (sources, 3, height, width), uint8 in [0, 255] or float32 in the normalized range."""
         return self._space
 
     def resize_chw(self, image: np.ndarray, height: int, width: int) -> np.ndarray:
