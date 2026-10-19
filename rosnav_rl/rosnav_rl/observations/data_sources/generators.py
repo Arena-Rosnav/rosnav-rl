@@ -8,6 +8,7 @@ calculations on data from other `DataSource`s.
 from __future__ import annotations
 
 import math
+import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 from warnings import warn
@@ -17,7 +18,6 @@ import numpy as np
 import people_msgs.msg as people_msgs
 import rclpy
 import tf2_ros
-import yaml
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import euler_from_quaternion
 
@@ -1207,13 +1207,17 @@ class ArenaPedestrianStateGenerator(Generator[ArenaPedestrianStates]):
 
 
 class EndEffectorPoseTFGenerator(Generator[Pose3D]):
+    """Pose [x, y, z, qx, qy, qz, qw] of the robot's end effector frame in target_frame from the TF tree."""
+
     requires = {}
+
+    WARN_PERIOD_S = 10.0
 
     def __init__(
         self,
         name: str,
         node: rclpy.Node | None = None,
-        source_frame_suffix: str = "tool0",
+        source_frame: str = "",
         target_frame: str = "map",
         **kwargs: Any,
     ):
@@ -1221,45 +1225,28 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
 
         if not node:
             raise ValueError("EndEffectorPoseTFGenerator requires a ROS 2 node.")
+        if not source_frame:
+            raise ValueError("EndEffectorPoseTFGenerator requires a non-empty source_frame.")
 
         self._node = node
         self._tf_buffer = tf2_ros.Buffer(node=self._node)
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self._node)
 
-        self._source_frame_suffix = source_frame_suffix
-        self.SOURCE_FRAME: str | None = None
+        self.SOURCE_FRAME: str = source_frame
         self.TARGET_FRAME: str = target_frame
 
         self._last_pose = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
         self._is_initialized = False
+        self._last_warn = -math.inf
 
-    def _resolve_source_frame(self) -> str | None:
-        try:
-            frames_yaml = self._tf_buffer.all_frames_as_yaml()
-            if not frames_yaml:
-                return None
-
-            frames_dict: dict = yaml.safe_load(frames_yaml)
-            if not frames_dict:
-                return None
-
-            for frame in frames_dict.keys():
-                if frame.endswith(self._source_frame_suffix):
-                    return frame
-
-        except Exception as e:
-            self._node.get_logger().warn(f"Failed to parse TF frames YAML: {e}")
-
-        return None
+    def _warn(self, message: str) -> None:
+        now = time.monotonic()
+        if now - self._last_warn < self.WARN_PERIOD_S:
+            return
+        self._last_warn = now
+        self._node.get_logger().warn(message)
 
     def _generate(self, **kwargs: Any) -> np.ndarray:
-
-        if self.SOURCE_FRAME is None:
-            self.SOURCE_FRAME = self._resolve_source_frame()
-            if self.SOURCE_FRAME is None:
-                self._node.get_logger().warn(f"Waiting for frame ending in '{self._source_frame_suffix}' in TF tree...")
-                return self._last_pose
-
         if not self._is_initialized:
             try:
                 if not self._tf_buffer.can_transform(
@@ -1268,12 +1255,11 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
                     rclpy.time.Time(),
                     timeout=rclpy.duration.Duration(seconds=1.0),
                 ):
+                    self._warn(f"Waiting for transform from '{self.SOURCE_FRAME}' to '{self.TARGET_FRAME}'")
                     return self._last_pose
                 self._is_initialized = True
             except tf2_ros.TransformException as e:
-                self._node.get_logger().warn(
-                    f"Could not get transform from '{self.SOURCE_FRAME}' to '{self.TARGET_FRAME}': {e}"
-                )
+                self._warn(f"Could not get transform from '{self.SOURCE_FRAME}' to '{self.TARGET_FRAME}': {e}")
                 return self._last_pose
 
         try:
@@ -1291,7 +1277,7 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
                 dtype=np.float32,
             )
         except tf2_ros.TransformException as e:
-            self._node.get_logger().warn(f"Could not transform '{self.SOURCE_FRAME}' to '{self.TARGET_FRAME}': {e}")
+            self._warn(f"Could not transform '{self.SOURCE_FRAME}' to '{self.TARGET_FRAME}': {e}")
 
         return self._last_pose
 
