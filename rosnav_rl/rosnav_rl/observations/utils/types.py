@@ -584,6 +584,8 @@ JointStates = Annotated[
 __all__ = [
     "DataSpec",
     "Pose2D",
+    "Pose3D",
+    "RelativePose3D",
     "LidarRanges",
     "RobotRelativePosition",
     "GoalLocation",
@@ -624,4 +626,5 @@ __all__ = [
     "SafetyContextVector",
     "RobotPoseVector",
     "LocalizationQualityVector",
+    "JointStates",
 ]

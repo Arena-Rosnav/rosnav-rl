@@ -1311,13 +1311,11 @@ class ArmGoalLocationInEndEffectorFrameGenerator(Generator[RelativePose3D]):
 
     requires = {
         "end_effector_pose": Pose3D,
-        # "end_effector_goal_pose": Pose3D,
     }
 
     def _generate(
         self,
         end_effector_pose: Pose3D,
-        # end_effector_goal_pose: Pose3D,
         **kwargs: Any,
     ) -> RelativePose3D:
 
@@ -1363,7 +1361,6 @@ class ArmDistAngleToGoalGenerator(Generator[DistanceAngleMetrics]):
     def _generate(
         self,
         arm_goal_in_ee_frame: RelativePose3D,
-        simulation_state_container: AgentParameters,
         **kwargs: Any,
     ) -> DistanceAngleMetrics:
         """Computes 3D distance and scalar rotational error.
