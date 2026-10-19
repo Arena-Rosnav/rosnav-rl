@@ -10,6 +10,7 @@ from gymnasium import spaces
 from rosnav_rl.cfg.action_spaces import (
     ActionSpaceSpec,
     BaseActionSpace,
+    CompositeActionSpace,
     DifferentialDriveActionSpace,
     HumanoidActionSpace,
     ManipulatorActionSpace,
@@ -172,6 +173,88 @@ class TestHumanoid:
         assert spec.num_dof == 8
         space = spec.get_gym_space()
         assert space.shape == (8,)
+
+
+# ============================================================
+# CompositeActionSpace
+# ============================================================
+
+
+class TestComposite:
+    def _parts(self):
+        return (
+            DifferentialDriveActionSpace(linear_range=(-1.0, 2.0), angular_range=(-3.0, 3.0)),
+            HumanoidActionSpace(locomotion_dof=2, upper_body_joint_limits=[(-0.5, 0.5)]),
+        )
+
+    def test_nested_composites_flatten_into_one_list(self):
+        drive, humanoid = self._parts()
+        spec = CompositeActionSpace(action_spaces=[CompositeActionSpace(action_spaces=[drive]), humanoid])
+
+        assert spec.action_spaces == [drive, humanoid]
+        assert spec.num_dof == 5
+        assert spec.get_gym_space().shape == (5,)
+
+    def test_nested_composites_flatten_from_yaml_data(self):
+        spec = CompositeActionSpace.model_validate(
+            {
+                "action_spaces": [
+                    {"type": "composite", "action_spaces": [{"type": "differential_drive"}]},
+                    {"type": "humanoid", "locomotion_dof": 2},
+                ]
+            }
+        )
+
+        assert [type(s) for s in spec.action_spaces] == [DifferentialDriveActionSpace, HumanoidActionSpace]
+
+    def test_discrete_sub_spaces_are_refused(self):
+        drive = DifferentialDriveActionSpace().to_discrete(buckets_linear=2, buckets_angular=2)
+
+        with pytest.raises(ValueError, match="continuous sub-spaces only"):
+            CompositeActionSpace(action_spaces=[drive])
+
+    def test_discrete_sub_spaces_are_refused_inside_nested_composites(self):
+        drive = DifferentialDriveActionSpace().to_discrete(buckets_linear=2, buckets_angular=2)
+
+        with pytest.raises(ValueError, match="continuous sub-spaces only"):
+            CompositeActionSpace.model_validate(
+                {"action_spaces": [{"type": "composite", "action_spaces": [drive.model_dump()]}]}
+            )
+
+    def test_decode_split_pairs_each_sub_space_with_its_slice(self):
+        drive, humanoid = self._parts()
+        spec = CompositeActionSpace(action_spaces=[drive, humanoid])
+
+        split = spec.decode_split(np.array([0.5, -1.0, 0.1, 0.2, 0.3]))
+
+        assert [s for s, _ in split] == [drive, humanoid]
+        assert split[0][0] is drive
+        np.testing.assert_allclose(split[0][1], [0.5, 0.0, -1.0])
+        np.testing.assert_allclose(split[1][1], [0.1, 0.2, 0.3])
+
+    def test_decode_split_rejects_a_wrong_action_length(self):
+        spec = CompositeActionSpace(action_spaces=list(self._parts()))
+
+        with pytest.raises(ValueError, match="expected 5"):
+            spec.decode_split(np.zeros(4))
+
+    def test_a_plain_spec_splits_into_itself(self):
+        drive, _ = self._parts()
+
+        split = ActionSpaceManager(drive).decode_split_action(np.array([0.5, -1.0]))
+
+        assert len(split) == 1
+        assert split[0][0] is drive
+        np.testing.assert_allclose(split[0][1], [0.5, 0.0, -1.0])
+
+    def test_the_manager_splits_a_composite_by_sub_space(self):
+        drive, humanoid = self._parts()
+
+        split = ActionSpaceManager(CompositeActionSpace(action_spaces=[drive, humanoid])).decode_split_action(
+            np.array([0.5, -1.0, 0.1, 0.2, 0.3])
+        )
+
+        assert [s for s, _ in split] == [drive, humanoid]
 
 
 # ============================================================

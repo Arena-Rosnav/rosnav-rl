@@ -68,7 +68,7 @@ from typing import Annotated, Any, Literal, Protocol
 import numpy as np
 from arena_robots.caps import ArmSpec
 from gymnasium import spaces
-from pydantic import BaseModel, Discriminator, Field
+from pydantic import BaseModel, Discriminator, Field, field_validator
 
 
 class RobotDiscreteAction(Protocol):
@@ -147,6 +147,10 @@ class BaseActionSpace(BaseModel):
             or ``(num_dof,)`` for manipulators / humanoids.
         """
         raise NotImplementedError
+
+    def decode_split(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+        """Decode model output into one ``(sub-space, command)`` pair per sub-space."""
+        return [(self, self.decode(action))]
 
     @property
     def is_discrete(self) -> bool:
@@ -501,6 +505,19 @@ class CompositeActionSpace(BaseActionSpace):
     type: Literal["composite"] = "composite"
     action_spaces: list[ActionSpaceSpec] = Field(default_factory=list)
 
+    @field_validator("action_spaces")
+    @classmethod
+    def _flatten_continuous(cls, action_spaces: list[BaseActionSpace]) -> list[BaseActionSpace]:
+        flat = [
+            sub
+            for space in action_spaces
+            for sub in (space.action_spaces if isinstance(space, CompositeActionSpace) else [space])
+        ]
+        discrete = [space.type for space in flat if space.is_discrete]
+        if discrete:
+            raise ValueError(f"composite action spaces take continuous sub-spaces only, got discrete {discrete}")
+        return flat
+
     @property
     def is_discrete(self) -> bool:
         return any(space.is_discrete for space in self.action_spaces)
@@ -537,26 +554,16 @@ class CompositeActionSpace(BaseActionSpace):
             idx += s.num_dof
         return np.concatenate(out)
 
-    def decode_split(self, action: np.ndarray) -> list[tuple[str, np.ndarray]]:
+    def decode_split(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
         a = np.asarray(action, dtype=np.float32).reshape(-1)
         if a.shape[0] != self.num_dof:
             raise ValueError(f"expected {self.num_dof}, got {a.shape[0]}")
 
         out, idx = [], 0
         for s in self.action_spaces:
-            out.append((s.type, np.asarray(s.decode(a[idx : idx + s.num_dof]), dtype=np.float32).reshape(-1)))
+            out.append((s, np.asarray(s.decode(a[idx : idx + s.num_dof]), dtype=np.float32).reshape(-1)))
             idx += s.num_dof
         return out
-
-    def resolve_discretization(self, robot_discrete_actions: list | None = None) -> CompositeActionSpace:
-        return self.model_copy(
-            update={
-                "action_spaces": [
-                    s.resolve_discretization(robot_discrete_actions) if hasattr(s, "resolve_discretization") else s
-                    for s in self.action_spaces
-                ]
-            }
-        )
 
     def _to_legacy_actions(self) -> dict:
         return {f"{s.type}_{i}": s._to_legacy_actions() for i, s in enumerate(self.action_spaces)}
