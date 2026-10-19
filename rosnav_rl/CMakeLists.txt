@@ -68,4 +68,11 @@ ament_export_include_directories(include)
 ament_export_libraries(rosnav_rl_planner)
 pluginlib_export_plugin_description_file(nav2_core local_planner_plugin.xml)
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(${PROJECT_NAME}_pytest tests
+    TIMEOUT 300
+  )
+endif()
+
 ament_package()

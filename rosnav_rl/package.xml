@@ -33,6 +33,8 @@
   <exec_depend>rclcpp</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
 
+  <test_depend>ament_cmake_pytest</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
     <pluginlib_plugin>
