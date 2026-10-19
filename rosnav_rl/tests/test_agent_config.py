@@ -1,6 +1,7 @@
 """Tests for the AgentConfig container and typed action space hierarchy."""
 
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -137,20 +138,84 @@ class TestOmnidirectional:
 # ============================================================
 
 
+@dataclass
+class _Arm:
+    chain: list[str]
+    controller: str = "arm_controller"
+    joint_limits: dict[str, dict[str, object]] = field(default_factory=dict)
+    named_poses: dict[str, dict[str, float]] = field(default_factory=dict)
+
+
+def _manipulator(position_limits):
+    return ManipulatorActionSpace(
+        joint_names=[f"joint_{i}" for i in range(len(position_limits))],
+        position_limits=position_limits,
+        controller="arm_controller",
+    )
+
+
 class TestManipulator:
     def test_space(self):
-        spec = ManipulatorActionSpace(joint_limits=[(-1, 1), (-2, 2), (-0.5, 0.5)])
+        spec = _manipulator([(-1, 1), (-2, 2), (-0.5, 0.5)])
         assert spec.num_dof == 3
         space = spec.get_gym_space()
         assert isinstance(space, spaces.Box)
         assert space.shape == (3,)
-        np.testing.assert_array_almost_equal(space.low, [-1, -2, -0.5])
-        np.testing.assert_array_almost_equal(space.high, [1, 2, 0.5])
+        np.testing.assert_array_almost_equal(space.low, [-1, -1, -1])
+        np.testing.assert_array_almost_equal(space.high, [1, 1, 1])
 
     def test_decode(self):
-        spec = ManipulatorActionSpace(joint_limits=[(-1, 1), (-2, 2)])
+        spec = _manipulator([(-1, 1), (-2, 2)])
         action = np.array([0.5, -1.0])
-        np.testing.assert_array_almost_equal(spec.decode(action), [0.5, -1.0])
+        np.testing.assert_array_almost_equal(spec.decode(action), [0.5, -2.0])
+
+    def test_decode_clips_to_the_joint_limits(self):
+        spec = _manipulator([(0.0, 1.0), (-2, 2)])
+        np.testing.assert_array_almost_equal(spec.decode(np.array([3.0, -7.0])), [1.0, -2.0])
+
+    def test_legacy_actions_carry_the_position_limits(self):
+        spec = _manipulator([(-1, 1), (-2, 2)])
+        assert spec._to_legacy_actions() == {"joint_limits": [[-1, 1], [-2, 2]]}
+
+    def test_from_config_reads_chain_controller_and_limits(self):
+        arm = _Arm(
+            chain=["shoulder", "elbow"],
+            controller="ur_arm_controller",
+            joint_limits={
+                "shoulder": {"has_position_limits": True, "min_position": -1.5, "max_position": 1.5},
+                "elbow": {"has_position_limits": False},
+            },
+        )
+
+        spec = ManipulatorActionSpace.from_config(arm)
+
+        assert spec.joint_names == ["shoulder", "elbow"]
+        assert spec.controller == "ur_arm_controller"
+        assert spec.position_limits == [(-1.5, 1.5), (-6.283185307179586, 6.283185307179586)]
+        assert spec.stow_positions is None
+
+    def test_from_config_matches_limits_by_joint_suffix(self):
+        arm = _Arm(
+            chain=["arm_shoulder"],
+            joint_limits={"shoulder": {"has_position_limits": True, "min_position": -0.5, "max_position": 0.25}},
+        )
+
+        assert ManipulatorActionSpace.from_config(arm).position_limits == [(-0.5, 0.25)]
+
+    def test_from_config_orders_the_stow_pose_by_the_chain(self):
+        arm = _Arm(chain=["shoulder", "elbow"], named_poses={"stow": {"elbow": 2.0, "shoulder": -1.0, "wrist": 0.5}})
+
+        assert ManipulatorActionSpace.from_config(arm).stow_positions == [-1.0, 2.0]
+
+    def test_from_config_drops_a_stow_pose_missing_a_chain_joint(self):
+        arm = _Arm(chain=["shoulder", "elbow"], named_poses={"stow": {"shoulder": -1.0}})
+
+        assert ManipulatorActionSpace.from_config(arm).stow_positions is None
+
+    def test_from_config_ignores_other_named_poses(self):
+        arm = _Arm(chain=["shoulder"], named_poses={"home": {"shoulder": 0.0}})
+
+        assert ManipulatorActionSpace.from_config(arm).stow_positions is None
 
 
 # ============================================================
@@ -269,7 +334,12 @@ class TestDiscriminatedUnion:
             ({"type": "differential_drive"}, DifferentialDriveActionSpace),
             ({"type": "omnidirectional"}, OmnidirectionalActionSpace),
             (
-                {"type": "manipulator", "joint_limits": [(-1, 1)]},
+                {
+                    "type": "arm",
+                    "joint_names": ["joint_0"],
+                    "position_limits": [(-1, 1)],
+                    "controller": "arm_controller",
+                },
                 ManipulatorActionSpace,
             ),
             ({"type": "humanoid"}, HumanoidActionSpace),

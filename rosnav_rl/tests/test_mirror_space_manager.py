@@ -140,7 +140,7 @@ def test_reflected_split_decisions_leave_non_drive_slices_alone():
 
 
 def test_arm_actions_are_refused():
-    arm = ManipulatorActionSpace(joint_names=["shoulder"], position_limits=[(-1.0, 1.0)])
+    arm = ManipulatorActionSpace(joint_names=["shoulder"], position_limits=[(-1.0, 1.0)], controller="arm_controller")
 
     with pytest.raises(ValueError, match="arm actions"):
         RL_Agent(_spec("canonical", action_space=CompositeActionSpace(action_spaces=[DRIVE, arm])))

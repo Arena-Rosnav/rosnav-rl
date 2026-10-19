@@ -66,7 +66,6 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal, Protocol
 
 import numpy as np
-from arena_robots.caps import ArmSpec
 from gymnasium import spaces
 from pydantic import BaseModel, Discriminator, Field, field_validator
 
@@ -78,6 +77,22 @@ class RobotDiscreteAction(Protocol):
     linear: float
     angular: float
     lateral: float
+
+
+class RobotArm(Protocol):
+    """One arm entry of a robot description's caps."""
+
+    @property
+    def chain(self) -> list[str]: ...
+
+    @property
+    def controller(self) -> str: ...
+
+    @property
+    def joint_limits(self) -> dict[str, dict[str, object]]: ...
+
+    @property
+    def named_poses(self) -> dict[str, dict[str, float]]: ...
 
 
 class DiscretizationStrategy(StrEnum):
@@ -417,6 +432,8 @@ class ManipulatorActionSpace(BaseActionSpace):
     type: Literal["arm"] = "arm"
     joint_names: list[str]
     position_limits: list[tuple[float, float]]
+    controller: str
+    stow_positions: list[float] | None = None
 
     @property
     def num_dof(self) -> int:
@@ -435,12 +452,11 @@ class ManipulatorActionSpace(BaseActionSpace):
         return {"joint_limits": [list(lim) for lim in self.position_limits]}
 
     @classmethod
-    def from_config(cls, arm_spec: ArmSpec) -> ManipulatorActionSpace:
+    def from_config(cls, arm_spec: RobotArm) -> ManipulatorActionSpace:
         joint_names = arm_spec.chain
         position_limits = []
 
-        raw_limits = getattr(arm_spec, "joint_limits", {}) or {}
-        limits_dict = raw_limits.get("joint_limits", raw_limits)
+        limits_dict = arm_spec.joint_limits
 
         for jn in joint_names:
             jl = limits_dict.get(jn, next((v for k, v in limits_dict.items() if k == jn or jn.endswith(k)), {}))
@@ -452,7 +468,15 @@ class ManipulatorActionSpace(BaseActionSpace):
             else:
                 position_limits.append((-6.283185307179586, 6.283185307179586))
 
-        return cls(joint_names=joint_names, position_limits=position_limits)
+        stow = arm_spec.named_poses.get("stow")
+        stow_positions = [stow[jn] for jn in joint_names] if stow and all(jn in stow for jn in joint_names) else None
+
+        return cls(
+            joint_names=joint_names,
+            position_limits=position_limits,
+            controller=arm_spec.controller,
+            stow_positions=stow_positions,
+        )
 
 
 # =====================================================================
