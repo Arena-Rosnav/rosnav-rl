@@ -144,13 +144,16 @@ class RGBSpace(BaseObservationSpace):
                 continue  # no img recieved -> zeros
 
             img = np.asarray(img)
-            if img.ndim == 3 and img.shape[2] in (3, 4):
-                img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
-
-            if img.shape[0] != 3:
-                continue  # None RGB format
+            if img.ndim != 3:
+                continue
+            if img.shape[0] in (3, 4):
+                img = img[:3]
+            elif img.shape[-1] in (3, 4):
+                img = np.transpose(img[..., :3], (2, 0, 1))
+            else:
+                continue
 
             img = self.resize_chw(img, self._image_height, self._image_width)
-            out[i] = np.clip(img, 0, 255).astype(np.uint8)
+            out[i] = np.clip(np.rint(img), 0, 255).astype(np.uint8)
 
         return out
