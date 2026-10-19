@@ -66,6 +66,9 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         if self._can_normalize:
             self._norm_low = self._space.low
             self._norm_high = self._space.high
+            if np.issubdtype(self._space.dtype, np.integer):
+                self._norm_low = self._norm_low.astype(np.float32)
+                self._norm_high = self._norm_high.astype(np.float32)
         else:
             self._norm_low = None
             self._norm_high = None
@@ -227,6 +230,8 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
             np.ndarray: Normalized array if normalization is enabled, otherwise unchanged.
         """
         if self._can_normalize:
+            if np.issubdtype(observation_arr.dtype, np.integer):
+                observation_arr = observation_arr.astype(np.float32)
             return self._normalizer.normalize(observation_arr, self._norm_low, self._norm_high)
         return observation_arr
 

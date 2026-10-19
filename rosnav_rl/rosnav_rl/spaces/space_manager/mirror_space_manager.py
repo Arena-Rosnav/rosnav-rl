@@ -23,6 +23,7 @@ from ..observation_space.spaces.navigation import DistAngleToGoalSpace, DistAngl
 from .base_space_manager import BaseSpaceManager
 
 if TYPE_CHECKING:
+    from rosnav_rl.cfg.action_spaces import BaseActionSpace
     from rosnav_rl.cfg.agent import AgentConfig
 
     from ..observation_space.spaces.base_observation_space import BaseObservationSpace
@@ -30,6 +31,8 @@ if TYPE_CHECKING:
 MirrorMode = Literal["canonical", "random"]
 
 _SYMMETRIC_NORMALIZERS = frozenset({"max_abs", "identity", "none"})
+
+_DRIVE_TYPES = frozenset({"differential_drive", "omnidirectional"})
 
 
 def _flip_rows(observation: np.ndarray) -> np.ndarray:
@@ -80,6 +83,8 @@ class MirrorSpaceManager(BaseSpaceManager):
         seed: int | None = None,
     ):
         super().__init__(spec, observation_space_list, observation_space_kwargs)
+        if any(sub.type == "arm" for sub in self._action_space_manager.spec.sub_spaces):
+            raise ValueError("mirroring has no reflection rule for arm actions")
         if spec.parameters.normalize and spec.parameters.normalizer not in _SYMMETRIC_NORMALIZERS:
             raise ValueError(f"mirroring needs a sign-preserving normalizer, got '{spec.parameters.normalizer}'")
         self._mode = mode
@@ -156,13 +161,21 @@ class MirrorSpaceManager(BaseSpaceManager):
             for name, value in encoded.items()
         }
 
-    def decode_action(self, action: np.ndarray) -> np.ndarray:
-        command = super().decode_action(action)
+    def _reflect(self, command: np.ndarray) -> np.ndarray:
         if not self._reflected:
             return command
         reflected = np.array(command, dtype=np.float32, copy=True)
         reflected[1:3] *= -1
         return reflected
+
+    def decode_action(self, action: np.ndarray) -> np.ndarray:
+        return self._reflect(super().decode_action(action))
+
+    def decode_split_action(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+        return [
+            (sub, self._reflect(command) if sub.type in _DRIVE_TYPES else command)
+            for sub, command in super().decode_split_action(action)
+        ]
 
     def reset_spaces(self) -> None:
         super().reset_spaces()

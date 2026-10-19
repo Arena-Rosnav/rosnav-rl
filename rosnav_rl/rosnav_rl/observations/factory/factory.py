@@ -202,6 +202,15 @@ def set_robot_pose_frames(config: dict[str, Any], robot_frame: str, base_frame: 
             params["target_frame"] = posixpath.join(robot_frame, "odom")
 
 
+def set_end_effector_frames(config: dict[str, Any], robot_frame: str, tip_link: str) -> None:
+    """Point every EndEffectorPoseTFGenerator in *config* at the arm tip and odom frames under *robot_frame*."""
+    for ds in config.get("datasources", {}).values():
+        if ds.get("type") == "EndEffectorPoseTFGenerator":
+            params = ds.setdefault("params", {})
+            params["source_frame"] = posixpath.join(robot_frame, tip_link)
+            params["target_frame"] = posixpath.join(robot_frame, "odom")
+
+
 def set_pedestrians_topic(config: dict[str, Any], robot_ns: str) -> None:
     """Point every Arena pedestrian collector in *config* at the arena_peds topic of the env that owns *robot_ns*."""
     for ds in config.get("datasources", {}).values():

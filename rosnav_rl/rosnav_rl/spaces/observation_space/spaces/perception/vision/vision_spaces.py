@@ -87,3 +87,71 @@ class RGBDSpace(BaseObservationSpace):
         # Combine RGB and Depth into RGBD (4 channels)
         rgbd_image = np.concatenate([color_image, depth_image], axis=-1)
         return rgbd_image.astype(np.uint8)
+
+
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.PERCEPTION)
+class RGBSpace(BaseObservationSpace):
+    name = "RGBSpace"
+
+    def __init__(
+        self,
+        rgb_sources: list[str] | None = None,
+        image_height: int = 128,
+        image_width: int = 128,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+
+        self._sources = sorted(rgb_sources or [])
+        self.requires = {source: ImageData for source in self._sources}
+        self._image_height = image_height
+        self._image_width = image_width
+        self._space = spaces.Box(
+            low=0, high=255, shape=(len(self._sources), 3, image_height, image_width), dtype=np.uint8
+        )
+        super().__init__(*args, **kwargs)
+        if self._can_normalize:
+            self._space = spaces.Box(
+                low=self._apply_normalization(self._space.low),
+                high=self._apply_normalization(self._space.high),
+                dtype=np.float32,
+            )
+
+    def get_gym_space(self) -> spaces.Space:
+        """Box of shape (sources, 3, height, width), uint8 in [0, 255] or float32 in the normalized range."""
+        return self._space
+
+    def resize_chw(self, image: np.ndarray, height: int, width: int) -> np.ndarray:
+        """Resize an (C, H, W) image to (height, width) via bilinear interpolation."""
+        if image.shape[1] == height and image.shape[2] == width:
+            return image
+        import torch
+        import torch.nn.functional as F
+
+        tensor = torch.from_numpy(np.ascontiguousarray(image)).unsqueeze(0).float()
+        resized = F.interpolate(tensor, size=(height, width), mode="bilinear", align_corners=False)
+        return resized.squeeze(0).numpy()
+
+    @BaseObservationSpace.apply_normalization
+    def encode_observation(self, *args: Any, **obs: Any) -> np.ndarray:
+        out = np.zeros((len(self._sources), 3, self._image_height, self._image_width), np.uint8)
+        for i, s in enumerate(self._sources):
+            img = obs.get(s)
+
+            if img is None or img.size == 0:
+                continue  # no img recieved -> zeros
+
+            img = np.asarray(img)
+            if img.ndim != 3:
+                continue
+            if img.shape[0] in (3, 4):
+                img = img[:3]
+            elif img.shape[-1] in (3, 4):
+                img = np.transpose(img[..., :3], (2, 0, 1))
+            else:
+                continue
+
+            img = self.resize_chw(img, self._image_height, self._image_width)
+            out[i] = np.clip(np.rint(img), 0, 255).astype(np.uint8)
+
+        return out

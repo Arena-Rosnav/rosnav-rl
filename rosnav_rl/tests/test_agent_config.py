@@ -1,6 +1,7 @@
 """Tests for the AgentConfig container and typed action space hierarchy."""
 
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,7 @@ from gymnasium import spaces
 from rosnav_rl.cfg.action_spaces import (
     ActionSpaceSpec,
     BaseActionSpace,
+    CompositeActionSpace,
     DifferentialDriveActionSpace,
     HumanoidActionSpace,
     ManipulatorActionSpace,
@@ -136,20 +138,87 @@ class TestOmnidirectional:
 # ============================================================
 
 
+@dataclass
+class _Arm:
+    chain: list[str]
+    controller: str = "arm_controller"
+    tip_link: str = "tool0"
+    joint_limits: dict[str, dict[str, object]] = field(default_factory=dict)
+    named_poses: dict[str, dict[str, float]] = field(default_factory=dict)
+
+
+def _manipulator(position_limits):
+    return ManipulatorActionSpace(
+        joint_names=[f"joint_{i}" for i in range(len(position_limits))],
+        position_limits=position_limits,
+        controller="arm_controller",
+        tip_link="tool0",
+    )
+
+
 class TestManipulator:
     def test_space(self):
-        spec = ManipulatorActionSpace(joint_limits=[(-1, 1), (-2, 2), (-0.5, 0.5)])
+        spec = _manipulator([(-1, 1), (-2, 2), (-0.5, 0.5)])
         assert spec.num_dof == 3
         space = spec.get_gym_space()
         assert isinstance(space, spaces.Box)
         assert space.shape == (3,)
-        np.testing.assert_array_almost_equal(space.low, [-1, -2, -0.5])
-        np.testing.assert_array_almost_equal(space.high, [1, 2, 0.5])
+        np.testing.assert_array_almost_equal(space.low, [-1, -1, -1])
+        np.testing.assert_array_almost_equal(space.high, [1, 1, 1])
 
     def test_decode(self):
-        spec = ManipulatorActionSpace(joint_limits=[(-1, 1), (-2, 2)])
+        spec = _manipulator([(-1, 1), (-2, 2)])
         action = np.array([0.5, -1.0])
-        np.testing.assert_array_almost_equal(spec.decode(action), [0.5, -1.0])
+        np.testing.assert_array_almost_equal(spec.decode(action), [0.5, -2.0])
+
+    def test_decode_clips_to_the_joint_limits(self):
+        spec = _manipulator([(0.0, 1.0), (-2, 2)])
+        np.testing.assert_array_almost_equal(spec.decode(np.array([3.0, -7.0])), [1.0, -2.0])
+
+    def test_legacy_actions_carry_the_position_limits(self):
+        spec = _manipulator([(-1, 1), (-2, 2)])
+        assert spec._to_legacy_actions() == {"joint_limits": [[-1, 1], [-2, 2]]}
+
+    def test_from_config_reads_chain_controller_and_limits(self):
+        arm = _Arm(
+            chain=["shoulder", "elbow"],
+            controller="ur_arm_controller",
+            joint_limits={
+                "shoulder": {"has_position_limits": True, "min_position": -1.5, "max_position": 1.5},
+                "elbow": {"has_position_limits": False},
+            },
+        )
+
+        spec = ManipulatorActionSpace.from_config(arm)
+
+        assert spec.joint_names == ["shoulder", "elbow"]
+        assert spec.controller == "ur_arm_controller"
+        assert spec.tip_link == "tool0"
+        assert spec.position_limits == [(-1.5, 1.5), (-6.283185307179586, 6.283185307179586)]
+        assert spec.stow_positions is None
+
+    def test_from_config_matches_limits_by_joint_suffix(self):
+        arm = _Arm(
+            chain=["arm_shoulder"],
+            joint_limits={"shoulder": {"has_position_limits": True, "min_position": -0.5, "max_position": 0.25}},
+        )
+
+        assert ManipulatorActionSpace.from_config(arm).position_limits == [(-0.5, 0.25)]
+
+    def test_from_config_orders_the_stow_pose_by_the_chain(self):
+        arm = _Arm(chain=["shoulder", "elbow"], named_poses={"stow": {"elbow": 2.0, "shoulder": -1.0, "wrist": 0.5}})
+
+        assert ManipulatorActionSpace.from_config(arm).stow_positions == [-1.0, 2.0]
+
+    def test_from_config_drops_a_stow_pose_missing_a_chain_joint(self):
+        arm = _Arm(chain=["shoulder", "elbow"], named_poses={"stow": {"shoulder": -1.0}})
+
+        assert ManipulatorActionSpace.from_config(arm).stow_positions is None
+
+    def test_from_config_ignores_other_named_poses(self):
+        arm = _Arm(chain=["shoulder"], named_poses={"home": {"shoulder": 0.0}})
+
+        assert ManipulatorActionSpace.from_config(arm).stow_positions is None
 
 
 # ============================================================
@@ -175,6 +244,88 @@ class TestHumanoid:
 
 
 # ============================================================
+# CompositeActionSpace
+# ============================================================
+
+
+class TestComposite:
+    def _parts(self):
+        return (
+            DifferentialDriveActionSpace(linear_range=(-1.0, 2.0), angular_range=(-3.0, 3.0)),
+            HumanoidActionSpace(locomotion_dof=2, upper_body_joint_limits=[(-0.5, 0.5)]),
+        )
+
+    def test_nested_composites_flatten_into_one_list(self):
+        drive, humanoid = self._parts()
+        spec = CompositeActionSpace(action_spaces=[CompositeActionSpace(action_spaces=[drive]), humanoid])
+
+        assert spec.action_spaces == [drive, humanoid]
+        assert spec.num_dof == 5
+        assert spec.get_gym_space().shape == (5,)
+
+    def test_nested_composites_flatten_from_yaml_data(self):
+        spec = CompositeActionSpace.model_validate(
+            {
+                "action_spaces": [
+                    {"type": "composite", "action_spaces": [{"type": "differential_drive"}]},
+                    {"type": "humanoid", "locomotion_dof": 2},
+                ]
+            }
+        )
+
+        assert [type(s) for s in spec.action_spaces] == [DifferentialDriveActionSpace, HumanoidActionSpace]
+
+    def test_discrete_sub_spaces_are_refused(self):
+        drive = DifferentialDriveActionSpace().to_discrete(buckets_linear=2, buckets_angular=2)
+
+        with pytest.raises(ValueError, match="continuous sub-spaces only"):
+            CompositeActionSpace(action_spaces=[drive])
+
+    def test_discrete_sub_spaces_are_refused_inside_nested_composites(self):
+        drive = DifferentialDriveActionSpace().to_discrete(buckets_linear=2, buckets_angular=2)
+
+        with pytest.raises(ValueError, match="continuous sub-spaces only"):
+            CompositeActionSpace.model_validate(
+                {"action_spaces": [{"type": "composite", "action_spaces": [drive.model_dump()]}]}
+            )
+
+    def test_decode_split_pairs_each_sub_space_with_its_slice(self):
+        drive, humanoid = self._parts()
+        spec = CompositeActionSpace(action_spaces=[drive, humanoid])
+
+        split = spec.decode_split(np.array([0.5, -1.0, 0.1, 0.2, 0.3]))
+
+        assert [s for s, _ in split] == [drive, humanoid]
+        assert split[0][0] is drive
+        np.testing.assert_allclose(split[0][1], [0.5, 0.0, -1.0])
+        np.testing.assert_allclose(split[1][1], [0.1, 0.2, 0.3])
+
+    def test_decode_split_rejects_a_wrong_action_length(self):
+        spec = CompositeActionSpace(action_spaces=list(self._parts()))
+
+        with pytest.raises(ValueError, match="expected 5"):
+            spec.decode_split(np.zeros(4))
+
+    def test_a_plain_spec_splits_into_itself(self):
+        drive, _ = self._parts()
+
+        split = ActionSpaceManager(drive).decode_split_action(np.array([0.5, -1.0]))
+
+        assert len(split) == 1
+        assert split[0][0] is drive
+        np.testing.assert_allclose(split[0][1], [0.5, 0.0, -1.0])
+
+    def test_the_manager_splits_a_composite_by_sub_space(self):
+        drive, humanoid = self._parts()
+
+        split = ActionSpaceManager(CompositeActionSpace(action_spaces=[drive, humanoid])).decode_split_action(
+            np.array([0.5, -1.0, 0.1, 0.2, 0.3])
+        )
+
+        assert [s for s, _ in split] == [drive, humanoid]
+
+
+# ============================================================
 # ActionSpaceSpec discriminated union
 # ============================================================
 
@@ -186,7 +337,13 @@ class TestDiscriminatedUnion:
             ({"type": "differential_drive"}, DifferentialDriveActionSpace),
             ({"type": "omnidirectional"}, OmnidirectionalActionSpace),
             (
-                {"type": "manipulator", "joint_limits": [(-1, 1)]},
+                {
+                    "type": "arm",
+                    "joint_names": ["joint_0"],
+                    "position_limits": [(-1, 1)],
+                    "controller": "arm_controller",
+                    "tip_link": "tool0",
+                },
                 ManipulatorActionSpace,
             ),
             ({"type": "humanoid"}, HumanoidActionSpace),

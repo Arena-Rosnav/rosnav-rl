@@ -12,7 +12,7 @@ from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
 
 from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
-from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_5_extended
+from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_10, EXTRACTOR_5_extended
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR, DRL_VO_ROSNAV_SCALAR_EXTRACTOR
 
 
@@ -334,3 +334,25 @@ class AGENT_6(StableBaselinesPolicyDescription):
     lstm_hidden_size = 128
     shared_lstm = False
     enable_critic_lstm = True
+
+
+@AgentFactory.register("AGENT_7")
+class AGENT_7(StableBaselinesPolicyDescription):
+    algorithm_class: type[BaseAlgorithm] = PPO
+    observation_space_kwargs = {
+        "normalize": True,
+        "goal_max_dist": 10,
+        "subgoal_max_dist": 10,
+        "reduced_num_beams": 270,
+        "rgb_sources": ["wrist_color", "arm_base_color"],
+    }
+    observation_spaces = [
+        spaces.perception.ReducedLaserScanSpace,
+        spaces.navigation.DistAngleToSubgoalSpace,
+        spaces.dynamics.LastActionSpace,
+        spaces.perception.RGBSpace,
+    ]
+    features_extractor_class = EXTRACTOR_10
+    features_extractor_kwargs = dict(features_dim=256)
+    net_arch = dict(pi=[64, 64], vf=[64, 64])
+    activation_fn = nn.ReLU

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from rosnav_rl.observations.factory.factory import set_robot_pose_frames
+from rosnav_rl.observations.factory.factory import set_end_effector_frames, set_robot_pose_frames
 
 
 def _config() -> dict:
@@ -45,3 +45,15 @@ def test_other_datasources_are_untouched():
     set_robot_pose_frames(config, "env_0/jackal/", "base_link")
 
     assert config["datasources"]["front_laser"]["params"] == {"topic": "lidar"}
+
+
+def test_end_effector_generator_points_at_the_arm_tip_under_the_robot_frame():
+    config = {"datasources": {"ee": {"type": "EndEffectorPoseTFGenerator", "params": {}}, **_config()["datasources"]}}
+
+    set_end_effector_frames(config, "env_0/rbkairos", "robot_arm_tool0")
+
+    assert config["datasources"]["ee"]["params"] == {
+        "source_frame": "env_0/rbkairos/robot_arm_tool0",
+        "target_frame": "env_0/rbkairos/odom",
+    }
+    assert config["datasources"]["robot_pose_from_tf"]["params"] == {}

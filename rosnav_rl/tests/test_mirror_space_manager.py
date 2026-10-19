@@ -5,7 +5,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
+from rosnav_rl.cfg.action_spaces import (
+    CompositeActionSpace,
+    DifferentialDriveActionSpace,
+    HumanoidActionSpace,
+    ManipulatorActionSpace,
+)
 from rosnav_rl.cfg.agent import AgentConfig
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.stable_baselines3.cfg import PPO_Cfg, StableBaselinesCfg
@@ -20,10 +25,15 @@ INCREMENT = 2 * np.pi / BEAMS
 PEDESTRIAN_MAPS = ("PedestrianVelXSpace", "PedestrianVelYSpace", "PedestrianTypeSpace", "PedestrianSocialStateSpace")
 
 
-def _spec(mirror: str, architecture: str = "AGENT_5", seed: int | None = None, **parameters) -> AgentConfig:
+DRIVE = DifferentialDriveActionSpace(linear_range=(-0.5, 1.0), angular_range=(-1.0, 1.0))
+
+
+def _spec(
+    mirror: str, architecture: str = "AGENT_5", seed: int | None = None, action_space=DRIVE, **parameters
+) -> AgentConfig:
     return AgentConfig(
         name=f"mirror_{mirror}",
-        action_space=DifferentialDriveActionSpace(linear_range=(-0.5, 1.0), angular_range=(-1.0, 1.0)),
+        action_space=action_space,
         parameters=AgentParameters(
             laser_num_beams=BEAMS,
             laser_angle_min=ANGLE_MIN,
@@ -99,6 +109,43 @@ def test_reflected_decisions_turn_and_strafe_the_other_way():
     mirrored.encode_observation(_scene(sign=-1.0))
 
     np.testing.assert_allclose(mirrored.decode_action(np.array([0.7, 0.4])), [0.7, 0.0, 0.4])
+
+
+def test_reflected_split_decisions_turn_the_drive_the_other_way():
+    mirrored = RL_Agent(_spec("canonical")).space_manager
+    mirrored.encode_observation(_scene())
+
+    [(sub, command)] = mirrored.decode_split_action(np.array([0.7, 0.4]))
+
+    assert sub.type == "differential_drive"
+    np.testing.assert_allclose(command, [0.7, 0.0, -0.4])
+
+    mirrored.encode_observation(_scene(sign=-1.0))
+
+    np.testing.assert_allclose(mirrored.decode_split_action(np.array([0.7, 0.4]))[0][1], [0.7, 0.0, 0.4])
+
+
+def test_reflected_split_decisions_leave_non_drive_slices_alone():
+    humanoid = HumanoidActionSpace(locomotion_dof=3)
+    mirrored = RL_Agent(
+        _spec("canonical", action_space=CompositeActionSpace(action_spaces=[DRIVE, humanoid]))
+    ).space_manager
+    mirrored.encode_observation(_scene())
+
+    drive, rest = mirrored.decode_split_action(np.array([0.7, 0.4, 0.1, 0.2, 0.3]))
+
+    np.testing.assert_allclose(drive[1], [0.7, 0.0, -0.4])
+    assert rest[0] == humanoid
+    np.testing.assert_allclose(rest[1], [0.1, 0.2, 0.3])
+
+
+def test_arm_actions_are_refused():
+    arm = ManipulatorActionSpace(
+        joint_names=["shoulder"], position_limits=[(-1.0, 1.0)], controller="arm_controller", tip_link="tool0"
+    )
+
+    with pytest.raises(ValueError, match="arm actions"):
+        RL_Agent(_spec("canonical", action_space=CompositeActionSpace(action_spaces=[DRIVE, arm])))
 
 
 def test_random_mode_reflects_whole_episodes_about_half_the_time():

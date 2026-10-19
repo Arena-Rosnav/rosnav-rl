@@ -1,6 +1,7 @@
 from .action_spaces import (
     ActionSpaceSpec,
     BaseActionSpace,
+    CompositeActionSpace,
     DifferentialDriveActionSpace,
     DiscretizationCfg,
     DiscretizationStrategy,
@@ -27,6 +28,7 @@ __all__ = [
     "LoggingCfg",
     "ManipulatorActionSpace",
     "OmnidirectionalActionSpace",
+    "CompositeActionSpace",
     "RewardCfg",
     "VERBOSE_TO_LEVEL",
     "configure_rosnav_rl_logging",

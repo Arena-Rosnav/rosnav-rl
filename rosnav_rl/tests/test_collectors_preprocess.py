@@ -3,17 +3,20 @@
 import numpy as np
 import pytest
 from arena_people_msgs.msg import Pedestrian, Pedestrians
+from control_msgs.msg import JointTrajectoryControllerState
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion, Twist, Vector3
 from nav2_msgs.msg import CollisionMonitorState
 from nav_msgs.msg import Odometry, Path
 from people_msgs.msg import People, Person
 from sensor_msgs.msg import Image, LaserScan
 from tf_transformations import quaternion_from_euler
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 from rosnav_rl.observations.data_sources.collectors import (
     ArenaPedestrianCollector,
     CollisionMonitorStateCollector,
     ImageColorCollector,
+    JointStateCollector,
     LaserScanCollector,
     OdometryCollector,
     PathCollector,
@@ -167,3 +170,29 @@ def test_people_and_arena_pedestrians_pass_through_unchanged():
 
     assert people_collector.get_observation() is people
     assert arena_collector.get_observation() is crowd
+
+
+def test_joint_states_map_each_joint_to_its_feedback():
+    collector = JointStateCollector("joint_states", topic="arm_controller/controller_state")
+
+    collector.update(
+        JointTrajectoryControllerState(
+            joint_names=["shoulder", "elbow"],
+            feedback=JointTrajectoryPoint(positions=[0.5, -1.0], velocities=[0.1, 0.2], effort=[3.0, 4.0]),
+        )
+    )
+
+    assert collector.get_observation() == {
+        "shoulder": {"position": 0.5, "velocity": 0.1, "effort": 3.0},
+        "elbow": {"position": -1.0, "velocity": 0.2, "effort": 4.0},
+    }
+
+
+def test_joint_states_without_velocity_or_effort_feedback_read_zero():
+    collector = JointStateCollector("joint_states", topic="arm_controller/controller_state")
+
+    collector.update(
+        JointTrajectoryControllerState(joint_names=["shoulder"], feedback=JointTrajectoryPoint(positions=[0.25]))
+    )
+
+    assert collector.get_observation() == {"shoulder": {"position": 0.25, "velocity": 0.0, "effort": 0.0}}

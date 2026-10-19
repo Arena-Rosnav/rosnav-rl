@@ -45,6 +45,9 @@ class ActionSpaceManager:
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         return self._spec.decode(action)
 
+    def decode_split_action(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+        return self._spec.decode_split(action)
+
     @property
     def config(self) -> dict[str, Any]:
         return self._spec.model_dump()

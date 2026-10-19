@@ -67,7 +67,7 @@ from typing import Annotated, Any, Literal, Protocol
 
 import numpy as np
 from gymnasium import spaces
-from pydantic import BaseModel, Discriminator, Field
+from pydantic import BaseModel, Discriminator, Field, field_validator
 
 
 class RobotDiscreteAction(Protocol):
@@ -77,6 +77,25 @@ class RobotDiscreteAction(Protocol):
     linear: float
     angular: float
     lateral: float
+
+
+class RobotArm(Protocol):
+    """One arm entry of a robot description's caps."""
+
+    @property
+    def chain(self) -> list[str]: ...
+
+    @property
+    def controller(self) -> str: ...
+
+    @property
+    def joint_limits(self) -> dict[str, dict[str, object]]: ...
+
+    @property
+    def named_poses(self) -> dict[str, dict[str, float]]: ...
+
+    @property
+    def tip_link(self) -> str: ...
 
 
 class DiscretizationStrategy(StrEnum):
@@ -146,6 +165,14 @@ class BaseActionSpace(BaseModel):
             or ``(num_dof,)`` for manipulators / humanoids.
         """
         raise NotImplementedError
+
+    def decode_split(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+        """Decode model output into one ``(sub-space, command)`` pair per sub-space."""
+        return [(self, self.decode(action))]
+
+    @property
+    def sub_spaces(self) -> list[BaseActionSpace]:
+        return [self]
 
     @property
     def is_discrete(self) -> bool:
@@ -405,23 +432,56 @@ class ManipulatorActionSpace(BaseActionSpace):
     Output command: joint values directly.
     """
 
-    type: Literal["manipulator"] = "manipulator"
-    joint_limits: list[tuple[float, float]]
+    type: Literal["arm"] = "arm"
+    joint_names: list[str]
+    position_limits: list[tuple[float, float]]
+    controller: str
+    tip_link: str
+    stow_positions: list[float] | None = None
 
     @property
     def num_dof(self) -> int:
-        return len(self.joint_limits)
+        return len(self.position_limits)
 
     def get_gym_space(self) -> spaces.Box:
-        lows = np.array([lo for lo, _ in self.joint_limits], dtype=np.float32)
-        highs = np.array([hi for _, hi in self.joint_limits], dtype=np.float32)
-        return spaces.Box(low=lows, high=highs)
+        return spaces.Box(-1, 1, shape=(self.num_dof,))
 
     def decode(self, action: np.ndarray) -> np.ndarray:
-        return np.asarray(action, dtype=np.float32)
+        action = np.clip(action, -1.0, 1.0)
+        lo = np.array([lo for lo, _ in self.position_limits], dtype=np.float32)
+        hi = np.array([hi for _, hi in self.position_limits], dtype=np.float32)
+        return np.asarray((action + 1.0) / 2.0 * (hi - lo) + lo, dtype=np.float32)
 
-    def _to_legacy_actions(self) -> dict[str, Any]:
-        return {"joint_limits": [list(lim) for lim in self.joint_limits]}
+    def _to_legacy_actions(self) -> dict:
+        return {"joint_limits": [list(lim) for lim in self.position_limits]}
+
+    @classmethod
+    def from_config(cls, arm_spec: RobotArm) -> ManipulatorActionSpace:
+        joint_names = arm_spec.chain
+        position_limits = []
+
+        limits_dict = arm_spec.joint_limits
+
+        for jn in joint_names:
+            jl = limits_dict.get(jn, next((v for k, v in limits_dict.items() if k == jn or jn.endswith(k)), {}))
+
+            if isinstance(jl, dict) and jl.get("has_position_limits", False):
+                min_pos = float(jl["min_position"])
+                max_pos = float(jl["max_position"])
+                position_limits.append((min_pos, max_pos))
+            else:
+                position_limits.append((-6.283185307179586, 6.283185307179586))
+
+        stow = arm_spec.named_poses.get("stow")
+        stow_positions = [stow[jn] for jn in joint_names] if stow and all(jn in stow for jn in joint_names) else None
+
+        return cls(
+            joint_names=joint_names,
+            position_limits=position_limits,
+            controller=arm_spec.controller,
+            tip_link=arm_spec.tip_link,
+            stow_positions=stow_positions,
+        )
 
 
 # =====================================================================
@@ -468,10 +528,93 @@ class HumanoidActionSpace(BaseActionSpace):
 
 
 # =====================================================================
+#  Composite Action Space
+# =====================================================================
+
+
+class CompositeActionSpace(BaseActionSpace):
+    """Generic Container for the merging of an abitrary amount of action spaces."""
+
+    type: Literal["composite"] = "composite"
+    action_spaces: list[ActionSpaceSpec] = Field(default_factory=list)
+
+    @field_validator("action_spaces")
+    @classmethod
+    def _flatten_continuous(cls, action_spaces: list[BaseActionSpace]) -> list[BaseActionSpace]:
+        flat = [
+            sub
+            for space in action_spaces
+            for sub in (space.action_spaces if isinstance(space, CompositeActionSpace) else [space])
+        ]
+        discrete = [space.type for space in flat if space.is_discrete]
+        if discrete:
+            raise ValueError(f"composite action spaces take continuous sub-spaces only, got discrete {discrete}")
+        return flat
+
+    @property
+    def sub_spaces(self) -> list[BaseActionSpace]:
+        return list(self.action_spaces)
+
+    @property
+    def is_discrete(self) -> bool:
+        return any(space.is_discrete for space in self.action_spaces)
+
+    @property
+    def is_holonomic(self) -> bool:
+        return any(space.is_holonomic for space in self.action_spaces)
+
+    @property
+    def num_dof(self) -> int:
+        return sum(space.num_dof for space in self.action_spaces)
+
+    def get_gym_space(self) -> spaces.Space:
+        lows = []
+        highs = []
+
+        for space in self.action_spaces:
+            gym_space = space.get_gym_space()
+            lows.append(gym_space.low)
+            highs.append(gym_space.high)
+
+        return spaces.Box(
+            low=np.concatenate(lows).astype(np.float32), high=np.concatenate(highs).astype(np.float32), dtype=np.float32
+        )
+
+    def decode(self, action: np.ndarray) -> np.ndarray:
+        a = np.asarray(action, dtype=np.float32).reshape(-1)
+        if a.shape[0] != self.num_dof:
+            raise ValueError(f"expected {self.num_dof}, got {a.shape[0]}")
+
+        out, idx = [], 0
+        for s in self.action_spaces:
+            out.append(np.asarray(s.decode(a[idx : idx + s.num_dof]), dtype=np.float32).reshape(-1))
+            idx += s.num_dof
+        return np.concatenate(out)
+
+    def decode_split(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+        a = np.asarray(action, dtype=np.float32).reshape(-1)
+        if a.shape[0] != self.num_dof:
+            raise ValueError(f"expected {self.num_dof}, got {a.shape[0]}")
+
+        out, idx = [], 0
+        for s in self.action_spaces:
+            out.append((s, np.asarray(s.decode(a[idx : idx + s.num_dof]), dtype=np.float32).reshape(-1)))
+            idx += s.num_dof
+        return out
+
+    def _to_legacy_actions(self) -> dict:
+        return {f"{s.type}_{i}": s._to_legacy_actions() for i, s in enumerate(self.action_spaces)}
+
+
+# =====================================================================
 #  Discriminated union — auto-selects type from YAML ``type`` field
 # =====================================================================
 
 ActionSpaceSpec = Annotated[
-    DifferentialDriveActionSpace | OmnidirectionalActionSpace | ManipulatorActionSpace | HumanoidActionSpace,
+    DifferentialDriveActionSpace
+    | OmnidirectionalActionSpace
+    | ManipulatorActionSpace
+    | HumanoidActionSpace
+    | CompositeActionSpace,
     Discriminator("type"),
 ]
