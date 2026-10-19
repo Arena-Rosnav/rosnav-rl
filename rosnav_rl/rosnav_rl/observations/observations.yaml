@@ -26,8 +26,6 @@ aliases:
   # Core robot state
   robot_pose: robot_pose_from_tf    # Primary robot localization source
   # robot_pose_tf: robot_pose_from_tf   # Alternative TF-based localization
-
-  end_effector_pose: end_effector_pose_from_tf # Primary end effector Localization Source
   
   # Navigation targets
   # goal: goal_pose                     # Final navigation target
@@ -52,44 +50,27 @@ datasources:
   
   # Robot localization sources
   # robot_pose_from_odom:
-  #   type: nav_msgs/Odometry          # → Pose2D
+  #   type: nav_msgs/Odometry            # → Pose2D
   #   params:
-  #     topic: "odom"                  # Standard odometry topic
-  #     up_to_date_required: true      # Require fresh data for temporal synchronization
+  #     topic: "odom"                    # Standard odometry topic
+  #     up_to_date_required: true        # Require fresh data for temporal synchronization
 
   robot_pose_from_tf:
     type: RobotPoseTFGenerator         # Listens to TF tree → Pose2D 
     params: {}                         # Uses simulation_state_container for frame config
 
-  end_effector_pose_from_tf:
-    type: EndEffectorPoseTFGenerator   # Generator (no ROS topic) → Pose3D
-    params: {}                          
-
   # Sensor data collectors
   front_laser:
     type: sensor_msgs/LaserScan        # → LidarRanges
     params:
-      topic: "lidar"                   # Primary lidar topic
+      topic: "lidar"                    # Primary lidar topic
       up_to_date_required: true        # Critical for obstacle avoidance
 
-  # Cameras
-
-  wrist_color:
-    type: ImageColorCollector
-    params:
-      topic: "wrist_camera/image"
-
-  arm_base_color:
-    type: ImageColorCollector
-    params:
-      topic: "arm_base_camera/image"
-
-  # Navigation target collectors 
-
+  # Navigation target collectors  
   goal_pose:
     type: geometry_msgs/PoseStamped    # → Pose2D
     params:
-      topic: "goal_pose"               # Navigation goal from planner (relative to namespace)
+      topic: "goal_pose"                # Navigation goal from planner (relative to namespace)
       up_to_date_required: false       # Goal updates less frequently
 
   subgoal_pose:
@@ -110,7 +91,7 @@ datasources:
 
   # Social navigation - people detection
   # people_detections:
-  #   type: people_msgs/People          # → PedestrianDetections
+  #   type: people_msgs/People           # → PedestrianDetections
   #   params:
   #     topic: "/task_generator_node/people"                  # People tracker output
   #     up_to_date_required: true
@@ -119,14 +100,14 @@ datasources:
   arena_pedestrian_detections:
     type: arena_people_msgs/Pedestrians  # → ArenaPedestrianDetections
     params:
-      topic: "arena_peds"                # Rebased onto the env namespace at load
+      topic: "arena_peds"              # Rebased onto the env namespace at load
       up_to_date_required: false
 
   collision_monitor:
     type: nav2_msgs/CollisionMonitorState  # → SafetyStatus
     params:
       topic: "collision_monitor_state"
-      state_key: "StopPolygon"             # Specific collision state to monitor
+      state_key: "StopPolygon"            # Specific collision state to monitor
 
   # Visual perception
   # front_camera:
@@ -146,13 +127,6 @@ datasources:
   #   params:
   #     topic: "collision_monitor_state"
   #     state_key: "collision"            # Specific collision state to monitor
-
-  # Arm state
-  joint_states:
-    type: control_msgs/JointTrajectoryControllerState     # → JointState
-    params:
-      topic: "arm_controller/controller_state"
-      up_to_date_required: true
 
   # ---------------------------------------------------------------------------
   # OPTIONAL COLLECTORS: Additional sensors for advanced configurations
@@ -196,15 +170,9 @@ datasources:
   subgoal_in_robot_frame:
     type: SubgoalLocationInRobotFrameGenerator  # Transforms subgoal from world → robot frame
 
-  arm_goal_in_ee_frame:
-    type: ArmGoalLocationInEndEffectorFrameGenerator
-
   # Navigation metrics - distance and angle computations
   dist_angle_to_goal:
     type: DistAngleToGoalGenerator           # Computes [distance, angle] to goal
-
-  arm_dist_angle_to_goal:                    
-    type: ArmDistAngleToGoalGenerator        # Computes [distance_error, angle_error] to goal
 
   dist_angle_to_subgoal:
     type: DistAngleToSubgoalGenerator        # Computes [distance, angle] to subgoal
@@ -235,7 +203,7 @@ datasources:
     type: PedestrianRelativeVelXGenerator        # Forward/backward velocity component
 
   pedestrian_vel_y:
-    type: PedestrianRelativeVelYGenerator        # Left/right velocity component
+    type: PedestrianRelativeVelYGenerator        # Left/right velocity component  
 
   # # Social navigation metrics
   # pedestrian_distances:
@@ -356,4 +324,3 @@ datasources:
 # 3. The simulation_state_container provides robot configuration parameters
 # 4. Type annotations ensure data consistency throughout the pipeline
 # 5. Failed data sources gracefully degrade (return empty arrays/default values)
-
