@@ -2072,7 +2072,6 @@ class RewardArmGoalReached(RewardUnit):
 
     requires = {
         "arm_dist_angle_to_goal": DistanceAngleMetrics,
-        "simulation_state_container": AgentParameters,
     }
 
     DONE_INFO = {
@@ -2087,6 +2086,8 @@ class RewardArmGoalReached(RewardUnit):
         self,
         reward_function: RewardFunction,
         reward: float = DEFAULTS.GOAL_REACHED.REWARD,
+        goal_radius: float = DEFAULTS.ARM_GOAL_REACHED.GOAL_RADIUS,
+        angle_tolerance: float = DEFAULTS.ARM_GOAL_REACHED.ANGLE_TOLERANCE,
         _on_safe_dist_violation: bool = DEFAULTS.GOAL_REACHED._ON_SAFE_DIST_VIOLATION,
         *args: Any,
         **kwargs: Any,
@@ -2094,6 +2095,8 @@ class RewardArmGoalReached(RewardUnit):
 
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._reward = reward
+        self._goal_radius = goal_radius
+        self._angle_tolerance = angle_tolerance
 
     def check_parameters(self, *args: Any, **kwargs: Any):
         if self._reward < 0.0:
@@ -2107,28 +2110,19 @@ class RewardArmGoalReached(RewardUnit):
     def __call__(
         self,
         arm_dist_angle_to_goal: DistanceAngleMetrics,
-        simulation_state_container: AgentParameters,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         """Calculates the reward and updates the information when the goal is reached.
 
         Args:
-            goal_in_robot_frame: Distance and angle to goal in robot frame.
-            simulation_state_container: Container with task configuration.
+            arm_dist_angle_to_goal: Distance and rotation error from the end effector to the arm goal.
         """
         target_distance = arm_dist_angle_to_goal[0]
         rotational_error = arm_dist_angle_to_goal[1]
 
-        # TODO create these params for arms
-        DEFAULT_ARM_GOAL_RADIUS = 0.05
-        DEFAULT_ARM_ANGLE_TOLERANCE = 0.20
-
-        goal_radius = getattr(simulation_state_container, "goal_radius", DEFAULT_ARM_GOAL_RADIUS)
-        goal_angle_tolerance = getattr(simulation_state_container, "goal_angle_tolerance", DEFAULT_ARM_ANGLE_TOLERANCE)
-
-        position_reached = target_distance < goal_radius
-        orientation_reached = rotational_error < goal_angle_tolerance
+        position_reached = target_distance < self._goal_radius
+        orientation_reached = rotational_error < self._angle_tolerance
 
         if position_reached and orientation_reached:
             self.add_reward(self._reward)
