@@ -15,7 +15,6 @@
   <build_depend>rosnav_rl_msgs</build_depend>
 
   <!-- Core Dependencies -->
-  <exec_depend>arena_rclpy_mixins</exec_depend>
   <exec_depend>control_msgs</exec_depend>
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>

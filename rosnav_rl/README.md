@@ -254,7 +254,7 @@ rosnav_rl/
 ├── states/               # Backward-compat shim (SimulationStateContainer = AgentParameters)
 ├── action_server/        # ROS 2 GetCommand service server
 ├── utils/                # RequiresProtocol, ErrorReportingMixin, validation, yaml_utils
-└── scripts/              # create_test_agent.py, test.py
+└── scripts/              # create_test_agent.py
 ```
 
 ---
