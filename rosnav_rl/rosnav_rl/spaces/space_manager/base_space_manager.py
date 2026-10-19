@@ -16,6 +16,7 @@ from ...spaces.observation_space.spaces.base_observation_space import (
 )
 
 if TYPE_CHECKING:
+    from rosnav_rl.cfg.action_spaces import BaseActionSpace
     from rosnav_rl.cfg.agent import AgentConfig
 
 
@@ -62,14 +63,17 @@ class BaseSpaceManager:
     ) -> np.ndarray | bool | dict[str, np.ndarray] | dict[str, np.ndarray | bool | dict[str, np.ndarray]]:
         return self._observation_space_manager.encode_observation(obs_dict)
 
-    def decode_action(self, action: np.ndarray) -> np.ndarray:
-        if self._normalized:
-            space = self._action_space_manager.action_space
-            action = space.low + (np.clip(action, -1.0, 1.0) + 1.0) / 2.0 * (space.high - space.low)
-        return self._action_space_manager.decode_action(action)
+    def _command_action(self, action: np.ndarray) -> np.ndarray:
+        if not self._normalized:
+            return action
+        space = self._action_space_manager.action_space
+        return space.low + (np.clip(action, -1.0, 1.0) + 1.0) / 2.0 * (space.high - space.low)
 
-    def decode_split_action(self, action: np.ndarray) -> list[tuple[str, np.ndarray]]:
-        return self._action_space_manager.decode_split_action(action)
+    def decode_action(self, action: np.ndarray) -> np.ndarray:
+        return self._action_space_manager.decode_action(self._command_action(action))
+
+    def decode_split_action(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+        return self._action_space_manager.decode_split_action(self._command_action(action))
 
     def decode_policy_action(self, action: np.ndarray) -> np.ndarray:
         """One command for a single-step policy, an (action_chunk, 3) array of commands for a chunked one."""

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
+from rosnav_rl.cfg.action_spaces import CompositeActionSpace, DifferentialDriveActionSpace, HumanoidActionSpace
 from rosnav_rl.cfg.agent import AgentConfig
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.stable_baselines3.cfg import PPO_Cfg, StableBaselinesCfg
@@ -16,10 +16,10 @@ from rosnav_rl.utils.utils import make_mock_env
 ACTION_SPACE = DifferentialDriveActionSpace(linear_range=(-2.0, 2.0), angular_range=(-4.0, 4.0))
 
 
-def _spec(normalized: bool, chunk: int = 1, **algorithm) -> AgentConfig:
+def _spec(normalized: bool, chunk: int = 1, action_space=ACTION_SPACE, **algorithm) -> AgentConfig:
     return AgentConfig(
         name=f"normalized_{normalized}_{chunk}",
-        action_space=ACTION_SPACE,
+        action_space=action_space,
         parameters=AgentParameters(laser_num_beams=360),
         framework=StableBaselinesCfg(
             algorithm=PPO_Cfg(architecture_name="AGENT_1", parameters=PPO_Algorithm_Cfg(device="cpu", **algorithm))
@@ -59,6 +59,28 @@ def test_chunks_of_unit_actions_decode_per_tick():
     np.testing.assert_allclose(
         manager.decode_policy_action(np.array([1.0, 0.0, -1.0, 0.5])), [[2.0, 0.0, 0.0], [-2.0, 0.0, 2.0]]
     )
+
+
+def test_split_unit_actions_map_onto_the_robot_limits():
+    manager = RL_Agent(_spec(True)).space_manager
+
+    [(sub, command)] = manager.decode_split_action(np.array([0.5, -0.25]))
+
+    assert sub is manager.action_space_manager.spec
+    np.testing.assert_allclose(command, [1.0, 0.0, -1.0])
+
+
+def test_split_unit_actions_map_onto_each_sub_space_of_a_composite():
+    humanoid = HumanoidActionSpace(locomotion_dof=1, locomotion_range=(0.0, 4.0))
+    composite = CompositeActionSpace(action_spaces=[ACTION_SPACE, humanoid])
+    manager = RL_Agent(_spec(True, action_space=composite)).space_manager
+
+    split = manager.decode_split_action(np.array([0.5, -0.25, 0.5]))
+
+    assert [sub for sub, _ in split] == [ACTION_SPACE, humanoid]
+    np.testing.assert_allclose(split[0][1], [1.0, 0.0, -1.0])
+    np.testing.assert_allclose(split[1][1], [3.0])
+    np.testing.assert_allclose(manager.decode_action(np.array([0.5, -0.25, 0.5])), [1.0, 0.0, -1.0, 3.0])
 
 
 @pytest.mark.parametrize("log_std_init", [-1.0, None])

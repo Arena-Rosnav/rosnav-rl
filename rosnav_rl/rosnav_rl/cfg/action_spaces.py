@@ -153,6 +153,10 @@ class BaseActionSpace(BaseModel):
         return [(self, self.decode(action))]
 
     @property
+    def sub_spaces(self) -> list[BaseActionSpace]:
+        return [self]
+
+    @property
     def is_discrete(self) -> bool:
         return False
 
@@ -517,6 +521,10 @@ class CompositeActionSpace(BaseActionSpace):
         if discrete:
             raise ValueError(f"composite action spaces take continuous sub-spaces only, got discrete {discrete}")
         return flat
+
+    @property
+    def sub_spaces(self) -> list[BaseActionSpace]:
+        return list(self.action_spaces)
 
     @property
     def is_discrete(self) -> bool:
