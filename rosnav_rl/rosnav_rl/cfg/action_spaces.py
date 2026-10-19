@@ -94,6 +94,9 @@ class RobotArm(Protocol):
     @property
     def named_poses(self) -> dict[str, dict[str, float]]: ...
 
+    @property
+    def tip_link(self) -> str: ...
+
 
 class DiscretizationStrategy(StrEnum):
     """Supported auto-discretization strategies for mobile action spaces.
@@ -433,6 +436,7 @@ class ManipulatorActionSpace(BaseActionSpace):
     joint_names: list[str]
     position_limits: list[tuple[float, float]]
     controller: str
+    tip_link: str
     stow_positions: list[float] | None = None
 
     @property
@@ -475,6 +479,7 @@ class ManipulatorActionSpace(BaseActionSpace):
             joint_names=joint_names,
             position_limits=position_limits,
             controller=arm_spec.controller,
+            tip_link=arm_spec.tip_link,
             stow_positions=stow_positions,
         )
 

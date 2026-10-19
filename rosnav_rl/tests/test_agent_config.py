@@ -142,6 +142,7 @@ class TestOmnidirectional:
 class _Arm:
     chain: list[str]
     controller: str = "arm_controller"
+    tip_link: str = "tool0"
     joint_limits: dict[str, dict[str, object]] = field(default_factory=dict)
     named_poses: dict[str, dict[str, float]] = field(default_factory=dict)
 
@@ -151,6 +152,7 @@ def _manipulator(position_limits):
         joint_names=[f"joint_{i}" for i in range(len(position_limits))],
         position_limits=position_limits,
         controller="arm_controller",
+        tip_link="tool0",
     )
 
 
@@ -191,6 +193,7 @@ class TestManipulator:
 
         assert spec.joint_names == ["shoulder", "elbow"]
         assert spec.controller == "ur_arm_controller"
+        assert spec.tip_link == "tool0"
         assert spec.position_limits == [(-1.5, 1.5), (-6.283185307179586, 6.283185307179586)]
         assert spec.stow_positions is None
 
@@ -339,6 +342,7 @@ class TestDiscriminatedUnion:
                     "joint_names": ["joint_0"],
                     "position_limits": [(-1, 1)],
                     "controller": "arm_controller",
+                    "tip_link": "tool0",
                 },
                 ManipulatorActionSpace,
             ),
