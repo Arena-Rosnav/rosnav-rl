@@ -1,6 +1,5 @@
 from typing import Any
 
-from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from stable_baselines3.common.base_class import BaseAlgorithm
 from torch import nn
@@ -14,6 +13,7 @@ from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
 from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_10, EXTRACTOR_5_extended
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR, DRL_VO_ROSNAV_SCALAR_EXTRACTOR
+from ..recurrent import PackedRecurrentPPO
 
 
 @AgentFactory.register("AGENT_1")
@@ -62,10 +62,10 @@ class AGENT_1(StableBaselinesPolicyDescription):
 @AgentFactory.register("AGENT_2")
 class AGENT_2(StableBaselinesPolicyDescription):
     """
-    AGENT_2 is a custom policy class for a reinforcement learning agent using the RecurrentPPO algorithm.
+    AGENT_2 is a custom policy class for a reinforcement learning agent using the PackedRecurrentPPO algorithm.
 
     Attributes:
-        algorithm_class (Type[BaseAlgorithm]): The algorithm class to be used, which is RecurrentPPO.
+        algorithm_class (Type[BaseAlgorithm]): The algorithm class to be used, which is PackedRecurrentPPO.
         observation_space_kwargs (dict): Keyword arguments for configuring the observation space.
             - normalize (bool): Whether to normalize the observations.
             - goal_max_dist (int): Maximum distance to the goal.
@@ -89,7 +89,7 @@ class AGENT_2(StableBaselinesPolicyDescription):
         log_std_init (float): Initial value for the log standard deviation of the policy.
     """
 
-    algorithm_class: type[BaseAlgorithm] = RecurrentPPO
+    algorithm_class: type[BaseAlgorithm] = PackedRecurrentPPO
     observation_space_kwargs = {
         "normalize": True,
         "goal_max_dist": 10,
@@ -162,10 +162,10 @@ class AGENT_3(StableBaselinesPolicyDescription):
 @AgentFactory.register("AGENT_4")
 class AGENT_4(StableBaselinesPolicyDescription):
     """
-    AGENT_4 is a custom policy class for a reinforcement learning agent using the RecurrentPPO algorithm from Stable Baselines3.
+    AGENT_4 is a custom policy class for a reinforcement learning agent using the PackedRecurrentPPO algorithm.
 
     Attributes:
-        algorithm_class (Type[BaseAlgorithm]): The algorithm class to be used, which is RecurrentPPO.
+        algorithm_class (Type[BaseAlgorithm]): The algorithm class to be used, which is PackedRecurrentPPO.
         stack_size (int): The size of the observation stack.
         observation_space_kwargs (dict): Keyword arguments for configuring the observation space.
             - normalize (bool): Whether to normalize the observations.
@@ -190,7 +190,7 @@ class AGENT_4(StableBaselinesPolicyDescription):
         log_std_init (float): Initial value for the log standard deviation of the policy.
     """
 
-    algorithm_class: type[BaseAlgorithm] = RecurrentPPO
+    algorithm_class: type[BaseAlgorithm] = PackedRecurrentPPO
     stack_size = 10
     observation_space_kwargs = {
         "normalize": True,
@@ -277,10 +277,10 @@ class AGENT_5_TTC(AGENT_5):
 @AgentFactory.register("AGENT_6")
 class AGENT_6(StableBaselinesPolicyDescription):
     """
-    AGENT_6 is a custom policy class for a reinforcement learning agent using the RecurrentPPO algorithm from Stable Baselines3.
+    AGENT_6 is a custom policy class for a reinforcement learning agent using the PackedRecurrentPPO algorithm.
 
     Attributes:
-        algorithm_class (Type[BaseAlgorithm]): The algorithm class to be used, which is RecurrentPPO.
+        algorithm_class (Type[BaseAlgorithm]): The algorithm class to be used, which is PackedRecurrentPPO.
         observation_spaces (list): A list of observation space classes used by the agent.
         observation_space_kwargs (dict): Keyword arguments for configuring the observation spaces.
             - roi_in_m (int): Region of interest in meters.
@@ -304,7 +304,7 @@ class AGENT_6(StableBaselinesPolicyDescription):
         enable_critic_lstm (bool): Whether to enable LSTM for the critic.
     """
 
-    algorithm_class: type[BaseAlgorithm] = RecurrentPPO
+    algorithm_class: type[BaseAlgorithm] = PackedRecurrentPPO
     observation_spaces = [
         spaces.environment.StackedLaserMapSpace,
         spaces.environment.PedestrianVelXSpace,

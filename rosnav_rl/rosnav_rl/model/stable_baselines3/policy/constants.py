@@ -6,12 +6,15 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.nn.modules.module import Module
 
+from .recurrent import PackedRecurrentPPO
+
 POLICY_TYPE: dict[type[BaseAlgorithm], Literal["MultiInputPolicy", "MultiInputLstmPolicy"]] = {
     # On-policy
     PPO: "MultiInputPolicy",
     A2C: "MultiInputPolicy",
     TRPO: "MultiInputPolicy",
     RecurrentPPO: "MultiInputLstmPolicy",
+    PackedRecurrentPPO: "MultiInputLstmPolicy",
     # Off-policy
     SAC: "MultiInputPolicy",
     TD3: "MultiInputPolicy",
