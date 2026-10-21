@@ -1423,7 +1423,7 @@ class CrowdSetGenerator(Generator[CrowdSet]):
         simulation_state_container: AgentParameters,
         **kwargs: Any,
     ) -> CrowdSet:
-        out = np.zeros((self.max_pedestrians, 5), dtype=np.float32)
+        out = np.zeros((self.max_pedestrians, 6), dtype=np.float32)
         if not arena_people_data or not arena_people_data.pedestrians:
             return out
 
@@ -1454,6 +1454,7 @@ class CrowdSetGenerator(Generator[CrowdSet]):
         out[:n, 0:2] = positions[keep]
         out[:n, 2:4] = velocities[keep]
         out[:n, 4] = 1.0
+        out[:n, 5] = ids[keep]
         return out
 
 

@@ -60,8 +60,8 @@ class CrowdSetSpace(BaseObservationSpace):
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:
-        low = np.tile(np.array([-self._range, -self._range, -self._max_speed, -self._max_speed, 0.0], dtype=np.float32), (self._k, 1))
-        high = np.tile(np.array([self._range, self._range, self._max_speed, self._max_speed, 1.0], dtype=np.float32), (self._k, 1))
+        low = np.tile(np.array([-self._range, -self._range, -self._max_speed, -self._max_speed, 0.0, 0.0], dtype=np.float32), (self._k, 1))
+        high = np.tile(np.array([self._range, self._range, self._max_speed, self._max_speed, 1.0, 4294967295.0], dtype=np.float32), (self._k, 1))
         return spaces.Box(low=low, high=high, dtype=np.float32)
 
     def encode_observation(self, crowd_set: CrowdSet, *args: Any, **kwargs: Any) -> CrowdSet:

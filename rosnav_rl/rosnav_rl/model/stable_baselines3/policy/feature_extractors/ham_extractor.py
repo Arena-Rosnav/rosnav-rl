@@ -68,7 +68,7 @@ class DRL_VO_HAM_EXTRACTOR(DRL_VO_ROSNAV_EXTRACTOR):
     def _get_input(self, observations) -> dict[str, torch.Tensor | None]:
         inputs = super()._get_input(observations)
         action = inputs["last_action"]
-        crowd = observations[CrowdSetSpace.name]
+        crowd = observations[CrowdSetSpace.name][..., :5]
         own = self._predicted_energy_change(crowd, self._robot_velocity(action))
         stop = self._predicted_energy_change(crowd, torch.zeros_like(own)[:, None].expand(-1, 2))
         inputs["last_action"] = torch.cat([action, own[:, None], stop[:, None]], dim=1)

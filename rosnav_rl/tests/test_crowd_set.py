@@ -40,9 +40,9 @@ def _gen(msg, pose=POSE, **kwargs):
 def test_rows_are_ordered_by_id_padded_and_out_of_range_dropped():
     out = _gen(_msg(_ped(7, 3, 0, -1, 0), _ped(2, 1, 1, 0, 0.5), _ped(9, 50, 0, 0, 0)), max_pedestrians=4)
 
-    assert out.shape == (4, 5)
-    np.testing.assert_allclose(out[0], [1, 1, 0, 0.5, 1])
-    np.testing.assert_allclose(out[1], [3, 0, -1, 0, 1])
+    assert out.shape == (4, 6)
+    np.testing.assert_allclose(out[0], [1, 1, 0, 0.5, 1, 2])
+    np.testing.assert_allclose(out[1], [3, 0, -1, 0, 1, 7])
     assert not out[2:].any()
 
 
@@ -67,16 +67,16 @@ def test_more_than_k_keeps_the_nearest_then_orders_by_id():
 def test_robot_yaw_rotates_positions_and_velocities():
     out = _gen(_msg(_ped(1, 1, 1, 0, 0.5)), pose={"x": 0.0, "y": 0.0, "yaw": np.pi / 2}, max_pedestrians=2)
 
-    np.testing.assert_allclose(out[0], [1, -1, 0.5, 0, 1], atol=1e-6)
+    np.testing.assert_allclose(out[0], [1, -1, 0.5, 0, 1, 1], atol=1e-6)
 
 
 def test_space_clips_to_physical_bounds():
     sp = CrowdSetSpace(max_pedestrians=2)
-    x = np.zeros((2, 5), dtype=np.float32)
-    x[0] = [20, 1, 5, 0, 1]
+    x = np.zeros((2, 6), dtype=np.float32)
+    x[0] = [20, 1, 5, 0, 1, 3]
 
-    assert sp.space.shape == (2, 5)
-    np.testing.assert_allclose(sp.encode_observation(x)[0], [12, 1, 3, 0, 1])
+    assert sp.space.shape == (2, 6)
+    np.testing.assert_allclose(sp.encode_observation(x)[0], [12, 1, 3, 0, 1, 3])
 
 
 def test_mirror_negates_y_and_vy_only():

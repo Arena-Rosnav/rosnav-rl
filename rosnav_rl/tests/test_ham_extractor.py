@@ -20,7 +20,7 @@ def _space():
             "PedestrianVelYSpace": spaces.Box(-3, 3, (80, 80), np.float32),
             "DistAngleToSubgoalSpace": spaces.Box(-10, 10, (2,), np.float32),
             "LastActionSpace": spaces.Box(np.array([-0.2, -1.5], np.float32), np.array([1.0, 1.5], np.float32)),
-            "CrowdSetSpace": spaces.Box(-12, 12, (K, 5), np.float32),
+            "CrowdSetSpace": spaces.Box(-12, 12, (K, 6), np.float32),
         }
     )
 
@@ -28,7 +28,7 @@ def _space():
 def _obs(crowd=None, action=None, batch=2):
     torch.manual_seed(0)
     if crowd is None:
-        crowd = torch.zeros(batch, K, 5)
+        crowd = torch.zeros(batch, K, 6)
         crowd[:, :3, :2] = torch.randn(batch, 3, 2) * 3
         crowd[:, :3, 2:4] = torch.randn(batch, 3, 2) * 0.5
         crowd[:, :3, 4] = 1
@@ -56,7 +56,7 @@ def test_output_shape(variant):
 def test_crowd_changes_the_features(variant):
     ex = _extractor(variant)
     a = ex(_obs())
-    b = ex(_obs(crowd=torch.zeros(2, K, 5)))
+    b = ex(_obs(crowd=torch.zeros(2, K, 6)))
 
     assert not torch.allclose(a, b)
 
