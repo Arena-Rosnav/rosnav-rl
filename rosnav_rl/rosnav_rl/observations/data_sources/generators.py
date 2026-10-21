@@ -34,6 +34,7 @@ from ..utils.types import (
     ArenaPedestrianDetections,
     ArenaPedestrianStates,
     CrowdTimeToContact,
+    CrowdSet,
     DistanceAngleMetrics,
     GoalLocation,
     LidarRanges,
@@ -1400,6 +1401,60 @@ class ArenaPedestrianTypeDistanceGenerator(Generator[PedestrianTypeMinDistances]
         if len(pedestrian_relative_locations) == 0:
             return {}
         return {0: float(np.linalg.norm(pedestrian_relative_locations, axis=1).min())}
+
+
+class CrowdSetGenerator(Generator[CrowdSet]):
+    """Padded set of the pedestrians within `max_range`: one [x, y, vx, vy, mask] row per pedestrian, in the robot frame, ordered by id."""
+
+    requires = {
+        "robot_pose": Pose2D,
+        "arena_people_data": ArenaPedestrianDetections,
+    }
+
+    def __init__(self, name: str, max_pedestrians: int = 24, max_range: float = 12.0, **kwargs: Any):
+        super().__init__(name, **kwargs)
+        self.max_pedestrians = max_pedestrians
+        self.max_range = max_range
+
+    def _generate(
+        self,
+        robot_pose: Pose2D,
+        arena_people_data: arena_people_msgs.Pedestrians,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> CrowdSet:
+        out = np.zeros((self.max_pedestrians, 5), dtype=np.float32)
+        if not arena_people_data or not arena_people_data.pedestrians:
+            return out
+
+        peds = arena_people_data.pedestrians
+        ids = np.array([p.id for p in peds], dtype=np.int64)
+        world = np.ones((len(peds), 3), dtype=np.float32)
+        world_vel = np.empty((len(peds), 2), dtype=np.float32)
+        for i, p in enumerate(peds):
+            world[i, 0] = p.pose.position.x
+            world[i, 1] = p.pose.position.y
+            world_vel[i, 0] = p.twist.linear.x
+            world_vel[i, 1] = p.twist.linear.y
+
+        positions = np.array(get_relative_pos_to_robot(robot_pose=robot_pose, distant_poses=world), dtype=np.float32)
+        velocities = np.array(
+            get_relative_vel_to_robot(robot_pose=robot_pose, pedestrian_vel_vector=world_vel), dtype=np.float32
+        )
+
+        dist = np.hypot(positions[:, 0], positions[:, 1])
+        keep = np.flatnonzero(dist <= self.max_range)
+        if len(keep) == 0:
+            return out
+        if len(keep) > self.max_pedestrians:
+            keep = keep[np.argsort(dist[keep], kind="stable")[: self.max_pedestrians]]
+        keep = keep[np.argsort(ids[keep], kind="stable")]
+
+        n = len(keep)
+        out[:n, 0:2] = positions[keep]
+        out[:n, 2:4] = velocities[keep]
+        out[:n, 4] = 1.0
+        return out
 
 
 class CrowdTimeToContactGenerator(Generator[CrowdTimeToContact]):

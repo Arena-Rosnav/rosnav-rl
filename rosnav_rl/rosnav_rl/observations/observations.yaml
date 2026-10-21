@@ -250,6 +250,9 @@ datasources:
   crowd_ttc:
     type: CrowdTimeToContactGenerator      # Time to contact against the measured robot velocity
 
+  crowd_set:
+    type: CrowdSetGenerator                # Padded set of nearby pedestrians (x, y, vx, vy, mask), ordered by id
+
 # =============================================================================
 # CONFIGURATION EXAMPLES & USAGE PATTERNS
 # =============================================================================

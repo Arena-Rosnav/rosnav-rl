@@ -24,7 +24,7 @@ from .advanced_environment_spaces import (
     ObstacleProximitySpace,
     SpatialAwarenessSpace,
 )
-from .crowd_spaces import CrowdTimeToContactSpace
+from .crowd_spaces import CrowdSetSpace, CrowdTimeToContactSpace
 from .feature_map_spaces import (
     LaserCartesianMapSpace,
     PedestrianLocationSpace,
@@ -47,4 +47,5 @@ __all__ = [
     "SpatialAwarenessSpace",
     "ObstacleProximitySpace",
     "CrowdTimeToContactSpace",
+    "CrowdSetSpace",
 ]
