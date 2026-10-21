@@ -13,6 +13,7 @@ from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
 from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_10, EXTRACTOR_5_extended
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR, DRL_VO_ROSNAV_SCALAR_EXTRACTOR
+from ..feature_extractors.ham_extractor import DRL_VO_HAM_EXTRACTOR
 from ..recurrent import PackedRecurrentPPO
 
 
@@ -272,6 +273,22 @@ class AGENT_5_TTC(AGENT_5):
 
     observation_spaces = [*AGENT_5.observation_spaces, spaces.environment.CrowdTimeToContactSpace]
     features_extractor_class = DRL_VO_ROSNAV_SCALAR_EXTRACTOR
+
+
+@AgentFactory.register("AGENT_5_HAM")
+class AGENT_5_HAM(AGENT_5):
+    """AGENT_5 plus the predicted crowd energy change from a port-Hamiltonian predictor in the head."""
+
+    observation_spaces = [*AGENT_5.observation_spaces, spaces.environment.CrowdSetSpace]
+    features_extractor_class = DRL_VO_HAM_EXTRACTOR
+    features_extractor_kwargs = {**AGENT_5.features_extractor_kwargs, "variant": "ham"}
+
+
+@AgentFactory.register("AGENT_5_PLAIN")
+class AGENT_5_PLAIN(AGENT_5_HAM):
+    """Control: the same head with an unstructured next-state predictor of the same size."""
+
+    features_extractor_kwargs = {**AGENT_5.features_extractor_kwargs, "variant": "plain"}
 
 
 @AgentFactory.register("AGENT_6")
