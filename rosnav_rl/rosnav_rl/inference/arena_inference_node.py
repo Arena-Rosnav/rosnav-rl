@@ -4,6 +4,8 @@ Runs the policy at a fixed rate, publishes `subgoal` (lookahead along the
 straight robot-to-goal line, the formula of StraightLineSubgoalGenerator) for display, and emits the
 decoded command as `Twist` on `~/cmd_vel`. A chunked policy is queried once per
 chunk, its commands play out one per tick while the observations keep encoding.
+Under lockstep the sim waits for every tick: the node holds a hard `rosnav/<robot>`
+channel at the control period and beats once per tick, after its command is out.
 
 When `train_mode=true`, only the subgoal display runs; the agent, ObservationManager,
 and cmd_vel publisher are skipped — the training loop owns the policy in that case.
@@ -19,7 +21,9 @@ import numpy as np
 import rclpy
 import tf2_ros
 import yaml
+from arena_robots.lockstep_beat import LockstepBeat
 from geometry_msgs.msg import PoseStamped, Twist
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Int16
@@ -41,6 +45,7 @@ if TYPE_CHECKING:
 
 
 _NODE_NAME = "rosnav_rl_inference"
+_RELEASE_TIMEOUT_S = 3.0
 
 
 class ArenaInferenceNode:
@@ -83,6 +88,9 @@ class ArenaInferenceNode:
         self._last_speed: float = 0.0
         self._queued_commands: list[np.ndarray] = []
 
+        self._period = 1.0 / max(self.control_rate, 1e-3)
+        self._beat: LockstepBeat | None = None
+
         self._subgoal_pub = node.create_publisher(PoseStamped, "subgoal", 1)
         self._goal_sub = node.create_subscription(
             PoseStamped,
@@ -104,13 +112,30 @@ class ArenaInferenceNode:
             self.logger.info("[rosnav_rl] agent loaded")
             self.observation_manager = self._load_observation_manager()
             self.logger.info("[rosnav_rl] observation manager ready")
+            self._beat = LockstepBeat(node, "rosnav", grace_s=None)
         else:
             self._cmd_vel_sub = node.create_subscription(Twist, "cmd_vel", self._on_cmd_vel, 1)
             self.logger.info("[rosnav_rl] subgoal-only mode (train_mode=true); agent and cmd_vel publisher skipped")
 
-        period = 1.0 / max(self.control_rate, 1e-3)
-        self._timer = node.create_timer(period, self._step)
+        self._timer = node.create_timer(self._period, self._tick)
         self.logger.info(f"[rosnav_rl] running at {self.control_rate:.1f} Hz")
+
+    async def start(self) -> None:
+        """Hold the lockstep channel the ticks beat on."""
+        if self._beat is not None:
+            await self._beat.acquire(self._period)
+
+    async def stop(self) -> None:
+        if self._beat is not None:
+            await self._beat.release()
+
+    def _tick(self) -> None:
+        stamp = self.node.get_clock().now().to_msg()
+        try:
+            self._step()
+        finally:
+            if self._beat is not None:
+                self._beat.pulse(stamp=stamp)
 
     def _load_agent(self) -> RL_Agent:
         from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg
@@ -221,12 +246,18 @@ class ArenaInferenceNode:
 def main(args: list[str] | None = None) -> None:
     rclpy.init(args=args)
     node = rclpy.create_node(_NODE_NAME)
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
+    inference: ArenaInferenceNode | None = None
     try:
-        ArenaInferenceNode(node)
-        rclpy.spin(node)
-    except KeyboardInterrupt:
+        inference = ArenaInferenceNode(node)
+        executor.spin_until_future_complete(executor.create_task(inference.start()))
+        executor.spin()
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
+        if inference is not None and rclpy.ok():
+            executor.spin_until_future_complete(executor.create_task(inference.stop()), timeout_sec=_RELEASE_TIMEOUT_S)
         node.destroy_node()
         rclpy.try_shutdown()
 

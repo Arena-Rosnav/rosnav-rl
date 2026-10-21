@@ -17,6 +17,8 @@
   <!-- Core Dependencies -->
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>arena_people_msgs</exec_depend>
+  <exec_depend>arena_robots</exec_depend>
+  <exec_depend>arena_runtime_msgs</exec_depend>
   <exec_depend>control_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
