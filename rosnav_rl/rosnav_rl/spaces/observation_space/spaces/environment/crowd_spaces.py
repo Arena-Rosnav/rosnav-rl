@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.utils.types import CrowdSet, CrowdTimeToContact
+from rosnav_rl.observations.utils.types import CrowdSet, CrowdTimeToContact, Pose2D
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from rosnav_rl.spaces.observation_space.spaces.base_observation_space import BaseObservationSpace
@@ -66,3 +66,27 @@ class CrowdSetSpace(BaseObservationSpace):
 
     def encode_observation(self, crowd_set: CrowdSet, *args: Any, **kwargs: Any) -> CrowdSet:
         return np.clip(np.asarray(crowd_set, dtype=np.float32), self._space.low, self._space.high)
+
+
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.ENVIRONMENT)
+class CrowdRobotPoseSpace(BaseObservationSpace):
+    """Robot pose [x, y, yaw] in the map frame, in meters and radians, never normalized."""
+
+    name = "CrowdRobotPoseSpace"
+    requires = {"crowd_robot_pose": Pose2D}
+
+    def __init__(self, world_extent: float = 1000.0, *args: Any, **kwargs: Any) -> None:
+        self._extent = world_extent
+        kwargs["normalize"] = False
+        super().__init__(*args, **kwargs)
+
+    def get_gym_space(self) -> spaces.Space:
+        e = self._extent
+        return spaces.Box(
+            low=np.array([-e, -e, -np.pi], dtype=np.float32),
+            high=np.array([e, e, np.pi], dtype=np.float32),
+            dtype=np.float32,
+        )
+
+    def encode_observation(self, crowd_robot_pose: Pose2D, *args: Any, **kwargs: Any) -> np.ndarray:
+        return np.clip(np.asarray(crowd_robot_pose, dtype=np.float32), self._space.low, self._space.high)

@@ -1403,6 +1403,18 @@ class ArenaPedestrianTypeDistanceGenerator(Generator[PedestrianTypeMinDistances]
         return {0: float(np.linalg.norm(pedestrian_relative_locations, axis=1).min())}
 
 
+class CrowdRobotPoseGenerator(Generator[Pose2D]):
+    """The robot pose [x, y, yaw] in the map frame, kept in the rollout buffer to align crowd states across time."""
+
+    requires = {"robot_pose": Pose2D}
+
+    def __init__(self, name: str, **kwargs: Any):
+        super().__init__(name, **kwargs)
+
+    def _generate(self, robot_pose: Pose2D, simulation_state_container: AgentParameters, **kwargs: Any) -> Pose2D:
+        return np.array([robot_pose["x"], robot_pose["y"], robot_pose["yaw"]], dtype=np.float32)
+
+
 class CrowdSetGenerator(Generator[CrowdSet]):
     """Padded set of the pedestrians within `max_range`: one [x, y, vx, vy, mask] row per pedestrian, in the robot frame, ordered by id."""
 

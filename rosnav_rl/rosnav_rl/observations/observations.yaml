@@ -253,6 +253,9 @@ datasources:
   crowd_set:
     type: CrowdSetGenerator                # Padded set of nearby pedestrians (x, y, vx, vy, mask), ordered by id
 
+  crowd_robot_pose:
+    type: CrowdRobotPoseGenerator       # Robot pose [x, y, yaw] to align crowd states over time
+
 # =============================================================================
 # CONFIGURATION EXAMPLES & USAGE PATTERNS
 # =============================================================================
