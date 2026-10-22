@@ -16,6 +16,8 @@ from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR, DRL_VO_R
 from ..feature_extractors.ham_extractor import DRL_VO_HAM_EXTRACTOR
 from ..recurrent import PackedRecurrentPPO
 
+from ..ham_aux import PPO_HamAux
+
 
 @AgentFactory.register("AGENT_1")
 class AGENT_1(StableBaselinesPolicyDescription):
@@ -284,6 +286,7 @@ class AGENT_5_HAM(AGENT_5):
         spaces.environment.CrowdSetSpace,
         spaces.environment.CrowdRobotPoseSpace,
     ]
+    algorithm_class = PPO_HamAux
     features_extractor_class = DRL_VO_HAM_EXTRACTOR
     features_extractor_kwargs = {**AGENT_5.features_extractor_kwargs, "variant": "ham"}
 
