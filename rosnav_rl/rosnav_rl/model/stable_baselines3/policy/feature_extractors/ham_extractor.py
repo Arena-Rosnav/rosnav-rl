@@ -10,16 +10,18 @@ from rosnav_rl.spaces.observation_space.spaces.dynamics import LastActionSpace
 from rosnav_rl.spaces.observation_space.spaces.environment import CrowdSetSpace
 
 from .ham_crowd_predictor import HamCrowdPredictor, matched_pair
-from .resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR
+from .resnet.resnet import DRL_VO_ROSNAV_SCALAR_EXTRACTOR
 
 N_SCALARS = 2
 
 
-class DRL_VO_HAM_EXTRACTOR(DRL_VO_ROSNAV_EXTRACTOR):
+class DRL_VO_HAM_EXTRACTOR(DRL_VO_ROSNAV_SCALAR_EXTRACTOR):
     """Appends [energy change under the last action, energy change under stop] to the robot state of the head.
 
     variant "ham" uses the port-Hamiltonian predictor, "plain" the unstructured control of the same size.
     """
+
+    SCALAR_SPACES = ()  # the two scalars are predicted here, not read from the observation
 
     def __init__(
         self,
