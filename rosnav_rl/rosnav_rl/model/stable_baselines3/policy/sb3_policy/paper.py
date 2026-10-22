@@ -279,7 +279,11 @@ class AGENT_5_TTC(AGENT_5):
 class AGENT_5_HAM(AGENT_5):
     """AGENT_5 plus the predicted crowd energy change from a port-Hamiltonian predictor in the head."""
 
-    observation_spaces = [*AGENT_5.observation_spaces, spaces.environment.CrowdSetSpace]
+    observation_spaces = [
+        *AGENT_5.observation_spaces,
+        spaces.environment.CrowdSetSpace,
+        spaces.environment.CrowdRobotPoseSpace,
+    ]
     features_extractor_class = DRL_VO_HAM_EXTRACTOR
     features_extractor_kwargs = {**AGENT_5.features_extractor_kwargs, "variant": "ham"}
 
