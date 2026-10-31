@@ -13,6 +13,7 @@ from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
 from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_10, EXTRACTOR_5_extended
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR, DRL_VO_ROSNAV_SCALAR_EXTRACTOR
+from ..hyperbolic import HyperbolicPPO
 from ..recurrent import PackedRecurrentPPO
 
 
@@ -272,6 +273,28 @@ class AGENT_5_TTC(AGENT_5):
 
     observation_spaces = [*AGENT_5.observation_spaces, spaces.environment.CrowdTimeToContactSpace]
     features_extractor_class = DRL_VO_ROSNAV_SCALAR_EXTRACTOR
+
+
+@AgentFactory.register("AGENT_5_HYPERBOLIC")
+class AGENT_5_HYPERBOLIC(AGENT_5):
+    """AGENT_5 with Hyperbolic policy and value heads matching Hyp2Nav head configuration.
+
+    Architecture follows Hyp2Nav's HyperDuelingDQN (feature layers 32 -> 128 followed by stream layer 32):
+        - Policy head (pi): [32, 128, 32]
+        - Value head (vf):  [32, 128, 32]
+    Total head parameters: 49,536 (~50K).
+    """
+
+    algorithm_class = HyperbolicPPO
+    net_arch = dict(pi=[32, 128, 32], vf=[32, 128, 32])
+
+
+@AgentFactory.register("AGENT_5_EUCLIDEAN_TWIN")
+class AGENT_5_EUCLIDEAN_TWIN(AGENT_5):
+    """AGENT_5 Euclidean twin with identical head architecture and parameter count (49,536 params, 1:1 match)."""
+
+    algorithm_class = PPO
+    net_arch = dict(pi=[32, 128, 32], vf=[32, 128, 32])
 
 
 @AgentFactory.register("AGENT_6")
