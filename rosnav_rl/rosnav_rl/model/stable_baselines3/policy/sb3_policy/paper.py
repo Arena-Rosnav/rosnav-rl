@@ -273,6 +273,15 @@ class AGENT_5_TTC(AGENT_5):
     observation_spaces = [*AGENT_5.observation_spaces, spaces.environment.CrowdTimeToContactSpace]
     features_extractor_class = DRL_VO_ROSNAV_SCALAR_EXTRACTOR
 
+@AgentFactory.register("AGENT_5_SPECTRAL")
+class AGENT_5_SPECTRAL(AGENT_5):
+    """AGENT_5 with 15 spectral crowd-graph scalars."""
+
+    observation_spaces = [
+        *AGENT_5.observation_spaces,
+        spaces.environment.CrowdSpectralSpace,
+    ]
+    features_extractor_class = DRL_VO_ROSNAV_SCALAR_EXTRACTOR
 
 @AgentFactory.register("AGENT_6")
 class AGENT_6(StableBaselinesPolicyDescription):

@@ -34,6 +34,7 @@ from rosnav_rl.spaces.observation_space.spaces.environment import (
     PedestrianVelXSpace,
     PedestrianVelYSpace,
     StackedLaserMapSpace,
+    CrowdSpectralSpace
 )
 from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
 
@@ -1518,7 +1519,8 @@ class DRL_VO_ROSNAV_EXTRACTOR(RESNET_MID_FUSION_EXTRACTOR_1):
 class DRL_VO_ROSNAV_SCALAR_EXTRACTOR(DRL_VO_ROSNAV_EXTRACTOR):
     """DRL_VO_ROSNAV_EXTRACTOR with the scalar spaces in SCALAR_SPACES appended to the robot state of the head."""
 
-    SCALAR_SPACES: ClassVar[tuple[str, ...]] = (CrowdTimeToContactSpace.name,)
+    SCALAR_SPACES: ClassVar[tuple[str, ...]] = (CrowdTimeToContactSpace.name,
+                                                CrowdSpectralSpace.name,)
 
     def _get_input_sizes(self):
         super()._get_input_sizes()

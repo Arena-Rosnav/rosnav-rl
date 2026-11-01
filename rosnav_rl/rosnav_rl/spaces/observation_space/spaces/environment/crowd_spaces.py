@@ -10,6 +10,8 @@ from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFa
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from rosnav_rl.spaces.observation_space.spaces.base_observation_space import BaseObservationSpace
 
+#add
+from rosnav_rl.observations.utils.types import CrowdSpectralScalars
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.ENVIRONMENT)
 class CrowdTimeToContactSpace(BaseObservationSpace):
@@ -33,3 +35,36 @@ class CrowdTimeToContactSpace(BaseObservationSpace):
     @BaseObservationSpace.apply_normalization
     def encode_observation(self, crowd_ttc: CrowdTimeToContact, *args: Any, **kwargs: Any) -> CrowdTimeToContact:
         return np.clip(np.asarray(crowd_ttc, dtype=np.float32), self._space.low, self._space.high)
+
+
+#class for 15 spectral crowd-graph scalars
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.ENVIRONMENT)
+class CrowdSpectralSpace(BaseObservationSpace):
+    """15 spectral crowd-graph scalars."""
+
+    name = "CrowdSpectralSpace"
+    requires = {"crowd_spectral": CrowdSpectralScalars}
+
+    def get_gym_space(self) -> spaces.Space:
+        low = np.array(
+            [0.0] * 6 + [0.0] * 6 + [0.0] + [-np.inf] * 2,
+            dtype=np.float32,
+        )
+        high = np.array(
+            [2.0] * 6 + [1.0] * 6 + [10.0] + [np.inf] * 2,
+            dtype=np.float32,
+        )
+        return spaces.Box(low=low, high=high, dtype=np.float32)
+
+    @BaseObservationSpace.apply_normalization
+    def encode_observation(
+        self,
+        crowd_spectral: CrowdSpectralScalars,
+        *args: Any,
+        **kwargs: Any,
+    ) -> CrowdSpectralScalars:
+        return np.clip(
+            np.asarray(crowd_spectral, dtype=np.float32),
+            self._space.low,
+            self._space.high,
+        )
