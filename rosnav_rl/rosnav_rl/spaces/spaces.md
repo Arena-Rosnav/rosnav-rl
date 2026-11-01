@@ -58,7 +58,6 @@ Example implementation of a laser scan observation space:
 ```python
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 
-
 @SpaceFactory.register("laser")
 class LaserScanSpace(BaseObservationSpace):
     """
@@ -78,7 +77,9 @@ class LaserScanSpace(BaseObservationSpace):
     name = "LASER"
     required_observation_units = [LaserCollector]
 
-    def __init__(self, laser_num_beams: int, laser_max_range: float, *args, **kwargs) -> None:
+    def __init__(
+        self, laser_num_beams: int, laser_max_range: float, *args, **kwargs
+    ) -> None:
         self._num_beams = laser_num_beams
         self._max_range = laser_max_range
         super().__init__(*args, **kwargs)
@@ -98,7 +99,9 @@ class LaserScanSpace(BaseObservationSpace):
         )
 
     @BaseObservationSpace.apply_normalization
-    def encode_observation(self, observation: ObservationDict, *args, **kwargs) -> LaserCollector.data_class:
+    def encode_observation(
+        self, observation: ObservationDict, *args, **kwargs
+    ) -> LaserCollector.data_class:
         """
         Encodes the laser scan observation.
 
@@ -117,7 +120,8 @@ from observation_space_manager import ObservationSpaceManager
 
 # Initialize observation space manager with required spaces and parameters
 obs_space_manager = ObservationSpaceManager(
-    space_list=[LaserScanSpace], space_kwargs={"laser_num_beams": 360, "laser_max_range": 20, "normalize": True}
+    space_list=[LaserScanSpace],
+    space_kwargs={"laser_num_beams": 360, "laser_max_range": 20, "normalize": True}
 )
 
 # Encode observations
