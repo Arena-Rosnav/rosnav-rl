@@ -250,6 +250,14 @@ datasources:
   crowd_ttc:
     type: CrowdTimeToContactGenerator      # Time to contact against the measured robot velocity
 
+  pedestrian_tube_values:
+    type: PedestrianTubeValueGenerator     # HJ reachability tube value per pedestrian, from the offline-solved table
+    params:
+      pedestrian_radius: 0.3
+
+  crowd_tube:
+    type: CrowdReachabilityTubeGenerator   # Min, second min, count inside the tube, min ahead
+
 # =============================================================================
 # CONFIGURATION EXAMPLES & USAGE PATTERNS
 # =============================================================================
