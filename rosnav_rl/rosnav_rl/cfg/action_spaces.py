@@ -113,6 +113,9 @@ class RobotGripper(Protocol):
     @property
     def positions(self) -> dict[str, float]: ...
 
+    @property
+    def max_effort(self) -> float: ...
+
 
 class DiscretizationStrategy(StrEnum):
     """Supported auto-discretization strategies for mobile action spaces.
@@ -501,11 +504,14 @@ class ManipulatorActionSpace(BaseActionSpace):
 
 
 class GripperActionSpace(BaseActionSpace):
+    """Gripper opening in ``[0, 1]``, 0 closed and 1 open."""
+
     type: Literal["gripper"] = "gripper"
-    arm: str | None
+    arm: str | None = None
     joint: str
     controller: str
     positions: dict[str, float]  # {"open": ..., "close": ...}
+    max_effort: float
 
     @field_validator("positions")
     @classmethod
@@ -526,14 +532,17 @@ class GripperActionSpace(BaseActionSpace):
         value = action[0] * (self.positions["open"] - self.positions["close"]) + self.positions["close"]
         return np.asarray([value], dtype=np.float32)
 
+    def _to_legacy_actions(self) -> dict:
+        return {"positions": dict(self.positions)}
+
     @classmethod
     def from_config(cls, gripper_spec: RobotGripper) -> GripperActionSpace:
-
         return cls(
             arm=gripper_spec.arm,
             joint=gripper_spec.joint,
             controller=gripper_spec.controller,
             positions=gripper_spec.positions,
+            max_effort=gripper_spec.max_effort,
         )
 
 
