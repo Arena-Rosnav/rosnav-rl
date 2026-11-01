@@ -7,6 +7,7 @@ package_name = "rosnav_rl"
 setup(
     name=package_name,
     packages=find_packages(),
+    package_data={"rosnav_rl.observations.utils": ["data/*.npz", "data/*.json"]},
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
