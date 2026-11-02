@@ -13,6 +13,7 @@ from rosnav_rl.cfg.action_spaces import (
     BaseActionSpace,
     CompositeActionSpace,
     DifferentialDriveActionSpace,
+    GripperActionSpace,
     HumanoidActionSpace,
     ManipulatorActionSpace,
     OmnidirectionalActionSpace,
@@ -219,6 +220,67 @@ class TestManipulator:
         arm = _Arm(chain=["shoulder"], named_poses={"home": {"shoulder": 0.0}})
 
         assert ManipulatorActionSpace.from_config(arm).stow_positions is None
+
+
+# ============================================================
+# GripperActionSpace
+# ============================================================
+
+
+@dataclass
+class _Gripper:
+    joint: str = "knuckle_joint"
+    controller: str = "gripper_controller"
+    arm: str | None = None
+    positions: dict[str, float] = field(default_factory=lambda: {"open": 0.0, "close": 0.8})
+    max_effort: float = 50.0
+
+
+def _gripper():
+    return GripperActionSpace.from_config(_Gripper())
+
+
+class TestGripper:
+    def test_space_is_one_opening_in_the_unit_interval(self):
+        space = _gripper().get_gym_space()
+        assert space.shape == (1,)
+        np.testing.assert_array_equal(space.low, [0.0])
+        np.testing.assert_array_equal(space.high, [1.0])
+
+    def test_decode_maps_one_to_open_and_zero_to_close(self):
+        spec = _gripper()
+        np.testing.assert_array_almost_equal(spec.decode(np.array([1.0])), [0.0])
+        np.testing.assert_array_almost_equal(spec.decode(np.array([0.0])), [0.8])
+        np.testing.assert_array_almost_equal(spec.decode(np.array([0.25])), [0.6])
+
+    def test_decode_clips_to_the_positions(self):
+        spec = _gripper()
+        np.testing.assert_array_almost_equal(spec.decode(np.array([4.0])), [0.0])
+        np.testing.assert_array_almost_equal(spec.decode(np.array([-4.0])), [0.8])
+
+    def test_positions_need_open_and_close(self):
+        with pytest.raises(ValueError, match="'open' and 'close'"):
+            GripperActionSpace(joint="j", controller="c", positions={"open": 0.0}, max_effort=1.0)
+
+    def test_from_config_reads_every_field(self):
+        spec = GripperActionSpace.from_config(_Gripper(arm="ur", max_effort=20.0))
+
+        assert (spec.arm, spec.joint, spec.controller) == ("ur", "knuckle_joint", "gripper_controller")
+        assert spec.positions == {"open": 0.0, "close": 0.8}
+        assert spec.max_effort == 20.0
+
+    def test_legacy_actions_carry_the_positions(self):
+        assert _gripper()._to_legacy_actions() == {"positions": {"open": 0.0, "close": 0.8}}
+
+    def test_a_composite_with_a_gripper_splits_and_lists_its_legacy_actions(self):
+        drive = DifferentialDriveActionSpace(linear_range=(-1.0, 1.0), angular_range=(-1.0, 1.0))
+        spec = CompositeActionSpace(action_spaces=[drive, _gripper()])
+
+        split = spec.decode_split(np.array([0.5, -1.0, 1.0]))
+
+        assert [type(s) for s, _ in split] == [DifferentialDriveActionSpace, GripperActionSpace]
+        np.testing.assert_array_almost_equal(split[1][1], [0.0])
+        assert spec._to_legacy_actions()["gripper_1"] == {"positions": {"open": 0.0, "close": 0.8}}
 
 
 # ============================================================
