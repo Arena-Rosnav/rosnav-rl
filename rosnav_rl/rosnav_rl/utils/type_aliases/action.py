@@ -10,5 +10,6 @@ _HolonomicAction = tuple[float, float, float] | np.ndarray | list[float]
 
 class DecodedAction(NamedTuple):
     """One decoded sub-action: the action-space it belongs to and its command vector."""
+
     space: "BaseActionSpace"
     action: np.ndarray
