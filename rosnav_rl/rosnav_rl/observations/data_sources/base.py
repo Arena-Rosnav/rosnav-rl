@@ -159,8 +159,8 @@ class Collector[RosMessageType, ProcessedDataType](DataSource, ErrorReportingMix
         This replaces the GenericObservation.update method.
         """
         try:
-            self._latest_msg = msg
             self._value = self._preprocess(msg)
+            self._latest_msg = msg
             self._stale = False
             self._timestamp = self._clock.now() if self._clock else None
             self.update_count += 1

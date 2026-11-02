@@ -1,5 +1,6 @@
 """The first observation of an episode waits for a scan stamped at or after the episode start, on a scan pair recorded at an episode boundary of the flatsim training stack."""
 
+import array
 import json
 import pathlib
 import threading
@@ -83,3 +84,19 @@ def test_first_observation_of_an_episode_waits_for_the_scan_of_the_new_pose(pipe
     observed = np.asarray(manager.get_observations()["front_laser"])
     assert observed.min() == pytest.approx(np.nanmin(RECORDED["reset"]["ranges"]))
     assert observed.min() > np.nanmin(RECORDED["terminal"]["ranges"]) + 0.5
+
+
+def test_a_reached_stamp_already_carries_its_scan(pipeline):
+    manager, _publisher = pipeline
+    collector = manager._collectors["front_laser"]
+    collector.update(_scan(RECORDED["terminal"]))
+    reset = _scan(RECORDED["reset"])
+    reset.ranges = array.array("f", np.full(20_000_000, 2.0, np.float32).tobytes())
+
+    updater = threading.Thread(target=collector.update, args=(reset,))
+    updater.start()
+    assert manager.wait_for_stamp(Time.from_msg(reset.header.stamp), 5.0)
+    observed = np.asarray(manager.get_observations()["front_laser"])
+    updater.join()
+
+    assert len(observed) == len(reset.ranges)

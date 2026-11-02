@@ -74,6 +74,7 @@ from rosnav_rl.cfg.action_spaces import (
     OmnidirectionalActionSpace,
     HumanoidActionSpace,
     ManipulatorActionSpace,
+    GripperActionSpace,
 )
 
 # Non-holonomic robot (2-DOF: linear, angular)
@@ -87,6 +88,14 @@ omni = OmnidirectionalActionSpace(
     linear_range_x=(-1.0, 1.0),
     linear_range_y=(-1.0, 1.0),
     angular_range=(-2.0, 2.0),
+)
+
+# Gripper (1-DOF: opening, 0 closed, 1 open)
+gripper = GripperActionSpace(
+    joint="gripper_joint",
+    controller="gripper_controller",
+    positions={"open": 0.0, "close": 0.8},
+    max_effort=50.0,
 )
 
 # Discrete actions
