@@ -253,7 +253,7 @@ class AGENT_5(StableBaselinesPolicyDescription):
         spaces.dynamics.LastActionSpace,
     ]
     observation_space_kwargs = {
-        "roi_in_m": 20,
+        "roi_in_m": 24,  # 80 cells span [-12 m, +12 m] for the 12 m crowd predictor horizon
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
@@ -281,21 +281,27 @@ class AGENT_5_TTC(AGENT_5):
 class AGENT_5_HAM(AGENT_5):
     """AGENT_5 plus the predicted crowd energy change from a port-Hamiltonian predictor in the head."""
 
-    observation_spaces = [
-        *AGENT_5.observation_spaces,
-        spaces.environment.CrowdSetSpace,
-        spaces.environment.CrowdRobotPoseSpace,
-    ]
+    # Keep the exact AGENT_5 Gym observation set. Raw crowd tracks for the
+    # auxiliary objective travel in transition info, never as policy inputs.
+    observation_spaces = list(AGENT_5.observation_spaces)
+    observation_space_kwargs = {**AGENT_5.observation_space_kwargs}
     algorithm_class = PPO_HamAux
     features_extractor_class = DRL_VO_HAM_EXTRACTOR
-    features_extractor_kwargs = {**AGENT_5.features_extractor_kwargs, "variant": "ham"}
+    features_extractor_kwargs = {
+        **AGENT_5.features_extractor_kwargs,
+        "variant": "ham",
+        "action_normalizer": "max_abs",
+        "map_roi_m": 24.0,
+        "crowd_range_m": 12.0,
+        "max_pedestrians": 24,
+    }
 
 
 @AgentFactory.register("AGENT_5_PLAIN")
 class AGENT_5_PLAIN(AGENT_5_HAM):
-    """Control: the same head with an unstructured next-state predictor of the same size."""
+    """Control: same AGENT_5 inputs and auxiliary weight with an unstructured predictor."""
 
-    features_extractor_kwargs = {**AGENT_5.features_extractor_kwargs, "variant": "plain"}
+    features_extractor_kwargs = {**AGENT_5_HAM.features_extractor_kwargs, "variant": "plain"}
 
 
 @AgentFactory.register("AGENT_6")

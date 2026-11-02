@@ -146,7 +146,17 @@ class ArenaInferenceNode:
         self._agent_spec = spec
         self._agent_parameters: AgentParameters = spec.parameters
         agent = RL_Agent(spec)
-        agent.load_model(path=model_dir / "best_model.zip")
+        checkpoint_name = spec.framework.algorithm.checkpoint or "best_model"
+        checkpoint_path = model_dir / checkpoint_name
+        if checkpoint_path.suffix.lower() != ".zip":
+            checkpoint_path = checkpoint_path.with_name(checkpoint_path.name + ".zip")
+        if not checkpoint_path.is_file():
+            available = sorted(p.name for p in model_dir.glob("*.zip"))
+            raise FileNotFoundError(
+                f"Configured checkpoint {checkpoint_name!r} was not found at "
+                f"{checkpoint_path}. Available checkpoints: {available}"
+            )
+        agent.load_model(path=checkpoint_path)
         return agent
 
     def _load_observation_manager(self) -> ObservationManager:

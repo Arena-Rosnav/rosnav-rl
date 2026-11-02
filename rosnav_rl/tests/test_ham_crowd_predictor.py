@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import torch
 
 from rosnav_rl.model.stable_baselines3.policy.feature_extractors.ham_crowd_predictor import (
@@ -43,8 +45,9 @@ def test_dissipation_is_nonnegative_and_removes_kinetic_energy_without_potential
 def test_parameter_counts_are_matched():
     ham, plain = matched_pair(64)
 
-    gap = abs(count_parameters(ham) - count_parameters(plain)) / count_parameters(ham)
-    assert gap < 0.01
+    assert count_parameters(ham) == count_parameters(plain)
+    # The signed port-Hamiltonian dissipation stays nonnegative by construction.
+    assert torch.nn.functional.softplus(ham.dissipation_gain_logit).item() > 0
 
 
 def test_gradients_reach_the_parameters():
@@ -55,3 +58,12 @@ def test_gradients_reach_the_parameters():
     state.pow(2).sum().backward()
 
     assert all(p.grad is not None for p in net.parameters())
+
+
+@pytest.mark.parametrize("predictor_type", [HamCrowdPredictor, PlainCrowdPredictor])
+def test_angular_robot_command_changes_the_one_second_prediction(predictor_type):
+    crowd, _ = _crowd(batch=1, k=5, real=3)
+    net = predictor_type(16).eval()
+    straight, _, _ = net(crowd, torch.tensor([[0.8, 0.0, 0.0]]))
+    turning, _, _ = net(crowd, torch.tensor([[0.8, 0.0, 1.0]]))
+    assert not torch.allclose(straight, turning)

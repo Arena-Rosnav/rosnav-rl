@@ -48,7 +48,7 @@ def test_grid_geometry_is_derived_from_size_and_roi():
 
     assert space.feature_map_size == 10
     assert (space._grid_resolution, space._grid_center) == (0.5, 5)
-    assert space._get_map_index((1.0, -0.5)) == (7, 4)
+    assert space._get_map_index((1.0, -0.5)) == (7, 3)
 
 
 @pytest.mark.parametrize(
@@ -65,7 +65,7 @@ def test_velocity_maps_write_speeds_into_pedestrian_cells_inside_the_roi(space_c
 
     assert space.space.shape == (10, 10)
     assert (space.space.low.min(), space.space.high.max()) == (-2.0, 2.0)
-    assert nonzero_cells(feature_map) == {(4, 7): pytest.approx(0.7), (9, 2): pytest.approx(-1.5)}
+    assert nonzero_cells(feature_map) == {(3, 7): pytest.approx(0.7), (9, 2): pytest.approx(-1.5)}
     assert key in space.requires
 
 
@@ -81,7 +81,7 @@ def test_flattened_velocity_maps_are_row_major_vectors(space):
 
     assert space.space.shape == (100,)
     assert feature_map.shape == (100,)
-    assert np.flatnonzero(feature_map).tolist() == [47]
+    assert np.flatnonzero(feature_map).tolist() == [37]
 
 
 @pytest.mark.parametrize("space_class", [PedestrianVelXSpace, PedestrianVelYSpace])
@@ -97,7 +97,7 @@ def test_location_map_marks_occupied_cells_and_clears_between_steps():
     occupied = nonzero_cells(space.encode_observation(LOCATIONS))
     empty = space.encode_observation(np.empty((0, 2)))
 
-    assert occupied == {(4, 7): 1.0, (9, 2): 1.0}
+    assert occupied == {(3, 7): 1.0, (9, 2): 1.0}
     assert not empty.any()
     assert space.space.shape == (10, 10)
 
@@ -120,7 +120,7 @@ def test_social_state_map_writes_states_as_integers():
     feature_map = space.encode_observation(LOCATIONS, np.array([2, 3, 4]))
 
     assert feature_map.dtype == np.int32
-    assert nonzero_cells(feature_map) == {(4, 7): 2, (9, 2): 4}
+    assert nonzero_cells(feature_map) == {(3, 7): 2, (9, 2): 4}
     assert (space.space.low.min(), space.space.high.max(), space.space.dtype) == (0, 4, np.int32)
     assert not space.encode_observation(np.empty((0, 2)), np.array([])).any()
 
@@ -136,7 +136,7 @@ def test_type_map_uses_minus_one_as_background():
 
     feature_map = space.encode_observation(LOCATIONS, np.array([0, 1, 2]))
 
-    assert nonzero_cells(feature_map, background=-1) == {(4, 7): 0, (9, 2): 2}
+    assert nonzero_cells(feature_map, background=-1) == {(3, 7): 0, (9, 2): 2}
     assert (space.space.low.min(), space.space.high.max()) == (-1, 3)
     assert (space.encode_observation(np.empty((0, 2)), np.array([])) == -1).all()
 
@@ -147,7 +147,7 @@ def test_flattened_type_map():
     feature_map = space.encode_observation(LOCATIONS, np.array([0, 1, 2]))
 
     assert feature_map.shape == (100,)
-    assert feature_map[47] == 0
+    assert feature_map[37] == 0
 
 
 def test_laser_cartesian_map_marks_hits_with_proximity_and_skips_max_range_and_far_hits():

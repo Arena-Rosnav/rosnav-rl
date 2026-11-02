@@ -96,9 +96,16 @@ class BaseFeatureMapSpace(BaseObservationSpace):
             (x, y) indices in the feature map, with origin at center.
         """
         x, y = position[0], position[1]
-        grid_x = int(np.floor(x * self._inv_grid_resolution + self._grid_center))
-        grid_y = int(np.floor(y * self._inv_grid_resolution + self._grid_center))
-        return grid_x, grid_y
+        def symmetric_index(value: float) -> int:
+            scaled = value * self._inv_grid_resolution
+            continuous = scaled + self._grid_center
+            # Resolve exact negative grid boundaries toward the preceding cell,
+            # so reflecting a point across zero reflects its index across the map.
+            if scaled < 0:
+                return int(np.ceil(continuous) - 1)
+            return int(np.floor(continuous))
+
+        return symmetric_index(x), symmetric_index(y)
 
     def _get_map_indices_vectorized(self, positions: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Convert multiple real-world coordinates to grid indices (vectorized).
@@ -109,7 +116,13 @@ class BaseFeatureMapSpace(BaseObservationSpace):
         Returns:
             Tuple of (grid_x, grid_y, valid_mask) where valid_mask filters in-bounds indices.
         """
-        grid_coords = np.floor(positions * self._inv_grid_resolution + self._grid_center).astype(np.intp)
+        scaled = positions * self._inv_grid_resolution
+        continuous = scaled + self._grid_center
+        grid_coords = np.where(
+            scaled < 0,
+            np.ceil(continuous) - 1,
+            np.floor(continuous),
+        ).astype(np.intp)
         grid_x = grid_coords[:, 0]
         grid_y = grid_coords[:, 1]
         valid = (grid_x >= 0) & (grid_x < self._feature_map_size) & (grid_y >= 0) & (grid_y < self._feature_map_size)

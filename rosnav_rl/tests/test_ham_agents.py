@@ -1,4 +1,4 @@
-"""Smoke tests: the Hamiltonian agent and its plain control build through RL_Agent and read the crowd set."""
+"""Smoke tests for policy registration and the AGENT_5 observation contract."""
 
 from __future__ import annotations
 
@@ -41,7 +41,17 @@ def test_bundled_observations_provide_what_the_agent_requires(name):
     }
 
     assert required <= provided
-    assert "crowd_set" in required
+    baseline = _agent("AGENT_5")
+    baseline_keys = set(baseline.space_manager.observation_space.spaces)
+    assert set(agent.space_manager.observation_space.spaces) == baseline_keys
+    assert "CrowdSetSpace" not in agent.space_manager.observation_space.spaces
+    assert "CrowdRobotPoseSpace" not in agent.space_manager.observation_space.spaces
+    # Same named spaces and tensor shapes as AGENT_5, with a shared 24 m map ROI
+    # so the predictor can observe the full 12 m radius on all three experiment arms.
+    from rosnav_rl.model.stable_baselines3.policy.sb3_policy.paper import AGENT_5, AGENT_5_HAM
+    assert AGENT_5_HAM.observation_spaces == AGENT_5.observation_spaces
+    assert AGENT_5.observation_space_kwargs["roi_in_m"] == 24
+    assert AGENT_5_HAM.observation_space_kwargs["roi_in_m"] == 24
 
 
 @pytest.mark.parametrize("name", ["AGENT_5_HAM", "AGENT_5_PLAIN"])
@@ -53,8 +63,10 @@ def test_agent_builds_and_extractor_runs(name):
         key: torch.zeros((1, *space.shape), dtype=torch.float32)
         for key, space in agent.space_manager.observation_space.spaces.items()
     }
+    # The empty physical pedestrian type is -1, represented by -1 under max_abs.
+    observation["PedestrianTypeSpace"].fill_(-1.0)
     extractor.eval()
     out = extractor(observation)
 
-    assert "CrowdSetSpace" in agent.space_manager.observation_space.spaces
+    assert set(agent.space_manager.observation_space.spaces) == set(_agent("AGENT_5").space_manager.observation_space.spaces)
     assert out.shape[0] == 1 and torch.isfinite(out).all()

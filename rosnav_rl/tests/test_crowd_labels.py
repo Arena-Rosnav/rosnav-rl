@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from rosnav_rl.model.stable_baselines3.crowd_labels import build_labels
+from rosnav_rl.model.stable_baselines3.crowd_labels import build_labels, map_targets_to_feature_crowd
 
 
 def _buffers(steps=12):
@@ -65,3 +65,24 @@ def test_steps_near_the_end_have_no_label():
     _, valid, _ = build_labels(crowd, pose, starts)
 
     assert not valid[-10:].any() and valid[0, 0, 0]
+
+
+def test_map_targets_follow_the_feature_map_track_not_raw_slot_order():
+    # 24 m ROI / 80 cells gives 0.3 m cells. x=1.45 maps to centre 1.35.
+    raw = np.zeros((12, 1, 3, 6), dtype=np.float32)
+    raw[:, 0, 0] = [1.45, 0.15, 0.5, 0.0, 1.0, 7.0]
+    raw[:, 0, 1] = [1.48, 0.15, -0.25, 0.0, 1.0, 8.0]  # same cell, but a different velocity
+    target = np.zeros((12, 1, 3, 4), dtype=np.float32)
+    valid = np.zeros((12, 1, 3), dtype=bool)
+    target[0, 0, 0] = [1.95, 0.15, 0.5, 0.0]
+    target[0, 0, 1] = [1.25, 0.15, -0.25, 0.0]
+    valid[0, 0, :2] = True
+    feature = np.zeros((12, 1, 2, 5), dtype=np.float32)
+    feature[..., 4] = 0
+    feature[0, 0, 0] = [1.35, 0.15, -0.25, 0.0, 1.0]  # matches track ID 8 by velocity
+    mapped_target, mapped_valid = map_targets_to_feature_crowd(
+        feature, raw, target, valid, roi_in_m=24.0, map_height=80, map_width=80
+    )
+    assert mapped_valid[0, 0, 0]
+    np.testing.assert_allclose(mapped_target[0, 0, 0], target[0, 0, 1])
+    assert not mapped_valid[0, 0, 1]
