@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.utils.type_aliases import ObservationDict
+from rosnav_rl.utils.type_aliases import DecodedAction, ObservationDict
 
 from ...spaces import (
     ActionSpaceManager,
@@ -16,7 +16,6 @@ from ...spaces.observation_space.spaces.base_observation_space import (
 )
 
 if TYPE_CHECKING:
-    from rosnav_rl.cfg.action_spaces import BaseActionSpace
     from rosnav_rl.cfg.agent import AgentConfig
 
 
@@ -72,7 +71,7 @@ class BaseSpaceManager:
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         return self._action_space_manager.decode_action(self._command_action(action))
 
-    def decode_split_action(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+    def decode_split_action(self, action: np.ndarray) -> list[DecodedAction]:
         return self._action_space_manager.decode_split_action(self._command_action(action))
 
     def decode_policy_action(self, action: np.ndarray) -> np.ndarray:
