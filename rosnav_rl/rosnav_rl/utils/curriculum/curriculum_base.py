@@ -41,7 +41,7 @@ Examples
 
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from arena_runtime_msgs.srv import QueryTaskModes, QueueEpisode
@@ -89,7 +89,7 @@ class CurriculumBase(ABC):
         starting_stage: int = 0,
         verbose: int = 0,
         timeout: float = 10.0,
-        modes: dict[str, str | list[str]] | None = None,
+        modes: Mapping[str, str | Sequence[str]] | None = None,
     ):
         self.node = node
         self.threshold_type = threshold_type
@@ -507,7 +507,7 @@ class CurriculumBase(ABC):
             self._mode_namespaces[node_name] = {pair.key.partition("/")[2]: pair.value for pair in pairs}
         return self._mode_namespaces[node_name]
 
-    def _queue_episode_batch(self, node_name: str, modes: dict[str, str | list[str]]) -> bool:
+    def _queue_episode_batch(self, node_name: str, modes: Mapping[str, str | Sequence[str]]) -> bool:
         """Route the mode selection to config/queue_episode on a single node."""
         client = self.task_mode_clients.get(node_name)
         if client is None:
@@ -524,7 +524,7 @@ class CurriculumBase(ABC):
         ]
         return self._call_queue_episode(client, node_name, req)
 
-    def _queue_episode(self, modes: dict[str, str | list[str]]) -> bool:
+    def _queue_episode(self, modes: Mapping[str, str | Sequence[str]]) -> bool:
         success = True
         for node_name in list(self.task_mode_clients.keys()):
             if not self._queue_episode_batch(node_name, modes):

@@ -1,5 +1,7 @@
 """StableBaselines3-specific curriculum learning callback."""
 
+from collections.abc import Mapping, Sequence
+
 from rclpy.node import Node
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 
@@ -29,7 +31,7 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
         timeout: float = 5.0,
         starting_stage: int = 0,
         verbose: int = 0,
-        modes: dict[str, str | list[str]] | None = None,
+        modes: Mapping[str, str | Sequence[str]] | None = None,
     ):
         """Initialize the staged training callback.
 
