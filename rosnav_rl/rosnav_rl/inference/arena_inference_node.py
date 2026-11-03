@@ -57,7 +57,7 @@ class ArenaInferenceNode:
 
         node.declare_parameter("agent", "")
         node.declare_parameter("namespace", "")
-        node.declare_parameter("task_generator_node", "")
+        node.declare_parameter("arena_env_node", "")
         node.declare_parameter("frame", "")
         node.declare_parameter("base_frame", "base_link")
         node.declare_parameter("control_rate", 10.0)
@@ -70,9 +70,9 @@ class ArenaInferenceNode:
         self.train_mode = bool(node.get_parameter("train_mode").get_parameter_value().bool_value)
         if not self.agent_name and not self.train_mode:
             raise RuntimeError("rosnav_rl_inference: parameter 'agent' is required")
-        self.task_generator_node = node.get_parameter("task_generator_node").get_parameter_value().string_value
-        if not self.task_generator_node and not self.train_mode:
-            raise RuntimeError("rosnav_rl_inference: parameter 'task_generator_node' is required")
+        self.arena_env_node = node.get_parameter("arena_env_node").get_parameter_value().string_value
+        if not self.arena_env_node and not self.train_mode:
+            raise RuntimeError("rosnav_rl_inference: parameter 'arena_env_node' is required")
         self.namespace = Namespace(node.get_parameter("namespace").get_parameter_value().string_value)
         self.frame = node.get_parameter("frame").get_parameter_value().string_value
         self.base_frame = node.get_parameter("base_frame").get_parameter_value().string_value or "base_link"
@@ -103,7 +103,7 @@ class ArenaInferenceNode:
             self._cmd_vel_pub = node.create_publisher(Twist, "cmd_vel", 1)
             self._reset_sub = node.create_subscription(
                 Int16,
-                f"{self.task_generator_node}/task_reset",
+                f"{self.arena_env_node}/task_reset",
                 self._on_task_reset,
                 QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE),
             )

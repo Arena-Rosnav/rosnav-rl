@@ -1,7 +1,5 @@
 """StableBaselines3-specific curriculum learning callback."""
 
-from typing import Any
-
 from rclpy.node import Node
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 
@@ -31,7 +29,7 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
         timeout: float = 5.0,
         starting_stage: int = 0,
         verbose: int = 0,
-        tm_dict: dict[str, Any] | None = None,
+        modes: dict[str, str | list[str]] | None = None,
     ):
         """Initialize the staged training callback.
 
@@ -46,7 +44,7 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
             timeout: Timeout for ROS2 parameter service calls
             starting_stage: Initial curriculum stage index
             verbose: Verbosity level
-            tm_dict: Task modes queued before the initial stage is applied
+            modes: axis -> mode names queued before the initial stage is applied
         """
         # Initialize CurriculumBase first to satisfy its required args and
         # avoid BaseCallback.__init__ accidentally invoking CurriculumBase.__init__
@@ -62,7 +60,7 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
             timeout=timeout,
             starting_stage=starting_stage,
             verbose=verbose,
-            tm_dict=tm_dict,
+            modes=modes,
         )
 
         BaseCallback.__init__(self, verbose=verbose)
