@@ -140,6 +140,7 @@ class ReliableLaserSpace(BaseObservationSpace):
         if self._reduce_indices is not None:
             return scan[self._reduce_indices]
         else:
+            assert self._interp_indices is not None
             return np.interp(self._interp_indices, np.arange(scan_len), scan)
 
     def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> np.ndarray:
@@ -279,6 +280,7 @@ class MultiRangeLaserSpace(BaseObservationSpace):
                 self._last_scan_len = len(scan)
                 self._interp_target = np.linspace(0, len(scan) - 1, self.num_beams)
                 self._interp_source = np.arange(len(scan))
+            assert self._interp_target is not None and self._interp_source is not None
             scan = np.interp(self._interp_target, self._interp_source, scan)
 
         # Vectorized multi-scale: broadcast scan (1, num_beams) / max_ranges (num_scales, 1)

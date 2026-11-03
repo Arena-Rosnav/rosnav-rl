@@ -1,5 +1,6 @@
 import os
 from collections.abc import Callable
+from typing import cast
 
 import gymnasium as gym
 import numpy as np
@@ -65,15 +66,18 @@ class RosnavEvalCallback(EvalCallback):
             # Reset success rate buffer
             self._is_success_buffer = []
 
-            episode_rewards, episode_lengths = evaluate_policy(
-                self.model,
-                self.eval_env,
-                n_eval_episodes=self.n_eval_episodes,
-                render=self.render,
-                deterministic=self.deterministic,
-                return_episode_rewards=True,
-                warn=self.warn,
-                callback=self._log_success_callback,
+            episode_rewards, episode_lengths = cast(
+                tuple[list[float], list[int]],
+                evaluate_policy(
+                    self.model,
+                    self.eval_env,
+                    n_eval_episodes=self.n_eval_episodes,
+                    render=self.render,
+                    deterministic=self.deterministic,
+                    return_episode_rewards=True,
+                    warn=self.warn,
+                    callback=self._log_success_callback,
+                ),
             )
 
             if self.log_path is not None:
@@ -81,19 +85,22 @@ class RosnavEvalCallback(EvalCallback):
                 self.evaluations_results.append(episode_rewards)
                 self.evaluations_length.append(episode_lengths)
 
-                kwargs = {}
-                # Save success log if present
                 if len(self._is_success_buffer) > 0:
                     self.evaluations_successes.append(self._is_success_buffer)
-                    kwargs = dict(successes=self.evaluations_successes)
-
-                np.savez(
-                    self.log_path,
-                    timesteps=self.evaluations_timesteps,
-                    results=self.evaluations_results,
-                    ep_lengths=self.evaluations_length,
-                    **kwargs,
-                )
+                    np.savez(
+                        self.log_path,
+                        timesteps=self.evaluations_timesteps,
+                        results=self.evaluations_results,
+                        ep_lengths=self.evaluations_length,
+                        successes=self.evaluations_successes,
+                    )
+                else:
+                    np.savez(
+                        self.log_path,
+                        timesteps=self.evaluations_timesteps,
+                        results=self.evaluations_results,
+                        ep_lengths=self.evaluations_length,
+                    )
 
             mean_reward, std_reward = np.mean(episode_rewards), np.std(episode_rewards)
             mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(episode_lengths)
@@ -181,7 +188,9 @@ class StopTrainingOnRewardThreshold(BaseCallback):
         self.is_last_state_getter = is_last_state_getter
 
     def _on_step(self) -> bool:
-        assert self.parent is not None, "``StopTrainingOnMinimumReward`` callback must be used with an ``EvalCallback``"
+        assert isinstance(self.parent, EvalCallback), (
+            "``StopTrainingOnMinimumReward`` callback must be used with an ``EvalCallback``"
+        )
         # Convert np.bool_ to bool, otherwise callback() is False won't work
         continue_training = bool(
             self.parent.best_mean_reward < self.reward_threshold or not self.is_last_state_getter()
@@ -220,11 +229,12 @@ class StopTrainingOnSuccessThreshold(BaseCallback):
 
     def _on_step(self) -> bool:
         assert self.parent is not None, "``StopTrainingOnMinimumReward`` callback must be used with an ``EvalCallback``"
+        parent = cast(RosnavEvalCallback, self.parent)
         # Convert np.bool_ to bool, otherwise callback() is False won't work
-        continue_training = bool(self.parent.last_success_rate < self.success_threshold or not self.last_state_getter())
+        continue_training = bool(parent.last_success_rate < self.success_threshold or not self.last_state_getter())
         if self.verbose >= 1 and not continue_training:
             print(
-                f"Stopping training because the success rate {self.parent.last_success_rate:.2f} "
+                f"Stopping training because the success rate {parent.last_success_rate:.2f} "
                 f" is above the threshold {self.success_threshold}"
             )
         return continue_training

@@ -494,7 +494,7 @@ class SafetyContextSpace(BaseObservationSpace):
             return 0.0  # No valid readings = no risk
 
         # Find closest obstacle
-        min_distance = np.min(valid_readings)
+        min_distance = float(np.min(valid_readings))
 
         # Base risk on distance
         if min_distance <= self.critical_distance:
@@ -506,7 +506,7 @@ class SafetyContextSpace(BaseObservationSpace):
             distance_risk = 0.0
 
         # Modify risk based on velocity (higher velocity = higher risk)
-        velocity_magnitude = np.linalg.norm(velocity)
+        velocity_magnitude = float(np.linalg.norm(velocity))
         velocity_factor = min(1.5, 1.0 + velocity_magnitude * 0.5)
 
         total_risk = min(1.0, distance_risk * velocity_factor)
@@ -530,7 +530,7 @@ class SafetyContextSpace(BaseObservationSpace):
         """Compute safety metrics."""
         # Average risk
         if len(self.risk_history) > 0:
-            avg_risk = np.mean(self.risk_history)
+            avg_risk = float(np.mean(self.risk_history))
         else:
             avg_risk = current_risk
 

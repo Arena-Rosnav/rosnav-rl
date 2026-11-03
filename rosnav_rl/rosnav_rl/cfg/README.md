@@ -289,7 +289,7 @@ framework: Annotated[
 
 1. Add a new `BaseActionSpace` subclass in `action_spaces.py`:
 ```python
-class QuadrupedActionSpace(BaseActionSpace):
+class QuadrupedActionSpace(BaseActionSpace, frozen=True):
     type: Literal["quadruped"] = "quadruped"
     gait_type: str = "trot"
     stride_range: tuple[float, float] = (0.0, 0.5)

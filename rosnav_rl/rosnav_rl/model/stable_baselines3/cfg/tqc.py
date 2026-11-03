@@ -4,6 +4,7 @@ from typing import Literal
 from sb3_contrib.tqc import TQC
 
 from .base import OffPolicyParameters, SBAlgorithmCfg
+from .lr_schedule import LearningRateSchedulerCfg
 
 
 class TQC_Algorithm_Cfg(OffPolicyParameters):
@@ -24,7 +25,7 @@ class TQC_Algorithm_Cfg(OffPolicyParameters):
     algorithm_name = TQC.__name__
 
     # TQC defaults (SAC-like)
-    learning_rate: float | Callable[[float], float] = 3e-4
+    learning_rate: float | Callable[[float], float] | LearningRateSchedulerCfg = 3e-4
     batch_size: int = 256
     buffer_size: int = 1_000_000
     learning_starts: int = 100
@@ -47,5 +48,5 @@ class TQC_Cfg(SBAlgorithmCfg):
         parameters: TQC-specific algorithm parameters.
     """
 
-    type: Literal["TQC"] = "TQC"
-    parameters: TQC_Algorithm_Cfg
+    type: Literal["TQC"] = "TQC"  # pyright: ignore[reportIncompatibleVariableOverride]
+    parameters: TQC_Algorithm_Cfg  # pyright: ignore[reportIncompatibleVariableOverride]

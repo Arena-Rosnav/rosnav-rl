@@ -1,4 +1,4 @@
-from .action import _HolonomicAction
+from .action import DecodedAction, _HolonomicAction
 from .models import (
     _SupportedDreamerModels,
     _SupportedRosnavRLModels,
@@ -24,6 +24,7 @@ from .spaces import (
 
 __all__ = [
     "_HolonomicAction",
+    "DecodedAction",
     "_SupportedDreamerModels",
     "_SupportedRosnavRLModels",
     "_SupportedStableBaselinesModels",

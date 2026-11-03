@@ -4,6 +4,7 @@ from typing import Literal
 from stable_baselines3.sac import SAC
 
 from .base import OffPolicyParameters, SBAlgorithmCfg
+from .lr_schedule import LearningRateSchedulerCfg
 
 
 class SAC_Algorithm_Cfg(OffPolicyParameters):
@@ -23,7 +24,7 @@ class SAC_Algorithm_Cfg(OffPolicyParameters):
     algorithm_name = SAC.__name__
 
     # SAC defaults
-    learning_rate: float | Callable[[float], float] = 3e-4
+    learning_rate: float | Callable[[float], float] | LearningRateSchedulerCfg = 3e-4
     batch_size: int = 256
     buffer_size: int = 1_000_000
     learning_starts: int = 100
@@ -45,5 +46,5 @@ class SAC_Cfg(SBAlgorithmCfg):
         parameters: SAC-specific algorithm parameters.
     """
 
-    type: Literal["SAC"] = "SAC"
-    parameters: SAC_Algorithm_Cfg
+    type: Literal["SAC"] = "SAC"  # pyright: ignore[reportIncompatibleVariableOverride]
+    parameters: SAC_Algorithm_Cfg  # pyright: ignore[reportIncompatibleVariableOverride]

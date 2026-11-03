@@ -66,13 +66,13 @@ class StandardScaler(Normalizer):
 
     def __init__(self, epsilon: float = 1e-8, **kwargs: Any):
         self.epsilon = epsilon
-        self._cached_mean = None
-        self._cached_std = None
-        self._cached_low = None
+        self._cached_mean: np.ndarray | None = None
+        self._cached_std: np.ndarray | None = None
+        self._cached_low: np.ndarray | None = None
 
     def normalize(self, observation: np.ndarray, low: np.ndarray, high: np.ndarray) -> np.ndarray:
         """Standardize using bounds as rough mean/std estimates."""
-        if self._cached_mean is None or self._cached_low is not low:
+        if self._cached_mean is None or self._cached_std is None or self._cached_low is not low:
             self._cached_mean = (low + high) / 2
             std = (high - low) / 4
             self._cached_std = np.where(std == 0, self.epsilon, std)

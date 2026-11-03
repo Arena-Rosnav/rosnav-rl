@@ -72,7 +72,7 @@ class AgentParameters(BaseModel, frozen=True):
     # ------------------------------------------------------------------
 
     laser_num_beams: int = Field(
-        720,
+        default=720,
         description=(
             "Number of laser scan beams. Must match the robot's LIDAR. "
             "Used by: BasicLaserObservationSpace, LaserObservationSpace, "
@@ -81,15 +81,15 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     laser_angle_min: float = Field(
-        -math.pi,
+        default=-math.pi,
         description="Angle of the first laser beam (rad). Used by: MirrorSpaceManager, LaserCartesianMapSpace. Set to robot_description.laser.angle.min at training time.",
     )
     laser_angle_increment: float | None = Field(
-        None,
+        default=None,
         description="Angle between laser beams (rad). Used by: MirrorSpaceManager. Set to robot_description.laser.angle.increment at training time.",
     )
     laser_max_range: float = Field(
-        30.0,
+        default=30.0,
         description=(
             "Maximum range of the laser sensor (m). "
             "Used by: BasicLaserObservationSpace, LaserObservationSpace, "
@@ -104,7 +104,7 @@ class AgentParameters(BaseModel, frozen=True):
     # ------------------------------------------------------------------
 
     min_linear_vel: float = Field(
-        0.0,
+        default=0.0,
         description=(
             "Minimum linear velocity (m/s). "
             "Used by: VelocityObservationSpace (space low bound). "
@@ -112,7 +112,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     max_linear_vel: float = Field(
-        1.0,
+        default=1.0,
         description=(
             "Maximum linear velocity (m/s). "
             "Used by: VelocityObservationSpace (space high bound), "
@@ -121,7 +121,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     min_translational_vel: float = Field(
-        0.0,
+        default=0.0,
         description=(
             "Minimum translational (y-axis) velocity for holonomic robots (m/s). "
             "Used by: VelocityObservationSpace (holonomic y-vel low bound). "
@@ -129,7 +129,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     max_translational_vel: float = Field(
-        1.0,
+        default=1.0,
         description=(
             "Maximum translational (y-axis) velocity for holonomic robots (m/s). "
             "Used by: VelocityObservationSpace (holonomic y-vel high bound). "
@@ -137,7 +137,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     min_angular_vel: float = Field(
-        -1.0,
+        default=-1.0,
         description=(
             "Minimum angular velocity (rad/s). "
             "Used by: VelocityObservationSpace (space low bound). "
@@ -145,7 +145,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     max_angular_vel: float = Field(
-        1.0,
+        default=1.0,
         description=(
             "Maximum angular velocity (rad/s). "
             "Used by: VelocityObservationSpace (space high bound), "
@@ -160,30 +160,30 @@ class AgentParameters(BaseModel, frozen=True):
     # ------------------------------------------------------------------
 
     ped_num_types: int = Field(
-        5,
+        default=5,
         description=(
             "Number of distinct pedestrian behaviour/social types. "
             "Used by: PedestrianTypeFeaturesSpace (one-hot encoding dimension)."
         ),
     )
     ped_min_speed_x: float = Field(
-        0.0,
+        default=0.0,
         description=("Minimum pedestrian speed along x-axis (m/s). Used by: PedestrianSpeedXSpace (space low bound)."),
     )
     ped_max_speed_x: float = Field(
-        2.0,
+        default=2.0,
         description=("Maximum pedestrian speed along x-axis (m/s). Used by: PedestrianSpeedXSpace (space high bound)."),
     )
     ped_min_speed_y: float = Field(
-        0.0,
+        default=0.0,
         description=("Minimum pedestrian speed along y-axis (m/s). Used by: PedestrianSpeedYSpace (space low bound)."),
     )
     ped_max_speed_y: float = Field(
-        2.0,
+        default=2.0,
         description=("Maximum pedestrian speed along y-axis (m/s). Used by: PedestrianSpeedYSpace (space high bound)."),
     )
     ped_social_state_num: int = Field(
-        6,
+        default=6,
         description=("Number of social-state categories for pedestrian modelling. Used by: SocialStateFeaturesSpace."),
     )
 
@@ -193,7 +193,7 @@ class AgentParameters(BaseModel, frozen=True):
     # ------------------------------------------------------------------
 
     goal_max_dist: float = Field(
-        10.0,
+        default=10.0,
         description=(
             "Maximum expected distance to the navigation goal (m). "
             "Used by: DistAngleToGoalSpace, RobustGoalSpace, MultiScaleGoalSpace "
@@ -201,7 +201,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     subgoal_max_dist: float = Field(
-        10.0,
+        default=10.0,
         description=(
             "Maximum expected distance to the current sub-goal (m). "
             "Used by: DistAngleToSubgoalSpace, SubgoalContextSpace "
@@ -215,14 +215,14 @@ class AgentParameters(BaseModel, frozen=True):
     # ------------------------------------------------------------------
 
     normalize: bool = Field(
-        True,
+        default=True,
         description=(
             "Whether to normalise all observation values to [-1, 1] or [0, 1]. "
             "Used by: BaseObservationSpace.__init__ — inherited by every observation space."
         ),
     )
     normalizer: str = Field(
-        "max_abs",
+        default="max_abs",
         description=(
             "Normalizer algorithm applied when normalize=True. "
             "One of: 'max_abs' (scale to [-1, 1]), 'min_max' (scale to [0, 1]), "
@@ -237,7 +237,7 @@ class AgentParameters(BaseModel, frozen=True):
     # ------------------------------------------------------------------
 
     robot_radius: float = Field(
-        0.3,
+        default=0.3,
         json_schema_extra={"group": "reward"},
         description=(
             "Physical bounding radius of the robot (m). "
@@ -249,7 +249,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     safety_distance: float = Field(
-        1.0,
+        default=1.0,
         json_schema_extra={"group": "reward"},
         description=(
             "Minimum safe clearance from obstacles (m). "
@@ -267,7 +267,7 @@ class AgentParameters(BaseModel, frozen=True):
     # ------------------------------------------------------------------
 
     goal_radius: float = Field(
-        0.5,
+        default=0.5,
         json_schema_extra={"group": "reward"},
         description=(
             "Distance threshold for considering the goal reached (m). "
@@ -276,7 +276,7 @@ class AgentParameters(BaseModel, frozen=True):
         ),
     )
     max_steps: int = Field(
-        600,
+        default=600,
         json_schema_extra={"group": "reward"},
         description=(
             "Maximum number of environment steps per episode. "
@@ -308,7 +308,9 @@ class AgentParameters(BaseModel, frozen=True):
         return {
             name: getattr(self, name)
             for name, field_info in self.__class__.model_fields.items()
-            if (field_info.json_schema_extra or {}).get("group") != "reward"
+            if not (
+                isinstance(field_info.json_schema_extra, dict) and field_info.json_schema_extra.get("group") == "reward"
+            )
         }
 
     @classmethod

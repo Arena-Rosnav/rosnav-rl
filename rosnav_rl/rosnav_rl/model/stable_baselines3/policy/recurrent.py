@@ -44,7 +44,7 @@ def _unpack(features: th.Tensor, mask: th.Tensor) -> th.Tensor:
 class PackedRecurrentActorCriticPolicy(RecurrentMultiInputActorCriticPolicy):
     """Recurrent multi-input actor-critic policy that extracts features of packed minibatches on their real rows."""
 
-    def extract_features(  # type: ignore[override]
+    def extract_features(
         self, obs: PyTorchObs, features_extractor: BaseFeaturesExtractor | None = None
     ) -> th.Tensor | tuple[th.Tensor, th.Tensor]:
         features = super().extract_features(obs, features_extractor)

@@ -96,6 +96,10 @@ class ActionServer(ABC):
         action_space_spec = self.agent.space_manager.action_space_manager.spec
         response.action_type = action_space_spec.type
 
+        if self.observation_collector is None:
+            self.logger.info("Observation collector not initialized yet.")
+            return response
+
         try:
             action = self.agent.get_action(self.observation_collector.get_observations())
         except Exception as exc:

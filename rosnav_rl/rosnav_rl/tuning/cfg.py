@@ -26,19 +26,19 @@ class PrunerCfg(BaseModel):
     """
 
     type: Literal["median", "hyperband", "percentile", "none"] = Field(
-        "median",
+        default="median",
         description="Pruner algorithm. 'none' disables pruning.",
     )
     n_startup_trials: int = Field(
-        5,
+        default=5,
         description="Number of trials to complete before pruning kicks in.",
     )
     n_warmup_steps: int = Field(
-        10,
+        default=10,
         description=("Number of intermediate reports to collect per trial before the pruner may prune."),
     )
     percentile: float = Field(
-        50.0,
+        default=50.0,
         description="For 'percentile' pruner — keep trials above this percentile.",
     )
 

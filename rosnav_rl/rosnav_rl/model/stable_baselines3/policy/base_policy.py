@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import TYPE_CHECKING, Any
 
 from stable_baselines3.common.base_class import BaseAlgorithm
@@ -29,85 +29,14 @@ class StableBaselinesPolicyDescription(ABC):
                                (defined elsewhere in the codebase)
     """
 
-    @property
-    @abstractmethod
-    def algorithm_class(self) -> type[BaseAlgorithm]:
-        """
-        Get the algorithm class.
-
-        Returns:
-            Type[BaseAlgorithm]: The algorithm class.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def observation_spaces(self) -> list[type["BaseObservationSpace"]]:
-        """
-        Get the list of observation spaces.
-
-        Returns:
-            List[BaseObservationSpace]: List of observation spaces.
-        """
-        return None
-
-    @property
-    def observation_space_kwargs(self) -> dict[str, Any]:
-        """
-        Get additional keyword arguments for the observation space.
-
-        Returns:
-            dict: Additional keyword arguments for the observation space.
-        """
-        return {}
-
-    @property
-    @abstractmethod
-    def features_extractor_class(self) -> type[BaseFeaturesExtractor]:
-        """
-        Get the class of the features extractor used by the agent.
-
-        Returns:
-            Type[BaseFeaturesExtractor]: The class of the features extractor.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def features_extractor_kwargs(self) -> dict[str, Any]:
-        """
-        Get additional keyword arguments for the features extractor.
-
-        Returns:
-            dict: Additional keyword arguments for the features extractor.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def net_arch(self) -> list[int] | dict[str, list[int]]:
-        """
-        Get the architecture of the neural network.
-
-        Returns:
-            List[dict]: List of dictionaries specifying the architecture of the neural network.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def activation_fn(self) -> type[Module]:
-        """
-        Get the activation function used in the neural network.
-
-        Returns:
-            Type[Module]: The activation function used in the neural network.
-        """
-        pass
-
-    @property
-    def stack_size(self) -> int:
-        return 1
+    algorithm_class: type[BaseAlgorithm]
+    observation_spaces: list[type["BaseObservationSpace"]]
+    observation_space_kwargs: dict[str, Any] = {}
+    features_extractor_class: type[BaseFeaturesExtractor]
+    features_extractor_kwargs: dict[str, Any]
+    net_arch: list[int] | dict[str, list[int]]
+    activation_fn: type[Module]
+    stack_size: int = 1
 
     def get_kwargs(self) -> dict[str, Any]:
         """

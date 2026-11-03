@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, SupportsFloat
 
 import gymnasium as gym
 import numpy as np
@@ -12,14 +12,28 @@ if TYPE_CHECKING:
 
     from ....utils.type_aliases import EncodedObservationDict
 
-    StepResult = tuple[EncodedObservationDict, float, bool, dict[str, object]]
+    StepResult = tuple[EncodedObservationDict, SupportsFloat, bool, dict[str, object]]
     ResetResult = tuple[EncodedObservationDict, dict[str, object]]
 
 
 class DreamerEnv(Protocol):
     def step(self, action: object) -> StepResult: ...
 
-    def reset(self) -> EncodedObservationDict: ...
+    def reset(self, **kwargs: Any) -> EncodedObservationDict: ...
+
+    def apply_action(self, action: object) -> None: ...
+
+    def step_sim(self) -> None: ...
+
+
+class _InfoResetEnv(Protocol):
+    action_space: gym.Space
+
+    def step(self, action: object) -> StepResult: ...
+
+    def reset(self, **kwargs: Any) -> ResetResult: ...
+
+    def apply_action(self, action: object) -> None: ...
 
 
 class _GymDelegatingWrapper(gym.Wrapper):
@@ -55,12 +69,14 @@ class TimeLimit(_GymDelegatingWrapper):
         env = TimeLimit(gym.make('CartPole-v1'), duration=500)
     """
 
+    env: _InfoResetEnv
+
     def __init__(self, env: gym.Env, duration: int):
         super().__init__(env)
         self._duration = duration
-        self._step = None
+        self._step: int | None = None
 
-    def step(self, action: object) -> StepResult:
+    def step(self, action: object) -> StepResult:  # pyright: ignore[reportIncompatibleMethodOverride]
         # assert self._step is not None, "Must reset environment."
         if self._step is None:
             raise AssertionError("Must reset environment.")
@@ -99,11 +115,15 @@ class NormalizeActions(_GymDelegatingWrapper):
         >>> normalized_action = env.action_space.sample()  # Will be in [-1, 1]
     """
 
+    env: _InfoResetEnv
+
     def __init__(self, env: gym.Env):
         super().__init__(env)
-        self._mask = np.logical_and(np.isfinite(env.action_space.low), np.isfinite(env.action_space.high))
-        self._low = np.where(self._mask, env.action_space.low, -1)
-        self._high = np.where(self._mask, env.action_space.high, 1)
+        space = env.action_space
+        assert isinstance(space, gym.spaces.Box)
+        self._mask = np.logical_and(np.isfinite(space.low), np.isfinite(space.high))
+        self._low = np.where(self._mask, space.low, -1)
+        self._high = np.where(self._mask, space.high, 1)
         low = np.where(self._mask, -np.ones_like(self._low), self._low)
         high = np.where(self._mask, np.ones_like(self._low), self._high)
         self.action_space = gym.spaces.Box(low, high, dtype=np.float32)
@@ -112,11 +132,15 @@ class NormalizeActions(_GymDelegatingWrapper):
         original = (action + 1) / 2 * (self._high - self._low) + self._low
         return np.where(self._mask, original, action)
 
-    def step(self, action: np.ndarray) -> StepResult:
+    def step(self, action: np.ndarray) -> StepResult:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self.env.step(self._original(action))
 
     def apply_action(self, action: np.ndarray) -> None:
         self.env.apply_action(self._original(action))
+
+
+class _OneHotBox(gym.spaces.Box):
+    discrete = True
 
 
 class OneHotAction(_GymDelegatingWrapper):
@@ -143,14 +167,14 @@ class OneHotAction(_GymDelegatingWrapper):
         ValueError: If the provided action is not a valid one-hot vector.
     """
 
+    env: _InfoResetEnv
+
     def __init__(self, env: gym.Env):
         assert isinstance(env.action_space, gym.spaces.Discrete)
         super().__init__(env)
         self._random = np.random.RandomState()
-        shape = (self.env.action_space.n,)
-        space = gym.spaces.Box(low=0, high=1, shape=shape, dtype=np.float32)
-        space.discrete = True
-        self.action_space = space
+        shape = (int(env.action_space.n),)
+        self.action_space = _OneHotBox(low=0, high=1, shape=shape, dtype=np.float32)
 
     @staticmethod
     def _index(action: np.ndarray) -> int:
@@ -161,7 +185,7 @@ class OneHotAction(_GymDelegatingWrapper):
             raise ValueError(f"Invalid one-hot action:\n{action}")
         return index
 
-    def step(self, action: np.ndarray) -> StepResult:
+    def step(self, action: np.ndarray) -> StepResult:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self.env.step(self._index(action))
 
     def apply_action(self, action: np.ndarray) -> None:
@@ -171,7 +195,9 @@ class OneHotAction(_GymDelegatingWrapper):
         return self.env.reset(**kwargs)
 
     def _sample_action(self) -> np.ndarray:
-        actions = self.env.action_space.n
+        space = self.env.action_space
+        assert isinstance(space, gym.spaces.Discrete)
+        actions = space.n
         index = self._random.randint(0, actions)
         reference = np.zeros(actions, dtype=np.float32)
         reference[index] = 1.0
@@ -194,20 +220,24 @@ class RewardObs(_GymDelegatingWrapper):
         of shape (1,). For the initial reset, the reward is set to 0.0.
     """
 
+    env: DreamerEnv
+
     def __init__(self, env: gym.Env):
         super().__init__(env)
-        spaces = self.env.observation_space.spaces
+        observation_space = env.observation_space
+        assert isinstance(observation_space, gym.spaces.Dict)
+        spaces = observation_space.spaces
         if "obs_reward" not in spaces:
             spaces["obs_reward"] = gym.spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float32)
         self.observation_space = gym.spaces.Dict(spaces)
 
-    def step(self, action: object) -> StepResult:
+    def step(self, action: object) -> StepResult:  # pyright: ignore[reportIncompatibleMethodOverride]
         obs, reward, done, info = self.env.step(action)
         if "obs_reward" not in obs:
             obs["obs_reward"] = np.array([reward], dtype=np.float32)
         return obs, reward, done, info
 
-    def reset(self, **kwargs: Any) -> EncodedObservationDict:
+    def reset(self, **kwargs: Any) -> EncodedObservationDict:  # pyright: ignore[reportIncompatibleMethodOverride]
         obs = self.env.reset(**kwargs)
         if "obs_reward" not in obs:
             obs["obs_reward"] = np.array([0.0], dtype=np.float32)
@@ -233,11 +263,13 @@ class SelectAction(_GymDelegatingWrapper):
         # Only [1,2,3] will be passed to the underlying environment
     """
 
+    env: _InfoResetEnv
+
     def __init__(self, env: gym.Env, key: str):
         super().__init__(env)
         self._key = key
 
-    def step(self, action: Mapping[str, object]) -> StepResult:
+    def step(self, action: Mapping[str, object]) -> StepResult:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self.env.step(action[self._key])
 
     def apply_action(self, action: Mapping[str, object]) -> None:
@@ -257,6 +289,8 @@ class UUID(_GymDelegatingWrapper):
     Attributes:
         id (str): A unique identifier string in the format 'YYYYMMDDTHHMMSS-uuid'.
     """
+
+    env: _InfoResetEnv
 
     def __init__(self, env: gym.Env):
         super().__init__(env)
@@ -287,7 +321,9 @@ class ResetWoInfo(_GymDelegatingWrapper):
         obs = env.reset()  # Returns only the observation
     """
 
-    def reset(self, **kwargs: Any) -> EncodedObservationDict:
+    env: _InfoResetEnv
+
+    def reset(self, **kwargs: Any) -> EncodedObservationDict:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self.env.reset(**kwargs)[0]
 
 
@@ -298,6 +334,8 @@ class ChannelFirsttoLast(_GymDelegatingWrapper):
     dimension (H, W, 1) so all CNN inputs have consistent rank when the
     DreamerV3 encoder concatenates them along the last axis.
     """
+
+    env: DreamerEnv
 
     @staticmethod
     def _transform(obs: EncodedObservationDict) -> EncodedObservationDict:
@@ -314,17 +352,19 @@ class ChannelFirsttoLast(_GymDelegatingWrapper):
         obs.update(updated)
         return obs
 
-    def step(self, action: object) -> StepResult:
+    def step(self, action: object) -> StepResult:  # pyright: ignore[reportIncompatibleMethodOverride]
         obs, reward, done, info = self.env.step(action)
         return self._transform(obs), reward, done, info
 
-    def reset(self, **kwargs: Any) -> EncodedObservationDict:
+    def reset(self, **kwargs: Any) -> EncodedObservationDict:  # pyright: ignore[reportIncompatibleMethodOverride]
         obs = self.env.reset(**kwargs)
         return self._transform(obs)
 
 
 class WoTruncatedFlag(_GymDelegatingWrapper):
-    def step(self, action: object) -> StepResult:
+    env: gym.Env
+
+    def step(self, action: object) -> StepResult:  # pyright: ignore[reportIncompatibleMethodOverride]
         obs, reward, done, _, info = self.env.step(action)
         return obs, reward, done, info
 
@@ -348,6 +388,8 @@ class RenameObsForDreamer(_GymDelegatingWrapper):
     unaware of the convention mismatch.
     """
 
+    env: DreamerEnv
+
     @staticmethod
     def _remap(obs: EncodedObservationDict) -> EncodedObservationDict:
         for old, new in _DREAMER_KEY_REMAP.items():
@@ -355,10 +397,10 @@ class RenameObsForDreamer(_GymDelegatingWrapper):
                 obs[new] = obs.pop(old)
         return obs
 
-    def reset(self, **kwargs: Any) -> EncodedObservationDict:
+    def reset(self, **kwargs: Any) -> EncodedObservationDict:  # pyright: ignore[reportIncompatibleMethodOverride]
         obs = self.env.reset(**kwargs)
         return self._remap(obs)
 
-    def step(self, action: object) -> StepResult:
+    def step(self, action: object) -> StepResult:  # pyright: ignore[reportIncompatibleMethodOverride]
         obs, reward, done, info = self.env.step(action)
         return self._remap(obs), reward, done, info

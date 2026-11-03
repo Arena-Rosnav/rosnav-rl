@@ -8,7 +8,7 @@ _TRANSFORM_BUFFER[2, :] = [0, 0, 1]  # last row is constant
 
 
 def get_relative_pos_to_robot(
-    robot_pose: np.ndarray, distant_poses: np.ndarray, output_buffer: np.ndarray = None
+    robot_pose: np.ndarray, distant_poses: np.ndarray, output_buffer: np.ndarray | None = None
 ) -> np.ndarray:
     """Transforms distant poses from map frame to robot frame coordinates.
 

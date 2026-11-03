@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from gymnasium import spaces
 
+from rosnav_rl.utils.type_aliases import DecodedAction
+
 if TYPE_CHECKING:
     from rosnav_rl.cfg.action_spaces import BaseActionSpace
 
@@ -45,7 +47,7 @@ class ActionSpaceManager:
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         return self._spec.decode(action)
 
-    def decode_split_action(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+    def decode_split_action(self, action: np.ndarray) -> list[DecodedAction]:
         return self._spec.decode_split(action)
 
     @property

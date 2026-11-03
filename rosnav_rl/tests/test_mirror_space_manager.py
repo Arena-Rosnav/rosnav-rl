@@ -18,6 +18,7 @@ from rosnav_rl.model.stable_baselines3.cfg.ppo import PPO_Algorithm_Cfg
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.spaces.space_manager import BaseSpaceManager, MirrorSpaceManager
 from rosnav_rl.spaces.space_manager.mirror_space_manager import mirrored_beams
+from rosnav_rl.utils.type_aliases import DecodedAction
 
 BEAMS = 720
 ANGLE_MIN = -np.pi
@@ -137,6 +138,23 @@ def test_reflected_split_decisions_leave_non_drive_slices_alone():
     np.testing.assert_allclose(drive[1], [0.7, 0.0, -0.4])
     assert rest[0] == humanoid
     np.testing.assert_allclose(rest[1], [0.1, 0.2, 0.3])
+
+
+def test_reflected_split_decisions_are_named_decoded_actions():
+    humanoid = HumanoidActionSpace(locomotion_dof=3)
+    mirrored = RL_Agent(
+        _spec("canonical", action_space=CompositeActionSpace(action_spaces=[DRIVE, humanoid]))
+    ).space_manager
+    mirrored.encode_observation(_scene())
+
+    drive, rest = mirrored.decode_split_action(np.array([0.7, 0.4, 0.1, 0.2, 0.3]))
+
+    assert isinstance(drive, DecodedAction)
+    assert isinstance(rest, DecodedAction)
+    assert drive.space.type == "differential_drive"
+    np.testing.assert_allclose(drive.action, [0.7, 0.0, -0.4])
+    assert rest.space == humanoid
+    np.testing.assert_allclose(rest.action, [0.1, 0.2, 0.3])
 
 
 def test_arm_actions_are_refused():

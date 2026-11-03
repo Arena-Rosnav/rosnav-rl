@@ -14,12 +14,12 @@ from rosnav_rl.spaces.space_manager.base_space_manager import BaseSpaceManager
 from rosnav_rl.utils.stable_baselines3.vec_frame_stack import VecFrameStack
 
 
-def load_json(file_path: str) -> dict[str, Any]:
+def load_json(file_path: str | os.PathLike[str]) -> dict[str, Any]:
     with open(file_path) as file:
         return json.load(file)
 
 
-def load_yaml(file_path: str) -> dict[str, Any]:
+def load_yaml(file_path: str | os.PathLike[str]) -> dict[str, Any]:
     with open(file_path) as file:
         return yaml.load(file, Loader=yaml.FullLoader)
 
@@ -72,7 +72,7 @@ def wrap_vec_framestack(env: DummyVecEnv, stack_size: int) -> VecFrameStack:
     return VecFrameStack(env, n_stack=stack_size, channels_order="first")
 
 
-def load_vec_normalize(path: str, venv: VecEnv | None = None) -> VecNormalize:
+def load_vec_normalize(path: str, venv: VecEnv) -> VecNormalize:
     return VecNormalize.load(path, venv)
 
 
