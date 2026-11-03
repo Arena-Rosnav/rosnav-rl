@@ -48,7 +48,7 @@ def apply_vec_normalize(
         clip_reward=clip_reward,
         gamma=gamma,
         epsilon=epsilon,
-        norm_obs_key=norm_obs_key,
+        norm_obs_keys=norm_obs_key,
     )
 
 

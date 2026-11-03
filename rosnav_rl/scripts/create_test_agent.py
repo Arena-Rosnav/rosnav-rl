@@ -21,6 +21,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 # ── path bootstrap ────────────────────────────────────────────────────────────
 # Locate the Arena workspace root robustly regardless of whether this script
@@ -90,8 +91,8 @@ def _populate_agent_spec(training_cfg):
     )
     from rosnav_rl.cfg.parameters import AgentParameters  # noqa: PLC0415
 
-    robot_desc = training_cfg.arena_config.robot.robot_description
-    general = training_cfg.arena_config.general
+    robot_desc = training_cfg.arena_cfg.robot.robot_description
+    general = training_cfg.arena_cfg.general
     cont = robot_desc.actions.continuous
 
     if robot_desc.is_holonomic:
@@ -156,7 +157,7 @@ def create_test_agent(
 
     training_cfg = TrainingCfg.model_validate(load_yaml(config_path))
     training_cfg.agent_config.name = agent_name
-    print(f"[create_test_agent] Using robot: {training_cfg.arena_config.robot.robot_description.robot_model}")
+    print(f"[create_test_agent] Using robot: {training_cfg.arena_cfg.robot.robot_model}")
 
     # ── Build everything from robot description ────────────────────────────
     _populate_agent_spec(training_cfg)
@@ -171,7 +172,9 @@ def create_test_agent(
 
     # ── Initialise model with random weights via mock env ─────────────────
     print("[create_test_agent] Initialising PPO model with random weights …")
+    from rosnav_rl.model.stable_baselines3 import StableBaselinesModel  # noqa: PLC0415
     from rosnav_rl.model.stable_baselines3.policy.constants import POLICY_TYPE  # noqa: PLC0415
+    from rosnav_rl.model.stable_baselines3.sb3_model import _SupportedStableBaselinesModels  # noqa: PLC0415
     from rosnav_rl.utils.utils import make_mock_env  # noqa: PLC0415
 
     mock_env = make_mock_env(ns="", space_manager=agent.space_manager)
@@ -183,22 +186,24 @@ def create_test_agent(
     #   TypeError: MultiInputActorCriticPolicy.__init__() got an unexpected
     #   keyword argument 'n_lstm_layers'
     # for any RecurrentPPO-based architecture.
-    policy_description = agent.model._policy_description
+    sb3_model = agent.model
+    assert isinstance(sb3_model, StableBaselinesModel)
+    policy_description = sb3_model._policy_description
     algo_cls = policy_description.algorithm_class
     policy_type = POLICY_TYPE[algo_cls]
     policy_kwargs = policy_description.get_kwargs()
-    ppo = algo_cls(
-        policy=policy_type,
-        env=mock_env,
-        policy_kwargs=policy_kwargs,
-        n_steps=64,    # minimal batch — only for model init, not training
-        batch_size=64,
-        device="cpu",
-        verbose=0,
-    )
+    ppo_kwargs: dict[str, Any] = {
+        "policy": policy_type,
+        "env": mock_env,
+        "policy_kwargs": policy_kwargs,
+        "n_steps": 64,  # minimal batch: only for model init, not training
+        "batch_size": 64,
+        "device": "cpu",
+        "verbose": 0,
+    }
+    ppo = cast("_SupportedStableBaselinesModels", algo_cls(**ppo_kwargs))
     # Attach the PPO to the RL_Agent model so save() works normally
-    agent.model._StableBaselinesModel__env = None  # reset env (clean state)
-    agent.model._model = ppo
+    sb3_model._model = ppo
 
     # ── Save agent directory ───────────────────────────────────────────────
     resolved_dir = _resolve_agents_dir(agents_dir)
@@ -216,7 +221,7 @@ def create_test_agent(
 
     # Save best_model.zip (SB3 PPO format)
     model_path = agent_dir / "best_model"
-    agent.model._model.save(str(model_path))
+    sb3_model.model.save(str(model_path))
     # SB3 appends .zip automatically - make sure the file exists
     zip_path = agent_dir / "best_model.zip"
     if not zip_path.exists():

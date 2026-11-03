@@ -42,7 +42,7 @@ Examples
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, overload
 
 from arena_runtime_msgs.srv import QueryTaskModes, QueueEpisode
 from diagnostic_msgs.msg import KeyValue
@@ -467,6 +467,16 @@ class CurriculumBase(ABC):
 
     # ------------------------- Task-mode routing -------------------------
     _MODES_KEY = "modes"
+
+    @overload
+    def _call(
+        self, client: Client, req: QueryTaskModes.Request, node_name: str, what: str
+    ) -> QueryTaskModes.Response | None: ...
+
+    @overload
+    def _call(
+        self, client: Client, req: QueueEpisode.Request, node_name: str, what: str
+    ) -> QueueEpisode.Response | None: ...
 
     def _call(
         self, client: Client, req: QueryTaskModes.Request | QueueEpisode.Request, node_name: str, what: str
