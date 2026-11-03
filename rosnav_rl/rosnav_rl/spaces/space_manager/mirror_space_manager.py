@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.utils.type_aliases import ObservationDict
+from rosnav_rl.utils.type_aliases import DecodedAction, ObservationDict
 
 from ..observation_space.spaces.dynamics import LastActionSpace
 from ..observation_space.spaces.environment import (
@@ -23,7 +23,6 @@ from ..observation_space.spaces.navigation import DistAngleToGoalSpace, DistAngl
 from .base_space_manager import BaseSpaceManager
 
 if TYPE_CHECKING:
-    from rosnav_rl.cfg.action_spaces import BaseActionSpace
     from rosnav_rl.cfg.agent import AgentConfig
 
     from ..observation_space.spaces.base_observation_space import BaseObservationSpace
@@ -171,9 +170,9 @@ class MirrorSpaceManager(BaseSpaceManager):
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         return self._reflect(super().decode_action(action))
 
-    def decode_split_action(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+    def decode_split_action(self, action: np.ndarray) -> list[DecodedAction]:
         return [
-            (sub, self._reflect(command) if sub.type in _DRIVE_TYPES else command)
+            DecodedAction(sub, self._reflect(command) if sub.type in _DRIVE_TYPES else command)
             for sub, command in super().decode_split_action(action)
         ]
 

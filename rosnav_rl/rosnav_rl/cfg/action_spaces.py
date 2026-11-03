@@ -69,6 +69,8 @@ import numpy as np
 from gymnasium import spaces
 from pydantic import BaseModel, Discriminator, Field, field_validator
 
+from rosnav_rl.utils.type_aliases.action import DecodedAction
+
 
 class RobotDiscreteAction(Protocol):
     """One entry of a robot description's ``actions.discrete`` list."""
@@ -185,9 +187,9 @@ class BaseActionSpace(BaseModel):
         """
         raise NotImplementedError
 
-    def decode_split(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+    def decode_split(self, action: np.ndarray) -> list[DecodedAction]:
         """Decode model output into one ``(sub-space, command)`` pair per sub-space."""
-        return [(self, self.decode(action))]
+        return [DecodedAction(self, self.decode(action))]
 
     @property
     def sub_spaces(self) -> list[BaseActionSpace]:
@@ -653,14 +655,15 @@ class CompositeActionSpace(BaseActionSpace):
             idx += s.num_dof
         return np.concatenate(out)
 
-    def decode_split(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+    def decode_split(self, action: np.ndarray) -> list[DecodedAction]:
         a = np.asarray(action, dtype=np.float32).reshape(-1)
         if a.shape[0] != self.num_dof:
             raise ValueError(f"expected {self.num_dof}, got {a.shape[0]}")
 
-        out, idx = [], 0
+        out: list[DecodedAction] = []
+        idx = 0
         for s in self.action_spaces:
-            out.append((s, np.asarray(s.decode(a[idx : idx + s.num_dof]), dtype=np.float32).reshape(-1)))
+            out.append(DecodedAction(s, np.asarray(s.decode(a[idx : idx + s.num_dof]), dtype=np.float32).reshape(-1)))
             idx += s.num_dof
         return out
 

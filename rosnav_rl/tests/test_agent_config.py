@@ -23,6 +23,7 @@ from rosnav_rl.cfg.agent import AgentConfig
 from rosnav_rl.model.stable_baselines3.cfg import StableBaselinesCfg, PPO_Cfg
 from rosnav_rl.model.stable_baselines3.cfg.ppo import PPO_Algorithm_Cfg
 from rosnav_rl.spaces.action_space.action_space_manager import ActionSpaceManager
+from rosnav_rl.utils.type_aliases import DecodedAction
 
 
 # ============================================================
@@ -361,6 +362,35 @@ class TestComposite:
         assert split[0][0] is drive
         np.testing.assert_allclose(split[0][1], [0.5, 0.0, -1.0])
         np.testing.assert_allclose(split[1][1], [0.1, 0.2, 0.3])
+
+    def test_decode_split_returns_named_decoded_actions(self):
+        drive, humanoid = self._parts()
+        spec = CompositeActionSpace(action_spaces=[drive, humanoid])
+
+        split = spec.decode_split(np.array([0.5, -1.0, 0.1, 0.2, 0.3]))
+
+        assert all(isinstance(item, DecodedAction) for item in split)
+        assert [item.space for item in split] == [drive, humanoid]
+        np.testing.assert_allclose(split[0].action, [0.5, 0.0, -1.0])
+        np.testing.assert_allclose(split[1].action, [0.1, 0.2, 0.3])
+
+    def test_a_single_space_decodes_to_one_named_decoded_action(self):
+        drive, _ = self._parts()
+
+        [item] = drive.decode_split(np.array([0.5, -1.0]))
+
+        assert isinstance(item, DecodedAction)
+        assert item.space is drive
+        np.testing.assert_allclose(item.action, [0.5, 0.0, -1.0])
+
+    def test_the_manager_returns_named_decoded_actions(self):
+        drive, _ = self._parts()
+
+        [item] = ActionSpaceManager(drive).decode_split_action(np.array([0.5, -1.0]))
+
+        assert isinstance(item, DecodedAction)
+        assert item.space is drive
+        np.testing.assert_allclose(item.action, [0.5, 0.0, -1.0])
 
     def test_decode_split_rejects_a_wrong_action_length(self):
         spec = CompositeActionSpace(action_spaces=list(self._parts()))
