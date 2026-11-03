@@ -1111,7 +1111,7 @@ class RewardRootVelocityDifference(RewardUnit):
         """
         if self.last_action is not None:
             # Calculate L2 norm of velocity differences
-            vel_diff = np.linalg.norm(last_action - self.last_action)
+            vel_diff = float(np.linalg.norm(last_action - self.last_action))
 
             # Provide positive reward for consistent motion under threshold
             if vel_diff < self._k:

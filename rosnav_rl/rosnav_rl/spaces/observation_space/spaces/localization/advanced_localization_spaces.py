@@ -79,8 +79,8 @@ class RobustOdometrySpace(BaseObservationSpace):
         self.include_acceleration = include_acceleration
 
         # Filtering state
-        self.filtered_linear_vel = None
-        self.filtered_angular_vel = None
+        self.filtered_linear_vel: float | None = None
+        self.filtered_angular_vel: float | None = None
         self.last_velocities = None  # For acceleration estimation
 
         super().__init__(*args, **kwargs)
@@ -99,7 +99,7 @@ class RobustOdometrySpace(BaseObservationSpace):
 
     def _filter_velocity(self, linear_vel: float, angular_vel: float) -> tuple[float, float]:
         """Apply exponential moving average filtering to velocities."""
-        if self.filtered_linear_vel is None:
+        if self.filtered_linear_vel is None or self.filtered_angular_vel is None:
             # Initialize filters
             self.filtered_linear_vel = linear_vel
             self.filtered_angular_vel = angular_vel

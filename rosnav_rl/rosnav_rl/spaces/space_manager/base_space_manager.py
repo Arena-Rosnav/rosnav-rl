@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from gymnasium import spaces
@@ -17,6 +17,10 @@ from ...spaces.observation_space.spaces.base_observation_space import (
 
 if TYPE_CHECKING:
     from rosnav_rl.cfg.agent import AgentConfig
+
+
+def _box_dtype(space: spaces.Box) -> type[np.floating[Any] | np.integer[Any]]:
+    return cast("type[np.floating[Any] | np.integer[Any]]", space.dtype.type)
 
 
 class BaseSpaceManager:
@@ -38,6 +42,8 @@ class BaseSpaceManager:
         observation_space_kwargs: dict[str, Any] | None = None,
     ):
         self._spec = spec
+        if spec.action_space is None:
+            raise ValueError("the agent config has no action_space")
         self._action_space_manager = ActionSpaceManager(spec.action_space)
         self._action_chunk = spec.action_chunk
         self._normalized = spec.normalized_actions
@@ -66,6 +72,7 @@ class BaseSpaceManager:
         if not self._normalized:
             return action
         space = self._action_space_manager.action_space
+        assert isinstance(space, spaces.Box)
         return space.low + (np.clip(action, -1.0, 1.0) + 1.0) / 2.0 * (space.high - space.low)
 
     def decode_action(self, action: np.ndarray) -> np.ndarray:
@@ -106,7 +113,8 @@ class BaseSpaceManager:
     def action_space(self) -> spaces.Space:
         space = self._action_space_manager.action_space
         if self._normalized:
-            return spaces.Box(low=-1.0, high=1.0, shape=space.shape, dtype=space.dtype)
+            assert isinstance(space, spaces.Box)
+            return spaces.Box(low=-1.0, high=1.0, shape=space.shape, dtype=_box_dtype(space))
         return space
 
     @property
@@ -119,10 +127,11 @@ class BaseSpaceManager:
         space = self.action_space
         if self._action_chunk == 1:
             return space
+        assert isinstance(space, spaces.Box)
         return spaces.Box(
             low=np.tile(space.low, self._action_chunk),
             high=np.tile(space.high, self._action_chunk),
-            dtype=space.dtype,
+            dtype=_box_dtype(space),
         )
 
     @property

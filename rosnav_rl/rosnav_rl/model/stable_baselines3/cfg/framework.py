@@ -29,7 +29,7 @@ class StableBaselinesCfg(FrameworkCfg):
             checkpoint info, and algorithm-specific hyper-parameters.
     """
 
-    name: Literal[SupportedRLFrameworks.STABLE_BASELINES3] = SupportedRLFrameworks.STABLE_BASELINES3
+    name: Literal[SupportedRLFrameworks.STABLE_BASELINES3] = SupportedRLFrameworks.STABLE_BASELINES3  # pyright: ignore[reportIncompatibleVariableOverride]
 
     @model_validator(mode="before")
     @classmethod

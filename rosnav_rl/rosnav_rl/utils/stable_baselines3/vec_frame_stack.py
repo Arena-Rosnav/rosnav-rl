@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from gymnasium import spaces
@@ -33,7 +33,7 @@ class UpdatedStackedObservations(StackedObservations):
                     key: substack_obs.stacked_observation_space
                     for key, substack_obs in self.sub_stacked_observations.items()
                 }
-            )  # type: Union[spaces.Dict, spaces.Box] # make mypy happy
+            )
         elif isinstance(observation_space, spaces.Box):
             if isinstance(channels_order, Mapping):
                 raise TypeError("When the observation space is Box, channels_order can't be a dict.")
@@ -43,8 +43,8 @@ class UpdatedStackedObservations(StackedObservations):
                     low=np.array([observation_space.low]),
                     high=np.array([observation_space.high]),
                     shape=(1, observation_space.shape[0]),
-                    dtype=observation_space.dtype,
-                )  # type: ignore[arg-type]
+                    dtype=observation_space.dtype.type,
+                )
                 self._enforce_time_dimension = True
 
             (
@@ -85,8 +85,8 @@ class UpdatedStackedObservations(StackedObservations):
         return super().reset(self.add_time_dimension(observation))
 
     def add_time_dimension(self, observation: TObs) -> TObs:
-        if self._enforce_time_dimension and isinstance(self.stacked_observation_space, spaces.Box):
-            return np.expand_dims(observation, 1)
+        if self._enforce_time_dimension and isinstance(observation, np.ndarray):
+            return cast(TObs, np.expand_dims(observation, 1))
         return observation
 
     # @staticmethod

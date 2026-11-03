@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from rosnav_rl.model.stable_baselines3.cfg import StableBaselinesCfg
 
 
-def _create_formatted_name(*args: str) -> str:
+def _create_formatted_name(*args: str | None) -> str:
     """
     Create a formatted name by joining the input arguments and appending a timestamp.
 

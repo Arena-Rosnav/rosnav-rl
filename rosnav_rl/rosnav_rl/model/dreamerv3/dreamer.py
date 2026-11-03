@@ -2,7 +2,7 @@ import os
 import pathlib
 import sys
 from collections.abc import Generator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 sys.path.append(str(pathlib.Path(__file__).parent))
 
@@ -74,15 +74,15 @@ class Dreamer(nn.Module):
         self._step = logger.step // config.environment.action_repeat
         self._update_count = 0
         self._dataset = dataset
-        self._wm = models.WorldModel(obs_space, act_space, self._step, config)
-        self._task_behavior = models.ImagBehavior(config, self._wm, act_space)
+        self._wm: models.WorldModel = models.WorldModel(obs_space, act_space, self._step, config)
+        self._task_behavior: models.ImagBehavior = models.ImagBehavior(config, self._wm, act_space)
 
         self._obs_space = obs_space
         self._act_space = act_space
 
         if config.general.compile and os.name != "nt":  # compilation is not supported on windows
-            self._wm = torch.compile(self._wm)
-            self._task_behavior = torch.compile(self._task_behavior)
+            self._wm = cast(models.WorldModel, torch.compile(self._wm))
+            self._task_behavior = cast(models.ImagBehavior, torch.compile(self._task_behavior))
 
         def reward(f: torch.Tensor, s: networks.RSSMState, a: torch.Tensor) -> torch.Tensor:
             """
@@ -137,6 +137,7 @@ class Dreamer(nn.Module):
         if training:
             steps = self._config.training.pretrain_steps if self._should_pretrain() else self._should_train(step)
             for _ in range(steps):
+                assert self._dataset is not None
                 self._train(next(self._dataset))
                 self._update_count += 1
                 self._metrics["update_count"] = self._update_count
@@ -145,6 +146,7 @@ class Dreamer(nn.Module):
                     self._logger.scalar(name, float(np.mean(values)))
                     self._metrics[name] = []
                 if self._config.general.video_pred_log:
+                    assert self._dataset is not None
                     openl = self._wm.video_pred(next(self._dataset))
                     self._logger.video("train_openl", to_np(openl))
                 self._logger.write(fps=True)
@@ -188,9 +190,9 @@ class Dreamer(nn.Module):
             latent = action = None
         else:
             latent, action = state
-        obs = self._wm.preprocess(obs)
-        embed = self._wm.encoder(obs)
-        latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
+        processed = self._wm.preprocess(obs)
+        embed = self._wm.encoder(processed)
+        latent, _ = self._wm.dynamics.obs_step(latent, action, embed, processed["is_first"])
         if self._config.model.behavior.eval_state_mean:
             latent["stoch"] = latent["mean"]
         feat = self._wm.dynamics.get_feat(latent)
@@ -266,6 +268,7 @@ class Dreamer(nn.Module):
 
         metrics.update(self._task_behavior._train(start, reward)[-1])
         if self._config.model.exploration.behavior != "greedy":
+            assert not isinstance(self._expl_behavior, models.ImagBehavior)
             mets = self._expl_behavior._train(start, context, data)[-1]
             metrics.update({"expl_" + key: value for key, value in mets.items()})
         for name, value in metrics.items():

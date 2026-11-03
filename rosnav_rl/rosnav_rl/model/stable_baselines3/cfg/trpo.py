@@ -46,5 +46,5 @@ class TRPO_Cfg(SBAlgorithmCfg):
         parameters: TRPO-specific algorithm parameters.
     """
 
-    type: Literal["TRPO"] = "TRPO"
-    parameters: TRPO_Algorithm_Cfg
+    type: Literal["TRPO"] = "TRPO"  # pyright: ignore[reportIncompatibleVariableOverride]
+    parameters: TRPO_Algorithm_Cfg  # pyright: ignore[reportIncompatibleVariableOverride]

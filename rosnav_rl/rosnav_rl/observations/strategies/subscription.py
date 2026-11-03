@@ -101,8 +101,10 @@ class SubscriptionManager:
     ) -> None:
         """Set up a single collector with its own subscription."""
         # Set QoS profile if the collector doesn't have one
-        if collector.qos_profile is None:
-            collector.set_qos_profile(self._qos_profile)
+        qos_profile = collector.qos_profile
+        if qos_profile is None:
+            qos_profile = self._qos_profile
+            collector.set_qos_profile(qos_profile)
 
         callback = partial(observation_callback, collector=collector)
 
@@ -112,7 +114,7 @@ class SubscriptionManager:
             collector.message_type,
             topic,
             callback,
-            qos_profile=collector.qos_profile,
+            qos_profile=qos_profile,
         )
         self._logger.debug(f"Subscribed to {topic} for collector '{name}'")
 
@@ -123,8 +125,10 @@ class SubscriptionManager:
         subscribers = []
 
         for name, collector in sync_collectors.items():
-            if collector.qos_profile is None:
-                collector.set_qos_profile(self._qos_profile)
+            qos_profile = collector.qos_profile
+            if qos_profile is None:
+                qos_profile = self._qos_profile
+                collector.set_qos_profile(qos_profile)
 
             topic = str(self._ns(collector.topic)) if collector.topic[0] != "/" else collector.topic
 
@@ -132,7 +136,7 @@ class SubscriptionManager:
                 self._node,
                 collector.message_type,
                 topic,
-                qos_profile=collector.qos_profile,
+                qos_profile=qos_profile,
             )
             subscribers.append(subscriber)
             self._logger.debug(f"Preparing {topic} for synchronized collector '{name}'")

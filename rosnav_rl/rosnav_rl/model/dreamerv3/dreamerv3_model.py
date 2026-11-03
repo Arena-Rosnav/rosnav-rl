@@ -1,8 +1,9 @@
 import pathlib
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+import gymnasium as gym
 import numpy as np
 import torch
 
@@ -11,6 +12,7 @@ import rosnav_rl.spaces.observation_space.spaces as spaces
 from ...spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
+from ...utils.type_aliases import EncodedObservationDict
 from ...utils.type_aliases.observation import ObservationDict
 from ..dreamerv3 import tools
 from ..model import RL_Model
@@ -35,7 +37,7 @@ if TYPE_CHECKING:
     from .cfg import DreamerV3Cfg
 
 
-class DreamerV3Model(RL_Model):
+class DreamerV3Model(RL_Model[Dreamer, "DreamerV3Cfg"]):
     """DreamerV3 model implementation for reinforcement learning.
 
     This class implements the DreamerV3 architecture for reinforcement learning.
@@ -116,10 +118,12 @@ class DreamerV3Model(RL_Model):
         Note:
             This method sets the internal _model attribute with the created agent.
         """
+        observation_space = self._rl_agent.observation_space
+        assert isinstance(observation_space, gym.spaces.Dict)
         self._model = create_agent(
             self._algorithm_cfg,
             self._rl_agent.action_space,
-            self._rl_agent.observation_space,
+            observation_space,
             self._logger,
             train_dataset,
         )
@@ -156,10 +160,9 @@ class DreamerV3Model(RL_Model):
         prepare_directories(self._algorithm_cfg, self._logdir)
         train_eps, eval_eps = load_episodes(self._algorithm_cfg)
 
-        action_space, observation_space = (
-            self._rl_agent.action_space,
-            self._rl_agent.observation_space,
-        )
+        action_space = self._rl_agent.action_space
+        observation_space = self._rl_agent.observation_space
+        assert isinstance(observation_space, gym.spaces.Dict)
 
         state = prefill_dataset(
             self._algorithm_cfg,
@@ -185,6 +188,7 @@ class DreamerV3Model(RL_Model):
             train_dataset = self._model.dataset
 
         self.load("latest", missing_ok=True)
+        assert self._model is not None
         train(
             self._algorithm_cfg,
             self._model,
@@ -219,6 +223,7 @@ class DreamerV3Model(RL_Model):
         Example:
             >>> model.save("checkpoint_100k")  # Saves to /logdir/checkpoint_100k.pt
         """
+        assert self._model is not None
         items_to_save = {
             "agent_state_dict": self._model.state_dict(),
             "optims_state_dict": tools.recursively_collect_optim_state_dict(self._model),
@@ -249,6 +254,7 @@ class DreamerV3Model(RL_Model):
             if missing_ok:
                 return
             raise FileNotFoundError(f"DreamerV3 checkpoint not found: {checkpoint_path}")
+        assert self._model is not None
         checkpoint = torch.load(checkpoint_path, weights_only=False)
         self._model.load_state_dict(checkpoint["agent_state_dict"])
         tools.recursively_load_optim_state_dict(self._model, checkpoint["optims_state_dict"])
@@ -260,7 +266,8 @@ class DreamerV3Model(RL_Model):
         encoded = self._rl_agent.space_manager.encode_observation(
             {**observation, "is_first": is_first, "is_terminal": False}
         )
-        obs = RenameObsForDreamer._remap(ChannelFirsttoLast._transform(dict(encoded)))
+        obs = RenameObsForDreamer._remap(ChannelFirsttoLast._transform(dict(cast(EncodedObservationDict, encoded))))
+        assert self._model is not None
         batch = {key: np.asarray(value)[np.newaxis] for key, value in obs.items()}
         policy_output, self._policy_state = self._model(batch, np.array([is_first]), self._policy_state, training=False)
         return self._rl_agent.space_manager.decode_action(policy_output["action"][0].cpu().numpy())

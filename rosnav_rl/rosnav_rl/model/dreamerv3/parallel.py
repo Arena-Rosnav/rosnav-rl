@@ -8,7 +8,7 @@ import time
 import traceback
 from collections.abc import Callable, Sequence
 from functools import partial as bind
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import cloudpickle
 
@@ -179,13 +179,16 @@ class Worker:
             of (state, function_result).
         """
 
-        if not state:
-            fn = lambda s, *args, fn=fn, **kwargs: (s, fn(*args, **kwargs))
+        worker_fn: Callable[..., tuple[object, object]]
+        if state:
+            worker_fn = cast("Callable[..., tuple[object, object]]", fn)
+        else:
+            worker_fn = lambda s, *args, fn=fn, **kwargs: (s, fn(*args, **kwargs))
         inits = self.initializers
         self.impl = {
             "process": bind(ProcessPipeWorker, initializers=inits),
             "daemon": bind(ProcessPipeWorker, initializers=inits, daemon=True),
-        }[strategy](fn)
+        }[strategy](worker_fn)
         self.promise = None
 
     def __call__(self, *args: Any, **kwargs: Any) -> Future:
@@ -207,7 +210,8 @@ class Worker:
         Raises:
             Any exception that might have been stored in the previous promise
         """
-        self.promise and self.promise()  # Raise previous exception if any.
+        if self.promise:
+            self.promise()  # Raise previous exception if any.
         self.promise = self.impl(*args, **kwargs)
         return self.promise
 
@@ -258,14 +262,16 @@ class ProcessPipeWorker:
         # Fork is not a thread safe method (see issue #217)
         # but is more user friendly (does not require to wrap the code in
         # a `if __name__ == "__main__":`)
-        forkserver_available = "forkserver" in multiprocessing.get_all_start_methods()
-        start_method = "forkserver" if forkserver_available else "spawn"
-
-        self._context = multiprocessing.get_context(start_method)
+        if "forkserver" in multiprocessing.get_all_start_methods():
+            self._context = multiprocessing.get_context("forkserver")
+        else:
+            self._context = multiprocessing.get_context("spawn")
         self._pipe, pipe = self._context.Pipe()
-        fn = cloudpickle.dumps(fn)
-        initializers = cloudpickle.dumps(initializers)
-        self._process = self._context.Process(target=self._loop, args=(pipe, fn, initializers), daemon=daemon)
+        pickled_fn = cloudpickle.dumps(fn)
+        pickled_initializers = cloudpickle.dumps(initializers)
+        self._process = self._context.Process(
+            target=self._loop, args=(pipe, pickled_fn, pickled_initializers), daemon=daemon
+        )
         self._process.start()
         self._nextid = 0
         self._results = {}
@@ -305,7 +311,9 @@ class ProcessPipeWorker:
             self._process.join(0.1)
             if self._process.exitcode is None:
                 try:
-                    os.kill(self._process.pid, 9)
+                    pid = self._process.pid
+                    if pid is not None:
+                        os.kill(pid, 9)
                     time.sleep(0.1)
                 except Exception:
                     pass
@@ -386,10 +394,10 @@ class ProcessPipeWorker:
         try:
             import cloudpickle
 
-            initializers = cloudpickle.loads(initializers)
-            function = cloudpickle.loads(function)
+            init_fns = cloudpickle.loads(initializers)
+            loop_fn = cloudpickle.loads(function)
 
-            [fn() for fn in initializers]
+            [fn() for fn in init_fns]
             while True:
                 if not pipe.poll(0.1):
                     continue  # Wake up for keyboard interrupts.
@@ -400,7 +408,7 @@ class ProcessPipeWorker:
                     return
                 elif message == Message.RUN:
                     args, kwargs = payload
-                    state, result = function(state, *args, **kwargs)
+                    state, result = loop_fn(state, *args, **kwargs)
                     pipe.send((Message.RESULT, callid, result))
                 else:
                     raise KeyError(f"Invalid message: {message}")

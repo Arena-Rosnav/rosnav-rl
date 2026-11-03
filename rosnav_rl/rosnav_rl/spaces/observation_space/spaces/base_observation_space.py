@@ -37,7 +37,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
     """
 
     name: ClassVar[str]
-    requires: ClassVar[dict[str, Any]] = {}
+    requires: dict[str, Any] = {}
 
     def __init__(
         self,
@@ -63,15 +63,14 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         self._normalizer = self._setup_normalizer(normalize, normalizer, **kwargs)
 
         self._can_normalize = self._normalize and isinstance(self._space, spaces.Box)
-        if self._can_normalize:
+        self._norm_low: np.ndarray | None = None
+        self._norm_high: np.ndarray | None = None
+        if self._normalize and isinstance(self._space, spaces.Box):
             self._norm_low = self._space.low
             self._norm_high = self._space.high
             if np.issubdtype(self._space.dtype, np.integer):
                 self._norm_low = self._norm_low.astype(np.float32)
                 self._norm_high = self._norm_high.astype(np.float32)
-        else:
-            self._norm_low = None
-            self._norm_high = None
 
         # Store configuration for debugging and serialization
         self._config = {
@@ -199,6 +198,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
 
     def _create_null_dict_observation(self) -> dict[str, np.ndarray]:
         """Create a null observation for Dict spaces."""
+        assert isinstance(self._space, spaces.Dict)
         null_dict = {}
         for key, subspace in self._space.spaces.items():
             if isinstance(subspace, spaces.Box):
@@ -229,7 +229,7 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Returns:
             np.ndarray: Normalized array if normalization is enabled, otherwise unchanged.
         """
-        if self._can_normalize:
+        if self._norm_low is not None and self._norm_high is not None:
             if np.issubdtype(observation_arr.dtype, np.integer):
                 observation_arr = observation_arr.astype(np.float32)
             return self._normalizer.normalize(observation_arr, self._norm_low, self._norm_high)

@@ -36,5 +36,5 @@ class A2C_Cfg(SBAlgorithmCfg):
         parameters: A2C-specific algorithm parameters.
     """
 
-    type: Literal["A2C"] = "A2C"
-    parameters: A2C_Algorithm_Cfg
+    type: Literal["A2C"] = "A2C"  # pyright: ignore[reportIncompatibleVariableOverride]
+    parameters: A2C_Algorithm_Cfg  # pyright: ignore[reportIncompatibleVariableOverride]

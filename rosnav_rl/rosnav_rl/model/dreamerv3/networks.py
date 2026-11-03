@@ -1,6 +1,7 @@
 import math
 import re
 from collections.abc import Callable
+from typing import cast
 
 import numpy as np
 import torch
@@ -133,13 +134,15 @@ class RSSM(nn.Module):
             - Separate stat layers for discrete/continuous state spaces
         """
         super().__init__()
+        assert num_actions is not None
+        assert embed is not None
         self._stoch = stoch
         self._deter = deter
         self._hidden = hidden
         self._min_std = min_std
         self._rec_depth = rec_depth
         self._discrete = discrete
-        act = getattr(torch.nn, act)
+        act_cls = getattr(torch.nn, act)
         self._mean_act = mean_act
         self._std_act = std_act
         self._unimix_ratio = unimix_ratio
@@ -156,7 +159,7 @@ class RSSM(nn.Module):
         inp_layers.append(nn.Linear(inp_dim, self._hidden, bias=False))
         if norm:
             inp_layers.append(nn.LayerNorm(self._hidden, eps=1e-03))
-        inp_layers.append(act())
+        inp_layers.append(act_cls())
         self._img_in_layers = nn.Sequential(*inp_layers)
         self._img_in_layers.apply(tools.weight_init)
         self._cell = GRUCell(self._hidden, self._deter, norm=norm)
@@ -167,7 +170,7 @@ class RSSM(nn.Module):
         img_out_layers.append(nn.Linear(inp_dim, self._hidden, bias=False))
         if norm:
             img_out_layers.append(nn.LayerNorm(self._hidden, eps=1e-03))
-        img_out_layers.append(act())
+        img_out_layers.append(act_cls())
         self._img_out_layers = nn.Sequential(*img_out_layers)
         self._img_out_layers.apply(tools.weight_init)
 
@@ -176,7 +179,7 @@ class RSSM(nn.Module):
         obs_out_layers.append(nn.Linear(inp_dim, self._hidden, bias=False))
         if norm:
             obs_out_layers.append(nn.LayerNorm(self._hidden, eps=1e-03))
-        obs_out_layers.append(act())
+        obs_out_layers.append(act_cls())
         self._obs_out_layers = nn.Sequential(*obs_out_layers)
         self._obs_out_layers.apply(tools.weight_init)
 
@@ -258,6 +261,8 @@ class RSSM(nn.Module):
         )
 
         # (batch, time, stoch, discrete_num) -> (batch, time, stoch, discrete_num)
+        assert isinstance(post, dict)
+        assert isinstance(prior, dict)
         post = {k: swap(v) for k, v in post.items()}
         prior = {k: swap(v) for k, v in prior.items()}
         return post, prior
@@ -287,6 +292,7 @@ class RSSM(nn.Module):
         action = swap(action)
         prior = tools.static_scan(self.img_step, [action], state)
         prior = prior[0]
+        assert isinstance(prior, dict)
         prior = {k: swap(v) for k, v in prior.items()}
         return prior
 
@@ -305,6 +311,9 @@ class RSSM(nn.Module):
             mean, std = state["mean"], state["std"]
             dist = tools.ContDist(torchd.independent.Independent(torchd.normal.Normal(mean, std), 1))
         return dist
+
+    def _mode(self, stats: RSSMState) -> torch.Tensor:
+        return cast("Callable[[], torch.Tensor]", self.get_dist(stats).mode)()
 
     def obs_step(
         self,
@@ -340,6 +349,7 @@ class RSSM(nn.Module):
         # overwrite the prev_state only where is_first=True
         elif torch.sum(is_first) > 0:
             is_first = is_first[:, None]
+            assert prev_action is not None
             prev_action *= 1.0 - is_first
             init_state = self.initial(len(is_first))
             for key, val in prev_state.items():
@@ -349,6 +359,7 @@ class RSSM(nn.Module):
                 )
                 prev_state[key] = val * (1.0 - is_first_r) + init_state[key] * is_first_r
 
+        assert prev_action is not None
         prior = self.img_step(prev_state, prev_action)
         x = torch.cat([prior["deter"], embed], -1)
         # (batch_size, prior_deter + embed) -> (batch_size, hidden)
@@ -358,7 +369,7 @@ class RSSM(nn.Module):
         if sample:
             stoch = self.get_dist(stats).sample()
         else:
-            stoch = self.get_dist(stats).mode()
+            stoch = self._mode(stats)
         post = {"stoch": stoch, "deter": prior["deter"], **stats}
         return post, prior
 
@@ -405,7 +416,7 @@ class RSSM(nn.Module):
         if sample:
             stoch = self.get_dist(stats).sample()
         else:
-            stoch = self.get_dist(stats).mode()
+            stoch = self._mode(stats)
         prior = {"stoch": stoch, "deter": deter, **stats}
         return prior
 
@@ -425,8 +436,7 @@ class RSSM(nn.Module):
         """
         x = self._img_out_layers(deter)
         stats = self._suff_stats_layer("ims", x)
-        dist = self.get_dist(stats)
-        return dist.mode()
+        return self._mode(stats)
 
     def _suff_stats_layer(self, name: str, x: torch.Tensor) -> RSSMState:
         """Calculate sufficient statistics for a given layer.
@@ -522,16 +532,20 @@ class RSSM(nn.Module):
                 - rep_loss (Tensor): Clipped representation loss
         """
         kld = torchd.kl.kl_divergence
-        dist = lambda x: self.get_dist(x)
+
+        def dist(x: RSSMState) -> torchd.Distribution:
+            d = self.get_dist(x)
+            return d._dist if isinstance(d, tools.ContDist) else d
+
         sg = lambda x: {k: v.detach() for k, v in x.items()}
 
         rep_loss = value = kld(
-            dist(post) if self._discrete else dist(post)._dist,
-            dist(sg(prior)) if self._discrete else dist(sg(prior))._dist,
+            dist(post),
+            dist(sg(prior)),
         )
         dyn_loss = kld(
-            dist(sg(post)) if self._discrete else dist(sg(post))._dist,
-            dist(prior) if self._discrete else dist(prior)._dist,
+            dist(sg(post)),
+            dist(prior),
         )
         # this is implemented using maximum at the original repo as the gradients are not backpropagated for the out of limits.
         rep_loss = torch.clip(rep_loss, min=free)
@@ -871,7 +885,7 @@ class ConvEncoder(nn.Module):
             layers (nn.Sequential): Sequential container of encoder layers.
         """
         super().__init__()
-        act = getattr(torch.nn, act)
+        act_cls = getattr(torch.nn, act)
         h, w, input_ch = input_shape
         stages = int(np.log2(h) - np.log2(minres))
         in_dim = input_ch
@@ -889,7 +903,7 @@ class ConvEncoder(nn.Module):
             )
             if norm:
                 layers.append(ImgChLayerNorm(out_dim))
-            layers.append(act())
+            layers.append(act_cls())
             in_dim = out_dim
             out_dim *= 2
             h, w = h // 2, w // 2
@@ -969,7 +983,7 @@ class ConvDecoder(nn.Module):
             layers (nn.Sequential): Sequential container of decoder layers
         """
         super().__init__()
-        act = getattr(torch.nn, act)
+        act_cls = getattr(torch.nn, act)
         self._shape = shape
         self._cnn_sigmoid = cnn_sigmoid
         layer_num = int(np.log2(shape[1]) - np.log2(minres))
@@ -984,11 +998,12 @@ class ConvDecoder(nn.Module):
 
         layers = []
         h, w = minres, minres
+        use_act = True
         for i in range(layer_num):
             bias = False
             if i == layer_num - 1:
                 out_dim = self._shape[0]
-                act = False
+                use_act = False
                 bias = True
                 norm = False
 
@@ -1010,8 +1025,8 @@ class ConvDecoder(nn.Module):
             )
             if norm:
                 layers.append(ImgChLayerNorm(out_dim))
-            if act:
-                layers.append(act())
+            if use_act:
+                layers.append(act_cls())
             in_dim = out_dim
             out_dim //= 2
             h, w = h * 2, w * 2
@@ -1109,7 +1124,7 @@ class MLP(nn.Module):
         self._shape = (shape,) if isinstance(shape, int) else shape
         if self._shape is not None and len(self._shape) == 0:
             self._shape = (1,)
-        act = getattr(torch.nn, act)
+        act_cls = getattr(torch.nn, act)
         self._dist = dist
         self._std = std if isinstance(std, str) else torch.tensor((std,), device=device)
         self._min_std = min_std
@@ -1125,7 +1140,7 @@ class MLP(nn.Module):
             self.layers.add_module(f"{name}_linear{i}", nn.Linear(inp_dim, units, bias=False))
             if norm:
                 self.layers.add_module(f"{name}_norm{i}", nn.LayerNorm(units, eps=1e-03))
-            self.layers.add_module(f"{name}_act{i}", act())
+            self.layers.add_module(f"{name}_act{i}", act_cls())
             if i == 0:
                 inp_dim = units
         self.layers.apply(tools.weight_init)
@@ -1133,20 +1148,20 @@ class MLP(nn.Module):
         if isinstance(self._shape, dict):
             self.mean_layer = nn.ModuleDict()
             for name, shape in self._shape.items():
-                self.mean_layer[name] = nn.Linear(inp_dim, np.prod(shape))
+                self.mean_layer[name] = nn.Linear(inp_dim, int(np.prod(shape)))
             self.mean_layer.apply(tools.uniform_weight_init(outscale))
             if self._std == "learned":
                 assert dist in ("tanh_normal", "normal", "trunc_normal", "huber"), dist
                 self.std_layer = nn.ModuleDict()
                 for name, shape in self._shape.items():
-                    self.std_layer[name] = nn.Linear(inp_dim, np.prod(shape))
+                    self.std_layer[name] = nn.Linear(inp_dim, int(np.prod(shape)))
                 self.std_layer.apply(tools.uniform_weight_init(outscale))
         elif self._shape is not None:
-            self.mean_layer = nn.Linear(inp_dim, np.prod(self._shape))
+            self.mean_layer = nn.Linear(inp_dim, int(np.prod(self._shape)))
             self.mean_layer.apply(tools.uniform_weight_init(outscale))
             if self._std == "learned":
                 assert dist in ("tanh_normal", "normal", "trunc_normal", "huber"), dist
-                self.std_layer = nn.Linear(units, np.prod(self._shape))
+                self.std_layer = nn.Linear(units, int(np.prod(self._shape)))
                 self.std_layer.apply(tools.uniform_weight_init(outscale))
 
     def forward(
@@ -1160,12 +1175,15 @@ class MLP(nn.Module):
         if self._shape is None:
             return out
         if isinstance(self._shape, dict):
+            assert isinstance(self.mean_layer, nn.ModuleDict)
             dists = {}
             for name, shape in self._shape.items():
                 mean = self.mean_layer[name](out)
                 if self._std == "learned":
+                    assert isinstance(self.std_layer, nn.ModuleDict)
                     std = self.std_layer[name](out)
                 else:
+                    assert not isinstance(self._std, str)
                     std = self._std
                 dists.update({name: self.dist(self._dist, mean, std, shape)})
             return dists
@@ -1174,6 +1192,7 @@ class MLP(nn.Module):
             if self._std == "learned":
                 std = self.std_layer(out)
             else:
+                assert not isinstance(self._std, str)
                 std = self._std
             return self.dist(self._dist, mean, std, self._shape)
 
@@ -1187,28 +1206,28 @@ class MLP(nn.Module):
         if dist == "tanh_normal":
             mean = torch.tanh(mean)
             std = F.softplus(std) + self._min_std
-            dist = torchd.normal.Normal(mean, std)
-            dist = torchd.transformed_distribution.TransformedDistribution(dist, tools.TanhBijector())
-            dist = torchd.independent.Independent(dist, 1)
-            dist = tools.SampleDist(dist)
+            normal = torchd.normal.Normal(mean, std)
+            transformed = torchd.transformed_distribution.TransformedDistribution(normal, tools.TanhBijector())
+            return tools.SampleDist(torchd.independent.Independent(transformed, 1))
         elif dist == "normal":
             std = (self._max_std - self._min_std) * torch.sigmoid(std + 2.0) + self._min_std
-            dist = torchd.normal.Normal(torch.tanh(mean), std)
-            dist = tools.ContDist(torchd.independent.Independent(dist, 1), absmax=self._absmax)
+            normal = torchd.normal.Normal(torch.tanh(mean), std)
+            return tools.ContDist(torchd.independent.Independent(normal, 1), absmax=self._absmax)
         elif dist == "normal_std_fixed":
-            dist = torchd.normal.Normal(mean, self._std)
-            dist = tools.ContDist(torchd.independent.Independent(dist, 1), absmax=self._absmax)
+            assert not isinstance(self._std, str)
+            normal = torchd.normal.Normal(mean, self._std)
+            return tools.ContDist(torchd.independent.Independent(normal, 1), absmax=self._absmax)
         elif dist == "trunc_normal":
             mean = torch.tanh(mean)
             std = 2 * torch.sigmoid(std / 2) + self._min_std
-            dist = tools.SafeTruncatedNormal(mean, std, -1, 1)
-            dist = tools.ContDist(torchd.independent.Independent(dist, 1), absmax=self._absmax)
+            trunc = tools.SafeTruncatedNormal(mean, std, -1, 1)
+            return tools.ContDist(torchd.independent.Independent(trunc, 1), absmax=self._absmax)
         elif dist == "onehot":
-            dist = tools.OneHotDist(mean, unimix_ratio=self._unimix_ratio)
+            return tools.OneHotDist(mean, unimix_ratio=self._unimix_ratio)
         elif dist == "onehot_gumble":
-            dist = tools.ContDist(torchd.gumbel.Gumbel(mean, 1 / self._temp), absmax=self._absmax)
+            return tools.ContDist(torchd.gumbel.Gumbel(mean, 1 / self._temp), absmax=self._absmax)
         elif dist == "huber":
-            dist = tools.ContDist(
+            return tools.ContDist(
                 torchd.independent.Independent(
                     tools.UnnormalizedHuber(mean, std, 1.0),
                     len(shape),
@@ -1216,14 +1235,13 @@ class MLP(nn.Module):
                 absmax=self._absmax,
             )
         elif dist == "binary":
-            dist = tools.Bernoulli(torchd.independent.Independent(torchd.bernoulli.Bernoulli(logits=mean), len(shape)))
+            return tools.Bernoulli(torchd.independent.Independent(torchd.bernoulli.Bernoulli(logits=mean), len(shape)))
         elif dist == "symlog_disc":
-            dist = tools.DiscDist(logits=mean, device=self._device)
+            return tools.DiscDist(logits=mean, device=self._device)
         elif dist == "symlog_mse":
-            dist = tools.SymlogDist(mean)
+            return tools.SymlogDist(mean)
         else:
             raise NotImplementedError(dist)
-        return dist
 
 
 class GRUCell(nn.Module):
@@ -1286,13 +1304,13 @@ class GRUCell(nn.Module):
             - Update gate with sigmoid activation and bias
             - Output mixing via interpolation between candidate and previous state
         """
-        state = state[0]  # Keras wraps the state in a list.
-        parts = self.layers(torch.cat([inputs, state], -1))
+        prev = state[0]  # Keras wraps the state in a list.
+        parts = self.layers(torch.cat([inputs, prev], -1))
         reset, cand, update = torch.split(parts, [self._size] * 3, -1)
         reset = torch.sigmoid(reset)
         cand = self._act(reset * cand)
         update = torch.sigmoid(update + self._update_bias)
-        output = update * cand + (1 - update) * state
+        output = update * cand + (1 - update) * prev
         return output, [output]
 
 
@@ -1322,14 +1340,14 @@ class Conv2dSamePad(torch.nn.Conv2d):
     def calc_same_pad(self, i: int, k: int, s: int, d: int) -> int:
         return max((math.ceil(i / s) - 1) * s + (k - 1) * d + 1 - i, 0)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
         """Performs forward pass through the convolutional layer with 'SAME' padding.
 
         This method ensures that the output has the same spatial dimensions as the input by
         automatically calculating and applying the necessary padding.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width)
+            input (torch.Tensor): Input tensor of shape (batch_size, channels, height, width)
 
         Returns:
             torch.Tensor: Output tensor after convolution with same padding applied
@@ -1339,15 +1357,15 @@ class Conv2dSamePad(torch.nn.Conv2d):
             to the 'SAME' padding scheme from TensorFlow, ensuring output dimensions match
             input dimensions when accounting for stride and dilation.
         """
-        ih, iw = x.size()[-2:]
+        ih, iw = input.size()[-2:]
         pad_h = self.calc_same_pad(i=ih, k=self.kernel_size[0], s=self.stride[0], d=self.dilation[0])
         pad_w = self.calc_same_pad(i=iw, k=self.kernel_size[1], s=self.stride[1], d=self.dilation[1])
 
         if pad_h > 0 or pad_w > 0:
-            x = F.pad(x, [pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2])
+            input = F.pad(input, [pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2])
 
         ret = F.conv2d(
-            x,
+            input,
             self.weight,
             self.bias,
             self.stride,

@@ -474,7 +474,7 @@ class TrajectoryStateSpace(BaseObservationSpace):
         else:
             speed_consistency = 1.0
 
-        return (normalized_path_length, normalized_curvature, speed_consistency)
+        return (float(normalized_path_length), float(normalized_curvature), float(speed_consistency))
 
     def encode_observation(
         self, robot_pose: Pose2D, last_action: RobotActionVector, *args: Any, **kwargs: Any

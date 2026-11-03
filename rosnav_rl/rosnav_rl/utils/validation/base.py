@@ -5,37 +5,41 @@ This module contains the core validation infrastructure that can be extended
 for specific validation strategies.
 """
 
+from collections.abc import Mapping
 from difflib import get_close_matches
-from typing import Annotated, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 import numpy as np
 
 from .exceptions import MissingObservationError
 from .protocols import RequiresProtocol
 
-try:
-    from ...observations.utils.types import DataSpec
-except ImportError:
-    # Fallback for direct execution or different import contexts
+if TYPE_CHECKING:
+    from rosnav_rl.observations.utils.types import DataSpec
+else:
     try:
-        from rosnav_rl.observations.utils.types import DataSpec
+        from ...observations.utils.types import DataSpec
     except ImportError:
-        # Create a minimal DataSpec for standalone usage
-        class DataSpec:
-            source: str | None = None
-            example: str | None = None
+        # Fallback for direct execution or different import contexts
+        try:
+            from rosnav_rl.observations.utils.types import DataSpec
+        except ImportError:
+            # Create a minimal DataSpec for standalone usage
+            class DataSpec:
+                source: str | None = None
+                example: str | None = None
 
-            def __init__(
-                self,
-                description: str | None = None,
-                shape: str | None = None,
-                units: str | None = None,
-                constraints: str | None = None,
-            ):
-                self.description = description
-                self.shape = shape
-                self.units = units
-                self.constraints = constraints
+                def __init__(
+                    self,
+                    description: str | None = None,
+                    shape: str | None = None,
+                    units: str | None = None,
+                    constraints: str | None = None,
+                ):
+                    self.description = description
+                    self.shape = shape
+                    self.units = units
+                    self.constraints = constraints
 
 
 class BaseSchemaValidator:
@@ -49,7 +53,7 @@ class BaseSchemaValidator:
     @staticmethod
     def validate_requirements(
         observations: dict[str, Any],
-        components: dict[str, RequiresProtocol],
+        components: Mapping[str, RequiresProtocol],
         component_type: str = "component",
     ) -> None:
         """

@@ -17,7 +17,7 @@ Details:
 
 from collections.abc import Callable
 from copy import deepcopy
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypedDict, cast
 
 import gymnasium as gym
 import torch
@@ -37,7 +37,7 @@ from rosnav_rl.spaces.observation_space.spaces.environment import (
 )
 from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
 
-from ..base_extractor import RosnavBaseExtractor, TensorDict
+from ..base_extractor import RosnavBaseExtractor, TensorDict, space_shape
 from .bottleneck import Bottleneck
 from .utils import conv1x1
 
@@ -51,6 +51,13 @@ __all__ = [
     "DRL_VO_ROSNAV_EXTRACTOR",
     "DRL_VO_ROSNAV_SCALAR_EXTRACTOR",
 ]
+
+
+class _ExtractorInputs(TypedDict):
+    ped_map: torch.Tensor | None
+    scan: torch.Tensor
+    goal: torch.Tensor
+    last_action: torch.Tensor | None
 
 
 class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
@@ -161,19 +168,19 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         Returns:
             None
         """
-        self._feature_map_size = self._observation_space[StackedLaserMapSpace.name].shape[-1]
-        self._scan_map_size = self._observation_space[StackedLaserMapSpace.name].shape[-1]
+        self._feature_map_size = space_shape(self._observation_space[StackedLaserMapSpace.name])[-1]
+        self._scan_map_size = space_shape(self._observation_space[StackedLaserMapSpace.name])[-1]
 
         self._goal_size = 2
 
         self._last_action_size = 0
         if LastActionSpace.name in self._observation_space.spaces:
-            self._last_action_size = self._observation_space[LastActionSpace.name].shape[-1]
+            self._last_action_size = space_shape(self._observation_space[LastActionSpace.name])[-1]
 
         self._ped_map_size = 0
         for obs in self._observation_space:
             if "pedestrian" in obs.lower():
-                self._ped_map_size += self._observation_space[obs].shape[-1]
+                self._ped_map_size += space_shape(self._observation_space[obs])[-1]
 
     def _setup_network(self, inplanes: int = 64):
         """
@@ -344,7 +351,7 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         if self._zero_init_residual:
             for m in self.modules():
                 if isinstance(m, Bottleneck):
-                    nn.init.constant_(m.bn3.weight, 0)
+                    nn.init.constant_(cast(nn.BatchNorm2d, m.bn3).weight, 0)
 
     def _make_layer(
         self,
@@ -464,13 +471,17 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        combination = (fusion_out, goal) if self._last_action_size == 0 else (fusion_out, goal, last_action)
+        combination = (
+            (fusion_out, goal)
+            if self._last_action_size == 0 or last_action is None
+            else (fusion_out, goal, last_action)
+        )
         fc_in = torch.cat(combination, dim=1)
         x = self.linear_fc(fc_in)
 
         return x
 
-    def _get_input(self, observations: TensorDict) -> dict[str, torch.Tensor | None]:
+    def _get_input(self, observations: TensorDict) -> _ExtractorInputs:
         laser_map = observations[StackedLaserMapSpace.name]  # (num_envs, 1, 80, 80)
 
         goal_key = (
@@ -491,12 +502,12 @@ class RESNET_MID_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         if LastActionSpace.name in self._observation_space.spaces:
             last_action = observations[LastActionSpace.name]  # (num_envs, 3)
 
-        return {
-            "ped_map": ped_map,
-            "scan": laser_map,
-            "goal": dist_angle_to_goal,
-            "last_action": last_action,
-        }
+        return _ExtractorInputs(
+            ped_map=ped_map,
+            scan=laser_map,
+            goal=dist_angle_to_goal,
+            last_action=last_action,
+        )
 
     def forward(self, observations: TensorDict) -> torch.Tensor:
         """
@@ -818,7 +829,11 @@ class RESNET_MID_FUSION_EXTRACTOR_2(RESNET_MID_FUSION_EXTRACTOR_1):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        combination = (fusion_out, goal) if self._last_action_size == 0 else (fusion_out, goal, last_action)
+        combination = (
+            (fusion_out, goal)
+            if self._last_action_size == 0 or last_action is None
+            else (fusion_out, goal, last_action)
+        )
         fc_in = torch.cat(combination, dim=1)
         x = self.linear_fc(fc_in)
 
@@ -876,10 +891,10 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
         LastActionSpace,
     ]
 
-    def _setup_network(self):
+    def _setup_network(self, inplanes: int = 64):
         if len(self._layers) < 4:
             self._layers.append(1)
-        super()._setup_network()
+        super()._setup_network(inplanes)
         self.conv1 = nn.Conv2d(
             self.num_pedestrian_feature_maps + 1,
             64,
@@ -959,7 +974,11 @@ class RESNET_MID_FUSION_EXTRACTOR_5(RESNET_MID_FUSION_EXTRACTOR_3):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        combination = (fusion_out, goal) if self._last_action_size == 0 else (fusion_out, goal, last_action)
+        combination = (
+            (fusion_out, goal)
+            if self._last_action_size == 0 or last_action is None
+            else (fusion_out, goal, last_action)
+        )
         fc_in = torch.cat(combination, dim=1)
         x = self.linear_fc(fc_in)
 
@@ -994,8 +1013,7 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         LastActionSpace,
     ]
 
-    def _setup_network(self):
-        inplanes = 128
+    def _setup_network(self, inplanes: int = 128):
         super()._setup_network(inplanes=inplanes)
         self.conv1 = nn.Conv2d(
             self.num_pedestrian_feature_maps + 1,
@@ -1062,7 +1080,11 @@ class RESNET_MID_FUSION_EXTRACTOR_6(RESNET_MID_FUSION_EXTRACTOR_3):
         # last_action_out = torch.flatten(last_action)
         ###### End of goal net #######
         # Combine
-        combination = (fusion_out, goal) if self._last_action_size == 0 else (fusion_out, goal, last_action)
+        combination = (
+            (fusion_out, goal)
+            if self._last_action_size == 0 or last_action is None
+            else (fusion_out, goal, last_action)
+        )
         fc_in = torch.cat(combination, dim=1)
         x = self.linear_fc(fc_in)
 
@@ -1330,7 +1352,11 @@ class DRL_VO_NAV_EXTRACTOR_TEST(DRL_VO_NAV_EXTRACTOR):
         # goal_out = goal
         ###### End of goal net #######
         # Combine
-        combination = (fusion_out, goal) if self._last_action_size == 0 else (fusion_out, goal, last_action)
+        combination = (
+            (fusion_out, goal)
+            if self._last_action_size == 0 or last_action is None
+            else (fusion_out, goal, last_action)
+        )
         fc_in = torch.cat(combination, dim=1)
         x = self.linear_fc(fc_in)
 
@@ -1525,11 +1551,11 @@ class DRL_VO_ROSNAV_SCALAR_EXTRACTOR(DRL_VO_ROSNAV_EXTRACTOR):
         if self._last_action_size == 0:
             raise ValueError(f"{type(self).__name__} needs {LastActionSpace.name} to carry its scalar spaces")
         self._scalar_keys = [key for key in self.SCALAR_SPACES if key in self._observation_space.spaces]
-        self._last_action_size += sum(self._observation_space[key].shape[-1] for key in self._scalar_keys)
+        self._last_action_size += sum(space_shape(self._observation_space[key])[-1] for key in self._scalar_keys)
 
-    def _get_input(self, observations: TensorDict) -> dict[str, torch.Tensor | None]:
+    def _get_input(self, observations: TensorDict) -> _ExtractorInputs:
         inputs = super()._get_input(observations)
-        inputs["last_action"] = torch.cat(
-            [inputs["last_action"], *(observations[key] for key in self._scalar_keys)], dim=1
-        )
+        last_action = inputs["last_action"]
+        assert last_action is not None
+        inputs["last_action"] = torch.cat([last_action, *(observations[key] for key in self._scalar_keys)], dim=1)
         return inputs

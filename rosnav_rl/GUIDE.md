@@ -316,7 +316,7 @@ When training with Arena, the action space, observation, and environment specs a
 
 ```python
 @ModelFactory.register(SupportedRLFrameworks.STABLE_BASELINES3)
-class StableBaselinesModel(RL_Model): ...
+class StableBaselinesModel(RL_Model[_SupportedStableBaselinesModels, "sb3_cfg.SBAlgorithmCfg"]): ...
 ```
 
 Creation is fully delegated — no `if/elif` branching:

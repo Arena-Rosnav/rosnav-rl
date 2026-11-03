@@ -33,5 +33,5 @@ class PPO_Cfg(SBAlgorithmCfg):
         parameters: PPO-specific algorithm parameters.
     """
 
-    type: Literal["PPO"] = "PPO"
-    parameters: PPO_Algorithm_Cfg
+    type: Literal["PPO"] = "PPO"  # pyright: ignore[reportIncompatibleVariableOverride]
+    parameters: PPO_Algorithm_Cfg  # pyright: ignore[reportIncompatibleVariableOverride]

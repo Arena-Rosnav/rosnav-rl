@@ -313,7 +313,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
 
         # Higher constraint when clearances are low
         constraint = 1.0 - (min_clearance * 0.6 + avg_clearance * 0.4)
-        return np.clip(constraint, 0.0, 1.0)
+        return float(np.clip(constraint, 0.0, 1.0))
 
     def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> SpatialAwarenessVector:
         """Encode comprehensive spatial awareness with directional clearance and corridor detection.

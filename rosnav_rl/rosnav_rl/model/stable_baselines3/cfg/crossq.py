@@ -4,6 +4,7 @@ from typing import Literal
 from sb3_contrib.crossq import CrossQ
 
 from .base import OffPolicyParameters, SBAlgorithmCfg
+from .lr_schedule import LearningRateSchedulerCfg
 
 
 class CrossQ_Algorithm_Cfg(OffPolicyParameters):
@@ -23,7 +24,7 @@ class CrossQ_Algorithm_Cfg(OffPolicyParameters):
     algorithm_name = CrossQ.__name__
 
     # CrossQ defaults
-    learning_rate: float | Callable[[float], float] = 1e-4
+    learning_rate: float | Callable[[float], float] | LearningRateSchedulerCfg = 1e-4
     batch_size: int = 256
     buffer_size: int = 1_000_000
     learning_starts: int = 100
@@ -45,5 +46,5 @@ class CrossQ_Cfg(SBAlgorithmCfg):
         parameters: CrossQ-specific algorithm parameters.
     """
 
-    type: Literal["CrossQ"] = "CrossQ"
-    parameters: CrossQ_Algorithm_Cfg
+    type: Literal["CrossQ"] = "CrossQ"  # pyright: ignore[reportIncompatibleVariableOverride]
+    parameters: CrossQ_Algorithm_Cfg  # pyright: ignore[reportIncompatibleVariableOverride]

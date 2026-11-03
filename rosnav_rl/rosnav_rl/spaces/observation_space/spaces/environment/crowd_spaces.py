@@ -32,4 +32,5 @@ class CrowdTimeToContactSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(self, crowd_ttc: CrowdTimeToContact, *args: Any, **kwargs: Any) -> CrowdTimeToContact:
+        assert isinstance(self._space, spaces.Box)
         return np.clip(np.asarray(crowd_ttc, dtype=np.float32), self._space.low, self._space.high)

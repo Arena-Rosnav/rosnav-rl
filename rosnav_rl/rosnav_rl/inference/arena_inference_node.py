@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import rclpy
+import rclpy.time
 import tf2_ros
 import yaml
 from arena_robots.lockstep_beat import LockstepBeat
@@ -211,6 +212,8 @@ class ArenaInferenceNode:
         self._publish_cmd_vel(float(cmd[0]), float(cmd[1]), float(cmd[2]))
 
     def _lookup_robot_xy(self) -> tuple[float, float] | None:
+        if self._goal is None:
+            return None
         try:
             tf = self._tf_buffer.lookup_transform(
                 self._goal.header.frame_id,
@@ -225,6 +228,9 @@ class ArenaInferenceNode:
         sx, sy = straight_line_subgoal(
             robot_xy, goal_xy, self._last_speed, self.min_lookahead, self.max_lookahead, self.lookahead_time
         )
+
+        if self._goal is None:
+            return
 
         msg = PoseStamped()
         msg.header.frame_id = self._goal.header.frame_id

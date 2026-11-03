@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import gymnasium
 import numpy as np
@@ -26,7 +26,7 @@ class Random(nn.Module):
                     (
                         int(self._act_space.n)
                         if isinstance(self._act_space, gymnasium.spaces.Discrete)
-                        else self._act_space.shape[0]
+                        else cast(gymnasium.spaces.Box, self._act_space).shape[0]
                     ),
                     device=self._config.general.device,
                 ).repeat(feat.shape[0], 1)
@@ -34,8 +34,12 @@ class Random(nn.Module):
         else:
             return torchd.independent.Independent(
                 torchd.uniform.Uniform(
-                    torch.tensor(self._act_space.low, device=self._config.general.device).repeat(feat.shape[0], 1),
-                    torch.tensor(self._act_space.high, device=self._config.general.device).repeat(feat.shape[0], 1),
+                    torch.tensor(
+                        cast(gymnasium.spaces.Box, self._act_space).low, device=self._config.general.device
+                    ).repeat(feat.shape[0], 1),
+                    torch.tensor(
+                        cast(gymnasium.spaces.Box, self._act_space).high, device=self._config.general.device
+                    ).repeat(feat.shape[0], 1),
                 ),
                 1,
             )
@@ -80,7 +84,9 @@ class Plan2Explore(nn.Module):
             + (
                 int(act_space.n)
                 if isinstance(act_space, gymnasium.spaces.Discrete)
-                else (act_space.shape[0] if config.model.exploration.disag_action_cond else 0)
+                else (
+                    cast(gymnasium.spaces.Box, act_space).shape[0] if config.model.exploration.disag_action_cond else 0
+                )
             ),  # pytorch version
             shape=size,
             layers=config.model.exploration.disag_layers,

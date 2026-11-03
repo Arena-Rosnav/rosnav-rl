@@ -10,13 +10,16 @@ from __future__ import annotations
 import math
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
 from warnings import warn
 
 import arena_people_msgs.msg as arena_people_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
 import rclpy
+import rclpy.duration
+import rclpy.time
 import tf2_ros
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import euler_from_quaternion
@@ -77,11 +80,12 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
         **kwargs: Any,
     ):
         super().__init__(name, **kwargs)
-        self._node = node
-        if not self._node:
+        if not node:
             raise ValueError("RobotPoseTFGenerator requires a ROS 2 node.")
         if not source_frame:
             raise ValueError("RobotPoseTFGenerator requires a non-empty source_frame.")
+
+        self._node = node
 
         self._tf_buffer = tf2_ros.Buffer(node=self._node)
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self._node)
@@ -817,7 +821,7 @@ class PedestrianTypeGenerator(Generator[PedestrianTypeArray]):
 
         # Use group_id as the unique identifier for each pedestrian
         try:
-            group_id_idx = people_data.people[0].tagnames.index("group_id")
+            group_id_idx = cast(Sequence[Any], people_data.people)[0].tagnames.index("group_id")
             current_ped_ids = [p.tags[group_id_idx] for p in people_data.people]
         except (ValueError, AttributeError, IndexError):
             warn("Pedestrian group ID not found in the data. Returning empty array.", stacklevel=2)
@@ -894,7 +898,7 @@ class PedestrianSocialStateGenerator(Generator[PedestrianSocialStates]):
         current_ped_ids = [p.name for p in people_data.people]
         num_peds = len(people_data.people)
         try:
-            behavior_idx = people_data.people[0].tagnames.index("behavior")
+            behavior_idx = cast(Sequence[Any], people_data.people)[0].tagnames.index("behavior")
             self._ped_social_states_buffer = np.empty(num_peds, dtype=int)
             for i, data in enumerate(people_data.people):
                 self._ped_social_states_buffer[i] = int(data.tags[behavior_idx])

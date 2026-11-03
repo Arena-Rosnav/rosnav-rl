@@ -85,7 +85,7 @@ class SB3TrialPruner(TrialPrunerBase, BaseCallback):
             Metric value, or ``None`` if unavailable.
         """
         try:
-            model = self.model  # type: ignore[union-attr]
+            model = self.model
         except AttributeError:
             return None
 
@@ -95,7 +95,7 @@ class SB3TrialPruner(TrialPrunerBase, BaseCallback):
         logger_key = _SB3_METRIC_MAP.get(self._metric, self._metric)
 
         try:
-            name_to_value = model.logger.name_to_value  # type: ignore[union-attr]
+            name_to_value = model.logger.name_to_value
             for prefix in ("rollout/", "train/", "eval/", ""):
                 full_key = f"{prefix}{logger_key}"
                 if full_key in name_to_value:

@@ -78,7 +78,7 @@ class ObservationFactory:
                 continue
             self._collectors[name] = obj
 
-            key = _ros_msg_type_string(obj.message_type)
+            key = _ros_msg_type_string(obj.message_type)  # pyright: ignore[reportGeneralTypeIssues]
             if key in self._msg_type_to_collector:
                 # Record the conflict but don't clobber the existing entry
                 self._msg_type_conflicts.setdefault(key, [self._msg_type_to_collector[key].__name__])

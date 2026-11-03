@@ -8,7 +8,7 @@ The `StableBaselinesPolicyDescription` class serves as an abstract base class fo
 
 ## Implementing a Custom Policy
 
-To create a custom policy, extend the `StableBaselinesPolicyDescription` class and implement all required abstract properties:
+To create a custom policy, extend the `StableBaselinesPolicyDescription` class and set all required class attributes:
 
 ```python
 @AgentFactory.register("CustomAgent")

@@ -8,7 +8,7 @@ import pathlib
 import random
 import time
 from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn, SupportsInt, cast
 
 import numpy as np
 import torch
@@ -110,7 +110,7 @@ class Logger:
         self._logdir = logdir
         self._writer = SummaryWriter(log_dir=str(logdir), max_queue=1000)
         self._last_step = None
-        self._last_time = None
+        self._last_time = 0.0
         self._scalars = {}
         self._images = {}
         self._videos = {}
@@ -257,7 +257,8 @@ _State = tuple[int, int, np.ndarray, np.ndarray, list[dict[str, np.ndarray] | No
 _Episode = dict[str, np.ndarray | list[np.ndarray]]
 _Cache = collections.OrderedDict[str, _Episode]
 _SampleShape = torch.Size | list[int] | tuple[int, ...]
-_ScanState = dict[str, torch.Tensor] | Sequence[dict[str, torch.Tensor] | torch.Tensor | None]
+_ScanOutput = dict[str, torch.Tensor] | Sequence[dict[str, torch.Tensor] | torch.Tensor]
+_ScanState = _ScanOutput | Sequence[dict[str, torch.Tensor] | torch.Tensor | None]
 
 
 def simulate(
@@ -319,6 +320,10 @@ def simulate(
         _pause = None
     gathered = envs[0].lockstep
 
+    obs: list[dict[str, np.ndarray] | None]
+    reward: list[float]
+    agent_state: Any
+
     # initialize or unpack simulation state
     if state is None:
         step, episode = 0, 0
@@ -326,9 +331,14 @@ def simulate(
         length = np.zeros(len(envs), np.int32)
         obs = [None] * len(envs)
         agent_state = None
-        reward = [0] * len(envs)
+        reward = [0.0] * len(envs)
     else:
         step, episode, done, length, obs, agent_state, reward = state
+    eval_scores: list[float] = []
+    eval_lengths: list[int] = []
+    eval_successes: list[int] = []
+    eval_done = False
+    video = None
     while (steps and step < steps) or (episodes and episode < episodes):
         if first_iter:
             first_iter = False
@@ -339,8 +349,7 @@ def simulate(
             results = [envs[i].reset() for i in indices]
             results = [r() for r in results]
             for index, result in zip(indices, results, strict=True):
-                t = result.copy()
-                t = {k: convert(v) for k, v in t.items()}
+                t: dict[str, ArrayLike] = {k: convert(v) for k, v in result.items()}
                 # action will be added to transition in add_to_cache
                 t["reward"] = 0.0
                 t["discount"] = 1.0
@@ -349,16 +358,18 @@ def simulate(
                 # replace obs with done by initial state
                 obs[index] = result
         # step agents
-        obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
+        current_obs = [_require_observation(o) for o in obs]
+        batched_obs = {k: np.stack([o[k] for o in current_obs]) for k in current_obs[0] if "log_" not in k}
         if _pause is not None:
             _pause(True)
-        action, agent_state = agent(obs, done, agent_state)
+        agent_action, agent_state = agent(batched_obs, done, agent_state)
         if _pause is not None:
             _pause(False)
-        if isinstance(action, dict):
-            action = [{k: np.array(action[k][i].detach().cpu()) for k in action} for i in range(len(envs))]
+        action: list[dict[str, np.ndarray]] | np.ndarray
+        if isinstance(agent_action, dict):
+            action = [{k: np.array(agent_action[k][i].detach().cpu()) for k in agent_action} for i in range(len(envs))]
         else:
-            action = np.array(action)
+            action = np.array(agent_action)
         assert len(action) == len(envs)
         # step envs
         if gathered:
@@ -367,10 +378,10 @@ def simulate(
             envs[0].step_sim()()
         results = [e.step(a) for e, a in zip(envs, action, strict=True)]
         results = [r() for r in results]
-        obs, reward, done = zip(*[p[:3] for p in results], strict=True)
-        obs = list(obs)
-        reward = list(reward)
-        done = np.stack(done)
+        step_obs, step_reward, step_done = zip(*[p[:3] for p in results], strict=True)
+        obs = [o for o in step_obs]
+        reward = [float(x) for x in step_reward]
+        done = np.stack(step_done)
         episode += int(done.sum())
         length += 1
         step += len(envs)
@@ -379,17 +390,16 @@ def simulate(
         _done_successes: dict[str, int] = {}
         for a, result, env in zip(action, results, envs, strict=True):
             o, r, d, info = result
-            o = {k: convert(v) for k, v in o.items()}
-            transition = o.copy()
+            transition: dict[str, ArrayLike] = {k: convert(v) for k, v in o.items()}
             if isinstance(a, dict):
                 transition.update(a)
             else:
                 transition["action"] = a
-            transition["reward"] = r
-            transition["discount"] = info.get("discount", np.array(1 - float(d)))
+            transition["reward"] = float(r)
+            transition["discount"] = cast("ArrayLike", info.get("discount", np.array(1 - float(d))))
             add_to_cache(cache, env.id, transition)
             if d:
-                _done_successes[env.id] = int(info.get("is_success", 0))
+                _done_successes[env.id] = int(cast("SupportsInt", info.get("is_success", 0)))
 
         if done.any():
             indices = [index for index, d in enumerate(done) if d]
@@ -417,11 +427,6 @@ def simulate(
                     logger.scalar("train_return", score)
                     logger.scalar("train_length", ep_length)
                 else:
-                    if "eval_lengths" not in locals():
-                        eval_lengths = []
-                        eval_scores = []
-                        eval_successes = []
-                        eval_done = False
                     # start counting scores for evaluation
                     eval_scores.append(score)
                     eval_lengths.append(ep_length)
@@ -454,6 +459,12 @@ def simulate(
     return (step - steps, episode - episodes, done, length, obs, agent_state, reward)
 
 
+def _require_observation(obs: dict[str, np.ndarray] | None) -> dict[str, np.ndarray]:
+    if obs is None:
+        raise ValueError("environment has no observation before its first reset")
+    return obs
+
+
 def add_to_cache(cache: dict[str, _Episode], id: str, transition: Mapping[str, ArrayLike]):
     """Add a transition to a cache dictionary using an ID as key.
 
@@ -475,13 +486,14 @@ def add_to_cache(cache: dict[str, _Episode], id: str, transition: Mapping[str, A
         for key, val in transition.items():
             cache[id][key] = [convert(val)]
     else:
+        episode = cast("dict[str, list[np.ndarray]]", cache[id])
         for key, val in transition.items():
-            if key not in cache[id]:
+            if key not in episode:
                 # fill missing data(action, etc.) at second time
-                cache[id][key] = [convert(0 * val)]
-                cache[id][key].append(convert(val))
+                episode[key] = [convert(0 * np.asarray(val))]
+                episode[key].append(convert(val))
             else:
-                cache[id][key].append(convert(val))
+                episode[key].append(convert(val))
 
 
 def erase_over_episodes(cache: dict[str, _Episode], dataset_size: int | None) -> int:
@@ -582,7 +594,7 @@ def save_episodes(directory: str | pathlib.Path, episodes: Mapping[str, _Episode
         length = len(episode["reward"])
         filename = directory / f"{filename}-{length}.npz"
         with io.BytesIO() as f1:
-            np.savez_compressed(f1, **episode)
+            np.savez_compressed(f1, **episode)  # pyright: ignore[reportArgumentType]
             f1.seek(0)
             with filename.open("wb") as f2:
                 f2.write(f1.read())
@@ -590,7 +602,7 @@ def save_episodes(directory: str | pathlib.Path, episodes: Mapping[str, _Episode
 
 
 def from_generator(
-    generator: Generator[_Episode, None, None], batch_size: int
+    generator: Generator[dict[str, np.ndarray], None, None], batch_size: int
 ) -> Generator[dict[str, np.ndarray], None, None]:
     """Convert a generator of dictionaries into a generator of batched dictionaries.
 
@@ -621,7 +633,9 @@ def from_generator(
         yield data
 
 
-def sample_episodes(episodes: Mapping[str, _Episode], length: int, seed: int = 0) -> Generator[_Episode, None, None]:
+def sample_episodes(
+    episodes: Mapping[str, _Episode], length: int, seed: int = 0
+) -> Generator[dict[str, np.ndarray], None, None]:
     """
     Sample fixed-length sequences from a collection of episodes.
 
@@ -650,18 +664,20 @@ def sample_episodes(episodes: Mapping[str, _Episode], length: int, seed: int = 0
     np_random = np.random.RandomState(seed)
     while True:
         size = 0
-        ret = None
+        ret: dict[str, np.ndarray] | None = None
         p = np.array([len(next(iter(episode.values()))) for episode in episodes.values()])
         p = p / np.sum(p)
         while size < length:
-            episode = np_random.choice(list(episodes.values()), p=p)
+            episode = list(episodes.values())[np_random.choice(len(episodes), p=p)]
             total = len(next(iter(episode.values())))
             # make sure at least one transition included
             if total < 2:
                 continue
             if not ret:
                 index = int(np_random.randint(0, total - 1))
-                ret = {k: v[index : min(index + length, total)].copy() for k, v in episode.items() if "log_" not in k}
+                ret = {
+                    k: np.array(v[index : min(index + length, total)]) for k, v in episode.items() if "log_" not in k
+                }
                 if "is_first" in ret:
                     ret["is_first"][0] = True
             else:
@@ -669,13 +685,15 @@ def sample_episodes(episodes: Mapping[str, _Episode], length: int, seed: int = 0
                 index = 0
                 possible = length - size
                 ret = {
-                    k: np.append(ret[k], v[index : min(index + possible, total)].copy(), axis=0)
+                    k: np.append(ret[k], np.array(v[index : min(index + possible, total)]), axis=0)
                     for k, v in episode.items()
                     if "log_" not in k
                 }
                 if "is_first" in ret:
                     ret["is_first"][size] = True
             size = len(next(iter(ret.values())))
+        if ret is None:
+            raise ValueError("length must be positive")
         yield ret
 
 
@@ -706,7 +724,7 @@ def load_episodes(directory: str | pathlib.Path, limit: int | None = None, rever
         - Invalid or corrupted .npz files will be skipped with an error message
     """
     directory = pathlib.Path(directory).expanduser()
-    episodes = collections.OrderedDict()
+    episodes: _Cache = collections.OrderedDict()
     total = 0
     if reverse:
         for filename in reversed(sorted(directory.glob("*.npz"))):
@@ -827,8 +845,8 @@ class OneHotDist(torchd.one_hot_categorical.OneHotCategorical):
         else:
             super().__init__(logits=logits, probs=probs)
 
-    def mode(self) -> torch.Tensor:
-        _mode = F.one_hot(torch.argmax(super().logits, axis=-1), super().logits.shape[-1])
+    def mode(self) -> torch.Tensor:  # pyright: ignore[reportIncompatibleMethodOverride]
+        _mode = F.one_hot(torch.argmax(super().logits, dim=-1), super().logits.shape[-1])
         return _mode.detach() + super().logits - super().logits.detach()
 
     def sample(self, sample_shape: _SampleShape = (), seed: int | None = None) -> torch.Tensor:
@@ -1169,10 +1187,10 @@ class UnnormalizedHuber(torchd.normal.Normal):
         super().__init__(loc, scale, validate_args=validate_args)
         self._threshold = threshold
 
-    def log_prob(self, event: torch.Tensor) -> torch.Tensor:
-        return -(torch.sqrt((event - self.mean) ** 2 + self._threshold**2) - self._threshold)
+    def log_prob(self, value: torch.Tensor) -> torch.Tensor:
+        return -(torch.sqrt((value - self.mean) ** 2 + self._threshold**2) - self._threshold)
 
-    def mode(self) -> torch.Tensor:
+    def mode(self) -> torch.Tensor:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self.mean
 
 
@@ -1214,7 +1232,7 @@ class SafeTruncatedNormal(torchd.normal.Normal):
         self._clip = clip
         self._mult = mult
 
-    def sample(self, sample_shape: _SampleShape) -> torch.Tensor:
+    def sample(self, sample_shape: _SampleShape = ()) -> torch.Tensor:
         event = super().sample(sample_shape)
         if self._clip:
             clipped = torch.clip(event, self._low + self._clip, self._high - self._clip)
@@ -1292,20 +1310,20 @@ def static_scan_for_lambda_return(
     last = start
     indices = range(inputs[0].shape[0])
     indices = reversed(indices)
-    flag = True
+    outputs: torch.Tensor | None = None
     for index in indices:
         # (inputs, pcont) -> (inputs[index], pcont[index])
         inp = lambda x: (_input[x] for _input in inputs)
         last = fn(last, *inp(index))
-        if flag:
+        if outputs is None:
             outputs = last
-            flag = False
         else:
             outputs = torch.cat([outputs, last], dim=-1)
-    outputs = torch.reshape(outputs, [outputs.shape[0], outputs.shape[1], 1])
-    outputs = torch.flip(outputs, [1])
-    outputs = torch.unbind(outputs, dim=0)
-    return outputs
+    if outputs is None:
+        raise ValueError("inputs must not be empty")
+    reshaped = torch.reshape(outputs, [outputs.shape[0], outputs.shape[1], 1])
+    flipped = torch.flip(reshaped, [1])
+    return torch.unbind(flipped, dim=0)
 
 
 def lambda_return(
@@ -1370,6 +1388,10 @@ def lambda_return(
     return returns
 
 
+def _raise_not_implemented(message: str) -> NoReturn:
+    raise NotImplementedError(message)
+
+
 class Optimizer:
     def __init__(
         self,
@@ -1411,7 +1433,7 @@ class Optimizer:
         self._wd_pattern = wd_pattern
         self._opt = {
             "adam": lambda: torch.optim.Adam(parameters, lr=lr, eps=eps),
-            "nadam": lambda: NotImplemented(f"{opt} is not implemented"),
+            "nadam": lambda: _raise_not_implemented(f"{opt} is not implemented"),
             "adamax": lambda: torch.optim.Adamax(parameters, lr=lr, eps=eps),
             "sgd": lambda: torch.optim.SGD(parameters, lr=lr),
             "momentum": lambda: torch.optim.SGD(parameters, lr=lr, momentum=0.9),
@@ -1510,18 +1532,18 @@ def args_type(default: object) -> Callable[[object], object]:
             return float(x) if ("e" in x or "." in x) else int(x)
         if isinstance(default, (list, tuple)):
             return tuple(args_type(default[0])(y) for y in x.split(","))
-        return type(default)(x)
+        return cast("Callable[[str], object]", type(default))(x)
 
     def parse_object(x: object) -> object:
         if isinstance(default, (list, tuple)):
-            return tuple(x)
+            return tuple(cast("Iterable[object]", x))
         return x
 
     return lambda x: parse_string(x) if isinstance(x, str) else parse_object(x)
 
 
 def static_scan(
-    fn: Callable[..., _ScanState],
+    fn: Callable[..., _ScanOutput],
     inputs: Sequence[torch.Tensor],
     start: _ScanState,
 ) -> list[dict[str, torch.Tensor] | torch.Tensor]:
@@ -1548,35 +1570,40 @@ def static_scan(
     """
     last = start
     indices = range(inputs[0].shape[0])
-    flag = True
+    dict_outputs: dict[str, torch.Tensor] | None = None
+    seq_outputs: list[dict[str, torch.Tensor] | torch.Tensor] | None = None
     for index in indices:
         inp = lambda x: (_input[x] for _input in inputs)
         last = fn(last, *inp(index))
-        if flag:
-            if type(last) is dict:
-                outputs = {key: value.clone().unsqueeze(0) for key, value in last.items()}
+        if isinstance(last, dict):
+            if dict_outputs is None:
+                dict_outputs = {key: value.clone().unsqueeze(0) for key, value in last.items()}
             else:
-                outputs = []
-                for _last in last:
-                    if type(_last) is dict:
-                        outputs.append({key: value.clone().unsqueeze(0) for key, value in _last.items()})
-                    else:
-                        outputs.append(_last.clone().unsqueeze(0))
-            flag = False
-        else:
-            if type(last) is dict:
                 for key in last.keys():
-                    outputs[key] = torch.cat([outputs[key], last[key].unsqueeze(0)], dim=0)
-            else:
-                for j in range(len(outputs)):
-                    if type(last[j]) is dict:
-                        for key in last[j].keys():
-                            outputs[j][key] = torch.cat([outputs[j][key], last[j][key].unsqueeze(0)], dim=0)
-                    else:
-                        outputs[j] = torch.cat([outputs[j], last[j].unsqueeze(0)], dim=0)
-    if type(last) is dict:
-        outputs = [outputs]
-    return outputs
+                    dict_outputs[key] = torch.cat([dict_outputs[key], last[key].unsqueeze(0)], dim=0)
+        elif seq_outputs is None:
+            seq_outputs = []
+            for _last in last:
+                if isinstance(_last, dict):
+                    seq_outputs.append({key: value.clone().unsqueeze(0) for key, value in _last.items()})
+                else:
+                    seq_outputs.append(_last.clone().unsqueeze(0))
+        else:
+            for j in range(len(seq_outputs)):
+                item = last[j]
+                out = seq_outputs[j]
+                if isinstance(item, dict):
+                    assert isinstance(out, dict)
+                    for key in item.keys():
+                        out[key] = torch.cat([out[key], item[key].unsqueeze(0)], dim=0)
+                else:
+                    assert isinstance(out, torch.Tensor)
+                    seq_outputs[j] = torch.cat([out, item.unsqueeze(0)], dim=0)
+    if dict_outputs is not None:
+        return [dict_outputs]
+    if seq_outputs is None:
+        raise ValueError("inputs must not be empty")
+    return seq_outputs
 
 
 class Every:
@@ -1865,7 +1892,7 @@ def recursively_load_optim_state_dict(obj: object, optimizers_state_dicts: Mappi
     """
     for path, state_dict in optimizers_state_dicts.items():
         keys = path.split(".")
-        obj_now = obj
+        obj_now: Any = obj
         for key in keys:
             obj_now = getattr(obj_now, key)
         obj_now.load_state_dict(state_dict)

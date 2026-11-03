@@ -8,6 +8,12 @@ from stable_baselines3.common.policies import BaseFeaturesExtractor
 from rosnav_rl.utils.type_aliases import ObservationSpaceList, TensorDict
 
 
+def space_shape(space: spaces.Space) -> tuple[int, ...]:
+    shape = space.shape
+    assert shape is not None
+    return shape
+
+
 class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
     REQUIRED_OBSERVATIONS: ClassVar[ObservationSpaceList] = []
 
@@ -38,7 +44,7 @@ class RosnavBaseExtractor(BaseFeaturesExtractor, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def forward(self, observations: th.Tensor | TensorDict) -> th.Tensor:
+    def forward(self, observations: TensorDict) -> th.Tensor:
         """
                 Forward pass of the feature extractor.
 
