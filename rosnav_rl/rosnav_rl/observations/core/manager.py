@@ -308,7 +308,7 @@ class ObservationManager:
               arena_pedestrian_detections:
                 type: ArenaPedestrianCollector
                 params:
-                  topic: "/task_generator_node/arena_peds"
+                  topic: "/arena_env_node/arena_peds"
                   up_to_date_required: true
 
               arena_pedestrian_relative_locations:
