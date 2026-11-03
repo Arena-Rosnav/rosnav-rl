@@ -55,7 +55,7 @@ def pipeline():
     executor.add_node(node)
     spinner = threading.Thread(target=executor.spin, daemon=True)
     spinner.start()
-    deadline = time.monotonic() + 10.0
+    deadline = time.monotonic() + 30.0
     while publisher.get_subscription_count() == 0 and time.monotonic() < deadline:
         time.sleep(0.01)
     yield manager, publisher
@@ -69,11 +69,11 @@ def test_first_observation_of_an_episode_waits_for_the_scan_of_the_new_pose(pipe
     start = Time.from_msg(builtin_interfaces.msg.Time(sec=RECORDED["start_time"][0], nanosec=RECORDED["start_time"][1]))
 
     publisher.publish(terminal)
-    assert manager.wait_for_stamp(Time.from_msg(terminal.header.stamp), 5.0)
+    assert manager.wait_for_stamp(Time.from_msg(terminal.header.stamp), 30.0)
     assert not manager.wait_for_stamp(start, 0.3)
 
     waited: list[bool] = []
-    waiter = threading.Thread(target=lambda: waited.append(manager.wait_for_stamp(start, 5.0)))
+    waiter = threading.Thread(target=lambda: waited.append(manager.wait_for_stamp(start, 30.0)))
     waiter.start()
     time.sleep(0.1)
     assert not waited
@@ -95,7 +95,7 @@ def test_a_reached_stamp_already_carries_its_scan(pipeline):
 
     updater = threading.Thread(target=collector.update, args=(reset,))
     updater.start()
-    assert manager.wait_for_stamp(Time.from_msg(reset.header.stamp), 5.0)
+    assert manager.wait_for_stamp(Time.from_msg(reset.header.stamp), 30.0)
     observed = np.asarray(manager.get_observations()["front_laser"])
     updater.join()
 

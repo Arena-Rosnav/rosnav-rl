@@ -65,6 +65,14 @@ class RowCountingExtractor(CombinedExtractor):
         return super().forward(observations)
 
 
+@pytest.fixture(autouse=True)
+def _one_torch_thread():
+    threads = th.get_num_threads()
+    th.set_num_threads(1)
+    yield
+    th.set_num_threads(threads)
+
+
 def _model(algorithm: type[RecurrentPPO], image_shape: tuple[int, ...], **policy_kwargs):
     env = DummyVecEnv([lambda i=i: ShortEpisodesEnv(i, image_shape) for i in range(N_ENVS)])
     return algorithm(
