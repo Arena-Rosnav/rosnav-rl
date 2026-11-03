@@ -63,7 +63,7 @@ def test_pedestrians_topic_is_rebased_onto_the_env_namespace():
         }
     }
 
-    set_pedestrians_topic(config, "/arena/env_0/task_generator_node/jackal")
+    set_pedestrians_topic(config, "/arena/env_0/arena_env_node/jackal")
 
     assert config["datasources"]["arena_pedestrian_detections"]["params"]["topic"] == "/arena/env_0/arena_peds"
     assert config["datasources"]["front_laser"]["params"] == {"topic": "lidar"}

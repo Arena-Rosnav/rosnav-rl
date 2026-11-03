@@ -75,7 +75,7 @@ def lockstep(tmp_path: Path):
         namespace=ROBOT_NS,
         parameter_overrides=[
             Parameter("agent", value=str(_saved_agent(tmp_path))),
-            Parameter("task_generator_node", value=f"{ENV}/task_generator_node"),
+            Parameter("arena_env_node", value=f"{ENV}/arena_env_node"),
             Parameter("control_rate", value=CONTROL_RATE),
         ],
     )
