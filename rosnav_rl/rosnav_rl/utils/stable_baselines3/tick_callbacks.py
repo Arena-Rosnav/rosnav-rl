@@ -1,5 +1,6 @@
 """StableBaselines3 callbacks driven by the training tick count instead of evaluation results."""
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from rclpy.node import Node
@@ -26,7 +27,7 @@ class TickScheduledCurriculum(CurriculumBase, BaseCallback):
         parameter_node_template: str,
         timeout: float = 5.0,
         verbose: int = 0,
-        modes: dict[str, str | list[str]] | None = None,
+        modes: Mapping[str, str | Sequence[str]] | None = None,
     ):
         self.stage_ticks = list(stage_ticks)
         self.ticks_per_step = ticks_per_step
