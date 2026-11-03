@@ -792,16 +792,16 @@ class SampleDist:
         return getattr(self._dist, name)
 
     def mean(self) -> torch.Tensor:
-        samples = self._dist.sample(self._samples)
+        samples = self._dist.sample((self._samples,))
         return torch.mean(samples, 0)
 
     def mode(self) -> torch.Tensor:
-        sample = self._dist.sample(self._samples)
+        sample = self._dist.sample((self._samples,))
         logprob = self._dist.log_prob(sample)
         return sample[torch.argmax(logprob)][0]
 
     def entropy(self) -> torch.Tensor:
-        sample = self._dist.sample(self._samples)
+        sample = self._dist.sample((self._samples,))
         logprob = self.log_prob(sample)
         return -torch.mean(logprob, 0)
 
@@ -944,7 +944,7 @@ class DiscDist:
         return (target * log_pred).sum(-1)
 
     def log_prob_target(self, target: torch.Tensor) -> torch.Tensor:
-        log_pred = super().logits - torch.logsumexp(super().logits, -1, keepdim=True)
+        log_pred = self.logits - torch.logsumexp(self.logits, -1, keepdim=True)
         return (target * log_pred).sum(-1)
 
 
@@ -1276,7 +1276,7 @@ class TanhBijector(torchd.Transform):
 
     def _forward_log_det_jacobian(self, x: torch.Tensor) -> torch.Tensor:
         log2 = torch.math.log(2.0)
-        return 2.0 * (log2 - x - torch.softplus(-2.0 * x))
+        return 2.0 * (log2 - x - F.softplus(-2.0 * x))
 
 
 def static_scan_for_lambda_return(
@@ -1384,7 +1384,7 @@ def lambda_return(
         lambda agg, cur0, cur1: cur0 + cur1 * lambda_ * agg, (inputs, pcont), bootstrap
     )
     if axis != 0:
-        returns = returns.permute(dims)
+        returns = tuple(ret.permute(dims) for ret in returns)
     return returns
 
 
@@ -1468,7 +1468,7 @@ class Optimizer:
         self._scaler.scale(loss).backward(retain_graph=retain_graph)
         self._scaler.unscale_(self._opt)
         # loss.backward(retain_graph=retain_graph)
-        norm = torch.nn.utils.clip_grad_norm_(params, self._clip)
+        norm = torch.nn.utils.clip_grad_norm_(params, float("inf") if self._clip is None else self._clip)
         if self._wd:
             self._apply_weight_decay(params)
         self._scaler.step(self._opt)

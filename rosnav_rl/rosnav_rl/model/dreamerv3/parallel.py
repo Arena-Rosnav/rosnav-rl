@@ -130,7 +130,6 @@ class Parallel:
         if state is None:
             state = ctor()
 
-        state = state or ctor
         if message == PMessage.CALLABLE:
             assert not args and not kwargs, (args, kwargs)
             result = callable(getattr(state, name))

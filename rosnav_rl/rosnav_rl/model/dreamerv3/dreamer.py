@@ -10,6 +10,7 @@ import gymnasium
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from ...utils.type_aliases import TensorDict
 from ..dreamerv3 import exploration as expl
@@ -209,14 +210,13 @@ class Dreamer(nn.Module):
         latent = {k: v.detach() for k, v in latent.items()}
         action = action.detach()
         if self._config.model.actor.dist == "onehot_gumble":
-            action = torch.one_hot(
-                torch.argmax(action, dim=-1),
-                (
-                    int(self._act_space.n)
-                    if isinstance(self._act_space, gymnasium.spaces.Discrete)
-                    else self._act_space.shape[0]
-                ),
-            )
+            if isinstance(self._act_space, gymnasium.spaces.Discrete):
+                num_classes = int(self._act_space.n)
+            else:
+                act_shape = self._act_space.shape
+                assert act_shape is not None
+                num_classes = act_shape[0]
+            action = F.one_hot(torch.argmax(action, dim=-1), num_classes)
         policy_output = {"action": action, "logprob": logprob}
         state = (latent, action)
         return policy_output, state

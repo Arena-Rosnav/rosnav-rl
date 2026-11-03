@@ -196,7 +196,7 @@ class RSSM(nn.Module):
 
         if self._initial == "learned":
             self.W = torch.nn.Parameter(
-                torch.zeros((1, self._deter), device=torch.device(self._device)),
+                torch.zeros((1, self._deter), device=self._device),
                 requires_grad=True,
             )
 
@@ -404,6 +404,7 @@ class RSSM(nn.Module):
         x = torch.cat([prev_stoch, prev_action], -1)
         # (batch, stoch * discrete_num + action, embed) -> (batch, hidden)
         x = self._img_in_layers(x)
+        deter = prev_state["deter"]
         for _ in range(self._rec_depth):  # rec depth is not correctly implemented
             deter = prev_state["deter"]
             # (batch, hidden), (batch, deter) -> (batch, deter), (batch, deter)
@@ -492,7 +493,7 @@ class RSSM(nn.Module):
                 "tanh5": lambda: 5.0 * torch.tanh(mean / 5.0),
             }[self._mean_act]()
             std = {
-                "softplus": lambda: torch.softplus(std),
+                "softplus": lambda: F.softplus(std),
                 "abs": lambda: torch.abs(std + 1),
                 "sigmoid": lambda: torch.sigmoid(std),
                 "sigmoid2": lambda: 2 * torch.sigmoid(std / 2),

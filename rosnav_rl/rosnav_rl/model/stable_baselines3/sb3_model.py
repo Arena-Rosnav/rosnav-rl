@@ -124,10 +124,13 @@ class StableBaselinesEnv:
             self._norm_wrapper.save(str(path))
 
     def load_normalization(self, path: str | Path) -> None:
-        if self.has_norm_wrapper:
-            self._norm_wrapper.load(path)
-        else:
+        if self._norm_wrapper is None:
             raise ValueError("Normalization wrapper not found.")
+        venv = self._norm_wrapper.venv
+        assert venv is not None
+        loaded = VecNormalize.load(str(path), venv)
+        self._norm_wrapper.obs_rms = loaded.obs_rms
+        self._norm_wrapper.ret_rms = loaded.ret_rms
 
     def normalize(self, observation: EncodedObservationDict | np.ndarray) -> EncodedObservationDict | np.ndarray:
         if self._norm_wrapper is None:
