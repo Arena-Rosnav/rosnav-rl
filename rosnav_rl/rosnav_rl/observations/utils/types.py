@@ -304,6 +304,18 @@ ArenaPedestrianStates = Annotated[
     ),
 ]
 
+CrowdSet = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="Padded set of the pedestrians around the robot, one row per pedestrian, ordered by id",
+        shape="(K, 6)",
+        units="meters, meters, meters/second, meters/second, flag, id",
+        source="Arena pedestrian detections and the robot pose",
+        constraints="[x, y, vx, vy, mask, id] in the robot frame, mask 1 for a real pedestrian and 0 for padding, ids ascending",
+        example="[[1.5, -0.8, 0.3, 0.0, 1.0], [0.0, 0.0, 0.0, 0.0, 0.0]]",
+    ),
+]
+
 CrowdTimeToContact = Annotated[
     np.ndarray,
     DataSpec(
@@ -605,6 +617,7 @@ __all__ = [
     "PedestrianTypeArray",
     "PedestrianSocialStates",
     "CrowdTimeToContact",
+    "CrowdSet",
     "MotionStateVector",
     "KinematicStateVector",
     "TrajectoryStateVector",

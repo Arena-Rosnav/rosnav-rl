@@ -530,7 +530,32 @@ class StableBaselinesModel(RL_Model[_SupportedStableBaselinesModels, "sb3_cfg.SB
         # we never pass an unsupported parameter (e.g. `batch_size` to A2C or
         # `use_sde` to TD3).
         algo_cls = self._policy_description.algorithm_class
-        algo_init_params = set(inspect.signature(algo_cls.__init__).parameters) - {"self"}
+        # Include explicit constructor parameters throughout the MRO. Custom
+        # algorithms such as PPO_HamAux use (*args, **kwargs) to preserve PPO's
+        # constructor, so inspecting only that override would filter out every
+        # PPO setting (n_steps, batch_size, n_epochs, target_kl, ...), silently
+        # falling back to SB3 defaults such as n_steps=2048.
+        algo_init_params: set[str] = set()
+        for cls in algo_cls.__mro__:
+            if cls is object:
+                break
+            signature = inspect.signature(cls.__init__)
+            accepts_extra_kwargs = any(
+                parameter.kind == inspect.Parameter.VAR_KEYWORD
+                for parameter in signature.parameters.values()
+            )
+            for name, parameter in signature.parameters.items():
+                if name == "self" or parameter.kind in (
+                    inspect.Parameter.VAR_POSITIONAL,
+                    inspect.Parameter.VAR_KEYWORD,
+                ):
+                    continue
+                algo_init_params.add(name)
+            # Follow the parent signature only when this constructor forwards
+            # arbitrary kwargs. Stop as soon as a concrete constructor defines
+            # the accepted API, avoiding unrelated kwargs from distant base classes.
+            if not accepts_extra_kwargs:
+                break
 
         # Always include these non-config kwargs that come from other sources.
         policy_kwargs = self._policy_description.get_kwargs()

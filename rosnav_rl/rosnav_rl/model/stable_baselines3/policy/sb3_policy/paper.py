@@ -13,7 +13,10 @@ from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
 from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_10, EXTRACTOR_5_extended
 from ..feature_extractors.resnet.resnet import DRL_VO_ROSNAV_EXTRACTOR, DRL_VO_ROSNAV_SCALAR_EXTRACTOR
+from ..feature_extractors.ham_extractor import DRL_VO_HAM_EXTRACTOR
 from ..recurrent import PackedRecurrentPPO
+
+from ..ham_aux import PPO_HamAux
 
 
 @AgentFactory.register("AGENT_1")
@@ -250,7 +253,7 @@ class AGENT_5(StableBaselinesPolicyDescription):
         spaces.dynamics.LastActionSpace,
     ]
     observation_space_kwargs = {
-        "roi_in_m": 20,
+        "roi_in_m": 24,  # 80 cells span [-12 m, +12 m] for the 12 m crowd predictor horizon
         "feature_map_size": 80,
         "laser_stack_size": 10,
         "normalize": True,
@@ -272,6 +275,33 @@ class AGENT_5_TTC(AGENT_5):
 
     observation_spaces = [*AGENT_5.observation_spaces, spaces.environment.CrowdTimeToContactSpace]
     features_extractor_class = DRL_VO_ROSNAV_SCALAR_EXTRACTOR
+
+
+@AgentFactory.register("AGENT_5_HAM")
+class AGENT_5_HAM(AGENT_5):
+    """AGENT_5 plus the predicted crowd energy change from a port-Hamiltonian predictor in the head."""
+
+    # Keep the exact AGENT_5 Gym observation set. Raw crowd tracks for the
+    # auxiliary objective travel in transition info, never as policy inputs.
+    observation_spaces = list(AGENT_5.observation_spaces)
+    observation_space_kwargs = {**AGENT_5.observation_space_kwargs}
+    algorithm_class = PPO_HamAux
+    features_extractor_class = DRL_VO_HAM_EXTRACTOR
+    features_extractor_kwargs = {
+        **AGENT_5.features_extractor_kwargs,
+        "variant": "ham",
+        "action_normalizer": "max_abs",
+        "map_roi_m": 24.0,
+        "crowd_range_m": 12.0,
+        "max_pedestrians": 24,
+    }
+
+
+@AgentFactory.register("AGENT_5_PLAIN")
+class AGENT_5_PLAIN(AGENT_5_HAM):
+    """Control: same AGENT_5 inputs and auxiliary weight with an unstructured predictor."""
+
+    features_extractor_kwargs = {**AGENT_5_HAM.features_extractor_kwargs, "variant": "plain"}
 
 
 @AgentFactory.register("AGENT_6")

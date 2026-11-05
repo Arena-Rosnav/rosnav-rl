@@ -23,6 +23,9 @@ class PPO_Algorithm_Cfg(OnPolicyParameters):
     clip_range: float | Callable[[float], float] = 0.2
     clip_range_vf: float | Callable[[float], float] | None = None
     target_kl: float | None = None
+    # Consumed only by PPO_HamAux; standard PPO filters this out because it
+    # does not accept the keyword. Both structured/plain predictors share it.
+    aux_weight: float = 1.0
 
 
 class PPO_Cfg(SBAlgorithmCfg):
