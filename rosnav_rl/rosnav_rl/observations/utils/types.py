@@ -579,6 +579,27 @@ JointStates = Annotated[
     ),
 ]
 
+# Additional crowd spectral features for social navigation
+CrowdSpectralScalars = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="Spectral features of the robot-pedestrian proximity graph",
+        shape="(15,)",
+        units="unitless eigenvalues and eigenvector entries, weighted degree, meters/second",
+        source="pedestrian relative positions and velocities",
+        constraints=(
+            "[6 smallest normalized Laplacian eigenvalues, "
+            "6 absolute robot eigenvector entries, "
+            "robot weighted degree, "
+            "weighted mean pedestrian velocity vx, vy]"
+        ),
+        example="[0.0, 0.5, 1.0, 1.5, 0.0, 0.0, 0.4, 0.6, 0.5, 0.3, 0.0, 0.0, 1.2, 0.5, -0.2]",
+    ),
+]
+
+
+
+
 
 # Export all type annotations for easy importing
 __all__ = [
@@ -605,6 +626,7 @@ __all__ = [
     "PedestrianTypeArray",
     "PedestrianSocialStates",
     "CrowdTimeToContact",
+    "CrowdSpectralScalars", # Newly added type annotation for crowd spectral features
     "MotionStateVector",
     "KinematicStateVector",
     "TrajectoryStateVector",

@@ -32,6 +32,7 @@ from ..utils.semantic import (
     get_relative_vel_to_robot,
     straight_line_subgoal,
     time_to_contact,
+    compute_spectral_crowd_scalars #
 )
 from ..utils.types import (
     ArenaPedestrianDetections,
@@ -55,6 +56,7 @@ from ..utils.types import (
     RobotVelocity,
     SafetyStatus,
     SubgoalLocation,
+    CrowdSpectralScalars #
 )
 from .base import Generator
 
@@ -1463,3 +1465,46 @@ class CrowdTimeToContactGenerator(Generator[CrowdTimeToContact]):
         out[2] = float(np.count_nonzero(ttc < self.imminent))
         out[3] = ttc[ahead].min() if ahead.any() else self.horizon
         return out
+
+
+
+#spectral features from a robot-centered pedestrian proximity graph
+class CrowdSpectralGenerator(Generator[CrowdSpectralScalars]):
+    """15 spectral features from a robot-centered pedestrian proximity graph."""
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+        "pedestrian_relative_velocities": PedestrianRelativeVelocities,
+    }
+
+    def __init__(
+        self,
+        name: str,
+        radius: float = 12.0,
+        sigma: float = 2.0,
+        max_pedestrians: int = 10,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        self.radius = radius
+        self.sigma = sigma
+        self.max_pedestrians = max_pedestrians
+
+    def _generate(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        pedestrian_relative_velocities: PedestrianRelativeVelocities,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> CrowdSpectralScalars:
+        positions = np.asarray(pedestrian_relative_locations, dtype=np.float64).reshape(-1, 2)
+        velocities = np.asarray(pedestrian_relative_velocities, dtype=np.float64).reshape(-1, 2)
+        if positions.shape != velocities.shape:
+            raise ValueError("Pedestrian locations and velocities must have matching shapes")
+        return compute_spectral_crowd_scalars(
+            pedestrian_positions=positions,
+            pedestrian_velocities=velocities,
+            radius=self.radius,
+            sigma=self.sigma,
+            max_pedestrians=self.max_pedestrians,
+        )

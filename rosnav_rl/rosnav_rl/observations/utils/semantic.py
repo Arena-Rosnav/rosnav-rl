@@ -115,6 +115,94 @@ def time_to_contact(
     return np.where(c <= 0.0, 0.0, t).astype(np.float32)
 
 
+def compute_spectral_crowd_scalars(
+    pedestrian_positions: np.ndarray,
+    pedestrian_velocities: np.ndarray,
+    radius: float = 12.0,
+    sigma: float = 2.0,
+    max_pedestrians: int = 10,
+) -> np.ndarray:
+    """Compute 15 spectral crowd-graph features in the robot frame.
+     Assumptions:
+            - Robot is located at (0, 0).
+            - Positions and velocities are expressed in robot frame.
+            - At most 10 pedestrians are selected.
+    
+        Output:
+            [0:6]   Six smallest normalized Laplacian eigenvalues.
+            [6:12]  Absolute robot entries of corresponding eigenvectors.
+            [12]    Robot weighted degree.
+            [13:15] Gaussian-weighted mean pedestrian velocity.
+    
+        Returns:
+            np.ndarray of shape (15,), dtype float32.
+    
+    """
+    out = np.zeros(15, dtype=np.float32)
+
+    if len(pedestrian_positions) == 0 or max_pedestrians == 0:
+        return out
+
+    # Select up to 10 nearest pedestrians within the radius.
+    distances = np.hypot(
+        pedestrian_positions[:, 0],
+        pedestrian_positions[:, 1],
+    )
+    valid = np.flatnonzero(distances <= radius)
+    if len(valid) == 0:
+        return out
+
+    order = np.lexsort((
+        pedestrian_velocities[valid, 1],
+        pedestrian_velocities[valid, 0],
+        pedestrian_positions[valid, 1],
+        pedestrian_positions[valid, 0],
+        distances[valid],
+    ))
+    selected = valid[order[:max_pedestrians]]
+    positions = pedestrian_positions[selected]
+    velocities = pedestrian_velocities[selected]
+
+    # Construct the Gaussian-weighted proximity graph.
+    nodes = np.vstack((np.zeros((1, 2)), positions))
+    delta = nodes[:, None, :] - nodes[None, :, :]
+    squared_distances = np.sum(delta**2, axis=-1)
+
+    weights = np.exp(-squared_distances / (2.0 * sigma**2))
+    np.fill_diagonal(weights, 0.0)
+
+    # Compute the symmetric normalized Laplacian.
+    degrees = weights.sum(axis=1)
+    inv_sqrt = np.zeros_like(degrees)
+    np.divide(
+        1.0, np.sqrt(degrees),
+        out=inv_sqrt, where=degrees > 0,
+    )
+    normalized_adjacency = (
+        inv_sqrt[:, None] * weights * inv_sqrt[None, :]
+    )
+    laplacian = (
+        np.diag((degrees > 0).astype(float))
+        - normalized_adjacency
+    )
+
+    # Extract the six smallest eigenvalues and robot entries.
+    eigenvalues, eigenvectors = np.linalg.eigh(laplacian)
+    k = min(6, len(nodes))
+    out[:k] = np.clip(eigenvalues[:k], 0.0, 2.0)
+    out[6:6 + k] = np.abs(eigenvectors[0, :k])
+
+    # Robot weighted degree and mean pedestrian velocity.
+    out[12] = degrees[0]
+    if degrees[0] > 0:
+        out[13:15] = (
+            weights[0, 1:] @ velocities
+        ) / degrees[0]
+
+    return out
+
+
+
 def straight_line_subgoal(
     robot_xy: tuple[float, float],
     goal_xy: tuple[float, float],
