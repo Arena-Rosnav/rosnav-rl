@@ -316,6 +316,30 @@ CrowdTimeToContact = Annotated[
     ),
 ]
 
+PedestrianTubeValues = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="HJ backward-reachable-tube value per pedestrian: clearance the robot's best steering still achieves within the horizon at its rated speed",
+        shape="(N,)",
+        units="meters",
+        source="ReachabilityTube lookup against each pedestrian's position/velocity relative to the robot",
+        constraints="value <= 0 means no steering avoids contact within the horizon under the model",
+        example="[1.2, -0.3, 0.8]",
+    ),
+]
+
+CrowdReachabilityTube = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="HJ backward-reachable-tube summary across pedestrians",
+        shape="(4,)",
+        units="meters, meters, count, meters",
+        source="PedestrianTubeValues reduced across the pedestrians in range",
+        constraints="[minimum, second minimum, count with value <= 0, minimum ahead], clipped to +/- value_cap",
+        example="[-0.2, 0.9, 1.0, -0.2]",
+    ),
+]
+
 # Additional encoded output types for observation spaces
 MotionStateVector = Annotated[
     np.ndarray,
@@ -605,6 +629,8 @@ __all__ = [
     "PedestrianTypeArray",
     "PedestrianSocialStates",
     "CrowdTimeToContact",
+    "PedestrianTubeValues",
+    "CrowdReachabilityTube",
     "MotionStateVector",
     "KinematicStateVector",
     "TrajectoryStateVector",

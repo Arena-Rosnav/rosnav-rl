@@ -274,6 +274,14 @@ class AGENT_5_TTC(AGENT_5):
     features_extractor_class = DRL_VO_ROSNAV_SCALAR_EXTRACTOR
 
 
+@AgentFactory.register("AGENT_5_HJ")
+class AGENT_5_HJ(AGENT_5):
+    """AGENT_5 plus the crowd HJ-reachability-tube scalars in the head."""
+
+    observation_spaces = [*AGENT_5.observation_spaces, spaces.environment.CrowdReachabilityTubeSpace]
+    features_extractor_class = DRL_VO_ROSNAV_SCALAR_EXTRACTOR
+
+
 @AgentFactory.register("AGENT_6")
 class AGENT_6(StableBaselinesPolicyDescription):
     """
