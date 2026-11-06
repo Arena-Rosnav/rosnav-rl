@@ -10,6 +10,7 @@ from rosnav_rl.utils.type_aliases import DecodedAction, ObservationDict
 
 from ..observation_space.spaces.dynamics import LastActionSpace
 from ..observation_space.spaces.environment import (
+    CrowdReachabilitySpace,
     CrowdTimeToContactSpace,
     LaserCartesianMapSpace,
     PedestrianLocationSpace,
@@ -121,7 +122,7 @@ class MirrorSpaceManager(BaseSpaceManager):
             if not isinstance(space, spaces.Box):
                 raise ValueError(f"'{name}' must be a Box to be reflected")
             return self._checked_negate(name, space, tuple(range(1, space.shape[-1])))
-        if name == CrowdTimeToContactSpace.name:
+        if name in (CrowdTimeToContactSpace.name, CrowdReachabilitySpace.name):
             return _identity
         raise ValueError(f"no reflection rule for observation space '{name}'")
 

@@ -250,6 +250,9 @@ datasources:
   crowd_ttc:
     type: CrowdTimeToContactGenerator      # Time to contact against the measured robot velocity
 
+  crowd_reachability:
+    type: CrowdReachabilityGenerator       # Share of the robot's candidate velocities blocked within 3 s
+
 # =============================================================================
 # CONFIGURATION EXAMPLES & USAGE PATTERNS
 # =============================================================================
