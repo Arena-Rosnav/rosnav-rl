@@ -9,6 +9,7 @@ from rosnav_rl.spaces.observation_space.spaces.base_observation_space import (
     BaseObservationSpace,
 )
 
+from ...algorithm.koopman_ppo import MLPPPO, KoopmanPPO
 from ..agent_factory import AgentFactory
 from ..base_policy import StableBaselinesPolicyDescription
 from ..feature_extractors.classic import EXTRACTOR_5, EXTRACTOR_10, EXTRACTOR_5_extended
@@ -356,3 +357,17 @@ class AGENT_7(StableBaselinesPolicyDescription):
     features_extractor_kwargs = dict(features_dim=256)
     net_arch = dict(pi=[64, 64], vf=[64, 64])
     activation_fn = nn.ReLU
+
+
+@AgentFactory.register("AGENT_KOOPMAN")
+class AGENT_KOOPMAN(AGENT_5):
+    """AGENT_5 backbone with a linear Koopman auxiliary transition loss."""
+
+    algorithm_class: type[BaseAlgorithm] = KoopmanPPO
+
+
+@AgentFactory.register("AGENT_MLP_CTRL")
+class AGENT_MLP_CTRL(AGENT_5):
+    """AGENT_5 backbone with an MLP auxiliary transition loss for control ablation."""
+
+    algorithm_class: type[BaseAlgorithm] = MLPPPO
