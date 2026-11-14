@@ -42,10 +42,14 @@ def _reachability(locations, velocities, **kwargs):
     )
 
 
-def test_candidates_are_the_stop_once_and_two_speeds_times_sixteen_headings():
-    assert CANDIDATES.shape == (33, 2)
-    np.testing.assert_allclose(np.hypot(*CANDIDATES.T), [0.0, *np.repeat([0.5, 1.0], 16)], atol=1e-12)
+def test_candidates_are_the_stop_once_and_two_speeds_times_nine_forward_headings():
+    assert CANDIDATES.shape == (19, 2)
+    np.testing.assert_allclose(np.hypot(*CANDIDATES.T), [0.0, *np.repeat([0.5, 1.0], 9)], atol=1e-12)
     assert len({tuple(np.round(c, 9)) for c in CANDIDATES}) == len(CANDIDATES)
+
+
+def test_no_candidate_points_backward():
+    assert (CANDIDATES[:, 0] >= -1e-9).all()
 
 
 def test_candidate_headings_are_symmetric_about_the_forward_axis():
