@@ -336,7 +336,7 @@ def _git_commit() -> str | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0], epilog="Needs the reachability dependency group: uv sync --group reachability")
+    parser = argparse.ArgumentParser(description=__doc__, epilog="Needs the reachability dependency group: uv sync --group reachability")
     parser.add_argument("--robot-caps", type=pathlib.Path, required=True, help="caps/mobile.yaml of the robot, for its radius and default speed bounds")
     parser.add_argument("--max-linear-vel", type=float, default=None, help="policy speed bound v_r in m/s, default the caps velocity_limits")
     parser.add_argument("--max-angular-vel", type=float, default=None, help="policy turn-rate bound in rad/s, default the caps velocity_limits")
