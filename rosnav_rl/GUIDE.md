@@ -500,7 +500,8 @@ generators. There is no separate "simulation state container" — it was absorbe
 - **Observation-space fields** (laser, velocity, pedestrian, navigation, normalize)
   — fed via `observation_kwargs()` at construction time.
 - **Reward/generator fields** (`robot_radius`, `safety_distance`, `goal_radius`,
-  `max_steps`) — read per-step directly from this object.
+  `max_steps`) — read per-step directly from this object. All but `goal_radius`
+  also reach the observation spaces through `observation_kwargs()`.
 
 At inference time use `spec.parameters` directly, or
 `AgentParameters.from_spec(agent_config)` as a convenience wrapper.

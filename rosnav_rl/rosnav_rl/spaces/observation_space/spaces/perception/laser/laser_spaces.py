@@ -328,6 +328,8 @@ class MultiLaserFusionSpace(BaseObservationSpace):
         overlap_resolution: str = "min_distance",
         enable_failure_detection: bool = True,
         outlier_threshold: float = 3.0,
+        laser_num_beams: int = 360,
+        laser_max_range: float = 30.0,
         *args: Any,
         **kwargs: Any,
     ):
@@ -340,6 +342,8 @@ class MultiLaserFusionSpace(BaseObservationSpace):
             overlap_resolution: How to handle overlapping beams
             enable_failure_detection: Enable sensor failure detection
             outlier_threshold: Threshold for outlier detection (std devs)
+            laser_num_beams: Number of output beams
+            laser_max_range: Maximum laser range (m)
         """
         if laser_configs is None:
             laser_configs = [
@@ -355,8 +359,8 @@ class MultiLaserFusionSpace(BaseObservationSpace):
         self.outlier_threshold = outlier_threshold
 
         # Processing parameters
-        self.num_output_beams = 360
-        self.max_range = 30.0
+        self.num_output_beams = laser_num_beams
+        self.max_range = laser_max_range
         self.min_range = 0.1
 
         # Sensor health tracking
