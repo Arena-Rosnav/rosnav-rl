@@ -151,10 +151,14 @@ def reachability_scalars(
     positions = np.asarray(relative_positions, dtype=np.float64).reshape(-1, 2)
     velocities = np.asarray(pedestrian_velocities, dtype=np.float64).reshape(-1, 2)
     candidates = np.asarray(candidates, dtype=np.float64).reshape(-1, 2)
-    blocked = np.empty((len(positions), len(candidates)), dtype=bool)
-    for k, candidate in enumerate(candidates):
-        # an unreached candidate reads inf, so a contact exactly at `horizon` still counts as blocked
-        blocked[:, k] = time_to_contact(positions, velocities - candidate, contact_radius, np.inf) <= horizon
+    relative = velocities[:, None, :] - candidates[None, :, :]
+    a = np.einsum("nkd,nkd->nk", relative, relative)
+    b = 2.0 * np.einsum("nd,nkd->nk", positions, relative)
+    c = (np.einsum("nd,nd->n", positions, positions) - contact_radius * contact_radius)[:, None]
+    disc = b * b - 4.0 * a * c
+    hits = (a > 1e-9) & (disc >= 0.0)
+    t = (-b - np.sqrt(np.maximum(disc, 0.0))) / np.where(hits, 2.0 * a, 1.0)
+    blocked = (c <= 0.0) | (hits & (t > 0.0) & (t <= horizon))
     share = blocked.mean(axis=1)
     ordered = np.sort(share)[::-1]
     out[0] = ordered[0]
