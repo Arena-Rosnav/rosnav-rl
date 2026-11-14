@@ -4,6 +4,7 @@ from typing import Literal
 from stable_baselines3.td3 import TD3
 
 from .base import OffPolicyParameters, SBAlgorithmCfg
+from .lr_schedule import LearningRateSchedulerCfg
 
 
 class TD3_Algorithm_Cfg(OffPolicyParameters):
@@ -22,7 +23,7 @@ class TD3_Algorithm_Cfg(OffPolicyParameters):
     algorithm_name = TD3.__name__
 
     # TD3 defaults
-    learning_rate: float | Callable[[float], float] = 1e-3
+    learning_rate: float | Callable[[float], float] | LearningRateSchedulerCfg = 1e-3
     batch_size: int = 256  # lowered bar for robots
     buffer_size: int = 1_000_000
     learning_starts: int = 100
@@ -44,5 +45,5 @@ class TD3_Cfg(SBAlgorithmCfg):
         parameters: TD3-specific algorithm parameters.
     """
 
-    type: Literal["TD3"] = "TD3"
-    parameters: TD3_Algorithm_Cfg
+    type: Literal["TD3"] = "TD3"  # pyright: ignore[reportIncompatibleVariableOverride]
+    parameters: TD3_Algorithm_Cfg  # pyright: ignore[reportIncompatibleVariableOverride]

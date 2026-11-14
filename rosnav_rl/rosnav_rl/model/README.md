@@ -72,7 +72,7 @@ New frameworks are registered with a decorator or explicit call:
 
 ```python
 @ModelFactory.register(SupportedRLFrameworks.STABLE_BASELINES3)
-class StableBaselinesModel(RL_Model):
+class StableBaselinesModel(RL_Model[_SupportedStableBaselinesModels, "sb3_cfg.SBAlgorithmCfg"]):
     ...
 ```
 

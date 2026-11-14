@@ -100,7 +100,7 @@ class LoggingCfg(BaseModel):
         description=(
             "Per-node ROS 2 logger level overrides applied after ros_level. "
             "Keys are ROS 2 logger names (typically node names, e.g. "
-            "'Arena_Trainer', 'task_generator_node')."
+            "'Arena_Trainer', 'arena_env_node')."
         ),
     )
 

@@ -18,11 +18,23 @@ from rosnav_rl.observations.utils.types import (
     SubgoalRelativePosition,
 )
 
-from ..constants import DEFAULTS, DONE_REASONS, REWARD_CONSTANTS
+from ..constants import DEFAULTS, DONE_REASONS
 from ..reward_function import RewardFunction
 from ..utils import check_params
 from .base_reward_units import RewardUnit
 from .reward_unit_factory import RewardUnitFactory
+
+
+def _velocity_ranges(params: AgentParameters) -> np.ndarray:
+    """Velocity range per action dimension (linear, translational, angular)."""
+    return np.array(
+        [
+            params.max_linear_vel - params.min_linear_vel,
+            params.max_translational_vel - params.min_translational_vel,
+            params.max_angular_vel - params.min_angular_vel,
+        ]
+    )
+
 
 # UPDATE WHEN ADDING A NEW UNIT
 __all__ = [
@@ -212,13 +224,13 @@ class RewardFactoredSafeDistance(RewardUnit):
 
     Technical Specifications:
     - Proportional Penalty: Reward scales with distance violation magnitude
-    - Safety Distance Integration: Uses robot safety parameters and radius
+    - Safety Distance Integration: Uses the configured safety distance as the threshold
     - Laser-Based Detection: Minimum laser reading analysis for proximity measurement
 
     Configuration:
     - factor: Scaling factor for distance-proportional penalty (default: -0.5)
 
-    Output Behavior: reward = factor × (safety_distance + radius - min_laser_distance)
+    Output Behavior: reward = factor * (safety_distance - min_laser_distance)
 
     Applications: Smooth distance-based penalties, safety margin enforcement, and proximity awareness.
     """
@@ -297,7 +309,7 @@ class RewardFactoredSafeDistance(RewardUnit):
             laser_min = np.min(front_laser)
 
             # Calculate proportional penalty based on safety margin violation
-            safety_threshold = simulation_state_container.safety_distance + simulation_state_container.robot_radius
+            safety_threshold = simulation_state_container.safety_distance
             distance_violation = safety_threshold - laser_min
 
             self.add_reward(self._factor * distance_violation)
@@ -321,13 +333,14 @@ class RewardNoMovement(RewardUnit):
     - reward: Negative reward value for inactivity (default: -0.1)
     - _on_safe_dist_violation: Enable/disable during safety violations
 
-    Output Behavior: Applies reward when linear velocity ≤ tolerance threshold.
+    Output Behavior: Applies reward when linear velocity <= tolerance_fraction * max_linear_vel.
 
     Applications: Exploration encouragement, deadlock prevention, and active navigation.
     """
 
     requires = {
         "last_action": RobotActionVector,
+        "simulation_state_container": AgentParameters,
     }
 
     @check_params
@@ -335,6 +348,7 @@ class RewardNoMovement(RewardUnit):
         self,
         reward_function: RewardFunction,
         reward: float = DEFAULTS.NO_MOVEMENT.REWARD,
+        tolerance_fraction: float = DEFAULTS.NO_MOVEMENT.TOLERANCE_FRACTION,
         _on_safe_dist_violation: bool = DEFAULTS.NO_MOVEMENT._ON_SAFE_DIST_VIOLATION,
         *args: Any,
         **kwargs: Any,
@@ -344,12 +358,14 @@ class RewardNoMovement(RewardUnit):
         Args:
             reward_function: The reward function object managing this unit
             reward: Negative reward value for inactivity detection (default: -0.1)
+            tolerance_fraction: Inactivity threshold as a fraction of max_linear_vel (default: 0.2)
             _on_safe_dist_violation: Enable reward during safety violations (default: False)
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._reward = reward
+        self._tolerance_fraction = tolerance_fraction
 
     def check_parameters(self) -> None:
         if self._reward > 0.0:
@@ -363,6 +379,7 @@ class RewardNoMovement(RewardUnit):
     def __call__(
         self,
         last_action: RobotActionVector,
+        simulation_state_container: AgentParameters,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -382,7 +399,7 @@ class RewardNoMovement(RewardUnit):
         # Check linear velocity magnitude against tolerance threshold
         linear_velocity_magnitude = abs(last_action[0])
 
-        if linear_velocity_magnitude <= REWARD_CONSTANTS.NO_MOVEMENT_TOLERANCE:
+        if linear_velocity_magnitude <= self._tolerance_fraction * simulation_state_container.max_linear_vel:
             self.add_reward(self._reward)
 
 
@@ -954,13 +971,15 @@ class RewardAbruptVelocityChange(RewardUnit):
     - vel_factors: Dictionary mapping dimension indices to penalty factors
     - _on_safe_dist_violation: Enable penalty during safety violations
 
-    Output Behavior: reward = -sum((velocity_diff^4 / 100) * factor) per dimension
+    Output Behavior: reward = -sum((velocity_diff^4 / 100) * factor) per dimension, with velocity_diff
+    normalized by the dimension's velocity range
 
     Applications: Smooth motion control, jerk reduction, and stable navigation patterns.
     """
 
     requires = {
         "last_action": RobotActionVector,
+        "simulation_state_container": AgentParameters,
     }
 
     @check_params
@@ -988,11 +1007,11 @@ class RewardAbruptVelocityChange(RewardUnit):
 
         self._vel_change_fcts = self._get_vel_change_fcts()
 
-    def _get_vel_change_fcts(self) -> list[Callable[[np.ndarray], None]]:
+    def _get_vel_change_fcts(self) -> list[Callable[[np.ndarray, np.ndarray], None]]:
         """Create velocity change penalty functions for each configured dimension."""
         return [self._prepare_reward_function(int(idx), factor) for idx, factor in self._vel_factors.items()]
 
-    def _prepare_reward_function(self, idx: int, factor: float) -> Callable[[np.ndarray], None]:
+    def _prepare_reward_function(self, idx: int, factor: float) -> Callable[[np.ndarray, np.ndarray], None]:
         """Prepare dimension-specific velocity change penalty function.
 
         Args:
@@ -1003,9 +1022,9 @@ class RewardAbruptVelocityChange(RewardUnit):
             Callable that applies quartic penalty for velocity changes
         """
 
-        def vel_change_fct(action: np.ndarray):
+        def vel_change_fct(action: np.ndarray, ranges: np.ndarray):
             assert isinstance(self.last_action, np.ndarray)
-            vel_diff = abs(action[idx] - self.last_action[idx])
+            vel_diff = abs(action[idx] - self.last_action[idx]) / ranges[idx]
             self.add_reward(-((vel_diff**4 / 100) * factor))
 
         return vel_change_fct
@@ -1013,6 +1032,7 @@ class RewardAbruptVelocityChange(RewardUnit):
     def __call__(
         self,
         last_action: RobotActionVector,
+        simulation_state_container: AgentParameters,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -1030,8 +1050,9 @@ class RewardAbruptVelocityChange(RewardUnit):
                 - Example: [0.4, 0.0, 0.3] (compared with previous action for smoothness)
         """
         if self.last_action is not None:
+            ranges = _velocity_ranges(simulation_state_container)
             for reward_function in self._vel_change_fcts:
-                reward_function(last_action)
+                reward_function(last_action, ranges)
 
         # Update tracking state
         self.last_action = last_action.copy()
@@ -1045,7 +1066,7 @@ class RewardAbruptVelocityChange(RewardUnit):
 class RewardRootVelocityDifference(RewardUnit):
     """Reward unit for promoting consistent root velocity differences.
 
-    Calculates the L2 norm of velocity differences between consecutive actions
+    Calculates the L2 norm of range-normalized velocity differences between consecutive actions
     and provides positive rewards when velocity changes remain below a threshold,
     encouraging smooth and consistent motion patterns.
 
@@ -1065,6 +1086,7 @@ class RewardRootVelocityDifference(RewardUnit):
 
     requires = {
         "last_action": RobotActionVector,
+        "simulation_state_container": AgentParameters,
     }
 
     @check_params
@@ -1093,6 +1115,7 @@ class RewardRootVelocityDifference(RewardUnit):
     def __call__(
         self,
         last_action: RobotActionVector,
+        simulation_state_container: AgentParameters,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -1110,8 +1133,10 @@ class RewardRootVelocityDifference(RewardUnit):
                 - Example: [0.4, 0.0, 0.3] (evaluated for L2 norm consistency)
         """
         if self.last_action is not None:
-            # Calculate L2 norm of velocity differences
-            vel_diff = np.linalg.norm(last_action - self.last_action)
+            # Calculate L2 norm of range-normalized velocity differences
+            vel_diff = float(
+                np.linalg.norm((last_action - self.last_action) / _velocity_ranges(simulation_state_container))
+            )
 
             # Provide positive reward for consistent motion under threshold
             if vel_diff < self._k:

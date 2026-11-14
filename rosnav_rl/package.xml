@@ -20,6 +20,7 @@
   <exec_depend>arena_robots</exec_depend>
   <exec_depend>arena_runtime_msgs</exec_depend>
   <exec_depend>control_msgs</exec_depend>
+  <exec_depend>diagnostic_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>
@@ -27,7 +28,6 @@
   <exec_depend>rcl_interfaces</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
-  <exec_depend>task_generator_msgs</exec_depend>
   <exec_depend>tf_transformations</exec_depend>
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>

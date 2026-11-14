@@ -1,15 +1,13 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import gymnasium as gym
 import numpy as np
 import torch as th
 from sb3_contrib.common.recurrent.policies import RecurrentActorCriticPolicy
-from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import (
     VecEnv,
-    VecFrameStack,
     VecNormalize,
 )
 
@@ -24,12 +22,14 @@ from rosnav_rl.utils.stable_baselines3.vec_env import (
     get_vec_framestack,
     get_vec_normalize,
 )
+from rosnav_rl.utils.stable_baselines3.vec_frame_stack import VecFrameStack
 from rosnav_rl.utils.type_aliases import (
     EncodedObservationDict,
     ObservationDict,
     _SupportedStableBaselinesModels,
 )
-from rosnav_rl.utils.utils import load_yaml, make_mock_env
+from rosnav_rl.utils.utils import make_mock_env
+from rosnav_rl.utils.yaml_io import load_yaml
 
 from ..model import RL_Model
 from .policy.agent_factory import AgentFactory
@@ -121,14 +121,17 @@ class StableBaselinesEnv:
         self._stack_wrapper = get_vec_framestack(env)
 
     def save_normalization(self, path: str | Path) -> None:
-        if self.has_norm_wrapper:
-            self._norm_wrapper.save(path)
+        if self._norm_wrapper is not None:
+            self._norm_wrapper.save(str(path))
 
     def load_normalization(self, path: str | Path) -> None:
-        if self.has_norm_wrapper:
-            self._norm_wrapper.load(path)
-        else:
+        if self._norm_wrapper is None:
             raise ValueError("Normalization wrapper not found.")
+        venv = self._norm_wrapper.venv
+        assert venv is not None
+        loaded = VecNormalize.load(str(path), venv)
+        self._norm_wrapper.obs_rms = loaded.obs_rms
+        self._norm_wrapper.ret_rms = loaded.ret_rms
 
     def normalize(self, observation: EncodedObservationDict | np.ndarray) -> EncodedObservationDict | np.ndarray:
         if self._norm_wrapper is None:
@@ -138,31 +141,30 @@ class StableBaselinesEnv:
     def stack(
         self, observation: EncodedObservationDict | np.ndarray
     ) -> tuple[EncodedObservationDict | np.ndarray, list[dict[str, Any]]]:
+        if self._stack_wrapper is None:
+            raise ValueError("Frame stacking wrapper not found.")
         # encode_observation returns unbatched obs; VecFrameStack expects (n_envs, ...)
+        dones = np.array([False] * self._env.num_envs)
+        infos: list[dict[str, Any]] = [{}] * self._env.num_envs
         if isinstance(observation, dict):
             batched = {k: np.asarray(v)[np.newaxis] for k, v in observation.items()}
-        else:
-            batched = np.asarray(observation)[np.newaxis]
-
+            stacked_dict, infos = self._stack_wrapper.stacked_obs.update(observations=batched, dones=dones, infos=infos)
+            # Remove batch dim: _predict_non_recurrent expects (stack_size, obs_dim) not (1, stack_size, obs_dim)
+            return {k: v[0] for k, v in stacked_dict.items()}, infos
         stacked, infos = self._stack_wrapper.stacked_obs.update(
-            observations=batched,
-            dones=np.array([False] * self._env.num_envs),
-            infos=[{}] * self._env.num_envs,
+            observations=np.asarray(observation)[np.newaxis], dones=dones, infos=infos
         )
         # Remove batch dim: _predict_non_recurrent expects (stack_size, obs_dim) not (1, stack_size, obs_dim)
-        if isinstance(stacked, dict):
-            return {k: v[0] for k, v in stacked.items()}, infos
         return stacked[0], infos
 
     def reset(self, observation: EncodedObservationDict | np.ndarray) -> EncodedObservationDict | np.ndarray:
+        if self._stack_wrapper is None:
+            raise ValueError("Frame stacking wrapper not found.")
         if isinstance(observation, dict):
             batched = {k: np.asarray(v)[np.newaxis] for k, v in observation.items()}
-        else:
-            batched = np.asarray(observation)[np.newaxis]
-        stacked = self._stack_wrapper.stacked_obs.reset(observation=batched)
-        if isinstance(stacked, dict):
-            return {k: v[0] for k, v in stacked.items()}
-        return stacked[0]
+            stacked_dict = self._stack_wrapper.stacked_obs.reset(observation=batched)
+            return {k: v[0] for k, v in stacked_dict.items()}
+        return self._stack_wrapper.stacked_obs.reset(observation=np.asarray(observation)[np.newaxis])[0]
 
     @property
     def has_norm_wrapper(self) -> bool:
@@ -177,7 +179,7 @@ class StableBaselinesEnv:
         return self._env
 
 
-class StableBaselinesModel(RL_Model):
+class StableBaselinesModel(RL_Model[_SupportedStableBaselinesModels, "sb3_cfg.SBAlgorithmCfg"]):
     """A reinforcement learning model implementation using the Stable Baselines 3 (SB3) framework.
 
     This class provides an interface for training, loading, and using different types of
@@ -203,7 +205,6 @@ class StableBaselinesModel(RL_Model):
     """
 
     _model: _SupportedStableBaselinesModels | None = None
-    _algorithm_cfg: "sb3_cfg.SBAlgorithmCfg | None" = None
     __env: StableBaselinesEnv | None = None
     __state: StableBaselinesModelState
 
@@ -258,9 +259,10 @@ class StableBaselinesModel(RL_Model):
             self._policy_description (StableBaselinesPolicyDescription): The policy description instantiated by the agent factory.
         """
         self._agent_factory: type[AgentFactory] = AgentFactory
-        self._policy_description: StableBaselinesPolicyDescription | type[BasePolicy] = self._agent_factory.instantiate(
-            self.algorithm_cfg.architecture_name
-        )
+        policy_description = self._agent_factory.instantiate(self.algorithm_cfg.architecture_name)
+        if not isinstance(policy_description, StableBaselinesPolicyDescription):
+            raise TypeError(f"Agent '{self.algorithm_cfg.architecture_name}' is not a policy description.")
+        self._policy_description: StableBaselinesPolicyDescription = policy_description
 
     def setup_model(
         self,
@@ -308,8 +310,10 @@ class StableBaselinesModel(RL_Model):
             dirpath (str): The directory path where the model and normalization data will be saved.
             file_name (str): The base name for the saved files.
         """
+        if self.__env is None:
+            raise ValueError("Environment not set.")
         model_path = Path(dirpath) / f"{file_name}.zip"
-        self._model.save(model_path)
+        self.model.save(model_path)
         self.__env.save_normalization(Path(dirpath) / f"vec_normalize_{file_name}.pkl")
 
     def load(self, path: str | Path, env: VecEnv | gym.Env | None = None) -> None:
@@ -350,7 +354,9 @@ class StableBaselinesModel(RL_Model):
         if is_first_observation:
             self.reset()
 
-        observation = self._rl_agent.space_manager.encode_observation(observation)
+        encoded = cast(
+            "EncodedObservationDict | np.ndarray", self._rl_agent.space_manager.encode_observation(observation)
+        )
 
         if self.__env is None:
             self.__env = StableBaselinesEnv(
@@ -365,15 +371,15 @@ class StableBaselinesModel(RL_Model):
 
         if self.__env.has_stack_wrapper:
             if episode_start:
-                observation = self.__env.reset(observation)
+                encoded = self.__env.reset(encoded)
             else:
-                observation, _ = self.__env.stack(observation)
+                encoded, _ = self.__env.stack(encoded)
 
         if self.__env.has_norm_wrapper:
-            observation = self.__env.normalize(observation)
+            encoded = self.__env.normalize(encoded)
 
         action, self.__state.model_state = self._predict(
-            observation=observation,
+            observation=encoded,
             deterministic=deterministic,
             state=self.__state.model_state,
             episode_start=(np.array([True] * self.__env.env.num_envs) if episode_start else None),
@@ -397,7 +403,7 @@ class StableBaselinesModel(RL_Model):
             bool: True if training completes successfully, False if interrupted by the user.
         """
         try:
-            self._model.learn(*args, **kwargs)
+            self.model.learn(*args, **kwargs)
         except KeyboardInterrupt:
             print("Training interrupted by user.")
             return False
@@ -435,7 +441,7 @@ class StableBaselinesModel(RL_Model):
             Path(source_dir) / f"{source_checkpoint}"
         )
 
-        self.model.policy = transfer_weights(
+        transfer_weights(
             target_model=self.model.policy,
             source_model=source_model.policy,
             include=include,
@@ -465,7 +471,7 @@ class StableBaselinesModel(RL_Model):
                 env,
                 path=self.algorithm_cfg.normalization.load_from,
                 is_training=is_training,
-                **self.algorithm_cfg.normalization.model_dump(exclude=["load_from"]),
+                **self.algorithm_cfg.normalization.model_dump(exclude={"load_from"}),
             )
         return env
 
@@ -511,6 +517,8 @@ class StableBaselinesModel(RL_Model):
         }
 
         if isinstance(parameters, OnPolicyParameters):
+            if not isinstance(env, VecEnv):
+                raise TypeError("On-policy algorithms need a VecEnv to derive n_steps.")
             check_batch_size(
                 n_envs=env.num_envs,
                 batch_size=parameters.total_batch_size,
@@ -561,7 +569,9 @@ class StableBaselinesModel(RL_Model):
             algorithm_parameters (Dict[str, Any]): A dictionary containing the parameters
                                          required to initialize the algorithm.
         """
-        self._model = self._policy_description.algorithm_class(**algorithm_parameters)
+        self._model = cast(
+            "_SupportedStableBaselinesModels", self._policy_description.algorithm_class(**algorithm_parameters)
+        )
 
     def _load_model(
         self,
@@ -608,7 +618,10 @@ class StableBaselinesModel(RL_Model):
         _th.load = _robust_load
         _sb3_save_util.th.load = _robust_load
         try:
-            return self._policy_description.algorithm_class.load(path, env=env, custom_objects=algorithm_args)
+            return cast(
+                "_SupportedStableBaselinesModels",
+                self._policy_description.algorithm_class.load(path, env=env, custom_objects=algorithm_args),
+            )
         finally:
             _th.load = _orig_th_load
             _sb3_save_util.th.load = _orig_sb3_load
@@ -686,19 +699,22 @@ class StableBaselinesModel(RL_Model):
             We reimplement the predict function for non recurrent models because of issues with stacked
             observations with the official implementation.
         """
+        if not isinstance(observation, dict):
+            raise TypeError("Non-recurrent prediction needs a dict observation.")
         observation_space = self.model.observation_space
         assert isinstance(observation_space, gym.spaces.Dict)
         for key, value in observation.items():
             if value.shape == observation_space[key].shape:
                 observation[key] = np.expand_dims(value, axis=0)
 
-        self._model.policy.set_training_mode(False)
+        self.model.policy.set_training_mode(False)
         with th.no_grad():
             actions = (
-                self._model.policy._predict(obs_as_tensor(observation, self._model.device), deterministic).cpu().numpy()
+                self.model.policy._predict(obs_as_tensor(observation, self.model.device), deterministic).cpu().numpy()
             )
 
         policy_space = self._rl_agent.space_manager.policy_action_space
+        assert isinstance(policy_space, gym.spaces.Box)
         actions = np.clip(actions, policy_space.low, policy_space.high)
 
         return actions.squeeze(axis=0), state

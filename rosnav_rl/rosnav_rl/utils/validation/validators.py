@@ -5,6 +5,7 @@ This module contains validators that extend the base functionality
 for specific use cases like generators and observation spaces.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 from .base import BaseSchemaValidator
@@ -33,7 +34,7 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
 
     @staticmethod
     def validate_configuration_dependencies(
-        generators: dict[str, RequiresProtocol], collectors: dict[str, Any]
+        generators: Mapping[str, RequiresProtocol], collectors: dict[str, Any]
     ) -> None:
         """
         Validate that all generator dependencies exist in the configuration.
@@ -72,7 +73,7 @@ class GeneratorSchemaValidator(BaseSchemaValidator):
             )
 
     @staticmethod
-    def validate_root_generators(observations: dict[str, Any], generators: dict[str, RequiresProtocol]) -> None:
+    def validate_root_generators(observations: dict[str, Any], generators: Mapping[str, RequiresProtocol]) -> None:
         """
         Validate generators that only depend on collectors (root generators).
         These can be validated upfront since their dependencies should be available.

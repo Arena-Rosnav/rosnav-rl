@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 import rclpy
-import yaml
+from rosnav_rl.utils.yaml_io import dumps_yaml
 from arena_runtime_msgs.msg import LockstepHeartbeat, LockstepRegistration
 from arena_runtime_msgs.srv import LockstepRegister
 from rclpy.executors import MultiThreadedExecutor
@@ -43,7 +43,7 @@ def _saved_agent(directory: Path) -> Path:
     agent.initialize_model(make_mock_env(ns="", space_manager=agent.space_manager))
     agent.model.model.save(directory / "best_model")
     (directory / "training_config.yaml").write_text(
-        yaml.safe_dump({"arena_cfg": {}, "agent_config": spec.model_dump(mode="json")})
+        dumps_yaml({"arena_cfg": {}, "agent_config": spec.model_dump(mode="json")})
     )
     return directory
 
@@ -75,7 +75,7 @@ def lockstep(tmp_path: Path):
         namespace=ROBOT_NS,
         parameter_overrides=[
             Parameter("agent", value=str(_saved_agent(tmp_path))),
-            Parameter("task_generator_node", value=f"{ENV}/task_generator_node"),
+            Parameter("arena_env_node", value=f"{ENV}/arena_env_node"),
             Parameter("control_rate", value=CONTROL_RATE),
         ],
     )

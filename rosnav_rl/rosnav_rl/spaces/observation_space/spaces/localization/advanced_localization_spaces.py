@@ -12,7 +12,7 @@ from rosnav_rl.observations.utils.types import (
     CombinedLocalizationVector,
     FilteredOdometryVector,
     Pose2D,
-    RobotActionVector,
+    RobotVelocity,
     StabilizedPoseVector,
 )
 
@@ -52,7 +52,7 @@ class RobustOdometrySpace(BaseObservationSpace):
     """
 
     name = "RobustOdometrySpace"
-    requires = {"last_action": RobotActionVector}
+    requires = {"robot_twist": RobotVelocity}
 
     def __init__(
         self,
@@ -79,8 +79,8 @@ class RobustOdometrySpace(BaseObservationSpace):
         self.include_acceleration = include_acceleration
 
         # Filtering state
-        self.filtered_linear_vel = None
-        self.filtered_angular_vel = None
+        self.filtered_linear_vel: float | None = None
+        self.filtered_angular_vel: float | None = None
         self.last_velocities = None  # For acceleration estimation
 
         super().__init__(*args, **kwargs)
@@ -99,7 +99,7 @@ class RobustOdometrySpace(BaseObservationSpace):
 
     def _filter_velocity(self, linear_vel: float, angular_vel: float) -> tuple[float, float]:
         """Apply exponential moving average filtering to velocities."""
-        if self.filtered_linear_vel is None:
+        if self.filtered_linear_vel is None or self.filtered_angular_vel is None:
             # Initialize filters
             self.filtered_linear_vel = linear_vel
             self.filtered_angular_vel = angular_vel
@@ -131,7 +131,7 @@ class RobustOdometrySpace(BaseObservationSpace):
         self.last_velocities = current_velocities
         return acceleration
 
-    def encode_observation(self, last_action: RobotActionVector, *args: Any, **kwargs: Any) -> FilteredOdometryVector:
+    def encode_observation(self, robot_twist: RobotVelocity, *args: Any, **kwargs: Any) -> FilteredOdometryVector:
         """Encode robust odometry data with advanced filtering and normalization processing.
 
         Processes robot action commands through exponential moving average filtering to produce
@@ -139,13 +139,11 @@ class RobustOdometrySpace(BaseObservationSpace):
         raw action data into normalized, filtered velocity vectors suitable for reinforcement learning.
 
         Args:
-            last_action (RobotActionVector): Most recent robot action command vector
-                - Shape: (2,) or (3,) depending on robot kinematics
-                - Units: [m/s, rad/s] for differential drive or [m/s, m/s, rad/s] for holonomic
-                - Source: robot action controller/command interface
-                - Constraints: velocities within robot physical limits
+            robot_twist (RobotVelocity): Measured robot velocity from odometry
+                - Shape: (3,) as [linear_x, linear_y, angular_z]
+                - Units: [m/s, m/s, rad/s]
+                - Source: odometry twist in the base frame
                 - Coordinate Frame: robot base frame (x: forward, y: left, z: up-rotation)
-                - Temporal: immediate last executed action command
                 - Example: [0.5, 0.2] (moving forward at 0.5 m/s, turning right at 0.2 rad/s)
                 - Update Rate: typically matches control frequency (10-50 Hz)
 
@@ -163,11 +161,9 @@ class RobustOdometrySpace(BaseObservationSpace):
                 - Example: [0.5, 0.2] (moderate forward motion, slight right turn)
                 - Example with acceleration: [0.5, 0.2, 0.1, 0.05] (low acceleration changes)
         """
-        # Extract velocities from pose data (assuming it contains velocity info)
-        # Note: This assumes robot_pose contains velocity data beyond just pose
         raw_linear_vel, raw_angular_vel = (
-            float(last_action[0]),
-            float(last_action[-1]),
+            float(robot_twist[0]),
+            float(robot_twist[-1]),
         )
 
         # Apply velocity filtering
@@ -375,7 +371,7 @@ class LocalizationCombinedSpace(BaseObservationSpace):
     name = "LocalizationCombinedSpace"
     requires = {
         "robot_pose": Pose2D,  # Robot pose from TF system
-        "last_action": RobotActionVector,  # Last action taken by the robot
+        "robot_twist": RobotVelocity,  # Measured robot velocity
     }
 
     def __init__(
@@ -428,7 +424,7 @@ class LocalizationCombinedSpace(BaseObservationSpace):
         return spaces.Box(low=np.array([-1.0] * 6), high=np.array([1.0] * 6), dtype=np.float32)
 
     def encode_observation(
-        self, robot_pose: Pose2D, last_action: RobotActionVector, *args: Any, **kwargs: Any
+        self, robot_pose: Pose2D, robot_twist: RobotVelocity, *args: Any, **kwargs: Any
     ) -> CombinedLocalizationVector:
         """Encode comprehensive localization data through integrated pose and velocity processing.
 
@@ -446,11 +442,10 @@ class LocalizationCombinedSpace(BaseObservationSpace):
                 - Coordinate Frame: world/map frame with consistent origin
                 - Example: [2.5, 1.2, 0.785] (2.5m east, 1.2m north, facing 45° northeast)
 
-            last_action (RobotActionVector): Most recent robot action command vector
-                - Shape: (2,) or (3,) depending on robot kinematics
-                - Units: [m/s, rad/s] for differential drive or [m/s, m/s, rad/s] for holonomic
-                - Source: robot action controller/command interface
-                - Constraints: velocities within robot physical limits
+            robot_twist (RobotVelocity): Measured robot velocity from odometry
+                - Shape: (3,) as [linear_x, linear_y, angular_z]
+                - Units: [m/s, m/s, rad/s]
+                - Source: odometry twist in the base frame
                 - Coordinate Frame: robot base frame (x: forward, y: left, z: up-rotation)
                 - Example: [0.5, 0.2] (moving forward at 0.5 m/s, turning right at 0.2 rad/s)
 
@@ -470,7 +465,7 @@ class LocalizationCombinedSpace(BaseObservationSpace):
         return np.concatenate(
             [
                 self.pose_space.encode_observation(robot_pose, *args, **kwargs),
-                self.odom_space.encode_observation(last_action, *args, **kwargs),
+                self.odom_space.encode_observation(robot_twist, *args, **kwargs),
             ],
             dtype=np.float32,
         )

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.utils.type_aliases import ObservationDict
+from rosnav_rl.utils.type_aliases import DecodedAction, ObservationDict
 
 from ..observation_space.spaces.dynamics import LastActionSpace
 from ..observation_space.spaces.environment import (
+    CrowdReachabilitySpace,
     CrowdReachabilityTubeSpace,
     CrowdTimeToContactSpace,
     LaserCartesianMapSpace,
@@ -24,7 +25,6 @@ from ..observation_space.spaces.navigation import DistAngleToGoalSpace, DistAngl
 from .base_space_manager import BaseSpaceManager
 
 if TYPE_CHECKING:
-    from rosnav_rl.cfg.action_spaces import BaseActionSpace
     from rosnav_rl.cfg.agent import AgentConfig
 
     from ..observation_space.spaces.base_observation_space import BaseObservationSpace
@@ -103,8 +103,10 @@ class MirrorSpaceManager(BaseSpaceManager):
             PedestrianTypeSpace.name,
             PedestrianSocialStateSpace.name,
             PedestrianLocationSpace.name,
-            LaserCartesianMapSpace.name,
         )
+        if name == LaserCartesianMapSpace.name:
+            self._check_cartesian_mirror(name, space)
+            return _flip_rows
         if name in rows:
             return _flip_rows
         if name == PedestrianVelYSpace.name:
@@ -120,10 +122,21 @@ class MirrorSpaceManager(BaseSpaceManager):
         if name in (DistAngleToSubgoalSpace.name, DistAngleToGoalSpace.name):
             return self._checked_negate(name, space, (1,))
         if name == LastActionSpace.name:
+            if not isinstance(space, spaces.Box):
+                raise ValueError(f"'{name}' must be a Box to be reflected")
             return self._checked_negate(name, space, tuple(range(1, space.shape[-1])))
-        if name in (CrowdTimeToContactSpace.name, CrowdReachabilityTubeSpace.name):
+        if name in (CrowdTimeToContactSpace.name, CrowdReachabilitySpace.name, CrowdReachabilityTubeSpace.name):
             return _identity
         raise ValueError(f"no reflection rule for observation space '{name}'")
+
+    def _check_cartesian_mirror(self, name: str, space: spaces.Space) -> None:
+        if not isinstance(space, spaces.Box) or space.shape[-1] % 2:
+            raise ValueError(f"'{name}' cannot be mirrored with an odd feature_map_size")
+        parameters = self._spec.parameters
+        increment = parameters.laser_angle_increment
+        if increment is None or self._spec.observation_encodings.get(name, 1) < 2:
+            increment = 2.0 * np.pi / parameters.laser_num_beams
+        mirrored_beams(parameters.laser_num_beams, parameters.laser_angle_min, increment)
 
     @staticmethod
     def _checked_negate(name: str, space: spaces.Space, indices: tuple[int, ...]) -> Callable[[np.ndarray], np.ndarray]:
@@ -150,17 +163,20 @@ class MirrorSpaceManager(BaseSpaceManager):
         encoded = super().encode_observation(obs_dict)
         if not isinstance(encoded, dict):
             raise ValueError("mirroring needs a dict observation")
+        arrays = cast("dict[str, np.ndarray]", encoded)
         self._reflected = (
             self._episode_reflected if self._mode == "random" else self._nearest_pedestrian_on_right(obs_dict)
         )
         if not self._reflected:
-            return encoded
-        return {
-            name: self._observation_space_manager.spaces[name].render(self._laser_order)
-            if name == StackedLaserMapSpace.name
-            else self._rules[name](value)
-            for name, value in encoded.items()
-        }
+            return arrays
+        reflected: dict[str, np.ndarray] = {}
+        for name, value in arrays.items():
+            space = self._observation_space_manager.spaces[name]
+            if isinstance(space, StackedLaserMapSpace):
+                reflected[name] = space.render(self._laser_order)
+            else:
+                reflected[name] = self._rules[name](value)
+        return reflected
 
     def _reflect(self, command: np.ndarray) -> np.ndarray:
         if not self._reflected:
@@ -172,9 +188,9 @@ class MirrorSpaceManager(BaseSpaceManager):
     def decode_action(self, action: np.ndarray) -> np.ndarray:
         return self._reflect(super().decode_action(action))
 
-    def decode_split_action(self, action: np.ndarray) -> list[tuple[BaseActionSpace, np.ndarray]]:
+    def decode_split_action(self, action: np.ndarray) -> list[DecodedAction]:
         return [
-            (sub, self._reflect(command) if sub.type in _DRIVE_TYPES else command)
+            DecodedAction(sub, self._reflect(command) if sub.type in _DRIVE_TYPES else command)
             for sub, command in super().decode_split_action(action)
         ]
 

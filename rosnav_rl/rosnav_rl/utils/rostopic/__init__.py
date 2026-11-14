@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 
 class Namespace:
     """
@@ -92,13 +94,13 @@ class Topic:
     def __init__(
         self,
         name: str,
-        namespaces: str | list[str | Namespace] | Namespace | None = None,
+        namespaces: str | Sequence[str | Namespace] | Namespace | None = None,
     ):
         self.namespaces: list[Namespace] = self._process_namespaces(namespaces)
         self.name, additional_namespaces = self._process_name(str(name))
         self.namespaces.extend(additional_namespaces)
 
-    def _process_namespaces(self, namespaces: str | list[str | Namespace] | Namespace | None) -> list[Namespace]:
+    def _process_namespaces(self, namespaces: str | Sequence[str | Namespace] | Namespace | None) -> list[Namespace]:
         """
         Process the namespaces associated with the topic.
 

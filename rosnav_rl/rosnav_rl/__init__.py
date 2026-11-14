@@ -51,6 +51,7 @@ __all__ = [
 ]
 
 
+from . import tuning
 from .cfg import (
     ActionSpaceSpec,
     AgentConfig,

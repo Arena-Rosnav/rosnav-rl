@@ -8,7 +8,7 @@ from rosnav_rl.spaces.observation_space.spaces.dynamics import LastActionSpace
 from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
 from rosnav_rl.spaces.observation_space.spaces.perception import LaserScanSpace, ReducedLaserScanSpace, RGBSpace
 
-from .base_extractor import RosnavBaseExtractor, TensorDict
+from .base_extractor import RosnavBaseExtractor, TensorDict, space_shape
 
 
 class EXTRACTOR_1(RosnavBaseExtractor):
@@ -36,9 +36,9 @@ class EXTRACTOR_1(RosnavBaseExtractor):
             LaserScanSpace.name if LaserScanSpace.name in observation_space else ReducedLaserScanSpace.name
         )
         self._laser_size, self._goal_size, self._last_action_size = (
-            observation_space[self._laser_key].shape[-1],
-            observation_space[DistAngleToSubgoalSpace.name].shape[-1],
-            observation_space[LastActionSpace.name].shape[-1],
+            space_shape(observation_space[self._laser_key])[-1],
+            space_shape(observation_space[DistAngleToSubgoalSpace.name])[-1],
+            space_shape(observation_space[LastActionSpace.name])[-1],
         )
 
         self._stack_size = stack_size
@@ -70,7 +70,7 @@ class EXTRACTOR_1(RosnavBaseExtractor):
             nn.ReLU(),
         )
 
-    def get_input(self, observations: th.Tensor | TensorDict) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
+    def get_input(self, observations: TensorDict) -> tuple[th.Tensor, ...]:
         if isinstance(observations, th.Tensor):
             raise NotImplementedError("Not implemented for th.Tensor.")
             # if observations.dim() == 2:
@@ -108,7 +108,7 @@ class EXTRACTOR_1(RosnavBaseExtractor):
 
         return tuple([add_time_dimension(obs) for obs in observations])
 
-    def forward(self, observations: th.Tensor | TensorDict) -> th.Tensor:
+    def forward(self, observations: TensorDict) -> th.Tensor:
         """
         Forward pass of the feature extractor.
 
@@ -600,7 +600,7 @@ class EXTRACTOR_10(EXTRACTOR_5):
         **kwargs: Any,
     ):
 
-        (self._img_num, self._img_c, self._img_h, self._img_w) = observation_space[RGBSpace.name].shape
+        (self._img_num, self._img_c, self._img_h, self._img_w) = space_shape(observation_space[RGBSpace.name])
 
         super().__init__(observation_space, features_dim, stack_size, *args, **kwargs)
 
@@ -636,7 +636,7 @@ class EXTRACTOR_10(EXTRACTOR_5):
             nn.ReLU(),
         )
 
-    def get_input(self, observations: TensorDict) -> tuple[th.Tensor, th.Tensor, th.Tensor, th.Tensor]:
+    def get_input(self, observations: TensorDict) -> tuple[th.Tensor, ...]:
         laser, goal, last_action = super().get_input(observations)
         images = observations[RGBSpace.name]
         return laser, goal, last_action, images

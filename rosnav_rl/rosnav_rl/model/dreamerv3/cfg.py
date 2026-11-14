@@ -395,7 +395,7 @@ class DreamerV3Cfg(FrameworkCfg):
         This class inherits from BaseModel and allows for arbitrary types in its configuration.
     """
 
-    name: Literal[SupportedRLFrameworks.DREAMER_V3] = SupportedRLFrameworks.DREAMER_V3
+    name: Literal[SupportedRLFrameworks.DREAMER_V3] = SupportedRLFrameworks.DREAMER_V3  # pyright: ignore[reportIncompatibleVariableOverride]
     general: GeneralCfg = GeneralCfg()
     environment: EnvironmentCfg = EnvironmentCfg()
     model: ModelCfg = ModelCfg()

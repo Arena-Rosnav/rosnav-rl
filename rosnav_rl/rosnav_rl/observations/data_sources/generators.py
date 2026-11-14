@@ -10,13 +10,16 @@ from __future__ import annotations
 import math
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
 from warnings import warn
 
 import arena_people_msgs.msg as arena_people_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
 import rclpy
+import rclpy.duration
+import rclpy.time
 import tf2_ros
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import euler_from_quaternion
@@ -26,14 +29,17 @@ if TYPE_CHECKING:
 from ..utils.pose import Pose2DType
 from ..utils.reachability_tube import ReachabilityTube
 from ..utils.semantic import (
+    candidate_velocities,
     get_relative_pos_to_robot,
     get_relative_vel_to_robot,
+    reachability_scalars,
     straight_line_subgoal,
     time_to_contact,
 )
 from ..utils.types import (
     ArenaPedestrianDetections,
     ArenaPedestrianStates,
+    CrowdReachability,
     CrowdReachabilityTube,
     CrowdTimeToContact,
     DistanceAngleMetrics,
@@ -80,11 +86,12 @@ class RobotPoseTFGenerator(Generator[Pose2D]):
         **kwargs: Any,
     ):
         super().__init__(name, **kwargs)
-        self._node = node
-        if not self._node:
+        if not node:
             raise ValueError("RobotPoseTFGenerator requires a ROS 2 node.")
         if not source_frame:
             raise ValueError("RobotPoseTFGenerator requires a non-empty source_frame.")
+
+        self._node = node
 
         self._tf_buffer = tf2_ros.Buffer(node=self._node)
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self._node)
@@ -820,7 +827,7 @@ class PedestrianTypeGenerator(Generator[PedestrianTypeArray]):
 
         # Use group_id as the unique identifier for each pedestrian
         try:
-            group_id_idx = people_data.people[0].tagnames.index("group_id")
+            group_id_idx = cast(Sequence[Any], people_data.people)[0].tagnames.index("group_id")
             current_ped_ids = [p.tags[group_id_idx] for p in people_data.people]
         except (ValueError, AttributeError, IndexError):
             warn("Pedestrian group ID not found in the data. Returning empty array.", stacklevel=2)
@@ -897,7 +904,7 @@ class PedestrianSocialStateGenerator(Generator[PedestrianSocialStates]):
         current_ped_ids = [p.name for p in people_data.people]
         num_peds = len(people_data.people)
         try:
-            behavior_idx = people_data.people[0].tagnames.index("behavior")
+            behavior_idx = cast(Sequence[Any], people_data.people)[0].tagnames.index("behavior")
             self._ped_social_states_buffer = np.empty(num_peds, dtype=int)
             for i, data in enumerate(people_data.people):
                 self._ped_social_states_buffer[i] = int(data.tags[behavior_idx])
@@ -1462,6 +1469,61 @@ class CrowdTimeToContactGenerator(Generator[CrowdTimeToContact]):
         out[2] = float(np.count_nonzero(ttc < self.imminent))
         out[3] = ttc[ahead].min() if ahead.any() else self.horizon
         return out
+
+
+class CrowdReachabilityGenerator(Generator[CrowdReachability]):
+    """Share of the robot's candidate velocities that lead to contact within `horizon`: largest, second largest, count above one half, union."""
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+        "pedestrian_relative_velocities": PedestrianRelativeVelocities,
+    }
+
+    def __init__(
+        self,
+        name: str,
+        pedestrian_radius: float = 0.3,
+        horizon: float = 3.0,
+        max_range: float = 12.0,
+        max_speed: float | None = None,
+        speed_fractions: tuple[float, ...] = (0.0, 0.5, 1.0),
+        num_headings: int = 16,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        self.pedestrian_radius = pedestrian_radius
+        self.horizon = horizon
+        self.max_range = max_range
+        self.max_speed = max_speed
+        self.speed_fractions = tuple(speed_fractions)
+        self.num_headings = num_headings
+        self._candidates: dict[float, np.ndarray] = {}
+
+    def _candidates_for(self, max_speed: float) -> np.ndarray:
+        if max_speed not in self._candidates:
+            self._candidates[max_speed] = candidate_velocities(max_speed, self.speed_fractions, self.num_headings)
+        return self._candidates[max_speed]
+
+    def _generate(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        pedestrian_relative_velocities: PedestrianRelativeVelocities,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> CrowdReachability:
+        if len(pedestrian_relative_locations) == 0 or len(pedestrian_relative_velocities) == 0:
+            return np.zeros(4, dtype=np.float32)
+        positions = np.asarray(pedestrian_relative_locations, dtype=np.float64).reshape(-1, 2)
+        velocities = np.asarray(pedestrian_relative_velocities, dtype=np.float64).reshape(-1, 2)
+        in_range = np.hypot(positions[:, 0], positions[:, 1]) <= self.max_range
+        max_speed = self.max_speed if self.max_speed is not None else simulation_state_container.max_linear_vel
+        return reachability_scalars(
+            positions[in_range],
+            velocities[in_range],
+            self._candidates_for(float(max_speed)),
+            contact_radius=simulation_state_container.robot_radius + self.pedestrian_radius,
+            horizon=self.horizon,
+        )
 
 
 class PedestrianTubeValueGenerator(Generator[PedestrianTubeValues]):

@@ -15,9 +15,11 @@ from rosnav_rl.cfg.agent import AgentConfig
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.stable_baselines3.cfg import PPO_Cfg, StableBaselinesCfg
 from rosnav_rl.model.stable_baselines3.cfg.ppo import PPO_Algorithm_Cfg
+from rosnav_rl.observations.utils.semantic import candidate_velocities, reachability_scalars
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.spaces.space_manager import BaseSpaceManager, MirrorSpaceManager
 from rosnav_rl.spaces.space_manager.mirror_space_manager import mirrored_beams
+from rosnav_rl.utils.type_aliases import DecodedAction
 
 BEAMS = 720
 ANGLE_MIN = -np.pi
@@ -66,6 +68,9 @@ def _scene(sign: float = 1.0) -> dict:
         "dist_angle_to_subgoal": np.array([3.0, 0.6 * sign], dtype=np.float32),
         "last_action": np.array([0.5, 0.3 * sign], dtype=np.float32),
         "crowd_ttc": np.array([2.0, 5.0, 1.0, 2.0], dtype=np.float32),
+        "crowd_reachability": reachability_scalars(
+            positions, velocities, candidate_velocities(1.0), contact_radius=0.7, horizon=3.0
+        ),
     }
 
 
@@ -86,6 +91,17 @@ def test_nearest_pedestrian_on_the_right_reads_as_the_reflected_scene():
     for name in encoded:
         np.testing.assert_allclose(encoded[name], expected[name], atol=1e-6, err_msg=name)
         assert encoded[name].flags["C_CONTIGUOUS"]
+
+
+def test_reachability_scalars_pass_through_a_reflection_unchanged():
+    mirrored = RL_Agent(_spec("canonical", "AGENT_5_REACH")).space_manager
+    plain = RL_Agent(_spec("none", "AGENT_5_REACH")).space_manager
+
+    encoded = mirrored.encode_observation(_scene())
+    expected = plain.encode_observation(_scene(sign=-1.0))
+
+    assert mirrored.reflected
+    np.testing.assert_allclose(encoded["CrowdReachabilitySpace"], expected["CrowdReachabilitySpace"], atol=1e-6)
 
 
 def test_nearest_pedestrian_on_the_left_passes_through():
@@ -137,6 +153,23 @@ def test_reflected_split_decisions_leave_non_drive_slices_alone():
     np.testing.assert_allclose(drive[1], [0.7, 0.0, -0.4])
     assert rest[0] == humanoid
     np.testing.assert_allclose(rest[1], [0.1, 0.2, 0.3])
+
+
+def test_reflected_split_decisions_are_named_decoded_actions():
+    humanoid = HumanoidActionSpace(locomotion_dof=3)
+    mirrored = RL_Agent(
+        _spec("canonical", action_space=CompositeActionSpace(action_spaces=[DRIVE, humanoid]))
+    ).space_manager
+    mirrored.encode_observation(_scene())
+
+    drive, rest = mirrored.decode_split_action(np.array([0.7, 0.4, 0.1, 0.2, 0.3]))
+
+    assert isinstance(drive, DecodedAction)
+    assert isinstance(rest, DecodedAction)
+    assert drive.space.type == "differential_drive"
+    np.testing.assert_allclose(drive.action, [0.7, 0.0, -0.4])
+    assert rest.space == humanoid
+    np.testing.assert_allclose(rest.action, [0.1, 0.2, 0.3])
 
 
 def test_arm_actions_are_refused():

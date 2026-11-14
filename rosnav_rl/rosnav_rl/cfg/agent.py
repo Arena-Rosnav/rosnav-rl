@@ -57,6 +57,7 @@ class AgentConfig(BaseModel):
         normalized_actions: Policy actions in [-1, 1], mapped linearly onto the robot limits.
         action_chunk: Commands per policy decision, executed one per control tick.
         mirror: Observation and action reflection across the forward axis.
+        observation_encodings: Encoding version per observation space, a space not listed reads version 1.
         deterministic_inference: Whether the inference node acts on the policy's mean action.
         parameters: Unified observation + environment parameters. Review and override in the training config YAML before
             starting a run.  See :class:`~rosnav_rl.cfg.parameters.AgentParameters`.
@@ -94,6 +95,10 @@ class AgentConfig(BaseModel):
             "Reflection across the robot's forward axis: canonical puts the nearest pedestrian on the left, "
             "random reflects whole episodes with probability one half."
         ),
+    )
+    observation_encodings: dict[str, int] = Field(
+        default_factory=dict,
+        description="Encoding version per observation space, fixed when training starts. A space not listed reads version 1.",
     )
     deterministic_inference: bool = Field(
         True, description="The inference node acts on the policy's mean action, False samples it as training does."
@@ -148,11 +153,9 @@ class AgentConfig(BaseModel):
     @classmethod
     def from_yaml(cls, path: str | Path) -> Self:
         """Load from a YAML file."""
-        import yaml
+        from rosnav_rl.utils.yaml_io import load_yaml
 
-        with open(path) as f:
-            data = yaml.safe_load(f)
-        return cls.model_validate(data)
+        return cls.model_validate(load_yaml(path))
 
     def _to_commented_map(self) -> CommentedMap:
         """Delegates to :func:`rosnav_rl.utils.yaml_utils.agent_config_to_commented_map`."""

@@ -182,13 +182,12 @@ class TestRewardFactoredSafeDistance:
         rf = make_reward_function()
         unit = RewardFactoredSafeDistance(rf, factor=-0.5)
 
-        # laser min=0.3, safety_distance=0.5, radius=0.3 => threshold=0.8
-        # violation = 0.8 - 0.3 = 0.5; reward = -0.5 * 0.5 = -0.25
+        # laser min=0.3, safety_distance=0.5 => violation = 0.2; reward = -0.5 * 0.2 = -0.1
         laser = np.array([0.3, 1.0, 2.0, 1.5])
 
         unit(laser_safety_violation=True, front_laser=laser, simulation_state_container=sim_state)
 
-        assert total_reward(rf) == pytest.approx(-0.25)
+        assert total_reward(rf) == pytest.approx(-0.1)
 
     def test_no_violation_no_penalty(self, make_reward_function, sim_state):
         rf = make_reward_function()
@@ -206,40 +205,44 @@ class TestRewardFactoredSafeDistance:
 
 
 class TestRewardNoMovement:
-    def test_stationary_robot_penalized(self, make_reward_function):
+    def test_stationary_robot_penalized(self, make_reward_function, sim_state):
+        sim_state = sim_state.model_copy(update={"max_linear_vel": 0.5})
         rf = make_reward_function()
         unit = RewardNoMovement(rf, reward=-0.01)
 
         action = np.array([0.0, 0.0, 0.0])
-        unit(last_action=action)
+        unit(last_action=action, simulation_state_container=sim_state)
 
         assert total_reward(rf) == pytest.approx(-0.01)
 
-    def test_moving_robot_no_penalty(self, make_reward_function):
+    def test_moving_robot_no_penalty(self, make_reward_function, sim_state):
+        sim_state = sim_state.model_copy(update={"max_linear_vel": 0.5})
         rf = make_reward_function()
         unit = RewardNoMovement(rf, reward=-0.01)
 
         action = np.array([0.5, 0.0, 0.2])
-        unit(last_action=action)
+        unit(last_action=action, simulation_state_container=sim_state)
 
         assert total_reward(rf) == 0.0
 
-    def test_micro_movement_below_tolerance(self, make_reward_function):
+    def test_micro_movement_below_tolerance(self, make_reward_function, sim_state):
+        sim_state = sim_state.model_copy(update={"max_linear_vel": 0.5})
         rf = make_reward_function()
         unit = RewardNoMovement(rf, reward=-0.05)
 
-        # Tolerance is 0.1
+        # Tolerance is 0.2 * 0.5
         action = np.array([0.05, 0.0, 0.0])
-        unit(last_action=action)
+        unit(last_action=action, simulation_state_container=sim_state)
 
         assert total_reward(rf) == pytest.approx(-0.05)
 
-    def test_at_tolerance_boundary(self, make_reward_function):
+    def test_at_tolerance_boundary(self, make_reward_function, sim_state):
+        sim_state = sim_state.model_copy(update={"max_linear_vel": 0.5})
         rf = make_reward_function()
         unit = RewardNoMovement(rf, reward=-0.05)
 
         action = np.array([0.1, 0.0, 0.0])
-        unit(last_action=action)
+        unit(last_action=action, simulation_state_container=sim_state)
 
         # abs(0.1) <= 0.1 => penalized
         assert total_reward(rf) == pytest.approx(-0.05)
@@ -623,61 +626,61 @@ class TestRewardFactoredReverseDrive:
 
 
 class TestRewardAbruptVelocityChange:
-    def test_first_step_no_penalty(self, make_reward_function):
+    def test_first_step_no_penalty(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardAbruptVelocityChange(rf)
 
         action = np.array([0.5, 0.0, 0.3])
-        unit(last_action=action)
+        unit(last_action=action, simulation_state_container=sim_state)
 
         assert total_reward(rf) == 0.0  # First step seeds state
 
-    def test_identical_actions_no_penalty(self, make_reward_function):
+    def test_identical_actions_no_penalty(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardAbruptVelocityChange(rf)
 
         action = np.array([0.5, 0.0, 0.3])
-        unit(last_action=action)
+        unit(last_action=action, simulation_state_container=sim_state)
         reset_rf(rf)
 
-        unit(last_action=action.copy())
+        unit(last_action=action.copy(), simulation_state_container=sim_state)
         assert total_reward(rf) == 0.0
 
-    def test_abrupt_change_penalized(self, make_reward_function):
+    def test_abrupt_change_penalized(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardAbruptVelocityChange(rf, vel_factors={"0": 1.0, "2": 1.0})
 
         action1 = np.array([0.0, 0.0, 0.0])
         action2 = np.array([1.0, 0.0, 1.0])
 
-        unit(last_action=action1)
+        unit(last_action=action1, simulation_state_container=sim_state)
         reset_rf(rf)
-        unit(last_action=action2)
+        unit(last_action=action2, simulation_state_container=sim_state)
 
-        # diff[0] = 1.0, diff[2] = 1.0
+        # ranges = [1.0, 1.0, 2.0] => normalized diff[0] = 1.0, diff[2] = 0.5
         # penalty_dim0 = -(1.0**4 / 100) * 1.0 = -0.01
-        # penalty_dim2 = -(1.0**4 / 100) * 1.0 = -0.01
-        assert total_reward(rf) == pytest.approx(-0.02)
+        # penalty_dim2 = -(0.5**4 / 100) * 1.0 = -0.000625
+        assert total_reward(rf) == pytest.approx(-0.010625)
 
-    def test_reset_clears_state(self, make_reward_function):
+    def test_reset_clears_state(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardAbruptVelocityChange(rf)
 
-        unit(last_action=np.array([1.0, 0.0, 0.5]))
+        unit(last_action=np.array([1.0, 0.0, 0.5]), simulation_state_container=sim_state)
         assert unit.last_action is not None
 
         unit.reset()
         assert unit.last_action is None
 
-    def test_small_change_small_penalty(self, make_reward_function):
+    def test_small_change_small_penalty(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardAbruptVelocityChange(rf, vel_factors={"0": 1.0})
 
-        unit(last_action=np.array([0.0, 0.0, 0.0]))
+        unit(last_action=np.array([0.0, 0.0, 0.0]), simulation_state_container=sim_state)
         reset_rf(rf)
 
         # Small change = 0.1; penalty = -(0.1^4 / 100) * 1.0 = -0.000001
-        unit(last_action=np.array([0.1, 0.0, 0.0]))
+        unit(last_action=np.array([0.1, 0.0, 0.0]), simulation_state_container=sim_state)
         assert total_reward(rf) == pytest.approx(-0.000001, abs=1e-8)
 
 
@@ -687,41 +690,41 @@ class TestRewardAbruptVelocityChange:
 
 
 class TestRewardRootVelocityDifference:
-    def test_first_step_no_reward(self, make_reward_function):
+    def test_first_step_no_reward(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardRootVelocityDifference(rf, k=500)
 
-        unit(last_action=np.array([0.5, 0.0, 0.3]))
+        unit(last_action=np.array([0.5, 0.0, 0.3]), simulation_state_container=sim_state)
         assert total_reward(rf) == 0.0
 
-    def test_consistent_velocity_rewarded(self, make_reward_function):
+    def test_consistent_velocity_rewarded(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardRootVelocityDifference(rf, k=500)
 
         action = np.array([0.5, 0.0, 0.3])
-        unit(last_action=action)
+        unit(last_action=action, simulation_state_container=sim_state)
         reset_rf(rf)
 
         # Identical velocity => diff=0 => reward = (1-0)/500 = 0.002
-        unit(last_action=action.copy())
+        unit(last_action=action.copy(), simulation_state_container=sim_state)
         assert total_reward(rf) == pytest.approx(1.0 / 500)
 
-    def test_large_difference_no_reward(self, make_reward_function):
+    def test_large_difference_no_reward(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardRootVelocityDifference(rf, k=0.1)
 
-        unit(last_action=np.array([0.0, 0.0, 0.0]))
+        unit(last_action=np.array([0.0, 0.0, 0.0]), simulation_state_container=sim_state)
         reset_rf(rf)
 
         # L2 diff = sqrt(1.0 + 1.0) ~ 1.414 > 0.1
-        unit(last_action=np.array([1.0, 0.0, 1.0]))
+        unit(last_action=np.array([1.0, 0.0, 1.0]), simulation_state_container=sim_state)
         assert total_reward(rf) == 0.0
 
-    def test_reset_clears_state(self, make_reward_function):
+    def test_reset_clears_state(self, make_reward_function, sim_state):
         rf = make_reward_function()
         unit = RewardRootVelocityDifference(rf)
 
-        unit(last_action=np.array([1.0, 0.0, 0.0]))
+        unit(last_action=np.array([1.0, 0.0, 0.0]), simulation_state_container=sim_state)
         unit.reset()
 
         assert unit.last_action is None

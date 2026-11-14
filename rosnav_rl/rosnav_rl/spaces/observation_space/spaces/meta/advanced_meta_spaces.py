@@ -43,7 +43,7 @@ class MissionContextSpace(BaseObservationSpace):
     - Progress computation: progress = 1 - (current_distance / initial_distance) with EMA smoothing
     - Phase detection: categorical assignment based on distance threshold comparison
     - Urgency calculation: urgency = max(0, expected_progress - actual_progress) * urgency_factor
-    - Time normalization: time_norm = elapsed_time / max_mission_time with clamping
+    - Time normalization: time_norm = elapsed_steps / max_steps with clamping
 
     Use Cases:
     - Mission-aware navigation with deadline constraints and progress monitoring
@@ -57,7 +57,7 @@ class MissionContextSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        max_mission_time: float = 300.0,  # 5 minutes
+        max_steps: int = 600,
         progress_smoothing: float = 0.9,
         phase_distance_thresholds: list[float] | None = None,
         *args: Any,
@@ -66,13 +66,13 @@ class MissionContextSpace(BaseObservationSpace):
         """Initialize mission context space.
 
         Args:
-            max_mission_time: Maximum expected mission duration (seconds)
+            max_steps: Episode length cap in steps
             progress_smoothing: Smoothing factor for progress tracking
             phase_distance_thresholds: Distance thresholds for mission phases
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
-        self.max_mission_time = max_mission_time
+        self.max_steps = max_steps
         self.progress_smoothing = progress_smoothing
         self.phase_distance_thresholds = phase_distance_thresholds or [10.0, 3.0, 1.0]
 
@@ -195,9 +195,7 @@ class MissionContextSpace(BaseObservationSpace):
 
         # Time normalization
         elapsed_steps = self.step_count - (self.mission_start_time or 0)
-        # Assume ~10 Hz, so max_time * 10 steps
-        max_steps = self.max_mission_time * 10.0
-        time_normalized = min(1.0, elapsed_steps / max_steps)
+        time_normalized = min(1.0, elapsed_steps / self.max_steps)
 
         # Mission phase
         mission_phase = self._determine_mission_phase(goal_distance)
@@ -229,7 +227,7 @@ class PerformanceContextSpace(BaseObservationSpace):
 
     Mathematical Processing:
     - Path efficiency: beneficial_steps / total_steps where beneficial = distance reduction
-    - Energy efficiency: 1 - (avg_velocity_usage / max_velocity) with normalization
+    - Energy efficiency: 1 - avg_velocity_usage with usage normalized by the velocity limits
     - Smoothness: 1 - (avg_acceleration_magnitude / max_expected_acceleration)
     - Overall performance: weighted_sum([path_eff, energy_eff, smoothness]) with configurable weights
 
@@ -246,17 +244,26 @@ class PerformanceContextSpace(BaseObservationSpace):
         "last_action": RobotActionVector,
     }
 
-    def __init__(self, efficiency_window: int = 50, max_velocity: float = 2.0, *args: Any, **kwargs: Any):
+    def __init__(
+        self,
+        efficiency_window: int = 50,
+        max_linear_vel: float = 1.0,
+        max_angular_vel: float = 1.0,
+        *args: Any,
+        **kwargs: Any,
+    ):
         """Initialize performance context space.
 
         Args:
             efficiency_window: Window size for efficiency calculations
-            max_velocity: Maximum velocity for energy calculations
+            max_linear_vel: Maximum linear velocity (m/s)
+            max_angular_vel: Maximum angular velocity (rad/s)
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
         self.efficiency_window = efficiency_window
-        self.max_velocity = max_velocity
+        self.max_linear_vel = max_linear_vel
+        self.max_angular_vel = max_angular_vel
 
         # Performance tracking
         self.distance_history = []
@@ -318,7 +325,7 @@ class PerformanceContextSpace(BaseObservationSpace):
         velocity_magnitudes = np.linalg.norm(velocities, axis=1)
 
         # Energy efficiency inversely related to average velocity usage
-        avg_velocity_ratio = np.mean(velocity_magnitudes) / self.max_velocity
+        avg_velocity_ratio = np.mean(velocity_magnitudes)
         energy_efficiency = 1.0 - avg_velocity_ratio
 
         return np.clip(energy_efficiency, 0.0, 1.0)
@@ -337,7 +344,7 @@ class PerformanceContextSpace(BaseObservationSpace):
         # Lower acceleration variance = higher smoothness
         if len(acceleration_magnitudes) > 0:
             avg_acceleration = np.mean(acceleration_magnitudes)
-            max_expected_acceleration = self.max_velocity * 0.5  # Assume reasonable acceleration
+            max_expected_acceleration = 0.5  # Assume reasonable acceleration
 
             smoothness = 1.0 - min(1.0, avg_acceleration / max_expected_acceleration)
         else:
@@ -392,7 +399,7 @@ class PerformanceContextSpace(BaseObservationSpace):
                 - Example: [0.85, 0.7, 0.9, 0.82] (high path efficiency, good energy use, smooth motion)
         """
         goal_distance = float(dist_angle_to_goal[0])
-        velocity = (float(last_action[0]), float(last_action[-1]))
+        velocity = (float(last_action[0]) / self.max_linear_vel, float(last_action[-1]) / self.max_angular_vel)
 
         # Update tracking
         self._update_tracking(goal_distance, velocity)
@@ -426,6 +433,7 @@ class SafetyContextSpace(BaseObservationSpace):
     Configuration:
     - safety_distance: Primary safety buffer distance threshold (meters)
     - critical_distance: Emergency collision threshold (meters)
+    - robot_radius: Robot radius subtracted from laser ranges (meters)
     - risk_history_length: Temporal window for risk statistics (steps)
 
     Output Format: 4-dimensional normalized safety vector with collision risk, average risk,
@@ -446,6 +454,7 @@ class SafetyContextSpace(BaseObservationSpace):
         safety_distance: float = 1.0,
         critical_distance: float = 0.3,
         risk_history_length: int = 20,
+        robot_radius: float = 0.0,
         *args: Any,
         **kwargs: Any,
     ):
@@ -455,11 +464,13 @@ class SafetyContextSpace(BaseObservationSpace):
             safety_distance: Safe distance threshold
             critical_distance: Critical distance threshold
             risk_history_length: Length of risk history to track
+            robot_radius: Robot radius subtracted from laser ranges to get surface clearance
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
         self.safety_distance = safety_distance
-        self.critical_distance = critical_distance
+        self.critical_distance = min(critical_distance, safety_distance)
+        self.robot_radius = robot_radius
         self.risk_history_length = risk_history_length
 
         # Safety tracking
@@ -494,7 +505,7 @@ class SafetyContextSpace(BaseObservationSpace):
             return 0.0  # No valid readings = no risk
 
         # Find closest obstacle
-        min_distance = np.min(valid_readings)
+        min_distance = float(np.min(valid_readings)) - self.robot_radius
 
         # Base risk on distance
         if min_distance <= self.critical_distance:
@@ -506,7 +517,7 @@ class SafetyContextSpace(BaseObservationSpace):
             distance_risk = 0.0
 
         # Modify risk based on velocity (higher velocity = higher risk)
-        velocity_magnitude = np.linalg.norm(velocity)
+        velocity_magnitude = float(np.linalg.norm(velocity))
         velocity_factor = min(1.5, 1.0 + velocity_magnitude * 0.5)
 
         total_risk = min(1.0, distance_risk * velocity_factor)
@@ -530,7 +541,7 @@ class SafetyContextSpace(BaseObservationSpace):
         """Compute safety metrics."""
         # Average risk
         if len(self.risk_history) > 0:
-            avg_risk = np.mean(self.risk_history)
+            avg_risk = float(np.mean(self.risk_history))
         else:
             avg_risk = current_risk
 

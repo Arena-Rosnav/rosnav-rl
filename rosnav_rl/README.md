@@ -229,6 +229,10 @@ Sensors ──▶ ObservationManager ──▶ ObservationSpaceManager ──▶
 
 ---
 
+## YAML
+
+rosnav_rl and arena_training read and write YAML only through `rosnav_rl.utils.yaml_io` (`load_yaml`, `loads_yaml`, `dump_yaml`, `dumps_yaml`), which wraps ruamel (`ruamel-yaml` in `pyproject.toml`) in YAML 1.2. A file written by one part then loads back with the same values in every other part. Do not import PyYAML: it follows YAML 1.1 and reads a float such as `3e-05` as a string.
+
 ## Testing
 
 ```bash

@@ -11,7 +11,7 @@ import geometry_msgs.msg
 import numpy as np
 import pytest
 import rclpy
-import yaml
+from rosnav_rl.utils.yaml_io import loads_yaml
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
@@ -30,7 +30,7 @@ def pipeline():
     if not rclpy.ok():
         rclpy.init()
     node = Node("first_subgoal_test")
-    config = yaml.safe_load((importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml").read_text())
+    config = loads_yaml((importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml").read_text())
     set_robot_pose_frames(config, "env_0/jackal", "base_link")
     set_pedestrians_topic(config, NAMESPACE)
     manager = ObservationManager.from_config(

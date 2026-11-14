@@ -6,16 +6,11 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from rosnav_rl.spaces.observation_space import (
-    DistAngleToSubgoalSpace,
-    LastActionSpace,
-    RGBDSpace,
-)
-from rosnav_rl.spaces.observation_space.observation_space_manager import (
-    ObservationSpaceManager,
-)
+from rosnav_rl.spaces.observation_space.spaces.dynamics import LastActionSpace
+from rosnav_rl.spaces.observation_space.spaces.navigation import DistAngleToSubgoalSpace
+from rosnav_rl.spaces.observation_space.spaces.perception import RGBDSpace
 
-from ..base_extractor import RosnavBaseExtractor, TensorDict
+from ..base_extractor import RosnavBaseExtractor, TensorDict, space_shape
 from .resnet import ResNet, RgbdPerceptionNet, resnet50_groupnorm
 
 
@@ -30,7 +25,6 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
     Args:
         observation_space (gym.spaces.Box): The observation space of the environment.
-        observation_space_manager (ObservationSpaceManager): The observation space manager.
         features_dim (int, optional): The dimensionality of the output features. Defaults to 512.
         rgbd_backbone (Callable[..., ResNet], optional): The factory method to initialize a ResNet
             object as the backbone for the RGBD perception network. Defaults to ResNet50 using GroupNorm.
@@ -51,11 +45,11 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
 
     def __init__(
         self,
-        observation_space: gym.spaces.Box,
-        observation_space_manager: ObservationSpaceManager,
+        observation_space: gym.spaces.Dict,
         image_height: int,
         image_width: int,
         features_dim: int = 512,
+        stack_size: int = 1,
         rgbd_backbone: Callable[..., ResNet] = resnet50_groupnorm,
         rgbd_out_dim: int = 512,
         goal_out_dim: int = 32,
@@ -70,20 +64,18 @@ class RESNET_RGBD_FUSION_EXTRACTOR_1(RosnavBaseExtractor):
         self._goal_out_dim = goal_out_dim
         self._last_action_out_dim = last_action_out_dim
 
-        self._observation_space_manager = observation_space_manager
-
-        self._get_input_sizes()
+        self._get_input_sizes(observation_space)
 
         super().__init__(
             observation_space=observation_space,
-            observation_space_manager=observation_space_manager,
             features_dim=features_dim,
+            stack_size=stack_size,
             **kwargs,
         )
 
-    def _get_input_sizes(self):
-        self._goal_size = self._observation_space_manager[DistAngleToSubgoalSpace].space.shape[-1]
-        self._last_action_size = self._observation_space_manager[LastActionSpace].space.shape[-1]
+    def _get_input_sizes(self, observation_space: gym.spaces.Dict):
+        self._goal_size = space_shape(observation_space[DistAngleToSubgoalSpace.name])[-1]
+        self._last_action_size = space_shape(observation_space[LastActionSpace.name])[-1]
         self._image_size = 4 * self._image_height * self._image_width
 
     def _setup_network(self, *args: Any, **kwargs: Any):

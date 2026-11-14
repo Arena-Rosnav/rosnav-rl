@@ -33,7 +33,7 @@ class EnvironmentContextSpace(BaseObservationSpace):
     - Environment Classification: Simple metrics for open, cluttered, or constrained spaces
 
     Configuration:
-    - max_range: Maximum valid laser range (meters)
+    - laser_max_range: Maximum valid laser range (meters)
     - density_sectors: Number of angular sectors for density computation
     - obstacle_threshold: Distance threshold for classifying obstacles (meters)
 
@@ -50,7 +50,7 @@ class EnvironmentContextSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        max_range: float = 10.0,
+        laser_max_range: float = 10.0,
         density_sectors: int = 8,
         obstacle_threshold: float = 0.5,
         *args: Any,
@@ -59,13 +59,13 @@ class EnvironmentContextSpace(BaseObservationSpace):
         """Initialize environment context space.
 
         Args:
-            max_range: Maximum laser range to consider
+            laser_max_range: Maximum laser range to consider
             density_sectors: Number of sectors for density analysis
             obstacle_threshold: Distance threshold for obstacle detection
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
-        self.max_range = max_range
+        self.max_range = laser_max_range
         self.density_sectors = density_sectors
         self.obstacle_threshold = obstacle_threshold
 
@@ -179,7 +179,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
     - Spatial Constraint: Quantitative measure of environmental restriction
 
     Configuration:
-    - max_range: Maximum valid laser range (meters)
+    - laser_max_range: Maximum valid laser range (meters)
     - safety_distance: Clearance threshold for safe navigation (meters)
     - corridor_width_threshold: Minimum width to consider as a corridor (meters)
 
@@ -196,24 +196,30 @@ class SpatialAwarenessSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        max_range: float = 10.0,
+        laser_max_range: float = 10.0,
         safety_distance: float = 0.8,
         corridor_width_threshold: float = 1.5,
+        laser_angle_min: float = -np.pi,
+        laser_angle_increment: float | None = None,
         *args: Any,
         **kwargs: Any,
     ):
         """Initialize spatial awareness space.
 
         Args:
-            max_range: Maximum laser range to consider
+            laser_max_range: Maximum laser range to consider
             safety_distance: Distance for safety clearance calculation
             corridor_width_threshold: Minimum width to consider as corridor
+            laser_angle_min: Angle of the first laser beam (rad)
+            laser_angle_increment: Angle between laser beams (rad), a full circle over the beams when None
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
-        self.max_range = max_range
+        self.max_range = laser_max_range
         self.safety_distance = safety_distance
         self.corridor_width_threshold = corridor_width_threshold
+        self.laser_angle_min = laser_angle_min
+        self.laser_angle_increment = laser_angle_increment
 
         super().__init__(*args, **kwargs)
 
@@ -227,7 +233,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
         """Compute clearance in cardinal directions."""
         n_rays = len(laser_data)
 
-        # Define angular sectors (assuming 360° scan)
+        # Define angular sectors
         front_sector = self._get_sector_indices(n_rays, -30, 30)
         left_sector = self._get_sector_indices(n_rays, 60, 120)
         right_sector = self._get_sector_indices(n_rays, -120, -60)
@@ -254,16 +260,11 @@ class SpatialAwarenessSpace(BaseObservationSpace):
         return clearances
 
     def _get_sector_indices(self, n_rays: int, start_angle: float, end_angle: float) -> np.ndarray:
-        """Get laser ray indices for angular sector."""
-        # Convert angles to indices (assuming 360° scan starting from front)
-        start_idx = int((start_angle + 180) / 360 * n_rays) % n_rays
-        end_idx = int((end_angle + 180) / 360 * n_rays) % n_rays
-
-        if start_idx <= end_idx:
-            return np.arange(start_idx, end_idx + 1)
-        else:
-            # Wrap around case
-            return np.concatenate([np.arange(start_idx, n_rays), np.arange(0, end_idx + 1)])
+        """Get laser ray indices whose beam angle falls in the sector (degrees, 0 = front)."""
+        increment = self.laser_angle_increment if self.laser_angle_increment is not None else 2 * np.pi / n_rays
+        beam_degrees = np.degrees(self.laser_angle_min + increment * np.arange(n_rays))
+        offset = (beam_degrees - start_angle) % 360.0
+        return np.flatnonzero((offset <= end_angle - start_angle + 1e-9) | (offset >= 360.0 - 1e-9))
 
     def _detect_corridor(self, laser_data: np.ndarray) -> tuple[float, float]:
         """Detect corridor and its direction.
@@ -313,7 +314,7 @@ class SpatialAwarenessSpace(BaseObservationSpace):
 
         # Higher constraint when clearances are low
         constraint = 1.0 - (min_clearance * 0.6 + avg_clearance * 0.4)
-        return np.clip(constraint, 0.0, 1.0)
+        return float(np.clip(constraint, 0.0, 1.0))
 
     def encode_observation(self, front_laser: LidarRanges, *args: Any, **kwargs: Any) -> SpatialAwarenessVector:
         """Encode comprehensive spatial awareness with directional clearance and corridor detection.
@@ -375,7 +376,7 @@ class ObstacleProximitySpace(BaseObservationSpace):
 
     Configuration:
     - proximity_zones: List of distance thresholds for proximity zones (meters)
-    - max_range: Maximum valid laser range (meters)
+    - laser_max_range: Maximum valid laser range (meters)
     - risk_threshold: Distance threshold for high risk (meters)
 
     Output Format: (len(proximity_zones) + 2)-dimensional normalized vector with zone occupancies,
@@ -392,7 +393,7 @@ class ObstacleProximitySpace(BaseObservationSpace):
     def __init__(
         self,
         proximity_zones: list[float] | None = None,
-        max_range: float = 10.0,
+        laser_max_range: float = 10.0,
         risk_threshold: float = 1.0,
         *args: Any,
         **kwargs: Any,
@@ -401,13 +402,13 @@ class ObstacleProximitySpace(BaseObservationSpace):
 
         Args:
             proximity_zones: Distance thresholds for zones [close, medium, far]
-            max_range: Maximum laser range
+            laser_max_range: Maximum laser range
             risk_threshold: Distance threshold for risk assessment
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
         self.proximity_zones = proximity_zones or [0.5, 1.5, 3.0]
-        self.max_range = max_range
+        self.max_range = laser_max_range
         self.risk_threshold = risk_threshold
 
         super().__init__(*args, **kwargs)

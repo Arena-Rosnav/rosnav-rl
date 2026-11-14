@@ -5,7 +5,7 @@ from typing import Type
 import numpy as np
 import pytest
 import torch.nn as nn
-import yaml
+from rosnav_rl.utils.yaml_io import dumps_yaml
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.base_class import BaseAlgorithm
 
@@ -164,9 +164,7 @@ def test_transfer_weights_loads_the_source_algorithm_from_its_training_config(tm
     )
     source = _initialized_agent(_spec("transfer_source", algorithm))
     source.model.model.save(tmp_path / "best_model")
-    (tmp_path / "training_config.yaml").write_text(
-        yaml.safe_dump({"agent_config": source.spec.model_dump(mode="json")})
-    )
+    (tmp_path / "training_config.yaml").write_text(dumps_yaml({"agent_config": source.spec.model_dump(mode="json")}))
     target = _initialized_agent(_spec("transfer_target", algorithm))
 
     target.model.transfer_weights(source_dir=tmp_path, source_checkpoint="best_model", include=[".*"])
@@ -179,7 +177,7 @@ def test_transfer_weights_loads_the_source_algorithm_from_its_training_config(tm
 def test_transfer_weights_rejects_a_training_config_without_agent_config(tmp_path):
     agent = _initialized_agent(_spec("transfer_missing_key", _ppo("AGENT_1")))
     agent.model.model.save(tmp_path / "best_model")
-    (tmp_path / "training_config.yaml").write_text(yaml.safe_dump({"agent_cfg": {}}))
+    (tmp_path / "training_config.yaml").write_text(dumps_yaml({"agent_cfg": {}}))
 
     with pytest.raises(KeyError, match="agent_config"):
         agent.model.transfer_weights(source_dir=tmp_path, source_checkpoint="best_model", include=[".*"])
