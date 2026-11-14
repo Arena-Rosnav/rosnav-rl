@@ -23,7 +23,7 @@ Examples:
 
 from pathlib import Path
 
-import yaml
+from rosnav_rl.utils.yaml_io import load_yaml
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchContext, LaunchDescription
@@ -37,7 +37,7 @@ def _action_server_node(context: LaunchContext) -> list[Node]:
     robot = LaunchConfiguration("robot").perform(context)
     if not base_frame and robot:
         model_params = Path(get_package_share_directory("arena_robots")) / "robots" / robot / "model_params.yaml"
-        base_frame = yaml.safe_load(model_params.read_text())["base_frame"]
+        base_frame = load_yaml(model_params)["base_frame"]
     return [
         Node(
             package="rosnav_rl",

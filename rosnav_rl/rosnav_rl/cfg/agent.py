@@ -153,11 +153,9 @@ class AgentConfig(BaseModel):
     @classmethod
     def from_yaml(cls, path: str | Path) -> Self:
         """Load from a YAML file."""
-        import yaml
+        from rosnav_rl.utils.yaml_io import load_yaml
 
-        with open(path) as f:
-            data = yaml.safe_load(f)
-        return cls.model_validate(data)
+        return cls.model_validate(load_yaml(path))
 
     def _to_commented_map(self) -> CommentedMap:
         """Delegates to :func:`rosnav_rl.utils.yaml_utils.agent_config_to_commented_map`."""

@@ -21,7 +21,6 @@ import numpy as np
 import rclpy
 import rclpy.time
 import tf2_ros
-import yaml
 from arena_robots.lockstep_beat import LockstepBeat
 from geometry_msgs.msg import PoseStamped, Twist
 from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
@@ -39,7 +38,7 @@ from rosnav_rl.observations.utils.semantic import straight_line_subgoal
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.utils.agent_paths import resolve_agent_dir, resolve_observations_config_path
 from rosnav_rl.utils.rostopic import Namespace
-from rosnav_rl.utils.utils import load_yaml
+from rosnav_rl.utils.yaml_io import load_yaml
 
 if TYPE_CHECKING:
     from arena_training.arena_rosnav_rl.cfg.arena_cfg import GeneralCfg
@@ -168,8 +167,7 @@ class ArenaInferenceNode:
 
     def _load_observation_manager(self) -> ObservationManager:
         obs_config_path = resolve_observations_config_path(self._agent_spec)
-        with open(obs_config_path) as f:
-            config = yaml.safe_load(f)
+        config = load_yaml(obs_config_path)
         set_robot_pose_frames(config, self.frame, self.base_frame)
         set_pedestrians_topic(config, str(self.namespace))
         return create_observation_manager_from_config(

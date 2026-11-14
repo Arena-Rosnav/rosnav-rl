@@ -6,7 +6,6 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 import torch
-import yaml
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
@@ -17,11 +16,6 @@ from rosnav_rl.utils.stable_baselines3.vec_frame_stack import VecFrameStack
 def load_json(file_path: str | os.PathLike[str]) -> dict[str, Any]:
     with open(file_path) as file:
         return json.load(file)
-
-
-def load_yaml(file_path: str | os.PathLike[str]) -> dict[str, Any]:
-    with open(file_path) as file:
-        return yaml.load(file, Loader=yaml.FullLoader)
 
 
 class _SpaceManagerEnv(gym.Env):

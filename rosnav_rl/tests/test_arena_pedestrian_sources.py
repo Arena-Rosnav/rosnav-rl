@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.resources
 
 import numpy as np
-import yaml
+from rosnav_rl.utils.yaml_io import loads_yaml
 from arena_people_msgs.msg import Pedestrian, Pedestrians
 
 from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
@@ -81,7 +81,7 @@ def test_bundled_observations_provide_what_the_dreamer_environment_spaces_requir
         )
     )
     agent.initialize_model()
-    config = yaml.safe_load((importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml").read_text())
+    config = loads_yaml((importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml").read_text())
     aliases = config["aliases"]
     provided = (set(config["datasources"]) - set(aliases.values())) | set(aliases)
 

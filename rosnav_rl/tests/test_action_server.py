@@ -281,7 +281,7 @@ class TestLoadPipeline:
     def test_training_config_loads(self):
         """TrainingCfg must be reconstructable from the saved YAML."""
         from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg
-        from rosnav_rl.utils.utils import load_yaml
+        from rosnav_rl.utils.yaml_io import load_yaml
 
         cfg = TrainingCfg.model_validate(load_yaml(TEST_AGENT_DIR / "training_config.yaml"))
         assert cfg.agent_cfg.name == "test_agent"

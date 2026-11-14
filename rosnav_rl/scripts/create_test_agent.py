@@ -149,11 +149,9 @@ def create_test_agent(
 
     Returns the path to the created agent directory.
     """
-    import yaml
-    from rosnav_rl.utils.utils import load_yaml
-
     print(f"[create_test_agent] Loading TrainingCfg from {config_path}")
     from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg  # noqa: PLC0415
+    from rosnav_rl.utils.yaml_io import dump_yaml, load_yaml  # noqa: PLC0415
 
     training_cfg = TrainingCfg.model_validate(load_yaml(config_path))
     training_cfg.agent_config.name = agent_name
@@ -212,11 +210,9 @@ def create_test_agent(
 
     # Save training_config.yaml
     # Use mode='json' so all values serialise to JSON-compatible primitives
-    # (Enum values → strings, etc.) — avoids Python-specific YAML tags that
-    # yaml.FullLoader cannot round-trip.
+    # (Enum values → strings, etc.) that load back as the same values.
     cfg_path = agent_dir / "training_config.yaml"
-    with open(cfg_path, "w") as f:
-        yaml.dump(training_cfg.model_dump(mode="json"), f, default_flow_style=False)
+    dump_yaml(training_cfg.model_dump(mode="json"), cfg_path)
     print(f"[create_test_agent] Saved {cfg_path}")
 
     # Save best_model.zip (SB3 PPO format)

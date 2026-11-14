@@ -4,7 +4,7 @@ import importlib.resources
 
 import numpy as np
 import pytest
-import yaml
+from rosnav_rl.utils.yaml_io import loads_yaml
 
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.spaces.observation_space.spaces.dynamics.advanced_dynamics_spaces import (
@@ -204,7 +204,7 @@ def test_localization_combined_reads_the_measured_twist(kwargs):
 
 @pytest.mark.parametrize("space_class", [RobustOdometrySpace, LocalizationCombinedSpace])
 def test_bundled_observations_provide_the_measured_twist(space_class):
-    config = yaml.safe_load((importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml").read_text())
+    config = loads_yaml((importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml").read_text())
 
     assert "robot_twist" in space_class.requires
     assert set(space_class.requires) <= set(config["datasources"]) | set(config["aliases"])

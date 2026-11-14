@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 import rclpy
-import yaml
+from rosnav_rl.utils.yaml_io import dumps_yaml
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 
@@ -36,7 +36,7 @@ def _saved_agent(directory: Path, general: dict) -> Path:
     agent.initialize_model(make_mock_env(ns="", space_manager=agent.space_manager))
     agent.model.model.save(directory / "best_model")
     (directory / "training_config.yaml").write_text(
-        yaml.safe_dump({"arena_cfg": {"general": general}, "agent_config": spec.model_dump(mode="json")})
+        dumps_yaml({"arena_cfg": {"general": general}, "agent_config": spec.model_dump(mode="json")})
     )
     return directory
 
