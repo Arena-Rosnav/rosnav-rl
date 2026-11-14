@@ -281,13 +281,13 @@ def gate_g8_convergence(params: RobotParams, v_p: float, horizon: float, value_c
 
 
 def pack_table(values_by_vp: np.ndarray, v_p_values: np.ndarray, grid_spec: GridSpec, params: RobotParams, horizon: float, value_cap: float, pedestrian_radius_max: float, gate_reports: list[dict], out_dir: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]:
-    """Clips to [0, oob_cap], quantizes to uint16 and writes <robot_id>_brt_v1.npz plus its metadata JSON."""
+    """Clips to [0, oob_cap], quantizes to uint16 and writes <robot_id>_brt_v2.npz plus its metadata JSON."""
     oob_cap = value_cap + params.radius + pedestrian_radius_max
     clipped = np.clip(values_by_vp, 0.0, oob_cap)
     quantized = np.round(clipped / oob_cap * np.iinfo(np.uint16).max).astype(np.uint16)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    npz_path = out_dir / f"{params.robot_id}_brt_v1.npz"
+    npz_path = out_dir / f"{params.robot_id}_brt_v2.npz"
     np.savez_compressed(
         npz_path,
         values=quantized,
@@ -298,15 +298,16 @@ def pack_table(values_by_vp: np.ndarray, v_p_values: np.ndarray, grid_spec: Grid
     )
     sha256 = hashlib.sha256(npz_path.read_bytes()).hexdigest()
 
-    json_path = out_dir / f"{params.robot_id}_brt_v1.json"
+    json_path = out_dir / f"{params.robot_id}_brt_v2.json"
     json_path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "robot_id": params.robot_id,
                 "horizon_s": horizon,
                 "robot_rated_speed_mps": params.v_r,
                 "robot_max_yaw_rate_radps": params.w_max,
+                "robot_speed_range_mps": [0.0, params.v_r],
                 "robot_radius_m": params.radius,
                 "pedestrian_radius_assumed_max_m": pedestrian_radius_max,
                 "value_cap_m": value_cap,

@@ -13,8 +13,8 @@ import pytest
 from rosnav_rl.observations.utils.reachability_tube import ReachabilityTube, straight_line_closest_approach
 
 DATA_DIR = pathlib.Path(str(importlib.resources.files("rosnav_rl") / "observations" / "utils" / "data"))
-JACKAL_NPZ = DATA_DIR / "jackal_brt_v1.npz"
-JACKAL_JSON = DATA_DIR / "jackal_brt_v1.json"
+JACKAL_NPZ = DATA_DIR / "jackal_brt_v2.npz"
+JACKAL_JSON = DATA_DIR / "jackal_brt_v2.json"
 
 
 @pytest.fixture
@@ -26,12 +26,14 @@ def test_from_npz_loads_the_jackal_table_metadata(tube: ReachabilityTube):
     assert tube.robot_rated_speed_mps == pytest.approx(0.5)
     assert tube.robot_max_yaw_rate_radps == pytest.approx(1.5)
     assert tube.horizon_s == pytest.approx(3.0)
+    assert tube.metadata["schema_version"] == 2
+    assert tube.metadata["robot_speed_range_mps"] == [0.0, 0.5]
 
 
 def test_from_npz_rejects_a_tampered_array(tmp_path: pathlib.Path):
-    npz = tmp_path / "jackal_brt_v1.npz"
+    npz = tmp_path / "jackal_brt_v2.npz"
     npz.write_bytes(JACKAL_NPZ.read_bytes() + b"\x00")
-    json_path = tmp_path / "jackal_brt_v1.json"
+    json_path = tmp_path / "jackal_brt_v2.json"
     json_path.write_text(JACKAL_JSON.read_text())
     with pytest.raises(ValueError, match="sha256"):
         ReachabilityTube.from_npz(npz, json_path)
@@ -78,6 +80,11 @@ def test_a_pedestrian_closer_ahead_reads_less_safe_than_one_further_ahead(tube: 
     close = tube.value(np.array([0.3]), np.array([0.0]), np.array([0.0]), np.array([0.0]), contact_radius=0.567)
     far = tube.value(np.array([3.5]), np.array([0.0]), np.array([0.0]), np.array([0.0]), contact_radius=0.567)
     assert close[0] < far[0]
+
+
+def test_a_standing_pedestrian_close_ahead_reads_safe_because_the_robot_can_stop(tube: ReachabilityTube):
+    value = tube.value(np.array([0.7]), np.array([0.0]), np.array([0.0]), np.array([0.0]), contact_radius=0.567)
+    assert value[0] == pytest.approx(0.7 - 0.567, abs=0.02)
 
 
 def test_query_batch_handles_n_zero():

@@ -138,7 +138,7 @@ class ReachabilityTube:
 def bound_metadata(v_r: float, w_max: float, tol: float = 1e-3) -> tuple[pathlib.Path, dict]:
     """The bundled table solved for the given rated speed and turn-rate bound, as its npz path and metadata."""
     data_dir = pathlib.Path(str(importlib.resources.files("rosnav_rl") / "observations" / "utils" / "data"))
-    tables = sorted(data_dir.glob("*_brt_v1.json"))
+    tables = sorted(data_dir.glob("*_brt_v2.json"))
     for json_path in tables:
         metadata = json.loads(json_path.read_text())
         if metadata_matches(metadata, v_r, w_max, tol):
