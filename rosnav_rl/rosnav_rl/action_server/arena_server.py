@@ -81,9 +81,14 @@ def _resolve_agent_dir(agent_name: str) -> Path:
 
 class ArenaActionServer(ActionServer):
     def __init__(
-        self, agent_name: str, namespace: str = "", robot_frame: str = "", base_frame: str = "base_link"
+        self,
+        agent_name: str,
+        namespace: str = "",
+        robot_frame: str = "",
+        base_frame: str = "base_link",
+        arena_env_node: str = "",
     ) -> None:
-        super().__init__(agent_name, namespace)
+        super().__init__(agent_name, namespace, arena_env_node=arena_env_node)
         self.robot_frame = robot_frame
         self.base_frame = base_frame
 

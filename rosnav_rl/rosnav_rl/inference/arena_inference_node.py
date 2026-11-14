@@ -42,11 +42,19 @@ from rosnav_rl.utils.rostopic import Namespace
 from rosnav_rl.utils.utils import load_yaml
 
 if TYPE_CHECKING:
+    from arena_training.arena_rosnav_rl.cfg.arena_cfg import GeneralCfg
+
     from rosnav_rl.observations.core.manager import ObservationManager
 
 
 _NODE_NAME = "rosnav_rl_inference"
 _RELEASE_TIMEOUT_S = 3.0
+_DEFAULT_CONTROL_RATE = 10.0
+
+
+def trained_control_rate(general: GeneralCfg) -> float:
+    """Rate in Hz of the gym steps the agent trained on: one lockstep step, else control_hz."""
+    return 1.0 / general.lockstep_step_seconds if general.lockstep else general.control_hz
 
 
 class ArenaInferenceNode:
@@ -61,7 +69,7 @@ class ArenaInferenceNode:
         node.declare_parameter("arena_env_node", "")
         node.declare_parameter("frame", "")
         node.declare_parameter("base_frame", "base_link")
-        node.declare_parameter("control_rate", 10.0)
+        node.declare_parameter("control_rate", 0.0)
         node.declare_parameter("min_lookahead_dist", 0.5)
         node.declare_parameter("max_lookahead_dist", 2.5)
         node.declare_parameter("lookahead_time", 1.5)
@@ -77,7 +85,7 @@ class ArenaInferenceNode:
         self.namespace = Namespace(node.get_parameter("namespace").get_parameter_value().string_value)
         self.frame = node.get_parameter("frame").get_parameter_value().string_value
         self.base_frame = node.get_parameter("base_frame").get_parameter_value().string_value or "base_link"
-        self.control_rate = float(node.get_parameter("control_rate").get_parameter_value().double_value or 10.0)
+        requested_rate = float(node.get_parameter("control_rate").get_parameter_value().double_value)
         self.min_lookahead = float(node.get_parameter("min_lookahead_dist").get_parameter_value().double_value or 0.5)
         self.max_lookahead = float(node.get_parameter("max_lookahead_dist").get_parameter_value().double_value or 2.5)
         self.lookahead_time = float(node.get_parameter("lookahead_time").get_parameter_value().double_value or 1.5)
@@ -89,7 +97,6 @@ class ArenaInferenceNode:
         self._last_speed: float = 0.0
         self._queued_commands: list[np.ndarray] = []
 
-        self._period = 1.0 / max(self.control_rate, 1e-3)
         self._beat: LockstepBeat | None = None
 
         self._subgoal_pub = node.create_publisher(PoseStamped, "subgoal", 1)
@@ -118,6 +125,14 @@ class ArenaInferenceNode:
             self._cmd_vel_sub = node.create_subscription(Twist, "cmd_vel", self._on_cmd_vel, 1)
             self.logger.info("[rosnav_rl] subgoal-only mode (train_mode=true); agent and cmd_vel publisher skipped")
 
+        if requested_rate > 0.0:
+            self.control_rate = requested_rate
+        elif not self.train_mode:
+            self.control_rate = trained_control_rate(self._training_cfg.arena_cfg.general)
+        else:
+            self.control_rate = _DEFAULT_CONTROL_RATE
+        self._period = 1.0 / max(self.control_rate, 1e-3)
+
         self._timer = node.create_timer(self._period, self._tick)
         self.logger.info(f"[rosnav_rl] running at {self.control_rate:.1f} Hz")
 
@@ -143,6 +158,7 @@ class ArenaInferenceNode:
 
         model_dir = resolve_agent_dir(self.agent_name)
         training_cfg = TrainingCfg.model_validate(load_yaml(model_dir / "training_config.yaml"))
+        self._training_cfg = training_cfg
         spec = training_cfg.agent_config
         self._agent_spec = spec
         self._agent_parameters: AgentParameters = spec.parameters

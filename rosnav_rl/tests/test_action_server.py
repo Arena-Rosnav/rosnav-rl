@@ -213,6 +213,8 @@ class TestGetCommandService:
         self._spin_thread.start()
         yield
 
+        self.server.stop()
+        self._spin_thread.join(timeout=10.0)
         self.server.node.destroy_node()
 
     def test_get_command_returns_the_decoded_agent_action(self):
