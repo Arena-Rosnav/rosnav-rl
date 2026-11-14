@@ -27,15 +27,15 @@ class RobotParams:
     radius: float
 
 
-def load_robot_params(caps_path: pathlib.Path) -> RobotParams:
-    """Reads v_r (velocity_limits.linear max), w_max and radius from caps/mobile.yaml."""
+def load_robot_params(caps_path: pathlib.Path, v_r: float | None = None, w_max: float | None = None) -> RobotParams:
+    """Reads the radius from caps/mobile.yaml, and v_r and w_max from its velocity_limits unless given."""
     caps = yaml.safe_load(caps_path.read_text())
     linear = caps["velocity_limits"]["linear"]
     angular = caps["velocity_limits"]["angular"]
     return RobotParams(
         robot_id=caps_path.parent.parent.name,
-        v_r=float(max(abs(linear[0]), abs(linear[1]))),
-        w_max=float(max(abs(angular[0]), abs(angular[1]))),
+        v_r=float(max(abs(linear[0]), abs(linear[1]))) if v_r is None else v_r,
+        w_max=float(max(abs(angular[0]), abs(angular[1]))) if w_max is None else w_max,
         radius=float(caps["radius"]),
     )
 
@@ -51,21 +51,24 @@ def straight_line_closest_approach(x: np.ndarray, y: np.ndarray, theta: np.ndarr
 
 
 class RelativeUnicyclePedestrianSlice(hj.dynamics.ControlAndDisturbanceAffineDynamics):
-    """Robot unicycle (control omega) vs. a pedestrian walking straight at fixed speed v_p."""
+    """Robot unicycle (controls speed and omega) vs. a pedestrian walking straight at fixed speed v_p.
 
-    def __init__(self, v_p: float, v_r: float, w_max: float):
+    With braking the speed ranges over [0, v_r], without it the robot keeps v_r.
+    """
+
+    def __init__(self, v_p: float, v_r: float, w_max: float, braking: bool = True):
         self.v_p = v_p
         self.v_r = v_r
-        control_space = hj.sets.Box(jnp.array([-w_max]), jnp.array([w_max]))
+        control_space = hj.sets.Box(jnp.array([0.0 if braking else v_r, -w_max]), jnp.array([v_r, w_max]))
         disturbance_space = hj.sets.Box(jnp.array([0.0]), jnp.array([0.0]))
         super().__init__("max", "min", control_space, disturbance_space)
 
     def open_loop_dynamics(self, state: jax.Array, time: float) -> jax.Array:
-        _, _, theta = state
-        return jnp.array([self.v_p - self.v_r * jnp.cos(theta), -self.v_r * jnp.sin(theta), 0.0])
+        return jnp.array([self.v_p, 0.0, 0.0])
 
     def control_jacobian(self, state: jax.Array, time: float) -> jax.Array:
-        return jnp.array([[0.0], [0.0], [1.0]])
+        _, _, theta = state
+        return jnp.array([[-jnp.cos(theta), 0.0], [-jnp.sin(theta), 0.0], [0.0, 1.0]])
 
     def disturbance_jacobian(self, state: jax.Array, time: float) -> jax.Array:
         return jnp.array([[0.0], [0.0], [0.0]])
@@ -116,7 +119,7 @@ def solve_slice(dynamics: RelativeUnicyclePedestrianSlice, grid: hj.Grid, times:
 
 def solve_no_turn_slice(grid: hj.Grid, v_p: float, v_r: float, horizon: float) -> np.ndarray:
     """Final values of the omega_max=0 problem, solved once and shared by gates G1 and G2."""
-    no_turn = RelativeUnicyclePedestrianSlice(v_p=v_p, v_r=v_r, w_max=0.0)
+    no_turn = RelativeUnicyclePedestrianSlice(v_p=v_p, v_r=v_r, w_max=0.0, braking=False)
     return solve_slice(no_turn, grid, np.array([0.0, -horizon]))[-1]
 
 
@@ -145,10 +148,13 @@ def gate_g2_turning_helps(values_with_turn: np.ndarray, no_turn_values: np.ndarr
 
 
 def gate_g3_bounds(values: np.ndarray, grid: hj.Grid, v_p: float, v_r: float, horizon: float, tol: float, near_target_band: float, near_target_tol: float, decision_band_upper: float) -> dict:
-    """V must sit between the straight-line value and ell, and above ell - (v_p + v_r) * horizon."""
+    """V must sit between ell and the better of driving straight at v_r and stopping, and above ell - (v_p + v_r) * horizon."""
     x, y, theta = (np.asarray(grid.states[..., i]) for i in range(3))
     ell = np.hypot(x, y)
-    straight_line = straight_line_closest_approach(x, y, theta, v_p, v_r, horizon)
+    straight_line = np.maximum(
+        straight_line_closest_approach(x, y, theta, v_p, v_r, horizon),
+        straight_line_closest_approach(x, y, theta, v_p, 0.0, horizon),
+    )
     speed_bound = ell - (v_p + v_r) * horizon
     lower_bound = np.maximum(straight_line, speed_bound)
     upper_violation = float(np.max(values - ell))
@@ -162,6 +168,22 @@ def gate_g3_bounds(values: np.ndarray, grid: hj.Grid, v_p: float, v_r: float, ho
     if near_target_violation > near_target_tol:
         raise AssertionError(f"gate G3 failed for v_p={v_p}: near-target lower violation {near_target_violation} > {near_target_tol}")
     return {"upper_violation": upper_violation, "decision_band_lower": decision_band_violation, "near_target_lower": near_target_violation}
+
+
+def gate_g7_braking_helps(values: np.ndarray, fixed_speed_values: np.ndarray, v_p: float, tol: float) -> float:
+    """Being able to brake must never lower the value versus keeping v_r; returns the min margin."""
+    margin = float(np.min(values - fixed_speed_values))
+    if margin < -tol:
+        raise AssertionError(f"gate G7 failed for v_p={v_p}: braking lowered the value by {-margin} > {tol}")
+    return margin
+
+
+def gate_g9_stop_ahead(values: np.ndarray, grid: hj.Grid, distance: float, contact_radius: float) -> float:
+    """A standing pedestrian `distance` ahead must read positive, since stopping keeps distance - contact_radius."""
+    value = float(grid.interpolate(jnp.asarray(values), jnp.array([distance, 0.0, 0.0]))) - contact_radius
+    if value <= 0.0:
+        raise AssertionError(f"gate G9 failed: a standing pedestrian {distance} m ahead reads {value} <= 0")
+    return value
 
 
 def gate_g4_monotonic(values_history: np.ndarray, tol: float) -> float:
@@ -183,13 +205,16 @@ def gate_g5_mirror_symmetry(values: np.ndarray, tol: float) -> float:
     return diff
 
 
-def run_core_gates(values_history: np.ndarray, grid: hj.Grid, v_p: float, v_r: float, horizon: float, tol: float, near_target_band: float, near_target_tol: float, decision_band_upper: float) -> dict:
-    """Runs gates G1-G5 for one pedestrian-speed slice; raises on the first one that fails."""
+def run_core_gates(values_history: np.ndarray, grid: hj.Grid, v_p: float, v_r: float, w_max: float, horizon: float, tol: float, near_target_band: float, near_target_tol: float, decision_band_upper: float) -> dict:
+    """Runs gates G1-G5 and G7 for one pedestrian-speed slice; raises on the first one that fails."""
     final_values = values_history[-1]
     no_turn_values = solve_no_turn_slice(grid, v_p, v_r, horizon)
+    fixed_speed = RelativeUnicyclePedestrianSlice(v_p=v_p, v_r=v_r, w_max=w_max, braking=False)
+    fixed_speed_values = solve_slice(fixed_speed, grid, np.array([0.0, -horizon]))[-1]
     return {
         "g1_straight_line": gate_g1_straight_line(no_turn_values, grid, v_p, v_r, horizon, tol, near_target_band, near_target_tol, decision_band_upper),
         "g2_turning_margin": gate_g2_turning_helps(final_values, no_turn_values, v_p, tol),
+        "g7_braking_margin": gate_g7_braking_helps(final_values, fixed_speed_values, v_p, tol),
         "g3_bounds": gate_g3_bounds(final_values, grid, v_p, v_r, horizon, tol, near_target_band, near_target_tol, decision_band_upper),
         "g4_monotonic_violation": gate_g4_monotonic(values_history, tol),
         "g5_mirror_diff": gate_g5_mirror_symmetry(final_values, tol),
@@ -197,7 +222,7 @@ def run_core_gates(values_history: np.ndarray, grid: hj.Grid, v_p: float, v_r: f
 
 
 def gate_g6_air3d_crosscheck(params: RobotParams, v_p: float, horizon: float, value_cap: float, pedestrian_radius_max: float, dxy: float, n_psi: int, margin: float, tol: float) -> dict:
-    """Cross-checks the pedestrian-frame solve against hj.systems.Air3d solved independently in the robot frame."""
+    """Cross-checks the fixed-speed pedestrian-frame solve against hj.systems.Air3d solved independently in the robot frame."""
     oob_cap = value_cap + params.radius + pedestrian_radius_max
     half = oob_cap + (v_p + params.v_r) * horizon + margin
     shape = (round(2 * half / dxy) + 1, round(2 * half / dxy) + 1, n_psi)
@@ -209,7 +234,7 @@ def gate_g6_air3d_crosscheck(params: RobotParams, v_p: float, horizon: float, va
 
     ped_grid_spec = build_grid_spec(params, horizon, value_cap, pedestrian_radius_max, v_p, dxy, n_psi, margin)
     ped_grid = ped_grid_spec.build()
-    ped_dynamics = RelativeUnicyclePedestrianSlice(v_p=v_p, v_r=params.v_r, w_max=params.w_max)
+    ped_dynamics = RelativeUnicyclePedestrianSlice(v_p=v_p, v_r=params.v_r, w_max=params.w_max, braking=False)
     ped_values = solve_slice(ped_dynamics, ped_grid, np.array([0.0, -horizon]))[-1]
 
     x, y, theta = (np.asarray(ped_grid.states[..., i]) for i in range(3))
@@ -311,7 +336,9 @@ def _git_commit() -> str | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0], epilog="Needs the reachability dependency group: uv sync --group reachability")
-    parser.add_argument("--robot-caps", type=pathlib.Path, required=True)
+    parser.add_argument("--robot-caps", type=pathlib.Path, required=True, help="caps/mobile.yaml of the robot, for its radius and default speed bounds")
+    parser.add_argument("--max-linear-vel", type=float, default=None, help="policy speed bound v_r in m/s, default the caps velocity_limits")
+    parser.add_argument("--max-angular-vel", type=float, default=None, help="policy turn-rate bound in rad/s, default the caps velocity_limits")
     parser.add_argument("--out-dir", type=pathlib.Path, required=True)
     parser.add_argument("--horizon", type=float, default=3.0)
     parser.add_argument("--value-cap", type=float, default=1.5)
@@ -325,6 +352,8 @@ def main() -> None:
     parser.add_argument("--tol", type=float, default=0.05, help="max abs error tolerated away from the point-target singularity")
     parser.add_argument("--near-target-band", type=float, default=0.2, help="closed-form distance below which the point-target discretization artifact (see gate G1) applies")
     parser.add_argument("--near-target-tol", type=float, default=0.3, help="looser tolerance inside --near-target-band; does not affect any realistic contact-radius decision")
+    parser.add_argument("--stop-ahead-distance", type=float, default=0.7, help="gate G9: a standing pedestrian this far ahead must read positive")
+    parser.add_argument("--stop-ahead-pedestrian-radius", type=float, default=0.3)
     parser.add_argument("--validate-only", action="store_true", help="run gates G6 (Air3d cross-check) and G8 (resolution convergence) for one slice instead of solving the full table")
     parser.add_argument("--validate-v-p", type=float, default=1.0)
     parser.add_argument("--gate6-dxy", type=float, default=0.15)
@@ -335,7 +364,7 @@ def main() -> None:
     parser.add_argument("--gate8-tol", type=float, default=0.08, help="max decision-band gap tolerated between the production grid (--dxy/--n-theta) and this finer reference; measures whether --dxy=0.1 is fine enough, not a bug check")
     args = parser.parse_args()
 
-    params = load_robot_params(args.robot_caps)
+    params = load_robot_params(args.robot_caps, args.max_linear_vel, args.max_angular_vel)
 
     if args.validate_only:
         t0 = time.monotonic()
@@ -363,13 +392,16 @@ def main() -> None:
         t0 = time.monotonic()
         dynamics = RelativeUnicyclePedestrianSlice(v_p=float(v_p), v_r=params.v_r, w_max=params.w_max)
         history = solve_slice(dynamics, grid, times)
-        report = run_core_gates(history, grid, float(v_p), params.v_r, args.horizon, args.tol, args.near_target_band, args.near_target_tol, oob_cap)
+        report = run_core_gates(history, grid, float(v_p), params.v_r, params.w_max, args.horizon, args.tol, args.near_target_band, args.near_target_tol, oob_cap)
         values_by_vp[i] = history[-1]
         gate_reports.append({"v_p": float(v_p), **report})
         print(f"v_p={v_p:.2f} solved in {time.monotonic() - t0:.1f}s gates={report}")
 
     if not np.isfinite(values_by_vp).all():
         raise AssertionError("solved table contains non-finite values")
+    stop_ahead = gate_g9_stop_ahead(values_by_vp[0], grid, args.stop_ahead_distance, params.radius + args.stop_ahead_pedestrian_radius)
+    gate_reports.append({"g9_stop_ahead_value": stop_ahead, "distance": args.stop_ahead_distance})
+    print(f"G9 standing pedestrian {args.stop_ahead_distance} m ahead reads {stop_ahead:.3f}")
 
     npz_path, json_path = pack_table(values_by_vp, v_p_values, grid_spec, params, args.horizon, args.value_cap, args.pedestrian_radius_max, gate_reports, args.out_dir)
     print(f"wrote {npz_path}")
