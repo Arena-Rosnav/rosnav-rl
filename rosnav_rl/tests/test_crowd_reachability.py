@@ -42,10 +42,10 @@ def _reachability(locations, velocities, **kwargs):
     )
 
 
-def test_candidates_are_three_speeds_times_sixteen_headings():
-    assert CANDIDATES.shape == (48, 2)
-    np.testing.assert_allclose(np.hypot(*CANDIDATES.T), np.repeat([0.0, 0.5, 1.0], 16), atol=1e-12)
-    assert len({tuple(np.round(c, 9)) for c in CANDIDATES}) == 33  # the 16 standing candidates coincide
+def test_candidates_are_the_stop_once_and_two_speeds_times_sixteen_headings():
+    assert CANDIDATES.shape == (33, 2)
+    np.testing.assert_allclose(np.hypot(*CANDIDATES.T), [0.0, *np.repeat([0.5, 1.0], 16)], atol=1e-12)
+    assert len({tuple(np.round(c, 9)) for c in CANDIDATES}) == len(CANDIDATES)
 
 
 def test_candidate_headings_are_symmetric_about_the_forward_axis():
@@ -76,16 +76,19 @@ def test_a_standing_pedestrian_ahead_blocks_only_the_candidates_that_reach_it_in
     assert out[2] == 0.0
 
 
-def test_a_pedestrian_walking_in_blocks_the_standing_candidates_too():
-    out = _scalars([[3.0, 0.0]], [[-1.0, 0.0]])
+def test_a_pedestrian_walking_in_blocks_the_standing_candidate_too():
+    stop = reachability_scalars(
+        np.array([[3.0, 0.0]]), np.array([[-1.0, 0.0]]), np.zeros((1, 2)), contact_radius=RADIUS, horizon=3.0
+    )
 
-    assert out[0] >= 16 / 48
+    assert CANDIDATES[0].tolist() == [0.0, 0.0]
+    assert stop[0] == 1.0
 
 
 def test_contact_exactly_at_the_horizon_counts_as_blocked():
     out = _scalars([[3.0 + RADIUS, 0.0]], [[0.0, 0.0]])
 
-    assert out[0] == pytest.approx(1 / 48)
+    assert out[0] == pytest.approx(1 / len(CANDIDATES))
 
 
 def test_a_pedestrian_behind_is_never_reached():

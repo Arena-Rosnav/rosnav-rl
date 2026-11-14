@@ -118,14 +118,16 @@ def time_to_contact(
 def candidate_velocities(
     max_speed: float, speed_fractions: tuple[float, ...] = (0.0, 0.5, 1.0), num_headings: int = 16
 ) -> np.ndarray:
-    """Robot-frame candidate velocities, `speed_fractions * max_speed` times `num_headings` headings, shape (K, 2).
+    """Distinct robot-frame candidate velocities, `speed_fractions * max_speed` times `num_headings` headings, shape (K, 2).
 
-    Speed-major order. The zero speed repeats once per heading, so those candidates coincide.
+    Speed-major order, a zero speed once.
     """
     headings = 2.0 * np.pi * np.arange(num_headings) / num_headings
     directions = np.column_stack((np.cos(headings), np.sin(headings)))
     speeds = max_speed * np.asarray(speed_fractions, dtype=np.float64)
-    return (speeds[:, None, None] * directions[None, :, :]).reshape(-1, 2)
+    stop = np.zeros((1 if (speeds == 0.0).any() else 0, 2))
+    moving = speeds[speeds != 0.0]
+    return np.vstack((stop, (moving[:, None, None] * directions[None, :, :]).reshape(-1, 2)))
 
 
 def reachability_scalars(
