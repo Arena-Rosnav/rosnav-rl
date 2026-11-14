@@ -108,7 +108,7 @@ class AgentParameters(BaseModel, frozen=True):
         description=(
             "Minimum linear velocity (m/s). "
             "Used by: VelocityObservationSpace (space low bound). "
-            "Set to robot_description.velocity_limits.linear min."
+            "Set to the configured action space linear min (the robot velocity_limits without one)."
         ),
     )
     max_linear_vel: float = Field(
@@ -117,7 +117,7 @@ class AgentParameters(BaseModel, frozen=True):
             "Maximum linear velocity (m/s). "
             "Used by: VelocityObservationSpace (space high bound), "
             "VelocityHistorySpace (normalisation). "
-            "Set to robot_description.velocity_limits.linear max."
+            "Set to the configured action space linear max (the robot velocity_limits without one)."
         ),
     )
     min_translational_vel: float = Field(
@@ -125,7 +125,7 @@ class AgentParameters(BaseModel, frozen=True):
         description=(
             "Minimum translational (y-axis) velocity for holonomic robots (m/s). "
             "Used by: VelocityObservationSpace (holonomic y-vel low bound). "
-            "Set to robot_description.velocity_limits.linear min."
+            "Set to the configured action space lateral min, linear on a differential drive."
         ),
     )
     max_translational_vel: float = Field(
@@ -133,7 +133,7 @@ class AgentParameters(BaseModel, frozen=True):
         description=(
             "Maximum translational (y-axis) velocity for holonomic robots (m/s). "
             "Used by: VelocityObservationSpace (holonomic y-vel high bound). "
-            "Set to robot_description.velocity_limits.linear max."
+            "Set to the configured action space lateral max, linear on a differential drive."
         ),
     )
     min_angular_vel: float = Field(
@@ -141,7 +141,7 @@ class AgentParameters(BaseModel, frozen=True):
         description=(
             "Minimum angular velocity (rad/s). "
             "Used by: VelocityObservationSpace (space low bound). "
-            "Set to robot_description.velocity_limits.angular min."
+            "Set to the configured action space angular min (the robot velocity_limits without one)."
         ),
     )
     max_angular_vel: float = Field(
@@ -150,7 +150,7 @@ class AgentParameters(BaseModel, frozen=True):
             "Maximum angular velocity (rad/s). "
             "Used by: VelocityObservationSpace (space high bound), "
             "VelocityHistorySpace (normalisation). "
-            "Set to robot_description.velocity_limits.angular max."
+            "Set to the configured action space angular max (the robot velocity_limits without one)."
         ),
     )
 
