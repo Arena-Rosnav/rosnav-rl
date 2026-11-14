@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.resources
 import pathlib
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -62,7 +64,7 @@ def test_a_state_far_outside_the_box_reads_the_saturation_cap(tube: Reachability
 def test_a_pedestrian_speed_beyond_the_table_falls_back_to_the_straight_line_bound_not_a_false_safe_cap(
     tube: ReachabilityTube,
 ):
-    value = tube.value(np.array([0.3]), np.array([0.0]), np.array([np.pi]), np.array([5.0]), contact_radius=0.567)
+    value = tube.value(np.array([-3.0]), np.array([0.0]), np.array([np.pi]), np.array([5.0]), contact_radius=0.567)
     assert value[0] < 0
 
 
@@ -73,8 +75,8 @@ def test_the_periodic_theta_axis_is_continuous_across_the_seam(tube: Reachabilit
 
 
 def test_a_pedestrian_closer_ahead_reads_less_safe_than_one_further_ahead(tube: ReachabilityTube):
-    close = tube.value(np.array([0.3]), np.array([0.0]), np.array([np.pi]), np.array([0.0]), contact_radius=0.567)
-    far = tube.value(np.array([3.5]), np.array([0.0]), np.array([np.pi]), np.array([0.0]), contact_radius=0.567)
+    close = tube.value(np.array([0.3]), np.array([0.0]), np.array([0.0]), np.array([0.0]), contact_radius=0.567)
+    far = tube.value(np.array([3.5]), np.array([0.0]), np.array([0.0]), np.array([0.0]), contact_radius=0.567)
     assert close[0] < far[0]
 
 
@@ -106,7 +108,8 @@ def test_straight_line_closest_approach_reads_the_initial_distance_when_moving_a
 
 
 def test_reachability_tube_module_does_not_import_jax():
-    import sys
-
-    assert "jax" not in sys.modules
-    assert "hj_reachability" not in sys.modules
+    probe = (
+        "import sys, rosnav_rl.observations.utils.reachability_tube; "
+        "assert not {'jax', 'hj_reachability'} & set(sys.modules), sorted({'jax', 'hj_reachability'} & set(sys.modules))"
+    )
+    subprocess.run([sys.executable, "-c", probe], check=True)

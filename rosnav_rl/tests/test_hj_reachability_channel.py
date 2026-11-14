@@ -15,6 +15,7 @@ from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.model.stable_baselines3.cfg import PPO_Cfg, StableBaselinesCfg
 from rosnav_rl.model.stable_baselines3.cfg.ppo import PPO_Algorithm_Cfg
 from rosnav_rl.observations.data_sources.generators import CrowdReachabilityTubeGenerator, PedestrianTubeValueGenerator
+from rosnav_rl.observations.utils.reachability_tube import ReachabilityTube
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.spaces.observation_space.spaces.environment import CrowdReachabilityTubeSpace
 from rosnav_rl.utils.utils import make_mock_env
@@ -55,6 +56,33 @@ def test_pedestrian_tube_value_generator_value_changes_sensibly_as_the_pedestria
         for h in headings
     ]
     assert values[0] < values[2]  # head-on is less safe than walking away; sideways (values[1]) is in between
+
+
+def test_pedestrian_tube_value_generator_looks_up_the_pedestrian_frame():
+    out = PedestrianTubeValueGenerator(name="pedestrian_tube_values")._generate(
+        np.array([[2.0, 0.0]], dtype=np.float32), np.array([[-1.0, 0.0]], dtype=np.float32), PARAMS
+    )
+    tube = ReachabilityTube.for_bound(PARAMS.max_linear_vel, PARAMS.max_angular_vel)
+    expected = tube.value(
+        np.array([-2.0]), np.array([0.0]), np.array([-np.pi]), np.array([1.0]), PARAMS.robot_radius + 0.3
+    )
+    np.testing.assert_allclose(out, expected, atol=1e-6)
+
+
+def test_reflecting_the_crowd_leaves_the_tube_scalars_unchanged():
+    values = PedestrianTubeValueGenerator(name="pedestrian_tube_values")
+    crowd = CrowdReachabilityTubeGenerator(name="crowd_tube")
+    rng = np.random.default_rng(0)
+    flip = np.array([1.0, -1.0], dtype=np.float32)
+    for _ in range(50):
+        locations = rng.uniform(-4.0, 4.0, (5, 2)).astype(np.float32)
+        velocities = rng.uniform(-1.5, 1.5, (5, 2)).astype(np.float32)
+        scalars = [
+            crowd._generate(locations * sign, values._generate(locations * sign, velocities * sign, PARAMS), PARAMS)
+            for sign in (np.ones(2, dtype=np.float32), flip)
+        ]
+
+        np.testing.assert_allclose(scalars[0], scalars[1], atol=1e-4)
 
 
 def test_crowd_reachability_tube_generator_reads_the_cap_with_no_pedestrians():
