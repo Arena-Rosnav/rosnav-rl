@@ -122,7 +122,7 @@ class DreamerV3Model(RL_Model[Dreamer, "DreamerV3Cfg"]):
         assert isinstance(observation_space, gym.spaces.Dict)
         self._model = create_agent(
             self._algorithm_cfg,
-            self._rl_agent.action_space,
+            self._rl_agent.space_manager.policy_action_space,
             observation_space,
             self._logger,
             train_dataset,
@@ -160,7 +160,7 @@ class DreamerV3Model(RL_Model[Dreamer, "DreamerV3Cfg"]):
         prepare_directories(self._algorithm_cfg, self._logdir)
         train_eps, eval_eps = load_episodes(self._algorithm_cfg)
 
-        action_space = self._rl_agent.action_space
+        action_space = self._rl_agent.space_manager.policy_action_space
         observation_space = self._rl_agent.observation_space
         assert isinstance(observation_space, gym.spaces.Dict)
 

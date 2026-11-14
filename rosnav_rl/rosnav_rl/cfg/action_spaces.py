@@ -399,8 +399,7 @@ class OmnidirectionalActionSpace(BaseActionSpace, frozen=True):
     ) -> OmnidirectionalActionSpace:
         """Resolve ``discretization`` config into a concrete ``discrete_actions`` list.
 
-        For omnidirectional robots only ROBOT_DEFINED and UNIFORM are meaningful;
-        the other strategies fall back to UNIFORM.
+        ROBOT_DEFINED uses the robot's list, every other strategy is a uniform grid over x, y and angular.
         """
         if self.discretization is None:
             return self
@@ -417,13 +416,21 @@ class OmnidirectionalActionSpace(BaseActionSpace, frozen=True):
                 for a in robot_discrete_actions
             ]
         else:
+            lateral = self.linear_range_y != (0.0, 0.0)
             actions = [
-                {"name": a["name"], "linear_x": a["linear"], "linear_y": 0.0, "angular": a["angular"]}
+                {
+                    "name": a["name"],
+                    "linear_x": a["linear"],
+                    "linear_y": a["translational"] or 0.0,
+                    "angular": a["angular"],
+                }
                 for a in generate_discrete_action_dict(
                     self.linear_range_x,
                     self.angular_range,
                     self.discretization.buckets_linear,
                     self.discretization.buckets_angular,
+                    self.linear_range_y if lateral else None,
+                    self.discretization.buckets_linear if lateral else 0,
                 )
             ]
 
