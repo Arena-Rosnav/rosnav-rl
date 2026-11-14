@@ -1547,7 +1547,7 @@ class PedestrianTubeValueGenerator(Generator[PedestrianTubeValues]):
         simulation_state_container: AgentParameters,
         **kwargs: Any,
     ) -> PedestrianTubeValues:
-        if len(pedestrian_relative_locations) == 0:
+        if len(pedestrian_relative_locations) == 0 or len(pedestrian_relative_velocities) == 0:
             return np.array([], dtype=np.float32)
         if self._tube is None:
             self._tube = ReachabilityTube.from_package(self._robot_id)
