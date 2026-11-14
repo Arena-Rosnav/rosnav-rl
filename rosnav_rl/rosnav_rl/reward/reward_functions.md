@@ -79,7 +79,7 @@ reward:
          _on_safe_dist_violation: true
 
       factored_reverse_drive:
-         factor: 0.05
+         factor: -0.05
          threshold: 0.0
          _on_safe_dist_violation: true
 
