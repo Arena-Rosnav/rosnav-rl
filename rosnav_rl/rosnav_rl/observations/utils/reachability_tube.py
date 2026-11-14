@@ -91,7 +91,7 @@ class ReachabilityTube:
         return lo, hi, weight_hi
 
     def query_batch(self, x: np.ndarray, y: np.ndarray, theta: np.ndarray, pedestrian_speed: np.ndarray) -> np.ndarray:
-        """Interpolated V0 without the contact radius; outside the box it reads oob_cap, beyond the table's speeds the straight-line bound."""
+        """Interpolated V0 without the contact radius; outside the box it reads oob_cap, beyond the table's speeds the better straight line of stopping and full speed."""
         x = np.atleast_1d(np.asarray(x, dtype=np.float64))
         y = np.atleast_1d(np.asarray(y, dtype=np.float64))
         theta = np.mod(np.atleast_1d(np.asarray(theta, dtype=np.float64)) + np.pi, 2 * np.pi) - np.pi
@@ -104,8 +104,13 @@ class ReachabilityTube:
 
         result = np.full(x.shape, self.oob_cap, dtype=np.float32)
         fallback = in_box & ~in_v_p_range
-        result[fallback] = straight_line_closest_approach(
-            x[fallback], y[fallback], theta[fallback], v_p[fallback], self.robot_rated_speed_mps, self.horizon_s
+        result[fallback] = np.maximum(
+            straight_line_closest_approach(
+                x[fallback], y[fallback], theta[fallback], v_p[fallback], self.robot_rated_speed_mps, self.horizon_s
+            ),
+            straight_line_closest_approach(
+                x[fallback], y[fallback], theta[fallback], v_p[fallback], 0.0, self.horizon_s
+            ),
         )
 
         interpolate = in_box & in_v_p_range
