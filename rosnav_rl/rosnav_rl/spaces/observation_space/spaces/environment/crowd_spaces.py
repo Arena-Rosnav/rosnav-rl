@@ -91,4 +91,5 @@ class CrowdReachabilityTubeSpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(self, crowd_tube: CrowdReachabilityTube, *args: Any, **kwargs: Any) -> CrowdReachabilityTube:
+        assert isinstance(self._space, spaces.Box)
         return np.clip(np.asarray(crowd_tube, dtype=np.float32), self._space.low, self._space.high)
