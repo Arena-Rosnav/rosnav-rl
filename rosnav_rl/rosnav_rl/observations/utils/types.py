@@ -316,6 +316,18 @@ CrowdTimeToContact = Annotated[
     ),
 ]
 
+CrowdReachability = Annotated[
+    np.ndarray,
+    DataSpec(
+        description="Share of the robot's candidate velocities that lead to contact with the pedestrians within the horizon",
+        shape="(4,)",
+        units="fraction, fraction, count, fraction",
+        source="pedestrian relative states, the pedestrians' own velocities and the candidate robot velocities",
+        constraints="[largest share, second largest share, pedestrians with share above 0.5, share blocked by any pedestrian]",
+        example="[0.6, 0.2, 1.0, 0.7]",
+    ),
+]
+
 # Additional encoded output types for observation spaces
 MotionStateVector = Annotated[
     np.ndarray,
@@ -605,6 +617,7 @@ __all__ = [
     "PedestrianTypeArray",
     "PedestrianSocialStates",
     "CrowdTimeToContact",
+    "CrowdReachability",
     "MotionStateVector",
     "KinematicStateVector",
     "TrajectoryStateVector",

@@ -28,14 +28,17 @@ if TYPE_CHECKING:
     from rosnav_rl.cfg.parameters import AgentParameters
 from ..utils.pose import Pose2DType
 from ..utils.semantic import (
+    candidate_velocities,
     get_relative_pos_to_robot,
     get_relative_vel_to_robot,
+    reachability_scalars,
     straight_line_subgoal,
     time_to_contact,
 )
 from ..utils.types import (
     ArenaPedestrianDetections,
     ArenaPedestrianStates,
+    CrowdReachability,
     CrowdTimeToContact,
     DistanceAngleMetrics,
     GoalLocation,
@@ -1463,3 +1466,58 @@ class CrowdTimeToContactGenerator(Generator[CrowdTimeToContact]):
         out[2] = float(np.count_nonzero(ttc < self.imminent))
         out[3] = ttc[ahead].min() if ahead.any() else self.horizon
         return out
+
+
+class CrowdReachabilityGenerator(Generator[CrowdReachability]):
+    """Share of the robot's candidate velocities that lead to contact within `horizon`: largest, second largest, count above one half, union."""
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+        "pedestrian_relative_velocities": PedestrianRelativeVelocities,
+    }
+
+    def __init__(
+        self,
+        name: str,
+        pedestrian_radius: float = 0.3,
+        horizon: float = 3.0,
+        max_range: float = 12.0,
+        max_speed: float | None = None,
+        speed_fractions: tuple[float, ...] = (0.0, 0.5, 1.0),
+        num_headings: int = 16,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        self.pedestrian_radius = pedestrian_radius
+        self.horizon = horizon
+        self.max_range = max_range
+        self.max_speed = max_speed
+        self.speed_fractions = tuple(speed_fractions)
+        self.num_headings = num_headings
+        self._candidates: dict[float, np.ndarray] = {}
+
+    def _candidates_for(self, max_speed: float) -> np.ndarray:
+        if max_speed not in self._candidates:
+            self._candidates[max_speed] = candidate_velocities(max_speed, self.speed_fractions, self.num_headings)
+        return self._candidates[max_speed]
+
+    def _generate(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        pedestrian_relative_velocities: PedestrianRelativeVelocities,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> CrowdReachability:
+        if len(pedestrian_relative_locations) == 0 or len(pedestrian_relative_velocities) == 0:
+            return np.zeros(4, dtype=np.float32)
+        positions = np.asarray(pedestrian_relative_locations, dtype=np.float64).reshape(-1, 2)
+        velocities = np.asarray(pedestrian_relative_velocities, dtype=np.float64).reshape(-1, 2)
+        in_range = np.hypot(positions[:, 0], positions[:, 1]) <= self.max_range
+        max_speed = self.max_speed if self.max_speed is not None else simulation_state_container.max_linear_vel
+        return reachability_scalars(
+            positions[in_range],
+            velocities[in_range],
+            self._candidates_for(float(max_speed)),
+            contact_radius=simulation_state_container.robot_radius + self.pedestrian_radius,
+            horizon=self.horizon,
+        )
