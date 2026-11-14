@@ -88,14 +88,14 @@ class EpisodeStepSpace(BaseObservationSpace):
 
     name = "EpisodeStepSpace"
 
-    def __init__(self, max_episode_steps: int = 1000, *args: Any, **kwargs: Any):
+    def __init__(self, max_steps: int = 600, *args: Any, **kwargs: Any):
         """
         Initialize episode step space.
 
         Args:
-            max_episode_steps: Maximum expected episode length
+            max_steps: Episode length cap in steps
         """
-        self.max_episode_steps = max_episode_steps
+        self.max_steps = max_steps
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:
@@ -103,9 +103,9 @@ class EpisodeStepSpace(BaseObservationSpace):
         Returns the Gym space for the episode step observation.
 
         Returns:
-            spaces.Space: Box space [0, max_episode_steps].
+            spaces.Space: Box space [0, max_steps].
         """
-        return spaces.Box(low=0, high=self.max_episode_steps, shape=(1,), dtype=np.int32)
+        return spaces.Box(low=0, high=self.max_steps, shape=(1,), dtype=np.int32)
 
     def encode_observation(self, episode_step: int = 0, *args: Any, **kwargs: Any) -> np.ndarray:
         """

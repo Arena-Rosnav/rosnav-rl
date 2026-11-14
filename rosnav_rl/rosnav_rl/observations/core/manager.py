@@ -78,12 +78,11 @@ class ObservationManager:
 
     Example:
         ```python
-        import yaml
+        from rosnav_rl.utils.yaml_io import load_yaml
         from rosnav_rl.observations.core.manager import ObservationManager
 
         # Load configuration
-        with open('observations.yaml', 'r') as f:
-            config = yaml.safe_load(f)
+        config = load_yaml('observations.yaml')
 
         # Create manager from config
         obs_manager = ObservationManager.from_config(
@@ -258,12 +257,11 @@ class ObservationManager:
         Example:
             Basic usage with YAML config file:
             ```python
-            import yaml
+            from rosnav_rl.utils.yaml_io import load_yaml
             from rosnav_rl.observations.core.manager import ObservationManager
 
             # Load configuration
-            with open('observations.yaml', 'r') as f:
-                config = yaml.safe_load(f)
+            config = load_yaml('observations.yaml')
 
             # Create manager
             obs_manager = ObservationManager.from_config(

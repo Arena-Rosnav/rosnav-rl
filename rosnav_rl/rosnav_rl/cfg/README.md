@@ -153,7 +153,7 @@ params = AgentParameters(
     max_steps=350,
 )
 
-# Observation-space subset (17 keys, fed to every BaseObservationSpace constructor)
+# Observation-space subset, fed to every BaseObservationSpace constructor
 obs_kwargs = params.observation_kwargs()
 
 # Reconstruct at inference time from a saved AgentConfig

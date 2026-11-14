@@ -1,3 +1,4 @@
+import inspect
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -60,8 +61,19 @@ class RewardUnit(ErrorReportingMixin, ABC, RequiresProtocol):
 
         Raises:
             AttributeError: If required schema is not properly defined
-            ValueError: If initialization parameters are invalid
+            ValueError: If initialization parameters are invalid or unknown
         """
+        if kwargs:
+            accepted = [
+                name
+                for name, param in inspect.signature(type(self).__init__).parameters.items()
+                if name not in ("self", "reward_function")
+                and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+            ]
+            raise ValueError(
+                f"Unknown parameter(s) {sorted(kwargs)} for reward unit {type(self).__name__}, accepted: {accepted}"
+            )
+
         super().__init__(
             *args,
             component_type=ComponentType.REWARD_UNIT,

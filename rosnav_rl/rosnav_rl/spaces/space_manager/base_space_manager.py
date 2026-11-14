@@ -58,7 +58,10 @@ class BaseSpaceManager:
             validate_observations=True,
         )
         self._observation_space_manager.load_configuration(
-            config={s.__name__: obs_kwargs for s in observation_space_list},
+            config={
+                s.__name__: {**obs_kwargs, "encoding_version": spec.observation_encodings.get(s.__name__, 1)}
+                for s in observation_space_list
+            },
         )
 
     # -- encode / decode ---------------------------------------------------

@@ -99,6 +99,12 @@ class SpaceFactory:
         return inner_wrapper
 
     @classmethod
+    def current_encodings(cls) -> dict[str, int]:
+        """Latest encoding version of every registered space whose encoding changed since version 1."""
+        classes = {info["class"] for info in cls.registry.values()}
+        return {space.__name__: space.encoding_version for space in classes if space.encoding_version > 1}
+
+    @classmethod
     def instantiate(cls, name: str, **kwargs: Any) -> "BaseObservationSpace":
         """Instantiate a registered space by name."""
         assert name in cls.registry, f"ObservationSpace '{name}' is not registered!"

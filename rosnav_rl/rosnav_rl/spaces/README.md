@@ -153,6 +153,7 @@ class MySpace(BaseObservationSpace):
   - `@BaseObservationSpace.check_dtype` — validates array for NaN/Inf, replaces with zeros
 - **Safe encoding**: `safe_encode_observation()` wraps `encode_observation()` with try/except, returning a properly shaped null array on failure
 - **Null fallback**: `_create_null_observation()` generates zero-filled arrays matching the gym space for graceful degradation
+- **Encoding versions**: `encoding_version` (class attribute) is the latest encoding of a space, the constructor argument of the same name selects one from 1 up. A change to what a space emits bumps the class attribute and keeps the older encodings behind the argument. A fresh training records `SpaceFactory.current_encodings()` in `AgentConfig.observation_encodings`, which saved agents carry, and a space not listed there reads encoding 1.
 
 ### ActionSpaceManager
 

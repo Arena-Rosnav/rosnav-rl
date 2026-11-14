@@ -35,7 +35,7 @@ Edge cases
 
 Examples
  >>> stages = [{"n_static_obstacles": [0,0], "goal_radius":1.5}, {"n_static_obstacles":[2,4], "goal_radius":1.2}]
- >>> curriculum = CurriculumBase(node, stages, 'succ', 0.9, 0.3, num_envs=1)
+ >>> curriculum = CurriculumBase(node, stages, 'succ', 0.9, 0.3, env_nodes=['/arena/env_0/arena_env_node'])
 
 """
 
@@ -63,10 +63,7 @@ class CurriculumBase(ABC):
         threshold_type: metric type used for thresholds (user-specific string)
         upper_threshold: value to advance stage
         lower_threshold: value to retreat stage
-        num_envs: number of task-generator nodes to configure
-        parameter_node_template: template for task generator node name, with an
-            optional `{i}` placeholder for env index. Default is the registry node
-            path '/arena/env_{i}/arena_env_node'
+        env_nodes: fully qualified names of the env nodes to configure
         parameter_service_name: suffix for service (default 'set_parameters')
         starting_stage: initial curriculum stage index (default 0)
         verbose: verbosity level (0 quiet, >0 prints/logs)
@@ -83,8 +80,7 @@ class CurriculumBase(ABC):
         threshold_type: str,
         upper_threshold: float,
         lower_threshold: float,
-        num_envs: int,
-        parameter_node_template: str | None = None,
+        env_nodes: Sequence[str],
         parameter_service_name: str = "set_parameters",
         starting_stage: int = 0,
         verbose: int = 0,
@@ -95,10 +91,9 @@ class CurriculumBase(ABC):
         self.threshold_type = threshold_type
         self.upper_threshold = upper_threshold
         self.lower_threshold = lower_threshold
-        self.num_envs = max(1, int(num_envs))
-        self.parameter_node_template = (
-            parameter_node_template if parameter_node_template is not None else "/arena/env_{i}/arena_env_node"
-        )
+        if not env_nodes:
+            raise ValueError("No env nodes provided")
+        self.env_nodes = list(env_nodes)
         self.parameter_service_name = parameter_service_name
         self.verbose = verbose
         self.timeout = timeout
@@ -179,8 +174,7 @@ class CurriculumBase(ABC):
     def _init_parameter_clients(self) -> dict[str, Client]:
         """Create ROS2 service clients for each task-generator node.
 
-        The method uses `self.parameter_node_template` to format node names for
-        each environment index. It returns a mapping node_name -> client
+        It returns a mapping node_name -> client
         (rclpy client object). Clients are created but not checked for availability
         here; callers should use `wait_for_service` with a timeout per-call.
 
@@ -188,11 +182,7 @@ class CurriculumBase(ABC):
             Dict[node_name, client]
         """
         clients: dict[str, Client] = {}
-        for i in range(self.num_envs):
-            if "{i}" in self.parameter_node_template:
-                node_name = self.parameter_node_template.format(i=i)
-            else:
-                node_name = self.parameter_node_template
+        for node_name in self.env_nodes:
             service_name = f"{node_name}/{self.parameter_service_name}"
             clients[node_name] = self.node.create_client(SetParameters, service_name)
             if self.verbose > 0:
@@ -205,11 +195,7 @@ class CurriculumBase(ABC):
     def _init_task_mode_clients(self) -> dict[str, Client]:
         """Create ROS2 service clients for config/queue_episode on each node."""
         clients: dict[str, Client] = {}
-        for i in range(self.num_envs):
-            if "{i}" in self.parameter_node_template:
-                node_name = self.parameter_node_template.format(i=i)
-            else:
-                node_name = self.parameter_node_template
+        for node_name in self.env_nodes:
             service_name = f"{node_name}/config/queue_episode"
             clients[node_name] = self.node.create_client(QueueEpisode, service_name)
         return clients
@@ -552,7 +538,7 @@ class CurriculumBase(ABC):
         if self.verbose > 0:
             print(f"[CURRICULUM_BASE] Applying stage {self.curriculum_index}: {stage}")
             print(f"[CURRICULUM_BASE] Available parameter clients: {list(self.parameter_clients.keys())}")
-            print(f"[CURRICULUM_BASE] Parameter node template: {self.parameter_node_template}")
+            print(f"[CURRICULUM_BASE] Env nodes: {self.env_nodes}")
 
         modes = stage.get(self._MODES_KEY)
         param_dict = {k: v for k, v in stage.items() if k not in (self._MODES_KEY, "train_mode")}

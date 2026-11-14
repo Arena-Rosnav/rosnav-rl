@@ -468,18 +468,18 @@ class TestAgentParameters:
         with pytest.raises(Exception):
             params.laser_num_beams = 100
 
-    def test_observation_kwargs_excludes_env_fields(self):
+    def test_observation_kwargs_carry_the_fields_spaces_read(self):
         params = AgentParameters()
         kwargs = params.observation_kwargs()
         # observation fields are included
         assert "laser_num_beams" in kwargs
         assert "normalize" in kwargs
         assert "normalizer" in kwargs
-        # reward fields are excluded
-        assert "robot_radius" not in kwargs
-        assert "safety_distance" not in kwargs
+        assert "robot_radius" in kwargs
+        assert "safety_distance" in kwargs
+        assert "max_steps" in kwargs
+        # reward-only fields are excluded
         assert "goal_radius" not in kwargs
-        assert "max_steps" not in kwargs
 
     def test_normalizer_custom(self):
         params = AgentParameters(normalizer="min_max")
