@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import importlib.resources
 import json
@@ -37,7 +38,8 @@ class ReachabilityTube:
         pedestrian_speed: np.ndarray,
         metadata: dict,
     ):
-        self._values = values.astype(np.float32) / _UINT16_MAX * metadata["oob_cap_m"]
+        self._values = values
+        self._scale = float(metadata["oob_cap_m"]) / _UINT16_MAX
         self._x = x
         self._y = y
         self._theta = theta
@@ -60,17 +62,12 @@ class ReachabilityTube:
 
     @classmethod
     def from_package(cls, robot_id: str) -> ReachabilityTube:
-        """Loads `<robot_id>_brt_v1.{npz,json}` from this package's bundled data directory."""
-        data_dir = importlib.resources.files("rosnav_rl") / "observations" / "utils" / "data"
-        npz_path = pathlib.Path(str(data_dir / f"{robot_id}_brt_v1.npz"))
-        json_path = pathlib.Path(str(data_dir / f"{robot_id}_brt_v1.json"))
-        if not npz_path.is_file():
-            raise FileNotFoundError(f"No reachability table for robot_id={robot_id!r} at {npz_path}")
-        return cls.from_npz(npz_path, json_path)
+        """Loads `<robot_id>_brt_v1.{npz,json}` from this package's bundled data directory, once per process."""
+        return _package_tube(robot_id)
 
     def matches_robot(self, v_r: float, w_max: float, tol: float = 1e-3) -> bool:
         """Whether this table was generated for the given rated speed and turn-rate bound."""
-        return abs(self.robot_rated_speed_mps - v_r) <= tol and abs(self.robot_max_yaw_rate_radps - w_max) <= tol
+        return metadata_matches(self.metadata, v_r, w_max, tol)
 
     def _axis_weights(
         self, coord: np.ndarray, axis: np.ndarray, periodic: bool
@@ -127,7 +124,7 @@ class ReachabilityTube:
                     for ti, tw in ((t_lo, 1 - wt), (t_hi, wt)):
                         for vi, vw in ((v_lo, 1 - wv), (v_hi, wv)):
                             acc += xw * yw * tw * vw * self._values[vi, xi, yi, ti]
-            result[interpolate] = acc.astype(np.float32)
+            result[interpolate] = (acc * self._scale).astype(np.float32)
 
         return result
 
@@ -136,3 +133,29 @@ class ReachabilityTube:
     ) -> np.ndarray:
         """V0 minus `contact_radius`; this, not query_batch, is the signed tube value to threshold at 0."""
         return self.query_batch(x, y, theta, pedestrian_speed) - contact_radius
+
+
+def _package_paths(robot_id: str) -> tuple[pathlib.Path, pathlib.Path]:
+    data_dir = importlib.resources.files("rosnav_rl") / "observations" / "utils" / "data"
+    npz_path = pathlib.Path(str(data_dir / f"{robot_id}_brt_v1.npz"))
+    if not npz_path.is_file():
+        raise FileNotFoundError(f"No reachability table for robot_id={robot_id!r} at {npz_path}")
+    return npz_path, npz_path.with_suffix(".json")
+
+
+def package_metadata(robot_id: str) -> dict:
+    """The metadata of a bundled table, without loading its array."""
+    return json.loads(_package_paths(robot_id)[1].read_text())
+
+
+def metadata_matches(metadata: dict, v_r: float, w_max: float, tol: float = 1e-3) -> bool:
+    """Whether a table's metadata names the given rated speed and turn-rate bound."""
+    return (
+        abs(float(metadata["robot_rated_speed_mps"]) - v_r) <= tol
+        and abs(float(metadata["robot_max_yaw_rate_radps"]) - w_max) <= tol
+    )
+
+
+@functools.cache
+def _package_tube(robot_id: str) -> ReachabilityTube:
+    return ReachabilityTube.from_npz(*_package_paths(robot_id))
