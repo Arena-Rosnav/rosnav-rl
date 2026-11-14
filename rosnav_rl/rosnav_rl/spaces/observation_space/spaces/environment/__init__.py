@@ -18,6 +18,7 @@ Feature Map Spaces:
 Crowd Scalar Spaces:
     - CrowdTimeToContactSpace: Crowd time-to-contact summary
     - CrowdReachabilitySpace: Share of the robot's velocities blocked by the crowd
+    - CrowdReachabilityTubeSpace: Crowd HJ reachability tube summary
 """
 
 from .advanced_environment_spaces import (
@@ -25,7 +26,7 @@ from .advanced_environment_spaces import (
     ObstacleProximitySpace,
     SpatialAwarenessSpace,
 )
-from .crowd_spaces import CrowdReachabilitySpace, CrowdTimeToContactSpace
+from .crowd_spaces import CrowdReachabilitySpace, CrowdReachabilityTubeSpace, CrowdTimeToContactSpace
 from .feature_map_spaces import (
     LaserCartesianMapSpace,
     PedestrianLocationSpace,
@@ -49,4 +50,5 @@ __all__ = [
     "ObstacleProximitySpace",
     "CrowdTimeToContactSpace",
     "CrowdReachabilitySpace",
+    "CrowdReachabilityTubeSpace",
 ]

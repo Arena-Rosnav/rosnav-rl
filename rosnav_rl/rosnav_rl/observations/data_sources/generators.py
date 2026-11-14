@@ -27,6 +27,7 @@ from tf_transformations import euler_from_quaternion
 if TYPE_CHECKING:
     from rosnav_rl.cfg.parameters import AgentParameters
 from ..utils.pose import Pose2DType
+from ..utils.reachability_tube import ReachabilityTube
 from ..utils.semantic import (
     candidate_velocities,
     get_relative_pos_to_robot,
@@ -39,6 +40,7 @@ from ..utils.types import (
     ArenaPedestrianDetections,
     ArenaPedestrianStates,
     CrowdReachability,
+    CrowdReachabilityTube,
     CrowdTimeToContact,
     DistanceAngleMetrics,
     GoalLocation,
@@ -48,6 +50,7 @@ from ..utils.types import (
     PedestrianRelativeLocations,
     PedestrianRelativeVelocities,
     PedestrianSocialStates,
+    PedestrianTubeValues,
     PedestrianTypeArray,
     PedestrianTypeMinDistances,
     PedestrianWorldLocations,
@@ -1521,3 +1524,93 @@ class CrowdReachabilityGenerator(Generator[CrowdReachability]):
             contact_radius=simulation_state_container.robot_radius + self.pedestrian_radius,
             horizon=self.horizon,
         )
+
+
+class PedestrianTubeValueGenerator(Generator[PedestrianTubeValues]):
+    """HJ backward-reachable-tube value per pedestrian, looked up in the table solved for the policy's speed and turn-rate bound."""
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+        "pedestrian_relative_velocities": PedestrianRelativeVelocities,
+    }
+
+    def __init__(self, name: str, pedestrian_radius: float = 0.3, **kwargs: Any):
+        super().__init__(name, **kwargs)
+        self.pedestrian_radius = pedestrian_radius
+        self._tube: ReachabilityTube | None = None
+
+    def _generate(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        pedestrian_relative_velocities: PedestrianRelativeVelocities,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> PedestrianTubeValues:
+        if len(pedestrian_relative_locations) == 0 or len(pedestrian_relative_velocities) == 0:
+            return np.array([], dtype=np.float32)
+        if self._tube is None:
+            self._tube = ReachabilityTube.for_bound(
+                simulation_state_container.max_linear_vel, simulation_state_container.max_angular_vel
+            )
+        positions = np.asarray(pedestrian_relative_locations, dtype=np.float64).reshape(-1, 2)
+        velocities = np.asarray(pedestrian_relative_velocities, dtype=np.float64).reshape(-1, 2)
+        speed = np.hypot(velocities[:, 0], velocities[:, 1])
+        psi = np.where(speed >= 1e-4, np.arctan2(velocities[:, 1], velocities[:, 0]), 0.0)
+        cos_psi, sin_psi = np.cos(psi), np.sin(psi)
+        x = cos_psi * positions[:, 0] + sin_psi * positions[:, 1]
+        y = -sin_psi * positions[:, 0] + cos_psi * positions[:, 1]
+        theta = np.mod(-psi + np.pi, 2 * np.pi) - np.pi
+        contact_radius = simulation_state_container.robot_radius + self.pedestrian_radius
+        return self._tube.value(x, y, theta, speed, contact_radius).astype(np.float32)
+
+
+class CrowdReachabilityTubeGenerator(Generator[CrowdReachabilityTube]):
+    """HJ reachability tube across pedestrians: minimum, second minimum, count inside the tube, minimum ahead."""
+
+    requires = {
+        "pedestrian_relative_locations": PedestrianRelativeLocations,
+        "pedestrian_tube_values": PedestrianTubeValues,
+    }
+
+    def __init__(
+        self,
+        name: str,
+        value_cap: float = 1.5,
+        count_cap: int = 10,
+        max_range: float = 12.0,
+        ahead_half_width: float = 1.5,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        self.value_cap = value_cap
+        self.count_cap = count_cap
+        self.max_range = max_range
+        self.ahead_half_width = ahead_half_width
+
+    def _generate(
+        self,
+        pedestrian_relative_locations: PedestrianRelativeLocations,
+        pedestrian_tube_values: PedestrianTubeValues,
+        simulation_state_container: AgentParameters,
+        **kwargs: Any,
+    ) -> CrowdReachabilityTube:
+        out = np.array([self.value_cap, self.value_cap, 0.0, self.value_cap], dtype=np.float32)
+        if len(pedestrian_tube_values) == 0:
+            return out
+        positions = np.asarray(pedestrian_relative_locations, dtype=np.float64).reshape(-1, 2)
+        values = np.asarray(pedestrian_tube_values, dtype=np.float32)
+        in_range = np.hypot(positions[:, 0], positions[:, 1]) <= self.max_range
+        positions, values = positions[in_range], values[in_range]
+        if len(values) == 0:
+            return out
+        if not np.isfinite(values).all():
+            warn("Non-finite reachability tube value; replacing with the cap.", stacklevel=2)
+            values = np.nan_to_num(values, nan=self.value_cap, posinf=self.value_cap, neginf=-self.value_cap)
+        ordered = np.sort(values)
+        ahead = (positions[:, 0] > 0.0) & (np.abs(positions[:, 1]) < self.ahead_half_width)
+        ahead_values = values[ahead]
+        out[0] = np.clip(ordered[0], -self.value_cap, self.value_cap)
+        out[1] = np.clip(ordered[1], -self.value_cap, self.value_cap) if len(ordered) > 1 else self.value_cap
+        out[2] = min(float(np.count_nonzero(values <= 0.0)), self.count_cap)
+        out[3] = np.clip(ahead_values.min(), -self.value_cap, self.value_cap) if ahead.any() else self.value_cap
+        return out

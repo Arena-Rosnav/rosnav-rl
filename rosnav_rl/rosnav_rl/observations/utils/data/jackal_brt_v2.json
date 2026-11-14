@@ -1,0 +1,217 @@
+{
+  "schema_version": 2,
+  "robot_id": "jackal",
+  "horizon_s": 3.0,
+  "robot_rated_speed_mps": 0.5,
+  "robot_max_yaw_rate_radps": 1.5,
+  "robot_speed_range_mps": [
+    0.0,
+    0.5
+  ],
+  "robot_radius_m": 0.267,
+  "pedestrian_radius_assumed_max_m": 0.4,
+  "value_cap_m": 1.5,
+  "oob_cap_m": 2.167,
+  "axes": [
+    "pedestrian_speed",
+    "x",
+    "y",
+    "theta"
+  ],
+  "periodic_axes": [
+    "theta"
+  ],
+  "grid_shape": [
+    11,
+    155,
+    80,
+    72
+  ],
+  "dtype": "uint16",
+  "sign_convention": "value_is_the_undilated_min_clearance_over_the_horizon;_subtract_contact_radius_at_lookup_time",
+  "solver_version": "0.7.0",
+  "generator_commit": null,
+  "array_sha256": "2d9a0052b6fefc619932e9f1b476268dcfcf1d821edeeb1045e919f41a73a745",
+  "gate_reports": [
+    {
+      "v_p": 0.0,
+      "g1_straight_line": {
+        "decision_band": 0.018362388014793396,
+        "near_target": 0.09573686867952347
+      },
+      "g2_turning_margin": 0.0,
+      "g7_braking_margin": 0.0,
+      "g3_bounds": {
+        "upper_violation": 9.5367431640625e-07,
+        "decision_band_lower": 2.148747444152832e-05,
+        "near_target_lower": 0.0
+      },
+      "g4_monotonic_violation": 9.5367431640625e-07,
+      "g5_mirror_diff": 1.430511474609375e-06
+    },
+    {
+      "v_p": 0.25,
+      "g1_straight_line": {
+        "decision_band": 0.02261956036090851,
+        "near_target": 0.09956938028335571
+      },
+      "g2_turning_margin": -1.430511474609375e-06,
+      "g7_braking_margin": -0.003239750862121582,
+      "g3_bounds": {
+        "upper_violation": 9.5367431640625e-07,
+        "decision_band_lower": 0.0038663893938064575,
+        "near_target_lower": 0.003688305616378784
+      },
+      "g4_monotonic_violation": 9.5367431640625e-07,
+      "g5_mirror_diff": 0.0002982616424560547
+    },
+    {
+      "v_p": 0.5,
+      "g1_straight_line": {
+        "decision_band": 0.02479410171508789,
+        "near_target": 0.11358671635389328
+      },
+      "g2_turning_margin": -4.869699478149414e-05,
+      "g7_braking_margin": -0.004425607621669769,
+      "g3_bounds": {
+        "upper_violation": 9.5367431640625e-07,
+        "decision_band_lower": 0.005115881562232971,
+        "near_target_lower": 0.006597861647605896
+      },
+      "g4_monotonic_violation": 9.5367431640625e-07,
+      "g5_mirror_diff": 0.00016546249389648438
+    },
+    {
+      "v_p": 0.75,
+      "g1_straight_line": {
+        "decision_band": 0.02719809114933014,
+        "near_target": 0.10646507143974304
+      },
+      "g2_turning_margin": -0.00029102712869644165,
+      "g7_braking_margin": -0.004926204681396484,
+      "g3_bounds": {
+        "upper_violation": 4.76837158203125e-07,
+        "decision_band_lower": 0.00583253800868988,
+        "near_target_lower": 0.008493825793266296
+      },
+      "g4_monotonic_violation": 4.76837158203125e-07,
+      "g5_mirror_diff": 0.00012230873107910156
+    },
+    {
+      "v_p": 1.0,
+      "g1_straight_line": {
+        "decision_band": 0.02836550772190094,
+        "near_target": 0.10908230394124985
+      },
+      "g2_turning_margin": -0.0011682510375976562,
+      "g7_braking_margin": -0.004767626523971558,
+      "g3_bounds": {
+        "upper_violation": 4.76837158203125e-07,
+        "decision_band_lower": 0.006402909755706787,
+        "near_target_lower": 0.009772107005119324
+      },
+      "g4_monotonic_violation": 2.384185791015625e-07,
+      "g5_mirror_diff": 0.00019931793212890625
+    },
+    {
+      "v_p": 1.25,
+      "g1_straight_line": {
+        "decision_band": 0.03097328543663025,
+        "near_target": 0.11004164069890976
+      },
+      "g2_turning_margin": -0.000499725341796875,
+      "g7_braking_margin": -0.0044722780585289,
+      "g3_bounds": {
+        "upper_violation": 4.76837158203125e-07,
+        "decision_band_lower": 0.006522029638290405,
+        "near_target_lower": 0.010198578238487244
+      },
+      "g4_monotonic_violation": 2.384185791015625e-07,
+      "g5_mirror_diff": 0.0001659393310546875
+    },
+    {
+      "v_p": 1.5,
+      "g1_straight_line": {
+        "decision_band": 0.03209805488586426,
+        "near_target": 0.11495717614889145
+      },
+      "g2_turning_margin": -0.0003809928894042969,
+      "g7_braking_margin": -0.0039033815264701843,
+      "g3_bounds": {
+        "upper_violation": 4.76837158203125e-07,
+        "decision_band_lower": 0.006734505295753479,
+        "near_target_lower": 0.010535210371017456
+      },
+      "g4_monotonic_violation": 2.384185791015625e-07,
+      "g5_mirror_diff": 0.00015735626220703125
+    },
+    {
+      "v_p": 1.75,
+      "g1_straight_line": {
+        "decision_band": 0.035020262002944946,
+        "near_target": 0.11325521767139435
+      },
+      "g2_turning_margin": -0.0012145042419433594,
+      "g7_braking_margin": -0.003437742590904236,
+      "g3_bounds": {
+        "upper_violation": 4.76837158203125e-07,
+        "decision_band_lower": 0.00742553174495697,
+        "near_target_lower": 0.010395854711532593
+      },
+      "g4_monotonic_violation": 2.384185791015625e-07,
+      "g5_mirror_diff": 0.00012683868408203125
+    },
+    {
+      "v_p": 2.0,
+      "g1_straight_line": {
+        "decision_band": 0.0348944216966629,
+        "near_target": 0.12112126499414444
+      },
+      "g2_turning_margin": -0.0012617111206054688,
+      "g7_braking_margin": -0.003088857978582382,
+      "g3_bounds": {
+        "upper_violation": 4.76837158203125e-07,
+        "decision_band_lower": 0.007476642727851868,
+        "near_target_lower": 0.010518386960029602
+      },
+      "g4_monotonic_violation": 2.384185791015625e-07,
+      "g5_mirror_diff": 0.00014066696166992188
+    },
+    {
+      "v_p": 2.25,
+      "g1_straight_line": {
+        "decision_band": 0.03721065819263458,
+        "near_target": 0.11831836402416229
+      },
+      "g2_turning_margin": -0.0015177726745605469,
+      "g7_braking_margin": -0.0027649663388729095,
+      "g3_bounds": {
+        "upper_violation": 4.76837158203125e-07,
+        "decision_band_lower": 0.007062554359436035,
+        "near_target_lower": 0.010734796524047852
+      },
+      "g4_monotonic_violation": 2.384185791015625e-07,
+      "g5_mirror_diff": 0.00011110305786132812
+    },
+    {
+      "v_p": 2.5,
+      "g1_straight_line": {
+        "decision_band": 0.03728248178958893,
+        "near_target": 0.12308872491121292
+      },
+      "g2_turning_margin": -0.0023436546325683594,
+      "g7_braking_margin": -0.0024217218160629272,
+      "g3_bounds": {
+        "upper_violation": 4.76837158203125e-07,
+        "decision_band_lower": 0.006959006190299988,
+        "near_target_lower": 0.01066596806049347
+      },
+      "g4_monotonic_violation": 2.384185791015625e-07,
+      "g5_mirror_diff": 0.0002713203430175781
+    },
+    {
+      "g9_stop_ahead_value": 0.13480720090866094,
+      "distance": 0.7
+    }
+  ]
+}
