@@ -98,9 +98,7 @@ def test_reachability_scalars_pass_through_a_reflection_unchanged():
     expected = plain.encode_observation(_scene(sign=-1.0))
 
     assert mirrored.reflected
-    np.testing.assert_allclose(
-        encoded["CrowdReachabilitySpace"], expected["CrowdReachabilitySpace"], atol=1e-6
-    )
+    np.testing.assert_allclose(encoded["CrowdReachabilitySpace"], expected["CrowdReachabilitySpace"], atol=1e-6)
 
 
 def test_nearest_pedestrian_on_the_left_passes_through():
