@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.utils.reachability_tube import metadata_matches, package_metadata
+from rosnav_rl.observations.utils.reachability_tube import bound_metadata
 from rosnav_rl.observations.utils.types import CrowdReachability, CrowdReachabilityTube, CrowdTimeToContact
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
@@ -72,7 +72,6 @@ class CrowdReachabilityTubeSpace(BaseObservationSpace):
         self,
         value_cap: float = 1.5,
         count_cap: int = 10,
-        robot_id: str = "jackal",
         max_linear_vel: float = 1.0,
         max_angular_vel: float = 1.0,
         *args: Any,
@@ -80,13 +79,7 @@ class CrowdReachabilityTubeSpace(BaseObservationSpace):
     ) -> None:
         self._value_cap = value_cap
         self._count_cap = count_cap
-        metadata = package_metadata(robot_id)
-        if not metadata_matches(metadata, max_linear_vel, max_angular_vel):
-            raise ValueError(
-                f"reachability table for robot_id={robot_id!r} was generated for rated speed "
-                f"{metadata['robot_rated_speed_mps']} m/s and turn rate {metadata['robot_max_yaw_rate_radps']} rad/s, "
-                f"but this agent's params are max_linear_vel={max_linear_vel}, max_angular_vel={max_angular_vel}"
-            )
+        bound_metadata(max_linear_vel, max_angular_vel)
         super().__init__(*args, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:

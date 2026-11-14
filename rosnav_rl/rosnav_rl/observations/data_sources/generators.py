@@ -1527,17 +1527,16 @@ class CrowdReachabilityGenerator(Generator[CrowdReachability]):
 
 
 class PedestrianTubeValueGenerator(Generator[PedestrianTubeValues]):
-    """HJ backward-reachable-tube value per pedestrian, looked up against the robot's rated-speed table."""
+    """HJ backward-reachable-tube value per pedestrian, looked up in the table solved for the policy's speed and turn-rate bound."""
 
     requires = {
         "pedestrian_relative_locations": PedestrianRelativeLocations,
         "pedestrian_relative_velocities": PedestrianRelativeVelocities,
     }
 
-    def __init__(self, name: str, pedestrian_radius: float = 0.3, robot_id: str = "jackal", **kwargs: Any):
+    def __init__(self, name: str, pedestrian_radius: float = 0.3, **kwargs: Any):
         super().__init__(name, **kwargs)
         self.pedestrian_radius = pedestrian_radius
-        self._robot_id = robot_id
         self._tube: ReachabilityTube | None = None
 
     def _generate(
@@ -1550,7 +1549,9 @@ class PedestrianTubeValueGenerator(Generator[PedestrianTubeValues]):
         if len(pedestrian_relative_locations) == 0 or len(pedestrian_relative_velocities) == 0:
             return np.array([], dtype=np.float32)
         if self._tube is None:
-            self._tube = ReachabilityTube.from_package(self._robot_id)
+            self._tube = ReachabilityTube.for_bound(
+                simulation_state_container.max_linear_vel, simulation_state_container.max_angular_vel
+            )
         positions = np.asarray(pedestrian_relative_locations, dtype=np.float64).reshape(-1, 2)
         velocities = np.asarray(pedestrian_relative_velocities, dtype=np.float64).reshape(-1, 2)
         speed = np.hypot(velocities[:, 0], velocities[:, 1])

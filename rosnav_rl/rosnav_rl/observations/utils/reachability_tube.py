@@ -61,9 +61,9 @@ class ReachabilityTube:
         return cls(data["values"], data["x"], data["y"], data["theta"], data["pedestrian_speed"], metadata)
 
     @classmethod
-    def from_package(cls, robot_id: str) -> ReachabilityTube:
-        """Loads `<robot_id>_brt_v1.{npz,json}` from this package's bundled data directory, once per process."""
-        return _package_tube(robot_id)
+    def for_bound(cls, v_r: float, w_max: float) -> ReachabilityTube:
+        """The bundled table solved for the given rated speed and turn-rate bound, loaded once per process."""
+        return _bound_tube(v_r, w_max)
 
     def matches_robot(self, v_r: float, w_max: float, tol: float = 1e-3) -> bool:
         """Whether this table was generated for the given rated speed and turn-rate bound."""
@@ -135,17 +135,18 @@ class ReachabilityTube:
         return self.query_batch(x, y, theta, pedestrian_speed) - contact_radius
 
 
-def _package_paths(robot_id: str) -> tuple[pathlib.Path, pathlib.Path]:
-    data_dir = importlib.resources.files("rosnav_rl") / "observations" / "utils" / "data"
-    npz_path = pathlib.Path(str(data_dir / f"{robot_id}_brt_v1.npz"))
-    if not npz_path.is_file():
-        raise FileNotFoundError(f"No reachability table for robot_id={robot_id!r} at {npz_path}")
-    return npz_path, npz_path.with_suffix(".json")
-
-
-def package_metadata(robot_id: str) -> dict:
-    """The metadata of a bundled table, without loading its array."""
-    return json.loads(_package_paths(robot_id)[1].read_text())
+def bound_metadata(v_r: float, w_max: float, tol: float = 1e-3) -> tuple[pathlib.Path, dict]:
+    """The bundled table solved for the given rated speed and turn-rate bound, as its npz path and metadata."""
+    data_dir = pathlib.Path(str(importlib.resources.files("rosnav_rl") / "observations" / "utils" / "data"))
+    tables = sorted(data_dir.glob("*_brt_v1.json"))
+    for json_path in tables:
+        metadata = json.loads(json_path.read_text())
+        if metadata_matches(metadata, v_r, w_max, tol):
+            return json_path.with_suffix(".npz"), metadata
+    raise ValueError(
+        f"no bundled reachability table for rated speed {v_r} m/s and turn rate {w_max} rad/s "
+        f"(bundled: {[path.stem for path in tables]}), solve one with tools/solve_reachability_tube.py"
+    )
 
 
 def metadata_matches(metadata: dict, v_r: float, w_max: float, tol: float = 1e-3) -> bool:
@@ -157,5 +158,6 @@ def metadata_matches(metadata: dict, v_r: float, w_max: float, tol: float = 1e-3
 
 
 @functools.cache
-def _package_tube(robot_id: str) -> ReachabilityTube:
-    return ReachabilityTube.from_npz(*_package_paths(robot_id))
+def _bound_tube(v_r: float, w_max: float) -> ReachabilityTube:
+    npz_path, _ = bound_metadata(v_r, w_max)
+    return ReachabilityTube.from_npz(npz_path, npz_path.with_suffix(".json"))

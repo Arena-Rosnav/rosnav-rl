@@ -19,7 +19,7 @@ from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.spaces.observation_space.spaces.environment import CrowdReachabilityTubeSpace
 from rosnav_rl.utils.utils import make_mock_env
 
-PARAMS = AgentParameters(robot_radius=0.267)
+PARAMS = AgentParameters(robot_radius=0.267, max_linear_vel=0.5, max_angular_vel=1.5)
 
 
 def test_pedestrian_tube_value_generator_returns_empty_for_no_pedestrians():
@@ -165,6 +165,6 @@ def test_mirror_manager_accepts_the_hj_agent():
     assert agent.space_manager.encode_observation is not None  # constructed without "no reflection rule"
 
 
-def test_a_crowd_reachability_tube_space_refuses_a_mismatched_robot():
+def test_a_crowd_reachability_tube_space_refuses_a_bound_without_a_table():
     with pytest.raises(ValueError, match="rated speed"):
-        CrowdReachabilityTubeSpace(robot_id="jackal", max_linear_vel=99.0, max_angular_vel=1.5)
+        CrowdReachabilityTubeSpace(max_linear_vel=99.0, max_angular_vel=1.5)
