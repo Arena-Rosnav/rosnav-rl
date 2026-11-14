@@ -56,4 +56,5 @@ class CrowdReachabilitySpace(BaseObservationSpace):
 
     @BaseObservationSpace.apply_normalization
     def encode_observation(self, crowd_reachability: CrowdReachability, *args: Any, **kwargs: Any) -> CrowdReachability:
+        assert isinstance(self._space, spaces.Box)
         return np.clip(np.asarray(crowd_reachability, dtype=np.float32), self._space.low, self._space.high)
