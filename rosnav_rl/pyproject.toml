@@ -50,7 +50,7 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-extend-exclude = ["launch", "scripts", "setup.py"]
+extend-exclude = ["launch", "scripts", "setup.py", "**/*.md"]
 
 [tool.ruff.lint]
 exclude = ["tests/**"]

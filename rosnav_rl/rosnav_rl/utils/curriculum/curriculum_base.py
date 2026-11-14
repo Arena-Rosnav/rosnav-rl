@@ -35,20 +35,21 @@ Edge cases
 
 Examples
  >>> stages = [{"n_static_obstacles": [0,0], "goal_radius":1.5}, {"n_static_obstacles":[2,4], "goal_radius":1.2}]
- >>> curriculum = CurriculumBase(node, stages, 'succ', 0.9, 0.3, num_envs=1)
+ >>> curriculum = CurriculumBase(node, stages, 'succ', 0.9, 0.3, env_nodes=['/arena/env_0/arena_env_node'])
 
 """
 
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, overload
 
+from arena_runtime_msgs.srv import QueryTaskModes, QueueEpisode
+from diagnostic_msgs.msg import KeyValue
 from rcl_interfaces.msg import Parameter, ParameterType
 from rcl_interfaces.srv import SetParameters
 from rclpy.client import Client
 from rclpy.node import Node
-from task_generator_msgs.srv import QueueEpisode
 
 StageInput = dict[str, list[Any]] | list[dict[str, Any]]
 
@@ -62,15 +63,12 @@ class CurriculumBase(ABC):
         threshold_type: metric type used for thresholds (user-specific string)
         upper_threshold: value to advance stage
         lower_threshold: value to retreat stage
-        num_envs: number of task-generator nodes to configure
-        parameter_node_template: template for task generator node name, must contain
-            one `{i}` placeholder for env index when `num_envs>1`. Default replicates
-            existing behaviour: '/task_generator_node' or '/task_generator_node_{i}'
+        env_nodes: fully qualified names of the env nodes to configure
         parameter_service_name: suffix for service (default 'set_parameters')
         starting_stage: initial curriculum stage index (default 0)
         verbose: verbosity level (0 quiet, >0 prints/logs)
         timeout: service call timeout in seconds
-        tm_dict: task modes queued before the initial stage is applied
+        modes: axis -> mode names queued before the initial stage is applied
 
     Hooks (callable signature): on_apply(stage_index, stage_dict), on_advance(idx), on_retreat(idx)
     """
@@ -82,24 +80,20 @@ class CurriculumBase(ABC):
         threshold_type: str,
         upper_threshold: float,
         lower_threshold: float,
-        num_envs: int,
-        parameter_node_template: str | None = None,
+        env_nodes: Sequence[str],
         parameter_service_name: str = "set_parameters",
         starting_stage: int = 0,
         verbose: int = 0,
         timeout: float = 10.0,
-        tm_dict: dict[str, Any] | None = None,
+        modes: Mapping[str, str | Sequence[str]] | None = None,
     ):
         self.node = node
         self.threshold_type = threshold_type
         self.upper_threshold = upper_threshold
         self.lower_threshold = lower_threshold
-        self.num_envs = max(1, int(num_envs))
-        self.parameter_node_template = (
-            parameter_node_template
-            if parameter_node_template is not None
-            else ("/task_generator_node_{i}" if self.num_envs > 1 else "/task_generator_node")
-        )
+        if not env_nodes:
+            raise ValueError("No env nodes provided")
+        self.env_nodes = list(env_nodes)
         self.parameter_service_name = parameter_service_name
         self.verbose = verbose
         self.timeout = timeout
@@ -117,6 +111,10 @@ class CurriculumBase(ABC):
         # Parameter clients keyed by node_name
         self.parameter_clients = self._init_parameter_clients()
         self.task_mode_clients = self._init_task_mode_clients()
+        self._namespace_clients = {
+            name: self.node.create_client(QueryTaskModes, f"{name}/query/task_modes") for name in self.task_mode_clients
+        }
+        self._mode_namespaces: dict[str, dict[str, str]] = {}
 
         # Lifecycle hooks
         self._on_apply: list[Callable[[int, dict[str, Any]], None]] = []
@@ -125,10 +123,10 @@ class CurriculumBase(ABC):
 
         # Nodes confirmed to lack config/queue_episode; task-prefixed params fall
         # back to SetParameters for these (same as legacy behaviour).
-        self._non_task_generator_nodes: set[str] = set()
+        self._non_arena_env_nodes: set[str] = set()
 
-        if tm_dict:
-            self._queue_episode(tm_dict)
+        if modes:
+            self._queue_episode(modes)
 
         # Apply initial stage
         self._apply_curriculum()
@@ -176,8 +174,7 @@ class CurriculumBase(ABC):
     def _init_parameter_clients(self) -> dict[str, Client]:
         """Create ROS2 service clients for each task-generator node.
 
-        The method uses `self.parameter_node_template` to format node names for
-        each environment index. It returns a mapping node_name -> client
+        It returns a mapping node_name -> client
         (rclpy client object). Clients are created but not checked for availability
         here; callers should use `wait_for_service` with a timeout per-call.
 
@@ -185,11 +182,7 @@ class CurriculumBase(ABC):
             Dict[node_name, client]
         """
         clients: dict[str, Client] = {}
-        for i in range(self.num_envs):
-            if "{i}" in self.parameter_node_template:
-                node_name = self.parameter_node_template.format(i=i)
-            else:
-                node_name = self.parameter_node_template
+        for node_name in self.env_nodes:
             service_name = f"{node_name}/{self.parameter_service_name}"
             clients[node_name] = self.node.create_client(SetParameters, service_name)
             if self.verbose > 0:
@@ -202,11 +195,7 @@ class CurriculumBase(ABC):
     def _init_task_mode_clients(self) -> dict[str, Client]:
         """Create ROS2 service clients for config/queue_episode on each node."""
         clients: dict[str, Client] = {}
-        for i in range(self.num_envs):
-            if "{i}" in self.parameter_node_template:
-                node_name = self.parameter_node_template.format(i=i)
-            else:
-                node_name = self.parameter_node_template
+        for node_name in self.env_nodes:
             service_name = f"{node_name}/config/queue_episode"
             clients[node_name] = self.node.create_client(QueueEpisode, service_name)
         return clients
@@ -287,38 +276,36 @@ class CurriculumBase(ABC):
             raise TypeError(f"Unsupported parameter type for {name}: {type(value)}")
         return param
 
-    def _split_task_mode_params(
-        self, param_dict: dict[str, Any]
-    ) -> tuple[list[Parameter], list[Parameter], dict[str, Any]]:
-        """Partition param_dict into (obstacles_params, robots_params, plain_dict).
+    def _split_task_params(
+        self, param_dict: dict[str, Any], namespaces: dict[str, str]
+    ) -> tuple[list[Parameter], dict[str, Any]]:
+        """Partition param_dict into (mode params by full name, plain_dict).
 
-        Keys of the form ``task.<mode>.<leaf>`` are routed to obstacles_params
-        with leaf ``<leaf>`` (the node prepends ``task.<active_mode>.`` at apply time),
-        ``task.episode.*`` node parameters go to plain_dict.
-        Robot-side curriculum keys are not currently produced by any config.
+        Keys of the form ``task.<mode>.<leaf>`` go to the mode params under the
+        env's namespace of ``<mode>``, ``task.episode.*`` node parameters go to plain_dict.
         """
-        obstacles: list[Parameter] = []
-        robots: list[Parameter] = []
+        task: list[Parameter] = []
         plain: dict[str, Any] = {}
 
         for key, val in param_dict.items():
             parts = key.split(".", 2)
             if len(parts) == 3 and parts[0] == "task" and parts[1] != "episode":
-                leaf = parts[2]
                 if isinstance(val, list) and not val:
                     continue
                 try:
-                    rcl_param = self._param_to_rcl_param(leaf, val)
+                    task.append(
+                        self._param_to_rcl_param(
+                            f"{namespaces[parts[1]]}.{parts[2]}" if parts[1] in namespaces else key, val
+                        )
+                    )
                 except TypeError as exc:
                     if self.verbose > 0:
                         print(f"[CURRICULUM_BASE] Failed to convert {key}={val}: {exc}")
                     plain[key] = val
-                    continue
-                obstacles.append(rcl_param)
             else:
                 plain[key] = val
 
-        return obstacles, robots, plain
+        return task, plain
 
     def _send_set_parameters(self, node_name: str, params: list[Parameter]) -> bool:
         """Send a SetParameters request for the given pre-built param list."""
@@ -392,60 +379,29 @@ class CurriculumBase(ABC):
         Returns:
             True if all parameters were set successfully, False otherwise
         """
-        obstacles_params, robots_params, plain_dict = self._split_task_mode_params(param_dict)
-        has_task_params = bool(obstacles_params or robots_params)
+        task_params, plain_dict = self._split_task_params(param_dict, self._namespaces_of(node_name))
 
         ok = True
 
-        if has_task_params and node_name not in self._non_task_generator_nodes:
+        if task_params and node_name not in self._non_arena_env_nodes:
             tm_client = self.task_mode_clients.get(node_name)
             if tm_client is not None and tm_client.wait_for_service(timeout_sec=2.0):
                 req = QueueEpisode.Request()
-                req.tm_robots = ""
-                req.tm_obstacles = ""
-                req.tm_modules = []
-                req.keep_modules = True
-                req.obstacles_params = obstacles_params
-                req.robots_params = robots_params
-                try:
-                    future = tm_client.call_async(req)
-                    start = time.time()
-                    poll_timeout = min(self.timeout, 5.0)
-                    while not future.done():
-                        time.sleep(0.01)
-                        if time.time() - start > poll_timeout:
-                            if self.verbose > 0:
-                                print(f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}")
-                            ok = False
-                            break
-                    if future.done():
-                        response = future.result()
-                        if not (response and response.success):
-                            reason = response.error_msg if response else "no response"
-                            if self.verbose > 0:
-                                print(f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}")
-                            ok = False
-                except Exception as e:
-                    if self.verbose > 0:
-                        print(f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}")
-                    ok = False
+                req.params = task_params
+                ok = self._call_queue_episode(tm_client, node_name, req)
             else:
                 # Service absent: mark node so we don't re-check and fall back.
-                self._non_task_generator_nodes.add(node_name)
+                self._non_arena_env_nodes.add(node_name)
                 if self.verbose > 0:
                     print(
                         f"[CURRICULUM_BASE] config/queue_episode not available for {node_name};"
                         " falling back to SetParameters for task-prefixed keys"
                     )
-                all_fallback = obstacles_params + robots_params
-                if all_fallback:
-                    ok = self._send_set_parameters(node_name, all_fallback) and ok
+                ok = self._send_set_parameters(node_name, task_params) and ok
 
-        elif has_task_params and node_name in self._non_task_generator_nodes:
+        elif task_params:
             # Already confirmed non-task-generator; send via SetParameters.
-            all_fallback = obstacles_params + robots_params
-            if all_fallback:
-                ok = self._send_set_parameters(node_name, all_fallback) and ok
+            ok = self._send_set_parameters(node_name, task_params) and ok
 
         # Plain (non-task-prefixed) parameters always go through SetParameters.
         if plain_dict:
@@ -462,7 +418,7 @@ class CurriculumBase(ABC):
             if params:
                 ok = self._send_set_parameters(node_name, params) and ok
 
-        if not plain_dict and not has_task_params:
+        if not plain_dict and not task_params:
             if self.verbose > 0:
                 print(f"[CURRICULUM_BASE] No parameters to set for node {node_name}")
         return ok
@@ -496,10 +452,59 @@ class CurriculumBase(ABC):
         return success
 
     # ------------------------- Task-mode routing -------------------------
-    _TASK_MODE_KEYS = frozenset({"tm_robots", "tm_obstacles", "tm_modules"})
+    _MODES_KEY = "modes"
 
-    def _queue_episode_batch(self, node_name: str, tm_dict: dict[str, Any]) -> bool:
-        """Route task-mode keys to config/queue_episode on a single node."""
+    @overload
+    def _call(
+        self, client: Client, req: QueryTaskModes.Request, node_name: str, what: str
+    ) -> QueryTaskModes.Response | None: ...
+
+    @overload
+    def _call(
+        self, client: Client, req: QueueEpisode.Request, node_name: str, what: str
+    ) -> QueueEpisode.Response | None: ...
+
+    def _call(
+        self, client: Client, req: QueryTaskModes.Request | QueueEpisode.Request, node_name: str, what: str
+    ) -> QueryTaskModes.Response | QueueEpisode.Response | None:
+        try:
+            future = client.call_async(req)
+            start = time.time()
+            while not future.done():
+                time.sleep(0.01)
+                if time.time() - start > min(self.timeout, 5.0):
+                    if self.verbose > 0:
+                        print(f"[CURRICULUM_BASE] Timeout waiting for {what} on {node_name}")
+                    return None
+            return future.result()
+        except Exception as e:
+            if self.verbose > 0:
+                print(f"[CURRICULUM_BASE] Exception in {what} for {node_name}: {e}")
+            return None
+
+    def _call_queue_episode(self, client: Client, node_name: str, req: QueueEpisode.Request) -> bool:
+        response = self._call(client, req, node_name, "queue_episode")
+        if response and response.success:
+            return True
+        if self.verbose > 0 and response is not None:
+            print(f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {response.error_msg}")
+        return False
+
+    def _namespaces_of(self, node_name: str) -> dict[str, str]:
+        """Mode name -> param namespace as the env reports it, asked once per node."""
+        if node_name not in self._mode_namespaces:
+            client = self._namespace_clients[node_name]
+            response = (
+                self._call(client, QueryTaskModes.Request(), node_name, "query_task_modes")
+                if client.wait_for_service(timeout_sec=2.0)
+                else None
+            )
+            pairs = response.namespaces if response else []
+            self._mode_namespaces[node_name] = {pair.key.partition("/")[2]: pair.value for pair in pairs}
+        return self._mode_namespaces[node_name]
+
+    def _queue_episode_batch(self, node_name: str, modes: Mapping[str, str | Sequence[str]]) -> bool:
+        """Route the mode selection to config/queue_episode on a single node."""
         client = self.task_mode_clients.get(node_name)
         if client is None:
             return False
@@ -509,39 +514,16 @@ class CurriculumBase(ABC):
             return False
 
         req = QueueEpisode.Request()
-        req.tm_robots = tm_dict.get("tm_robots", "")
-        req.tm_obstacles = tm_dict.get("tm_obstacles", "")
-        raw_modules = tm_dict.get("tm_modules", [])
-        if isinstance(raw_modules, str):
-            raw_modules = [m.strip() for m in raw_modules.split(",") if m.strip()]
-        req.tm_modules = raw_modules
-        req.keep_modules = not bool(raw_modules)
+        req.modes = [
+            KeyValue(key=axis, value=names if isinstance(names, str) else ",".join(names))
+            for axis, names in modes.items()
+        ]
+        return self._call_queue_episode(client, node_name, req)
 
-        try:
-            future = client.call_async(req)
-            start = time.time()
-            while not future.done():
-                time.sleep(0.01)
-                if time.time() - start > min(self.timeout, 5.0):
-                    if self.verbose > 0:
-                        print(f"[CURRICULUM_BASE] Timeout waiting for queue_episode on {node_name}")
-                    return False
-            response = future.result()
-            if response and response.success:
-                return True
-            if self.verbose > 0:
-                reason = response.error_msg if response else "no response"
-                print(f"[CURRICULUM_BASE] queue_episode rejected for {node_name}: {reason}")
-            return False
-        except Exception as e:
-            if self.verbose > 0:
-                print(f"[CURRICULUM_BASE] Exception in queue_episode for {node_name}: {e}")
-            return False
-
-    def _queue_episode(self, tm_dict: dict[str, Any]) -> bool:
+    def _queue_episode(self, modes: Mapping[str, str | Sequence[str]]) -> bool:
         success = True
         for node_name in list(self.task_mode_clients.keys()):
-            if not self._queue_episode_batch(node_name, tm_dict):
+            if not self._queue_episode_batch(node_name, modes):
                 success = False
         return success
 
@@ -556,17 +538,16 @@ class CurriculumBase(ABC):
         if self.verbose > 0:
             print(f"[CURRICULUM_BASE] Applying stage {self.curriculum_index}: {stage}")
             print(f"[CURRICULUM_BASE] Available parameter clients: {list(self.parameter_clients.keys())}")
-            print(f"[CURRICULUM_BASE] Parameter node template: {self.parameter_node_template}")
+            print(f"[CURRICULUM_BASE] Env nodes: {self.env_nodes}")
 
-        tm_keys = self._TASK_MODE_KEYS.intersection(stage)
-        param_dict = {k: v for k, v in stage.items() if k not in self._TASK_MODE_KEYS and k != "train_mode"}
-        tm_dict = {k: stage[k] for k in tm_keys}
+        modes = stage.get(self._MODES_KEY)
+        param_dict = {k: v for k, v in stage.items() if k not in (self._MODES_KEY, "train_mode")}
 
         ok = True
         if param_dict:
             ok = self._set_parameters(param_dict) and ok
-        if tm_dict:
-            ok = self._queue_episode(tm_dict) and ok
+        if modes:
+            ok = self._queue_episode(modes) and ok
         # call hooks even if setting fails (observer may want to react)
         self._call_hooks(self._on_apply, self.curriculum_index, stage)
         return ok

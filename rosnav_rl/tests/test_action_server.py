@@ -19,7 +19,6 @@ Prerequisites (for smoke test):
 
 import os
 import threading
-import time
 from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import patch
@@ -212,9 +211,10 @@ class TestGetCommandService:
 
         self._spin_thread = threading.Thread(target=self.server.start, daemon=True)
         self._spin_thread.start()
-        time.sleep(0.5)
         yield
 
+        self.server.stop()
+        self._spin_thread.join(timeout=10.0)
         self.server.node.destroy_node()
 
     def test_get_command_returns_the_decoded_agent_action(self):
@@ -227,10 +227,10 @@ class TestGetCommandService:
         executor = SingleThreadedExecutor()
         executor.add_node(client_node)
 
-        assert client.wait_for_service(timeout_sec=5.0), "GetCommand service not available within 5 s"
+        assert client.wait_for_service(timeout_sec=30.0), "GetCommand service not available within 30 s"
 
         future = client.call_async(GetCommand.Request())
-        executor.spin_until_future_complete(future, timeout_sec=5.0)
+        executor.spin_until_future_complete(future, timeout_sec=30.0)
 
         response = future.result()
         assert response is not None, "Service call timed out"
@@ -281,7 +281,7 @@ class TestLoadPipeline:
     def test_training_config_loads(self):
         """TrainingCfg must be reconstructable from the saved YAML."""
         from arena_training.arena_rosnav_rl.cfg.train import TrainingCfg
-        from rosnav_rl.utils.utils import load_yaml
+        from rosnav_rl.utils.yaml_io import load_yaml
 
         cfg = TrainingCfg.model_validate(load_yaml(TEST_AGENT_DIR / "training_config.yaml"))
         assert cfg.agent_cfg.name == "test_agent"

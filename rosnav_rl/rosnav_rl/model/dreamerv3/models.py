@@ -1,6 +1,6 @@
 import copy
-from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, cast
 
 import gymnasium
 import numpy as np
@@ -116,9 +116,14 @@ class WorldModel(nn.Module):
         self._step = step
         self._use_amp = True if config.general.precision == 16 else False
         self._config = config
-        shapes = {k: tuple(v.shape) for k, v in obs_space.spaces.items()}
+        shapes = {k: tuple(cast("tuple[int, ...]", v.shape)) for k, v in obs_space.spaces.items()}
         self.encoder = networks.MultiEncoder(shapes, device=config.general.device, **config.model.encoder.model_dump())
         self.embed_size = self.encoder.outdim
+        if isinstance(act_space, gymnasium.spaces.Discrete):
+            num_actions = int(act_space.n)
+        else:
+            assert act_space.shape is not None
+            num_actions = act_space.shape[0]
         self.dynamics = networks.RSSM(
             config.model.dyn_stoch,
             config.model.dyn_deter,
@@ -132,7 +137,7 @@ class WorldModel(nn.Module):
             config.model.dyn_min_std,
             config.model.unimix_ratio,
             config.model.initial,
-            (int(act_space.n) if isinstance(act_space, gymnasium.spaces.Discrete) else act_space.shape[0]),
+            num_actions,
             self.embed_size,
             config.general.device,
         )
@@ -231,12 +236,12 @@ class WorldModel(nn.Module):
         # image (batch_size, batch_length, h, w, ch)
         # reward (batch_size, batch_length)
         # discount (batch_size, batch_length)
-        data = self.preprocess(data)
+        batch = self.preprocess(data)
 
         with tools.RequiresGrad(self):
             with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=self._use_amp):
-                embed = self.encoder(data)
-                post, prior = self.dynamics.observe(embed, data["action"], data["is_first"])
+                embed = self.encoder(batch)
+                post, prior = self.dynamics.observe(embed, batch["action"], batch["is_first"])
                 kl_free = self._config.model.kl_free
                 dyn_scale = self._config.model.dyn_scale
                 rep_scale = self._config.model.rep_scale
@@ -256,12 +261,12 @@ class WorldModel(nn.Module):
                         preds[name] = pred
                 losses = {}
                 for name, pred in preds.items():
-                    loss = -pred.log_prob(data[name])
+                    loss = -pred.log_prob(batch[name])
                     assert loss.shape == embed.shape[:2], (name, loss.shape)
                     losses[name] = loss
                 scaled = {key: value * self._scales.get(key, 1.0) for key, value in losses.items()}
                 model_loss = sum(scaled.values()) + kl_loss
-            metrics = self._model_opt(torch.mean(model_loss), self.parameters())
+            metrics: dict[str, float | np.ndarray] = dict(self._model_opt(torch.mean(model_loss), self.parameters()))
 
         metrics.update({f"{name}_loss": to_np(loss) for name, loss in losses.items()})
         metrics["kl_free"] = kl_free
@@ -307,19 +312,19 @@ class WorldModel(nn.Module):
             - 'is_terminal' is required for continuation head training
         """
 
-        obs = {k: torch.tensor(v, device=self._config.general.device, dtype=torch.float32) for k, v in obs.items()}
-        if "image" in obs:
-            obs["image"] = obs["image"] / 255.0
-        if "discount" in obs:
-            obs["discount"] *= self._config.model.behavior.discount
+        tensors = {k: torch.tensor(v, device=self._config.general.device, dtype=torch.float32) for k, v in obs.items()}
+        if "image" in tensors:
+            tensors["image"] = tensors["image"] / 255.0
+        if "discount" in tensors:
+            tensors["discount"] *= self._config.model.behavior.discount
             # (batch_size, batch_length) -> (batch_size, batch_length, 1)
-            obs["discount"] = obs["discount"].unsqueeze(-1)
+            tensors["discount"] = tensors["discount"].unsqueeze(-1)
         # 'is_first' is necesarry to initialize hidden state at training
-        assert "is_first" in obs
+        assert "is_first" in tensors
         # 'is_terminal' is necesarry to train cont_head
-        assert "is_terminal" in obs
-        obs["cont"] = (1.0 - obs["is_terminal"]).unsqueeze(-1)
-        return obs
+        assert "is_terminal" in tensors
+        tensors["cont"] = (1.0 - tensors["is_terminal"]).unsqueeze(-1)
+        return tensors
 
     def video_pred(self, data: dict[str, np.ndarray]) -> torch.Tensor:
         """
@@ -334,17 +339,17 @@ class WorldModel(nn.Module):
         Returns:
             torch.Tensor: A tensor containing the concatenated truth, model prediction, and error images.
         """
-        data = self.preprocess(data)
-        embed = self.encoder(data)
+        batch = self.preprocess(data)
+        embed = self.encoder(batch)
 
-        states, _ = self.dynamics.observe(embed[:6, :5], data["action"][:6, :5], data["is_first"][:6, :5])
+        states, _ = self.dynamics.observe(embed[:6, :5], batch["action"][:6, :5], batch["is_first"][:6, :5])
         recon = self.heads["decoder"](self.dynamics.get_feat(states))["image"].mode()[:6]
         init = {k: v[:, -1] for k, v in states.items()}
-        prior = self.dynamics.imagine_with_action(data["action"][:6, 5:], init)
+        prior = self.dynamics.imagine_with_action(batch["action"][:6, 5:], init)
         openl = self.heads["decoder"](self.dynamics.get_feat(prior))["image"].mode()
         # observed image is given until 5 steps
         model = torch.cat([recon[:, :5], openl], 1)
-        truth = data["image"][:6]
+        truth = batch["image"][:6]
         model = model
         error = (model - truth + 1.0) / 2.0
 
@@ -374,6 +379,8 @@ class ImagBehavior(nn.Module):
         _compute_actor_loss(imag_feat, imag_action, target, weights, base): Calculate actor loss
         _update_slow_target(): Update parameters of the slow target value network
     """
+
+    ema_vals: torch.Tensor
 
     def __init__(
         self,
@@ -420,9 +427,14 @@ class ImagBehavior(nn.Module):
             feat_size = config.model.dyn_stoch * config.model.dyn_discrete + config.model.dyn_deter
         else:
             feat_size = config.model.dyn_stoch + config.model.dyn_deter
+        if isinstance(act_space, gymnasium.spaces.Discrete):
+            num_actions = int(act_space.n)
+        else:
+            assert act_space.shape is not None
+            num_actions = act_space.shape[0]
         self.actor = networks.MLP(
             feat_size,
-            ((int(act_space.n) if isinstance(act_space, gymnasium.spaces.Discrete) else act_space.shape[0]),),
+            (num_actions,),
             config.model.actor.layers,
             config.model.units,
             config.model.act,
@@ -452,18 +464,15 @@ class ImagBehavior(nn.Module):
         if config.model.critic.slow_target:
             self._slow_value = copy.deepcopy(self.value)
             self._updates = 0
-        kw = dict(
-            wd=config.model.weight_decay,
-            opt=config.training.opt,
-            use_amp=self._use_amp,
-        )
         self._actor_opt = tools.Optimizer(
             "actor",
             self.actor.parameters(),
             config.model.actor.lr,
             config.model.actor.eps,
             config.model.actor.grad_clip,
-            **kw,
+            wd=config.model.weight_decay,
+            opt=config.training.opt,
+            use_amp=self._use_amp,
         )
         print(f"Optimizer actor_opt has {sum(param.numel() for param in self.actor.parameters())} variables.")
         self._value_opt = tools.Optimizer(
@@ -472,7 +481,9 @@ class ImagBehavior(nn.Module):
             config.model.critic.lr,
             config.model.critic.eps,
             config.model.critic.grad_clip,
-            **kw,
+            wd=config.model.weight_decay,
+            opt=config.training.opt,
+            use_amp=self._use_amp,
         )
         print(f"Optimizer value_opt has {sum(param.numel() for param in self.value.parameters())} variables.")
         if self._config.environment.reward_EMA:
@@ -592,7 +603,7 @@ class ImagBehavior(nn.Module):
             prev: tuple[networks.RSSMState, torch.Tensor | None, torch.Tensor | None],
             _: torch.Tensor,
         ) -> tuple[networks.RSSMState, torch.Tensor, torch.Tensor]:
-            state, _, _ = prev
+            state = prev[0]
             feat = dynamics.get_feat(state)
             inp = feat.detach()
             action = policy(inp).sample()
@@ -600,6 +611,9 @@ class ImagBehavior(nn.Module):
             return succ, feat, action
 
         succ, feats, actions = tools.static_scan(step, [torch.arange(horizon)], (start, None, None))
+        assert isinstance(succ, dict)
+        assert isinstance(feats, torch.Tensor)
+        assert isinstance(actions, torch.Tensor)
         states = {k: torch.cat([start[k][None], v[:-1]], 0) for k, v in succ.items()}
 
         return feats, states, actions
@@ -649,7 +663,7 @@ class ImagBehavior(nn.Module):
         self,
         imag_feat: torch.Tensor,
         imag_action: torch.Tensor,
-        target: Sequence[torch.Tensor],
+        target: tuple[torch.Tensor, ...],
         weights: torch.Tensor,
         base: torch.Tensor,
     ) -> tuple[torch.Tensor, dict[str, float | np.ndarray]]:
@@ -672,30 +686,30 @@ class ImagBehavior(nn.Module):
         inp = imag_feat.detach()
         policy = self.actor(inp)
         # Q-val for actor is not transformed using symlog
-        target = torch.stack(target, dim=1)
+        stacked = torch.stack(target, dim=1)
         if self._config.environment.reward_EMA:
-            offset, scale = self.reward_ema(target, self.ema_vals)
-            normed_target = (target - offset) / scale
+            offset, scale = self.reward_ema(stacked, self.ema_vals)
+            normed_target = (stacked - offset) / scale
             normed_base = (base - offset) / scale
             adv = normed_target - normed_base
             metrics.update(tools.tensorstats(normed_target, "normed_target"))
             metrics["EMA_005"] = to_np(self.ema_vals[0])
             metrics["EMA_095"] = to_np(self.ema_vals[1])
         else:
-            adv = target - base
+            adv = stacked - base
 
         if self._config.model.behavior.imag_gradient == "dynamics":
             actor_target = adv
         elif self._config.model.behavior.imag_gradient == "reinforce":
             actor_target = (
-                policy.log_prob(imag_action)[:-1][:, :, None] * (target - self.value(imag_feat[:-1]).mode()).detach()
+                policy.log_prob(imag_action)[:-1][:, :, None] * (stacked - self.value(imag_feat[:-1]).mode()).detach()
             )
         elif self._config.model.behavior.imag_gradient == "both":
             actor_target = (
-                policy.log_prob(imag_action)[:-1][:, :, None] * (target - self.value(imag_feat[:-1]).mode()).detach()
+                policy.log_prob(imag_action)[:-1][:, :, None] * (stacked - self.value(imag_feat[:-1]).mode()).detach()
             )
             mix = self._config.model.behavior.imag_gradient_mix
-            actor_target = mix * target + (1 - mix) * actor_target
+            actor_target = mix * stacked + (1 - mix) * actor_target
             metrics["imag_gradient_mix"] = mix
         else:
             raise NotImplementedError(self._config.model.behavior.imag_gradient)

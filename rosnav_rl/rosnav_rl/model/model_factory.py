@@ -83,7 +83,7 @@ class ModelFactory:
                 f"Unsupported RL framework: {framework_name}. Supported frameworks: {list(cls._model_registry.keys())}"
             )
 
-        model_class = cls._model_registry[framework_name]
+        model_class = cls._model_registry[SupportedRLFrameworks(framework_name)]
         return model_class.from_framework_cfg(
             rl_agent=rl_agent,
             framework_cfg=framework_cfg,

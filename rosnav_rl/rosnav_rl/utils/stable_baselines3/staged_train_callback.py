@@ -1,6 +1,6 @@
 """StableBaselines3-specific curriculum learning callback."""
 
-from typing import Any
+from collections.abc import Mapping, Sequence
 
 from rclpy.node import Node
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
@@ -26,12 +26,11 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
         threshold_type: str,
         upper_threshold: float,
         lower_threshold: float,
-        num_envs: int,
-        parameter_node_template: str,
+        env_nodes: Sequence[str],
         timeout: float = 5.0,
         starting_stage: int = 0,
         verbose: int = 0,
-        tm_dict: dict[str, Any] | None = None,
+        modes: Mapping[str, str | Sequence[str]] | None = None,
     ):
         """Initialize the staged training callback.
 
@@ -41,12 +40,11 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
             threshold_type: Type of threshold ('rew' for reward, 'succ' for success)
             upper_threshold: Threshold to advance to next stage
             lower_threshold: Threshold to retreat to previous stage
-            num_envs: Number of environments
-            parameter_node_template: Template for task generator node name
+            env_nodes: Fully qualified env node names
             timeout: Timeout for ROS2 parameter service calls
             starting_stage: Initial curriculum stage index
             verbose: Verbosity level
-            tm_dict: Task modes queued before the initial stage is applied
+            modes: axis -> mode names queued before the initial stage is applied
         """
         # Initialize CurriculumBase first to satisfy its required args and
         # avoid BaseCallback.__init__ accidentally invoking CurriculumBase.__init__
@@ -57,12 +55,11 @@ class StagedTrainCallback(CurriculumBase, BaseCallback):
             threshold_type=threshold_type,
             upper_threshold=upper_threshold,
             lower_threshold=lower_threshold,
-            num_envs=num_envs,
-            parameter_node_template=parameter_node_template,
+            env_nodes=env_nodes,
             timeout=timeout,
             starting_stage=starting_stage,
             verbose=verbose,
-            tm_dict=tm_dict,
+            modes=modes,
         )
 
         BaseCallback.__init__(self, verbose=verbose)

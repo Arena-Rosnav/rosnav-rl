@@ -28,7 +28,7 @@ def test_context_spaces_are_four_unit_boxes(space_class):
 
 
 def test_mission_first_step_has_no_progress_and_phase_from_thresholds():
-    space = MissionContextSpace(max_mission_time=1.0, progress_smoothing=0.5)
+    space = MissionContextSpace(max_steps=10, progress_smoothing=0.5)
 
     np.testing.assert_allclose(space.encode_observation(goal(10.0)), [0.0, 0.0, 1 / 3, 0.0], atol=1e-6)
     assert space.initial_distance == 10.0
@@ -36,7 +36,7 @@ def test_mission_first_step_has_no_progress_and_phase_from_thresholds():
 
 
 def test_mission_progress_is_exponentially_smoothed():
-    space = MissionContextSpace(max_mission_time=1.0, progress_smoothing=0.5)
+    space = MissionContextSpace(max_steps=10, progress_smoothing=0.5)
     space.encode_observation(goal(10.0))
 
     second = space.encode_observation(goal(5.0))
@@ -54,7 +54,7 @@ def test_mission_phase_buckets_distance_by_descending_thresholds(distance, phase
 
 
 def test_mission_urgency_grows_when_progress_lags_behind_time_and_saturates():
-    space = MissionContextSpace(max_mission_time=1.0, progress_smoothing=0.5)
+    space = MissionContextSpace(max_steps=10, progress_smoothing=0.5)
 
     urgencies = [space.encode_observation(goal(10.0))[3] for _ in range(12)]
 
@@ -77,7 +77,7 @@ def test_mission_progress_before_initialization_is_zero():
 
 
 def test_mission_reset_restarts_the_mission():
-    space = MissionContextSpace(max_mission_time=1.0, progress_smoothing=0.5)
+    space = MissionContextSpace(max_steps=10, progress_smoothing=0.5)
     for distance in (10.0, 6.0, 4.0):
         space.encode_observation(goal(distance))
 
@@ -88,7 +88,7 @@ def test_mission_reset_restarts_the_mission():
 
 
 def test_performance_tracks_path_energy_and_smoothness_over_the_window():
-    space = PerformanceContextSpace(efficiency_window=3, max_velocity=2.0)
+    space = PerformanceContextSpace(efficiency_window=3, max_linear_vel=2.0, max_angular_vel=2.0)
 
     first = space.encode_observation(goal(10.0), action(1.0))
     second = space.encode_observation(goal(9.0), action(1.0))
@@ -103,7 +103,7 @@ def test_performance_tracks_path_energy_and_smoothness_over_the_window():
 
 
 def test_performance_energy_uses_linear_and_angular_magnitude_and_clips_at_zero():
-    space = PerformanceContextSpace(max_velocity=2.0)
+    space = PerformanceContextSpace(max_linear_vel=2.0, max_angular_vel=2.0)
 
     slow = space.encode_observation(goal(5.0), action(0.6, 0.8))
     space.reset()

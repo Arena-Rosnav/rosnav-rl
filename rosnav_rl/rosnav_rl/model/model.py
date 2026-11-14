@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import numpy as np
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     )
 
 
-class RL_Model(ABC):
+class RL_Model[M: _SupportedRosnavRLModels, C: BaseModel](ABC):
     """Abstract base class for Reinforcement Learning models.
 
     This class serves as a blueprint for different reinforcement learning model implementations
@@ -45,11 +45,11 @@ class RL_Model(ABC):
         config: Property that returns the model configuration (default: empty dict).
     """
 
-    _model: _SupportedRosnavRLModels | None
-    _algorithm_cfg: BaseModel
+    _model: M | None
+    _algorithm_cfg: C
     _rl_agent: "RL_Agent"
 
-    def __init__(self, rl_agent: "RL_Agent", algorithm_cfg: BaseModel, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, rl_agent: "RL_Agent", algorithm_cfg: C, *args: Any, **kwargs: Any) -> None:
         self._rl_agent = rl_agent
         self._algorithm_cfg = algorithm_cfg
 
@@ -62,7 +62,7 @@ class RL_Model(ABC):
         implementation passes the entire ``framework_cfg`` as the algorithm
         config.
         """
-        return cls(*args, rl_agent=rl_agent, algorithm_cfg=framework_cfg, **kwargs)
+        return cls(*args, rl_agent=rl_agent, algorithm_cfg=cast(C, framework_cfg), **kwargs)
 
     @abstractmethod
     def setup_model(self, *args: Any, **kwargs: Any):
@@ -96,17 +96,17 @@ class RL_Model(ABC):
         return self._model is not None
 
     @property
-    def model(self) -> _SupportedRosnavRLModels:
+    def model(self) -> M:
         if self._model is None:
             raise ValueError("Model not initialized. Call 'initialize' first.")
         return self._model
 
     @model.setter
-    def model(self, model: _SupportedRosnavRLModels):
+    def model(self, model: M):
         self._model = model
 
     @property
-    def algorithm_cfg(self) -> BaseModel:
+    def algorithm_cfg(self) -> C:
         return self._algorithm_cfg
 
     @property

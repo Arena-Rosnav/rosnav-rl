@@ -145,7 +145,7 @@ class ROS1Logger(BaseLogger):
         super().__init__(name, **kwargs)
 
         try:
-            import rospy
+            import rospy  # pyright: ignore[reportMissingImports]
 
             self.rospy = rospy
         except ImportError as err:

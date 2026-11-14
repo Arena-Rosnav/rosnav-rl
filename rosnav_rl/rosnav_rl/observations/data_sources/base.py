@@ -208,7 +208,7 @@ class Collector[RosMessageType, ProcessedDataType](DataSource, ErrorReportingMix
         """Get the QoS profile."""
         return self._qos_profile
 
-    def get_observation(self) -> ProcessedDataType | None:
+    def get_observation(self, obs_dict: dict[str, Any] | None = None, **kwargs: Any) -> ProcessedDataType | None:
         """
         Implementation of DataSource.get_observation for collectors.
         Simply returns the current processed value.
@@ -277,7 +277,7 @@ class Generator[ProcessedDataType](DataSource, RequiresProtocol, ErrorReportingM
         self.required_keys = list(self.requires.keys())
 
     @abstractmethod
-    def _generate(self, **kwargs: Any) -> ProcessedDataType:
+    def _generate(self, *args: Any, **kwargs: Any) -> ProcessedDataType:
         """
         The core logic of the generator.
         For dict inputs, receives dependencies as keyword arguments.

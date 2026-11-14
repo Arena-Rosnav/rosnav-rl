@@ -49,7 +49,8 @@ class MotionStateSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        max_velocity: float = 2.0,
+        max_linear_vel: float = 1.0,
+        max_angular_vel: float = 1.0,
         stability_window: int = 5,
         include_acceleration: bool = False,
         *args: Any,
@@ -58,13 +59,15 @@ class MotionStateSpace(BaseObservationSpace):
         """Initialize motion state space.
 
         Args:
-            max_velocity: Maximum expected velocity magnitude
+            max_linear_vel: Maximum linear velocity (m/s)
+            max_angular_vel: Maximum angular velocity (rad/s)
             stability_window: Window size for stability calculation
             include_acceleration: Include acceleration estimates
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
-        self.max_velocity = max_velocity
+        self.max_linear_vel = max_linear_vel
+        self.max_angular_vel = max_angular_vel
         self.stability_window = stability_window
         self.include_acceleration = include_acceleration
 
@@ -106,7 +109,7 @@ class MotionStateSpace(BaseObservationSpace):
         if len(velocity_magnitudes) > 1:
             variance = np.var(velocity_magnitudes)
             # Normalize variance and invert (high stability = low variance)
-            stability = np.exp(-variance / (self.max_velocity**2))
+            stability = np.exp(-variance)
             return stability
 
         return 0.0
@@ -118,10 +121,7 @@ class MotionStateSpace(BaseObservationSpace):
         else:
             # Simple acceleration magnitude
             vel_diff = np.array(current_velocity) - np.array(self.last_velocity)
-            acceleration_magnitude = np.linalg.norm(vel_diff)
-
-            # Normalize
-            acceleration_magnitude = np.tanh(acceleration_magnitude / self.max_velocity)
+            acceleration_magnitude = np.tanh(np.linalg.norm(vel_diff))
 
         self.last_velocity = current_velocity
         return acceleration_magnitude
@@ -150,12 +150,12 @@ class MotionStateSpace(BaseObservationSpace):
                 - Temporal Window: stability computed over configurable window (default 5 steps)
                 - Example: [0.75, 0.125, 0.92, 0.15] (high speed, slight right turn, very stable, low acceleration)
         """
-        linear_vel = float(last_action[0])
-        angular_vel = float(last_action[-1])
+        linear_vel = float(last_action[0]) / self.max_linear_vel
+        angular_vel = float(last_action[-1]) / self.max_angular_vel
 
         # Compute velocity magnitude and direction
         velocity_magnitude = np.sqrt(linear_vel**2 + angular_vel**2)
-        normalized_magnitude = np.tanh(velocity_magnitude / self.max_velocity)
+        normalized_magnitude = np.tanh(velocity_magnitude)
 
         # Velocity direction (angle of velocity vector)
         if velocity_magnitude > 1e-6:
@@ -211,7 +211,8 @@ class KinematicStateSpace(BaseObservationSpace):
 
     def __init__(
         self,
-        max_velocity: float = 2.0,
+        max_linear_vel: float = 1.0,
+        max_angular_vel: float = 1.0,
         position_scale: float = 10.0,
         include_motion_alignment: bool = True,
         *args: Any,
@@ -220,13 +221,15 @@ class KinematicStateSpace(BaseObservationSpace):
         """Initialize kinematic state space.
 
         Args:
-            max_velocity: Maximum expected velocity
+            max_linear_vel: Maximum linear velocity (m/s)
+            max_angular_vel: Maximum angular velocity (rad/s)
             position_scale: Scale for position normalization
             include_motion_alignment: Include motion-orientation alignment
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
-        self.max_velocity = max_velocity
+        self.max_linear_vel = max_linear_vel
+        self.max_angular_vel = max_angular_vel
         self.position_scale = position_scale
         self.include_motion_alignment = include_motion_alignment
 
@@ -313,15 +316,16 @@ class KinematicStateSpace(BaseObservationSpace):
 
         # Pre-calculate inverses for faster multiplication
         inv_pos_scale = 1.0 / self.position_scale
-        inv_max_vel = 1.0 / self.max_velocity
+        inv_max_linear = 1.0 / self.max_linear_vel
+        inv_max_angular = 1.0 / self.max_angular_vel
 
         # Normalize pose and velocities
         normalized_x = np.tanh(x * inv_pos_scale)
         normalized_y = np.tanh(y * inv_pos_scale)
         cos_yaw = np.cos(yaw)
         sin_yaw = np.sin(yaw)
-        normalized_linear_vel = np.clip(linear_vel * inv_max_vel, -1.0, 1.0)
-        normalized_angular_vel = np.clip(angular_vel * inv_max_vel, -1.0, 1.0)
+        normalized_linear_vel = np.clip(linear_vel * inv_max_linear, -1.0, 1.0)
+        normalized_angular_vel = np.clip(angular_vel * inv_max_angular, -1.0, 1.0)
 
         # Directly construct the final numpy array
         if self.include_motion_alignment:
@@ -392,19 +396,27 @@ class TrajectoryStateSpace(BaseObservationSpace):
     }
 
     def __init__(
-        self, history_length: int = 3, max_velocity: float = 2.0, position_scale: float = 5.0, *args: Any, **kwargs: Any
+        self,
+        history_length: int = 3,
+        max_linear_vel: float = 1.0,
+        max_angular_vel: float = 1.0,
+        position_scale: float = 5.0,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize trajectory state space.
 
         Args:
             history_length: Number of historical states to track
-            max_velocity: Maximum expected velocity
+            max_linear_vel: Maximum linear velocity (m/s)
+            max_angular_vel: Maximum angular velocity (rad/s)
             position_scale: Scale for position differences
             *args: Variable arguments
             **kwargs: Keyword arguments
         """
         self.history_length = history_length
-        self.max_velocity = max_velocity
+        self.max_linear_vel = max_linear_vel
+        self.max_angular_vel = max_angular_vel
         self.position_scale = position_scale
 
         # State history
@@ -466,15 +478,15 @@ class TrajectoryStateSpace(BaseObservationSpace):
             normalized_curvature = 0.0
 
         # Speed consistency (variance in velocity magnitude)
-        velocity_magnitudes = np.linalg.norm(velocities, axis=1)
+        velocity_magnitudes = np.linalg.norm(velocities / np.array([self.max_linear_vel, self.max_angular_vel]), axis=1)
         if len(velocity_magnitudes) > 1:
             speed_variance = np.var(velocity_magnitudes)
             # Consistency inversely related to variance
-            speed_consistency = np.exp(-speed_variance / (self.max_velocity**2))
+            speed_consistency = np.exp(-speed_variance)
         else:
             speed_consistency = 1.0
 
-        return (normalized_path_length, normalized_curvature, speed_consistency)
+        return (float(normalized_path_length), float(normalized_curvature), float(speed_consistency))
 
     def encode_observation(
         self, robot_pose: Pose2D, last_action: RobotActionVector, *args: Any, **kwargs: Any
@@ -529,12 +541,13 @@ class TrajectoryStateSpace(BaseObservationSpace):
 
         # Vectorized normalization
         inv_pos_scale = 1.0 / self.position_scale
-        inv_max_vel = 1.0 / self.max_velocity
+        inv_max_linear = 1.0 / self.max_linear_vel
+        inv_max_angular = 1.0 / self.max_angular_vel
 
         normalized_x = np.tanh(x * inv_pos_scale)
         normalized_y = np.tanh(y * inv_pos_scale)
-        normalized_linear_vel = np.clip(linear_vel * inv_max_vel, -1.0, 1.0)
-        normalized_angular_vel = np.clip(angular_vel * inv_max_vel, -1.0, 1.0)
+        normalized_linear_vel = np.clip(linear_vel * inv_max_linear, -1.0, 1.0)
+        normalized_angular_vel = np.clip(angular_vel * inv_max_angular, -1.0, 1.0)
 
         # Compute trajectory features
         path_length, curvature, speed_consistency = self._compute_trajectory_features()

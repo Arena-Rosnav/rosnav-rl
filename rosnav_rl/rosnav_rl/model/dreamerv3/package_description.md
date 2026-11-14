@@ -180,7 +180,7 @@ In your agent configuration, specify which observation spaces to use:
 ```python
 from rosnav_rl.spaces import observation_space as spaces
 
-class DreamerV3Model(RL_Model):
+class DreamerV3Model(RL_Model[Dreamer, "DreamerV3Cfg"]):
     # Define which observation spaces the model uses
     @property
     def observation_space_list(self) -> List["BaseObservationSpace"]:

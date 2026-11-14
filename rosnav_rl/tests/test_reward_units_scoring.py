@@ -138,10 +138,18 @@ def test_goal_reached_writes_success_info_into_the_holder(holder, params):
 def test_factored_safe_distance_scales_with_the_margin_violation(holder, params):
     unit = RewardFactoredSafeDistance(holder, factor=-2.0)
 
-    unit(True, np.array([1.0, 0.6, 2.0]), params)
+    unit(True, np.array([1.0, 0.3, 2.0]), params)
 
     assert holder.state.info == {"safe_dist_violation": True}
-    assert score(holder) == pytest.approx(-2.0 * (0.5 + 0.3 - 0.6))
+    assert score(holder) == pytest.approx(-2.0 * (0.5 - 0.3))
+
+
+def test_factored_safe_distance_is_continuous_at_the_trigger_threshold(holder, params):
+    unit = RewardFactoredSafeDistance(holder, factor=-2.0)
+
+    unit(True, np.array([1.0, params.safety_distance, 2.0]), params)
+
+    assert score(holder) == pytest.approx(0.0)
 
 
 def test_collision_latches_after_the_monitor_pulse_clears(holder, params):
@@ -232,33 +240,126 @@ def test_factored_reverse_drive_is_proportional_to_reverse_speed(holder):
     assert score(holder) == pytest.approx(-0.1)
 
 
-def test_abrupt_velocity_change_applies_quartic_penalty_per_dimension(holder):
+@pytest.fixture
+def jackal_params():
+    return AgentParameters(
+        min_linear_vel=0.0,
+        max_linear_vel=0.5,
+        min_translational_vel=0.0,
+        max_translational_vel=0.5,
+        min_angular_vel=-1.0,
+        max_angular_vel=1.0,
+    )
+
+
+def test_abrupt_velocity_change_applies_quartic_penalty_per_dimension(holder, params):
     unit = RewardAbruptVelocityChange(holder, vel_factors={"0": 1.0, "2": 0.5})
 
-    unit(np.array([0.0, 0.0, 0.0]))
-    unit(np.array([2.0, 5.0, -1.0]))
+    unit(np.array([0.0, 0.0, 0.0]), params)
+    unit(np.array([0.5, 5.0, -1.0]), params)
 
-    assert score(holder) == pytest.approx(-(2.0**4 / 100 * 1.0) - (1.0**4 / 100 * 0.5))
+    assert score(holder) == pytest.approx(-(0.5**4 / 100 * 1.0) - (0.5**4 / 100 * 0.5))
 
 
-def test_abrupt_velocity_change_tracks_a_copy_of_the_action(holder):
+def test_abrupt_velocity_change_is_invariant_to_the_robot_speed_scale(holder, params, jackal_params):
+    fast = params.model_copy(update={"max_linear_vel": 2.0, "min_angular_vel": -4.0, "max_angular_vel": 4.0})
+    unit = RewardAbruptVelocityChange(holder, vel_factors={"0": 1.0, "2": 1.0})
+
+    unit(np.array([0.0, 0.0, 0.0]), jackal_params)
+    unit(np.array([0.25, 0.0, 1.0]), jackal_params)
+    slow_score = score(holder)
+    unit.reset()
+    unit(np.array([0.0, 0.0, 0.0]), fast)
+    unit(np.array([1.0, 0.0, 4.0]), fast)
+
+    assert slow_score != 0.0
+    assert score(holder) == pytest.approx(slow_score)
+
+
+def test_abrupt_velocity_change_tracks_a_copy_of_the_action(holder, params):
     unit = RewardAbruptVelocityChange(holder, vel_factors={"0": 1.0})
     action = np.array([1.0, 0.0, 0.0])
 
-    unit(action)
+    unit(action, params)
     action[0] = 3.0
-    unit(np.array([1.0, 0.0, 0.0]))
+    unit(np.array([1.0, 0.0, 0.0]), params)
 
     assert score(holder) == 0.0
 
 
-def test_root_velocity_difference_rewards_small_l2_change(holder):
+def test_root_velocity_difference_rewards_small_normalized_l2_change(holder, jackal_params):
     unit = RewardRootVelocityDifference(holder, k=2.0)
 
-    unit(np.array([0.0, 0.0, 0.0]))
-    unit(np.array([0.3, 0.0, 0.4]))
+    unit(np.array([0.0, 0.0, 0.0]), jackal_params)
+    unit(np.array([0.3, 0.0, 0.8]), jackal_params)
 
-    assert score(holder) == pytest.approx((1 - 0.5) / 2.0)
+    normalized_diff = np.linalg.norm([0.3 / 0.5, 0.0, 0.8 / 2.0])
+    assert score(holder) == pytest.approx((1 - normalized_diff) / 2.0)
+
+
+def test_root_velocity_difference_gives_nothing_above_the_threshold(holder, jackal_params):
+    unit = RewardRootVelocityDifference(holder, k=0.5)
+
+    unit(np.array([0.0, 0.0, 0.0]), jackal_params)
+    unit(np.array([0.5, 0.0, 0.0]), jackal_params)
+
+    assert score(holder) == 0.0
+
+
+def test_no_movement_threshold_is_a_fraction_of_the_max_linear_vel(holder, jackal_params):
+    unit = RewardNoMovement(holder, reward=-0.5)
+    fast = jackal_params.model_copy(update={"max_linear_vel": 2.0})
+
+    unit(np.array([0.1, 0.0, 0.0]), jackal_params)
+    at_jackal_bound = score(holder)
+    unit(np.array([0.11, 0.0, 0.0]), jackal_params)
+    above_jackal_bound = score(holder)
+    unit(np.array([0.3, 0.0, 0.0]), fast)
+    below_fast_bound = score(holder)
+
+    assert at_jackal_bound == pytest.approx(-0.5)
+    assert above_jackal_bound == 0.0
+    assert below_fast_bound == pytest.approx(-0.5)
+
+
+def test_no_movement_tolerance_fraction_is_configurable(holder, jackal_params):
+    unit = RewardNoMovement(holder, reward=-0.5, tolerance_fraction=0.5)
+
+    unit(np.array([0.25, 0.0, 0.0]), jackal_params)
+
+    assert score(holder) == pytest.approx(-0.5)
+
+
+@pytest.mark.parametrize(
+    "unit_name",
+    ["goal_reached", "no_movement", "factored_reverse_drive", "abrupt_velocity_change"],
+)
+def test_reward_function_rejects_unknown_unit_kwargs_naming_unit_key_and_accepted_keys(unit_name):
+    with pytest.raises(ValueError) as error:
+        RewardFunction({unit_name: {"safe_dist": 0.3}})
+
+    message = str(error.value)
+    assert "safe_dist" in message
+    assert "accepted" in message
+    assert "_on_safe_dist_violation" in message
+
+
+def test_unknown_unit_kwarg_error_names_the_unit_class(holder):
+    with pytest.raises(ValueError, match="RewardFactoredReverseDrive"):
+        RewardFactoredReverseDrive(holder, factr=-0.1)
+
+
+def test_reward_function_accepts_the_documented_unit_kwargs():
+    RewardFunction(
+        {
+            "goal_reached": {"reward": 15, "_follow_subgoal": True},
+            "factored_safe_distance": {"factor": -0.2},
+            "approach_goal": {"pos_factor": 0.3, "neg_factor": 0.4, "_goal_update_threshold": 0.25},
+            "factored_reverse_drive": {"factor": -0.05, "threshold": 0.0, "_on_safe_dist_violation": True},
+            "two_factor_velocity_difference": {"alpha": 0.005, "beta": 0.0},
+            "no_movement": {"reward": -0.01, "tolerance_fraction": 0.2},
+        }
+    )
 
 
 def test_two_factor_velocity_difference_weighs_first_and_last_dimension(holder):

@@ -2,7 +2,7 @@ import functools
 import logging
 import pathlib
 from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import gymnasium as gym
 import numpy as np
@@ -22,6 +22,12 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 to_np = lambda x: x.detach().cpu().numpy()
+
+
+def _require_dir(directory: pathlib.Path | None, name: str) -> pathlib.Path:
+    if directory is None:
+        raise ValueError(f"{name} is not set, call prepare_config first")
+    return directory
 
 
 def set_runtime_configuration(config: "DreamerV3Cfg"):
@@ -54,6 +60,8 @@ def prepare_config(config: "DreamerV3Cfg") -> pathlib.Path:
     Returns:
         pathlib.Path: The expanded log directory path.
     """
+    if config.general.logdir is None:
+        raise ValueError("config.general.logdir is not set")
     logdir = pathlib.Path(config.general.logdir).expanduser()
 
     config.general.traindir = config.general.traindir or logdir / "train_eps"
@@ -90,8 +98,8 @@ def prepare_directories(config: "DreamerV3Cfg", logdir: pathlib.Path):
 
     logdir.mkdir(parents=True, exist_ok=True)
     logdir.mkdir(parents=True, exist_ok=True)
-    config.general.traindir.mkdir(parents=True, exist_ok=True)
-    config.general.evaldir.mkdir(parents=True, exist_ok=True)
+    _require_dir(config.general.traindir, "traindir").mkdir(parents=True, exist_ok=True)
+    _require_dir(config.general.evaldir, "evaldir").mkdir(parents=True, exist_ok=True)
 
 
 def prepare_logger(config: "DreamerV3Cfg", logdir: pathlib.Path) -> tools.Logger:
@@ -109,7 +117,7 @@ def prepare_logger(config: "DreamerV3Cfg", logdir: pathlib.Path) -> tools.Logger
         This function calculates the current step count from the training directory specified in the config
         and adjusts it based on the environment's action repeat parameter.
     """
-    step = data_tools.count_steps(config.general.traindir)
+    step = data_tools.count_steps(_require_dir(config.general.traindir, "traindir"))
     return tools.Logger(logdir, config.environment.action_repeat * step)
 
 
@@ -132,14 +140,14 @@ def load_episodes(config: "DreamerV3Cfg") -> tuple[tools._Cache, tools._Cache]:
     if config.general.offline_traindir:
         directory = config.general.offline_traindir.format(**vars(config))
     else:
-        directory = config.general.traindir
+        directory = _require_dir(config.general.traindir, "traindir")
 
     train_eps = tools.load_episodes(directory, limit=config.training.dataset_size)
 
     if config.general.offline_evaldir:
         directory = config.general.offline_evaldir.format(**vars(config))
     else:
-        directory = config.general.evaldir
+        directory = _require_dir(config.general.evaldir, "evaldir")
 
     eval_eps = tools.load_episodes(directory, limit=1)
 
@@ -182,14 +190,18 @@ def prefill_dataset(
         list(observation_space.keys()),
     )
 
-    _num_actions = int(action_space.n) if isinstance(action_space, gym.spaces.Discrete) else action_space.shape[0]
+    _num_actions = (
+        int(action_space.n)
+        if isinstance(action_space, gym.spaces.Discrete)
+        else cast(gym.spaces.Box, action_space).shape[0]
+    )
     _image_available = observation_space.get("image", None) is not None
 
     # Prefill dataset if no offline dataset is provided
     if not config.general.offline_traindir:
         prefill = max(
             0,
-            config.training.prefill_steps - data_tools.count_steps(config.general.traindir),
+            config.training.prefill_steps - data_tools.count_steps(_require_dir(config.general.traindir, "traindir")),
         )
         _log.info("Prefilling dataset (%d steps).", prefill)
         if hasattr(action_space, "discrete"):
@@ -197,8 +209,8 @@ def prefill_dataset(
         else:
             random_actor = torchd.independent.Independent(
                 torchd.uniform.Uniform(
-                    torch.tensor(action_space.low).repeat(len(train_envs), 1),
-                    torch.tensor(action_space.high).repeat(len(train_envs), 1),
+                    torch.tensor(cast(gym.spaces.Box, action_space).low).repeat(len(train_envs), 1),
+                    torch.tensor(cast(gym.spaces.Box, action_space).high).repeat(len(train_envs), 1),
                 ),
                 1,
             )
@@ -212,7 +224,7 @@ def prefill_dataset(
             random_agent,
             train_envs,
             train_eps,
-            config.general.traindir,
+            _require_dir(config.general.traindir, "traindir"),
             logger,
             limit=config.training.dataset_size,
             steps=prefill,
@@ -403,7 +415,7 @@ def _run_evaluation(
         eval_policy,
         eval_envs,
         eval_eps,
-        config.general.evaldir,
+        _require_dir(config.general.evaldir, "evaldir"),
         logger,
         is_eval=True,
         episodes=config.training.eval_episode_num,
@@ -430,10 +442,10 @@ def _run_training(
         agent,
         train_envs,
         train_eps,
-        config.general.traindir,
+        _require_dir(config.general.traindir, "traindir"),
         logger,
         limit=config.training.dataset_size,
-        steps=config.training.eval_every,
+        steps=int(config.training.eval_every),
         state=state,
         no_image_key=not is_image_available,
     )
@@ -478,6 +490,7 @@ def wandb_format_value(
             return value[-1]
         elif isinstance(value[-1], np.ndarray):
             return wandb_format_value(value[-1])
+        raise TypeError(f"cannot format {type(value[-1])} for wandb")
     elif isinstance(value, np.ndarray):
         if value.size == 0:
             return 0.0

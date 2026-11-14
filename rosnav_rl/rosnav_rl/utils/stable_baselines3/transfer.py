@@ -3,15 +3,14 @@ from pprint import pprint
 from warnings import warn
 
 import torch
-from stable_baselines3.common.policies import ActorCriticPolicy
 
 
-def transfer_weights(
-    target_model: ActorCriticPolicy,
-    source_model: ActorCriticPolicy,
+def transfer_weights[P: torch.nn.Module](
+    target_model: P,
+    source_model: torch.nn.Module,
     include: list[str] | None = None,
     exclude: list[str] | None = None,
-) -> ActorCriticPolicy:
+) -> P:
     """
     Transfers weights from source_model to target_model based on specified inclusion and exclusion criteria.
 

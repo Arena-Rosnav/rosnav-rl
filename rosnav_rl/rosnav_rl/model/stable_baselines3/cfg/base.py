@@ -125,9 +125,6 @@ class OffPolicyParameters(SBAlgorithmParameters, ABC):
     sde_sample_freq: int = -1
     use_sde_at_warmup: bool = False
 
-    class Config:
-        arbitrary_types_allowed = True
-
 
 # ---------------------------------------------------------------------------
 # Wrapper that holds the full algorithm configuration

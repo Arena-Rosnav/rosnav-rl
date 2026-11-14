@@ -304,19 +304,19 @@ class TestMetaSpaces:
         assert space.encode_observation(is_terminal=0) == 0
 
     def test_episode_step_space(self):
-        space = EpisodeStepSpace(max_episode_steps=500)
+        space = EpisodeStepSpace(max_steps=500)
         result = space.encode_observation(episode_step=42)
 
         np.testing.assert_array_equal(result, [42])
 
     def test_episode_step_default(self):
-        space = EpisodeStepSpace(max_episode_steps=500)
+        space = EpisodeStepSpace(max_steps=500)
         result = space.encode_observation()
 
         np.testing.assert_array_equal(result, [0])
 
     def test_episode_step_gym_space(self):
-        space = EpisodeStepSpace(max_episode_steps=1000)
+        space = EpisodeStepSpace(max_steps=1000)
         gs = space.get_gym_space()
 
         assert gs.shape == (1,)
@@ -330,15 +330,15 @@ class TestMetaSpaces:
 
 class TestMotionStateSpace:
     def test_shape_without_acceleration(self):
-        space = MotionStateSpace(max_velocity=2.0)
+        space = MotionStateSpace(max_linear_vel=2.0, max_angular_vel=2.0)
         assert space.shape == (3,)
 
     def test_shape_with_acceleration(self):
-        space = MotionStateSpace(max_velocity=2.0, include_acceleration=True)
+        space = MotionStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, include_acceleration=True)
         assert space.shape == (4,)
 
     def test_zero_velocity(self):
-        space = MotionStateSpace(max_velocity=2.0)
+        space = MotionStateSpace(max_linear_vel=2.0, max_angular_vel=2.0)
         action = np.array([0.0, 0.0, 0.0])
 
         result = space.encode_observation(last_action=action)
@@ -348,7 +348,7 @@ class TestMotionStateSpace:
         assert result[1] == pytest.approx(0.0)  # direction
 
     def test_forward_motion(self):
-        space = MotionStateSpace(max_velocity=2.0)
+        space = MotionStateSpace(max_linear_vel=2.0, max_angular_vel=2.0)
         action = np.array([1.0, 0.0, 0.0])
 
         result = space.encode_observation(last_action=action)
@@ -359,7 +359,7 @@ class TestMotionStateSpace:
         assert result[1] == pytest.approx(0.0)
 
     def test_stability_improves_over_time(self):
-        space = MotionStateSpace(max_velocity=2.0, stability_window=5)
+        space = MotionStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, stability_window=5)
         action = np.array([0.5, 0.0, 0.0])
 
         results = []
@@ -371,7 +371,7 @@ class TestMotionStateSpace:
         assert results[-1] >= results[1]
 
     def test_reset_clears_history(self):
-        space = MotionStateSpace(max_velocity=2.0, stability_window=5)
+        space = MotionStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, stability_window=5)
 
         for _ in range(3):
             space.encode_observation(last_action=np.array([0.5, 0.0, 0.2]))
@@ -384,7 +384,7 @@ class TestMotionStateSpace:
         assert space.last_velocity is None
 
     def test_acceleration_computed(self):
-        space = MotionStateSpace(max_velocity=2.0, include_acceleration=True)
+        space = MotionStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, include_acceleration=True)
 
         # First action
         result1 = space.encode_observation(last_action=np.array([0.0, 0.0, 0.0]))
@@ -402,15 +402,15 @@ class TestMotionStateSpace:
 
 class TestKinematicStateSpace:
     def test_shape_with_alignment(self):
-        space = KinematicStateSpace(max_velocity=2.0, include_motion_alignment=True)
+        space = KinematicStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, include_motion_alignment=True)
         assert space.shape == (7,)
 
     def test_shape_without_alignment(self):
-        space = KinematicStateSpace(max_velocity=2.0, include_motion_alignment=False)
+        space = KinematicStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, include_motion_alignment=False)
         assert space.shape == (6,)
 
     def test_origin_zero_velocity(self):
-        space = KinematicStateSpace(max_velocity=2.0, include_motion_alignment=True)
+        space = KinematicStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, include_motion_alignment=True)
         pose = make_pose(0.0, 0.0, 0.0)
         action = np.array([0.0, 0.0, 0.0])
 
@@ -426,7 +426,7 @@ class TestKinematicStateSpace:
         assert result[6] == pytest.approx(0.0)  # motion_alignment (no motion)
 
     def test_forward_motion_alignment(self):
-        space = KinematicStateSpace(max_velocity=2.0, include_motion_alignment=True)
+        space = KinematicStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, include_motion_alignment=True)
         pose = make_pose(0.0, 0.0, 0.0)
         action = np.array([1.0, 0.0, 0.0])
 
@@ -436,7 +436,7 @@ class TestKinematicStateSpace:
         assert result[6] == pytest.approx(1.0)
 
     def test_backward_motion_alignment(self):
-        space = KinematicStateSpace(max_velocity=2.0, include_motion_alignment=True)
+        space = KinematicStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, include_motion_alignment=True)
         pose = make_pose(0.0, 0.0, 0.0)
         action = np.array([-1.0, 0.0, 0.0])
 
@@ -446,7 +446,7 @@ class TestKinematicStateSpace:
         assert result[6] == pytest.approx(-1.0)
 
     def test_position_normalization(self):
-        space = KinematicStateSpace(max_velocity=2.0, position_scale=10.0)
+        space = KinematicStateSpace(max_linear_vel=2.0, max_angular_vel=2.0, position_scale=10.0)
         pose = make_pose(10.0, -5.0, np.pi / 4)
         action = np.array([0.0, 0.0, 0.0])
 
@@ -456,7 +456,7 @@ class TestKinematicStateSpace:
         assert result[1] == pytest.approx(np.tanh(-0.5))  # tanh(-5/10)
 
     def test_velocity_clipping(self):
-        space = KinematicStateSpace(max_velocity=1.0)
+        space = KinematicStateSpace(max_linear_vel=1.0, max_angular_vel=1.0)
         pose = make_pose(0.0, 0.0, 0.0)
         action = np.array([5.0, 0.0, 5.0])  # Far exceeds max
 

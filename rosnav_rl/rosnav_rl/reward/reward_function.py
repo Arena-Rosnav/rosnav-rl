@@ -53,7 +53,7 @@ class RewardFunction(ErrorReportingMixin):
         ```python
         reward_dict = {
             "goal_reached": {"reward": 15.0},
-            "safe_dist": {"reward": -1.0, "safe_dist": 0.3}
+            "safe_distance": {"reward": -1.0}
         }
         reward_function = RewardFunction(reward_dict)
         reward, info = reward_function.get_reward(observation, sim_state)

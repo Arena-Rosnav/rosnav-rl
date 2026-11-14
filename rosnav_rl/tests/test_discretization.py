@@ -50,4 +50,5 @@ def test_omnidirectional_uniform_actions_all_decode():
     decoded = [space.decode(np.array([i])) for i in range(space.get_gym_space().n)]
 
     assert len(decoded) == len(space.discrete_actions)
-    assert all(cmd.shape == (3,) and cmd[1] == 0.0 for cmd in decoded)
+    assert all(cmd.shape == (3,) for cmd in decoded)
+    assert {float(cmd[1]) for cmd in decoded} >= set(space.linear_range_y)

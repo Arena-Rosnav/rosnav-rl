@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-import yaml
-
 from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.observations.factory.factory import (
     create_observation_manager_from_config,
@@ -11,7 +9,7 @@ from rosnav_rl.observations.factory.factory import (
 )
 from rosnav_rl.rl_agent import RL_Agent
 from rosnav_rl.utils.agent_paths import resolve_observations_config_path
-from rosnav_rl.utils.utils import load_yaml
+from rosnav_rl.utils.yaml_io import load_yaml
 
 from .base_server import ActionServer, ObservationCollector
 
@@ -81,9 +79,14 @@ def _resolve_agent_dir(agent_name: str) -> Path:
 
 class ArenaActionServer(ActionServer):
     def __init__(
-        self, agent_name: str, namespace: str = "", robot_frame: str = "", base_frame: str = "base_link"
+        self,
+        agent_name: str,
+        namespace: str = "",
+        robot_frame: str = "",
+        base_frame: str = "base_link",
+        arena_env_node: str = "",
     ) -> None:
-        super().__init__(agent_name, namespace)
+        super().__init__(agent_name, namespace, arena_env_node=arena_env_node)
         self.robot_frame = robot_frame
         self.base_frame = base_frame
 
@@ -121,8 +124,7 @@ class ArenaActionServer(ActionServer):
         """
         obs_config_path = resolve_observations_config_path(self._agent_spec)
 
-        with open(obs_config_path) as f:
-            config = yaml.safe_load(f)
+        config = load_yaml(obs_config_path)
         set_robot_pose_frames(config, self.robot_frame, self.base_frame)
         set_pedestrians_topic(config, str(self.namespace))
 
