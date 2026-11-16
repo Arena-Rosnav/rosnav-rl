@@ -21,6 +21,9 @@ if TYPE_CHECKING:
 
     from ..core.manager import ObservationManager
 
+_GENERATOR_TYPE_ALIASES: dict[str, str] = {
+    "EndEffectorPoseTFGenerator": "ObjectPoseTFGenerator",
+}
 
 def _ros_msg_type_string(msg_cls: type) -> str:
     """Derive 'package/MsgClass' string from a ROS message class.
@@ -95,6 +98,14 @@ class ObservationFactory:
         for name, obj in inspect.getmembers(generators):
             if inspect.isclass(obj) and issubclass(obj, Generator) and obj is not Generator:
                 self._generators[name] = obj
+
+        for alias, target in _GENERATOR_TYPE_ALIASES.items():
+            if target not in self._generators:
+                raise ValueError(
+                    f"generator type alias '{alias}' points at '{target}', "
+                    f"which is not a registered generator"
+                )
+            self._generators[alias] = self._generators[target]
 
     def create_data_sources(self, config: dict[str, Any], **kwargs: Any) -> dict[str, DataSource]:
         """
@@ -202,13 +213,32 @@ def set_robot_pose_frames(config: dict[str, Any], robot_frame: str, base_frame: 
             params["target_frame"] = posixpath.join(robot_frame, "odom")
 
 
-def set_end_effector_frames(config: dict[str, Any], robot_frame: str, tip_link: str) -> None:
-    """Point every EndEffectorPoseTFGenerator in *config* at the arm tip and odom frames under *robot_frame*."""
-    for ds in config.get("datasources", {}).values():
+def set_end_effector_frames(config: dict[str, Any], robot_frame: str, tip_link: str, target_frame: str = "map") -> None:
+    """Point every EndEffectorPoseTFGenerator in *config* at the arm tip under robot_frame, expressed in target_frame."""
+    for name, ds in config.get("datasources", {}).items():
         if ds.get("type") == "EndEffectorPoseTFGenerator":
             params = ds.setdefault("params", {})
+            if params.get("source_frame"):
+                raise ValueError(
+                    f"EndEffectorPoseTFGenerator '{name}' must not set source_frame; "
+                    f"use ObjectPoseTFGenerator for world objects"
+                )
             params["source_frame"] = posixpath.join(robot_frame, tip_link)
-            params["target_frame"] = posixpath.join(robot_frame, "odom")
+            params["target_frame"] = target_frame
+
+def set_object_pose_frames(config: dict[str, Any], env_scope: str, target_frame: str = "map") -> None:
+    """Point every ObjectPoseTFGenerator in *config* at the YAML-declared frame and map under *env_scope*."""
+    for name, ds in config.get("datasources", {}).items():
+        if ds.get("type") == "ObjectPoseTFGenerator":
+            params = ds.setdefault("params", {})
+            leaf = params.get("source_frame")
+            if not leaf:
+                raise ValueError(
+                    f"ObjectPoseTFGenerator '{name}' requires a source_frame "
+                    f"(a leaf name relative to the env scope.)"
+                )
+            params["source_frame"] = posixpath.join(env_scope, leaf)
+            params["target_frame"] = target_frame
 
 
 def set_grasp_frames(config: dict[str, Any], robot_frame: str) -> None:

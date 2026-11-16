@@ -10,7 +10,7 @@ class DONE_REASONS(enum.Enum):
     STEP_LIMIT = enum.auto()
     COLLISION = enum.auto()
     SUCCESS = enum.auto()
-    DROP = enum.auto() 
+    DROP = enum.auto()
 
 
 class DEFAULTS:

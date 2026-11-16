@@ -2130,7 +2130,7 @@ class RewardObjectRetention(RewardUnit):
 
     requires = {
         "grasp_state": GraspStateSpec,
-        "robot_pose": Pose2D,
+        "target_pose": Pose3D,
     }
 
     DONE_INFO = {
@@ -2183,15 +2183,15 @@ class RewardObjectRetention(RewardUnit):
         self._lost_steps = 0
         self._ever_grasped = False
 
-    def _at_delivery(self, robot_pose: Pose2D) -> bool:
-        dx = float(robot_pose[0]) - float(self._delivery_xy[0])
-        dy = float(robot_pose[1]) - float(self._delivery_xy[1])
+    def _at_delivery(self, target_pose: Pose3D) -> bool:
+        dx = float(target_pose[0]) - float(self._delivery_xy[0])
+        dy = float(target_pose[1]) - float(self._delivery_xy[1])
         return float(np.hypot(dx, dy)) <= self._delivery_radius
 
     def __call__(
         self,
         grasp_state: GraspState,
-        robot_pose: Pose2D,
+        target_pose: Pose3D,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -2207,7 +2207,7 @@ class RewardObjectRetention(RewardUnit):
         if not self._ever_grasped:
             return
 
-        if self._at_delivery(robot_pose):
+        if self._at_delivery(target_pose):
             self._lost_steps = 0
             return
 
@@ -2226,7 +2226,7 @@ class RewardDeliverySuccess(RewardUnit):
 
     requires = {
         "grasp_state": GraspStateSpec,
-        "robot_pose": Pose2D,
+        "target_pose": Pose3D,
     }
 
     DONE_INFO = {
@@ -2274,12 +2274,12 @@ class RewardDeliverySuccess(RewardUnit):
         self._settled_steps = 0
         self._ever_grasped = False
 
-    def _at_delivery(self, robot_pose: Pose2D) -> bool:
-        dx = float(robot_pose[0] - self._delivery_xy[0])
-        dy = float(robot_pose[1] - self._delivery_xy[1])
+    def _at_delivery(self, target_pose: Pose3D) -> bool:
+        dx = float(target_pose[0] - self._delivery_xy[0])
+        dy = float(target_pose[1] - self._delivery_xy[1])
         return float(np.hypot(dx, dy)) <= self._delivery_radius
 
-    def __call__(self, grasp_state: GraspStateSpec, robot_pose: Pose2D, *args: Any, **kwargs: Any):
+    def __call__(self, grasp_state: GraspStateSpec, target_pose: Pose3D, *args: Any, **kwargs: Any):
         if self._target in grasp_state.other:
             self._held_steps += 1
             self._settled_steps = 0
@@ -2289,7 +2289,7 @@ class RewardDeliverySuccess(RewardUnit):
 
         self._held_steps = 0
 
-        if not (self._ever_grasped and self._at_delivery(robot_pose)):
+        if not (self._ever_grasped and self._at_delivery(target_pose)):
             self._settled_steps = 0
             return
 

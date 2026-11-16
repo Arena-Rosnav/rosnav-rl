@@ -1215,7 +1215,7 @@ class ArenaPedestrianStateGenerator(Generator[ArenaPedestrianStates]):
 
 
 class ObjectPoseTFGenerator(Generator[Pose3D]):
-    """Pose [x, y, z, qx, qy, qz, qw] of the robot's end effector frame in target_frame from the TF tree."""
+    """Pose [x, y, z, qx, qy, qz, qw] of the objects frame in target_frame from the TF tree."""
 
     requires = {}
 
