@@ -12,6 +12,7 @@ from rosnav_rl.utils.yaml_io import dumps_yaml
 from arena_runtime_msgs.msg import LockstepHeartbeat, LockstepRegistration
 from arena_runtime_msgs.srv import LockstepRegister
 from rclpy.executors import MultiThreadedExecutor
+from arena_rclpy_mixins.Time import TimeNode
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 
@@ -70,7 +71,7 @@ def lockstep(tmp_path: Path):
     runtime = Node("beat_test_runtime")
     runtime.create_service(LockstepRegister, "/arena/sim_lifecycle/lockstep/register", register)
     runtime.create_subscription(LockstepHeartbeat, f"{ROBOT_NS}/lockstep/rosnav", heartbeats.append, 50)
-    node = Node(
+    node = TimeNode(
         "rosnav_rl_inference",
         namespace=ROBOT_NS,
         parameter_overrides=[
