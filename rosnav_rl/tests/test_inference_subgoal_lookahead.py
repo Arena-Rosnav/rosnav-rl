@@ -7,6 +7,7 @@ import geometry_msgs.msg
 import pytest
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
+from arena_rclpy_mixins.Time import TimeNode
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
@@ -20,7 +21,9 @@ NAMESPACE = "lookahead_test"
 def stack():
     if not rclpy.ok():
         rclpy.init()
-    node = Node("rosnav_rl_inference", namespace=NAMESPACE, parameter_overrides=[Parameter("train_mode", value=True)])
+    node = TimeNode(
+        "rosnav_rl_inference", namespace=NAMESPACE, parameter_overrides=[Parameter("train_mode", value=True)]
+    )
     ArenaInferenceNode(node)
     driver = Node("lookahead_driver", namespace=NAMESPACE)
     pose = geometry_msgs.msg.TransformStamped()

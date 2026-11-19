@@ -21,10 +21,10 @@ import numpy as np
 import rclpy
 import rclpy.time
 import tf2_ros
+from arena_rclpy_mixins.Time import TimeNode
 from arena_robots.lockstep_beat import LockstepBeat
 from geometry_msgs.msg import PoseStamped, Twist
 from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
-from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Int16
 
@@ -59,7 +59,7 @@ def trained_control_rate(general: GeneralCfg) -> float:
 class ArenaInferenceNode:
     """Owns the per-robot RL agent and drives cmd_vel from observations."""
 
-    def __init__(self, node: Node) -> None:
+    def __init__(self, node: TimeNode) -> None:
         self.node = node
         self.logger = node.get_logger()
 
@@ -145,7 +145,7 @@ class ArenaInferenceNode:
             await self._beat.release()
 
     def _tick(self) -> None:
-        stamp = self.node.get_clock().now().to_msg()
+        stamp = self.node.sim_time.to_msg()
         try:
             self._step()
         finally:
@@ -248,7 +248,7 @@ class ArenaInferenceNode:
 
         msg = PoseStamped()
         msg.header.frame_id = self._goal.header.frame_id
-        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.header.stamp = self.node.sim_time.to_msg()
         msg.pose.position.x = sx
         msg.pose.position.y = sy
         msg.pose.orientation.w = 1.0
@@ -265,7 +265,7 @@ class ArenaInferenceNode:
 
 def main(args: list[str] | None = None) -> None:
     rclpy.init(args=args)
-    node = rclpy.create_node(_NODE_NAME)
+    node = TimeNode(_NODE_NAME)
     executor = SingleThreadedExecutor()
     executor.add_node(node)
     inference: ArenaInferenceNode | None = None
