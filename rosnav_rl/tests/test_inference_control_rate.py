@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import rclpy
 from rosnav_rl.utils.yaml_io import dumps_yaml
-from rclpy.node import Node
+from arena_rclpy_mixins.Time import TimeNode
 from rclpy.parameter import Parameter
 
 from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
@@ -44,7 +44,7 @@ def _saved_agent(directory: Path, general: dict) -> Path:
 def _inference(agent_dir: Path, *overrides: Parameter) -> ArenaInferenceNode:
     if not rclpy.ok():
         rclpy.init()
-    node = Node(
+    node = TimeNode(
         "rosnav_rl_inference",
         namespace="/rate_env/jackal",
         parameter_overrides=[
