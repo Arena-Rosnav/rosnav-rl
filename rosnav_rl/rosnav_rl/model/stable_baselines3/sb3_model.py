@@ -28,7 +28,8 @@ from rosnav_rl.utils.type_aliases import (
     ObservationDict,
     _SupportedStableBaselinesModels,
 )
-from rosnav_rl.utils.utils import load_yaml, make_mock_env
+from rosnav_rl.utils.utils import make_mock_env
+from rosnav_rl.utils.yaml_io import load_yaml
 
 from ..model import RL_Model
 from .policy.agent_factory import AgentFactory

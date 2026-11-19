@@ -56,8 +56,7 @@ def test_stage_zero_sets_the_episode_tolerance_on_the_task_generator(task_genera
         threshold_type="succ",
         upper_threshold=0.9,
         lower_threshold=0.3,
-        num_envs=1,
-        parameter_node_template="/curriculum_test/env_{i}/arena_env_node",
+        env_nodes=["/curriculum_test/env_0/arena_env_node"],
         timeout=30.0,
     )
     assert target.get_parameter(TOLERANCE).value == pytest.approx(1.5)
@@ -71,8 +70,7 @@ def test_tick_scheduled_stage_zero_sets_the_episode_tolerance_on_the_task_genera
         train_stages=[stage, {**stage, TOLERANCE: 1.2}],
         stage_ticks=[0, 50000],
         ticks_per_step=1,
-        num_envs=1,
-        parameter_node_template="/curriculum_test/env_{i}/arena_env_node",
+        env_nodes=["/curriculum_test/env_0/arena_env_node"],
         timeout=30.0,
     )
     assert target.get_parameter(TOLERANCE).value == pytest.approx(1.5)
@@ -86,8 +84,7 @@ def test_stage_modes_and_task_params_reach_queue_episode_as_modes_and_namespaced
         threshold_type="succ",
         upper_threshold=0.9,
         lower_threshold=0.3,
-        num_envs=1,
-        parameter_node_template="/curriculum_test/env_{i}/arena_env_node",
+        env_nodes=["/curriculum_test/env_0/arena_env_node"],
         timeout=30.0,
         modes={"robots": "random", "modules": ["staged", "sounds"]},
     )

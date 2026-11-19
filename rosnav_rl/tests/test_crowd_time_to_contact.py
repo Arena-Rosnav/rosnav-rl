@@ -7,7 +7,7 @@ import importlib.resources
 import numpy as np
 import pytest
 import torch
-import yaml
+from rosnav_rl.utils.yaml_io import loads_yaml
 from nav_msgs.msg import Odometry
 
 from rosnav_rl.cfg.action_spaces import DifferentialDriveActionSpace
@@ -114,7 +114,7 @@ def _ttc_agent() -> RL_Agent:
 
 def test_bundled_observations_provide_what_the_ttc_agent_requires():
     agent = _ttc_agent()
-    config = yaml.safe_load((importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml").read_text())
+    config = loads_yaml((importlib.resources.files("rosnav_rl") / "observations" / "observations.yaml").read_text())
     provided = (set(config["datasources"]) - set(config["aliases"].values())) | set(config["aliases"]) | {"is_terminal"}
 
     required = {

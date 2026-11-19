@@ -115,6 +115,59 @@ def time_to_contact(
     return np.where(c <= 0.0, 0.0, t).astype(np.float32)
 
 
+def candidate_velocities(
+    max_speed: float, speed_fractions: tuple[float, ...] = (0.0, 0.5, 1.0), num_headings: int = 16
+) -> np.ndarray:
+    """Distinct robot-frame candidate velocities, `speed_fractions * max_speed` times the forward ones of `num_headings` headings, shape (K, 2).
+
+    Speed-major order, a zero speed once. Forward means cos >= 0, mirror-symmetric about the x axis.
+    """
+    headings = 2.0 * np.pi * np.arange(num_headings) / num_headings
+    directions = np.column_stack((np.cos(headings), np.sin(headings)))
+    directions = directions[directions[:, 0] >= -1e-9]
+    speeds = max_speed * np.asarray(speed_fractions, dtype=np.float64)
+    stop = np.zeros((1 if (speeds == 0.0).any() else 0, 2))
+    moving = speeds[speeds != 0.0]
+    return np.vstack((stop, (moving[:, None, None] * directions[None, :, :]).reshape(-1, 2)))
+
+
+def reachability_scalars(
+    relative_positions: np.ndarray,
+    pedestrian_velocities: np.ndarray,
+    candidates: np.ndarray,
+    contact_radius: float,
+    horizon: float,
+    majority: float = 0.5,
+) -> np.ndarray:
+    """Share of the candidate robot velocities that lead to contact within `horizon`, summarised over the pedestrians.
+
+    `pedestrian_velocities` are the pedestrians' own velocities in the robot frame, not relative to the robot.
+    Each candidate replaces the measured robot velocity. Returns [largest share, second largest share,
+    number of pedestrians with a share above `majority`, share blocked by at least one pedestrian].
+    """
+    out = np.zeros(4, dtype=np.float32)
+    if len(relative_positions) == 0 or len(candidates) == 0:
+        return out
+    positions = np.asarray(relative_positions, dtype=np.float64).reshape(-1, 2)
+    velocities = np.asarray(pedestrian_velocities, dtype=np.float64).reshape(-1, 2)
+    candidates = np.asarray(candidates, dtype=np.float64).reshape(-1, 2)
+    relative = velocities[:, None, :] - candidates[None, :, :]
+    a = np.einsum("nkd,nkd->nk", relative, relative)
+    b = 2.0 * np.einsum("nd,nkd->nk", positions, relative)
+    c = (np.einsum("nd,nd->n", positions, positions) - contact_radius * contact_radius)[:, None]
+    disc = b * b - 4.0 * a * c
+    hits = (a > 1e-9) & (disc >= 0.0)
+    t = (-b - np.sqrt(np.maximum(disc, 0.0))) / np.where(hits, 2.0 * a, 1.0)
+    blocked = (c <= 0.0) | (hits & (t > 0.0) & (t <= horizon))
+    share = blocked.mean(axis=1)
+    ordered = np.sort(share)[::-1]
+    out[0] = ordered[0]
+    out[1] = ordered[1] if len(ordered) > 1 else 0.0
+    out[2] = float(np.count_nonzero(share > majority))
+    out[3] = blocked.any(axis=0).mean()
+    return out
+
+
 def straight_line_subgoal(
     robot_xy: tuple[float, float],
     goal_xy: tuple[float, float],

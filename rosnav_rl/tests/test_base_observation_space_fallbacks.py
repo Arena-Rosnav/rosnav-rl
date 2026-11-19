@@ -98,7 +98,7 @@ def test_missing_key_in_the_pose_falls_back_to_zeros(collector):
 
 
 def test_unexpected_exception_falls_back_to_zeros(collector):
-    space = MissionContextSpace(max_mission_time=0.0)
+    space = MissionContextSpace(max_steps=0)
 
     result = space.safe_encode_observation(dist_angle_to_goal=np.array([3.0, 0.0]))
 

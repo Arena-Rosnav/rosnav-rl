@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Protocol
 
+import numpy as np
 import rclpy
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rosnav_rl_msgs.srv import GetCommand
@@ -27,7 +29,9 @@ class ActionServer(ABC):
     agent: RL_Agent | None = None
     observation_collector: ObservationCollector | None = None
 
-    def __init__(self, agent_name: str, namespace: str = "", node: Node | None = None) -> None:
+    def __init__(
+        self, agent_name: str, namespace: str = "", node: Node | None = None, arena_env_node: str = ""
+    ) -> None:
         """
         Initializes the BaseServer.
 
@@ -35,8 +39,11 @@ class ActionServer(ABC):
             agent_name (str): The name of the trained agent to load.
             namespace (str, optional): The namespace for the server. Defaults to an empty string.
             node (Node, optional): An existing ROS2 node. If None, a new one is created.
+            arena_env_node (str, optional): Name of the env node whose task_reset topic resets the agent. Empty disables the reset subscription.
         """
         self.agent_name = agent_name
+        self.arena_env_node = arena_env_node
+        self._queued_commands: list[np.ndarray] = []
         self.namespace = Namespace(namespace)
         self.node = (
             node
@@ -47,6 +54,7 @@ class ActionServer(ABC):
             )
         )
         self.logger = self.node.get_logger()
+        self._executor = SingleThreadedExecutor()
 
     @abstractmethod
     def _initialize_agent(self) -> RL_Agent: ...
@@ -67,13 +75,13 @@ class ActionServer(ABC):
             "get_command",
             self.__handle_next_action_srv,
         )
-        # TODO: Adjust episode reset trigger
-        self._sub_reset_stacked_obs = self.node.create_subscription(
-            Int16,
-            "/scenario_reset",
-            self.__on_scene_reset,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE),
-        )
+        if self.arena_env_node:
+            self._sub_reset_stacked_obs = self.node.create_subscription(
+                Int16,
+                f"{self.arena_env_node}/task_reset",
+                self.__on_scene_reset,
+                QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE),
+            )
 
     def __handle_next_action_srv(
         self, request: GetCommand.Request, response: GetCommand.Response
@@ -101,7 +109,8 @@ class ActionServer(ABC):
             return response
 
         try:
-            action = self.agent.get_action(self.observation_collector.get_observations())
+            action = self.__next_command(self.agent, self.observation_collector.get_observations())
+            response.action = [float(v) for v in action]
         except Exception as exc:
             # Gracefully handle transient observation failures (e.g. missing
             # topic data at startup) instead of crashing the whole node.
@@ -110,10 +119,19 @@ class ActionServer(ABC):
             )
             return response
 
-        # Generic decoded command — works for any robot morphology.
-        response.action = [float(v) for v in action]
-
         return response
+
+    def __next_command(self, agent: RL_Agent, observations: ObservationDict) -> np.ndarray:
+        """Pops the next queued command of a chunked policy, else queries the agent."""
+        if self._queued_commands:
+            observations["is_terminal"] = False
+            agent.space_manager.encode_observation(observations)
+            return self._queued_commands.pop(0)
+        command = agent.get_action(observations, deterministic=agent.spec.deterministic_inference)
+        if command.ndim == 2:
+            self._queued_commands = list(command[1:])
+            return command[0]
+        return command
 
     def __on_scene_reset(self, msg: Int16):
         """
@@ -126,6 +144,7 @@ class ActionServer(ABC):
             self.logger.info("Agent not initialized yet.")
             return
         self.agent.reset()
+        self._queued_commands = []
 
     def start(self):
         """
@@ -145,4 +164,9 @@ class ActionServer(ABC):
         self.logger.info("[Rosnav-RL | Action Server] Observation collector initialized.")
 
         self.logger.info("[Rosnav-RL | Action Server] Spinning...")
-        rclpy.spin(self.node)
+        self._executor.add_node(self.node)
+        self._executor.spin()
+
+    def stop(self) -> None:
+        """Stop spinning the node."""
+        self._executor.shutdown()

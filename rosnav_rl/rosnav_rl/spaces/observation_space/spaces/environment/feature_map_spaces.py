@@ -356,6 +356,7 @@ class StackedLaserMapSpace(BaseObservationSpace):
 
     name = "StackedLaserMapSpace"
     requires = {"front_laser": LidarRanges, "is_terminal": IsTerminal}
+    encoding_version = 2
 
     def __init__(
         self,
@@ -364,17 +365,17 @@ class StackedLaserMapSpace(BaseObservationSpace):
         laser_max_range: float = 30.0,
         laser_num_beams: int = 720,
         flatten: bool = False,
+        encoding_version: int = 1,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         self._laser_stack_size = laser_stack_size
         self._feature_map_size = feature_map_size
         self._flatten = flatten
+        self._even_bins = encoding_version >= 2
 
         # Pre-compute derived constants (avoids per-step division)
-        beams_per_col = max(1, laser_num_beams // feature_map_size)
-        self._beams_per_col = beams_per_col
-        self._usable_beams = feature_map_size * beams_per_col
+        self._set_bins(laser_num_beams)
         # MaxAbsScaler: [0, laser_max_range] → [-1, 1],  scale = 2 / max_range
         self._norm_scale = np.float32(2.0 / laser_max_range)
 
@@ -382,7 +383,26 @@ class StackedLaserMapSpace(BaseObservationSpace):
         self._ring_buffer = np.zeros((laser_stack_size, laser_num_beams), dtype=np.float32)
         self._ring_idx: int = 0
 
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, encoding_version=encoding_version, **kwargs)
+
+    def _set_bins(self, num_beams: int) -> None:
+        if not self._even_bins:
+            self._beams_per_col = max(1, num_beams // self._feature_map_size)
+            self._usable_beams = self._feature_map_size * self._beams_per_col
+            self._bin_starts = None
+            self._bin_sizes = None
+            return
+        if num_beams < self._feature_map_size:
+            raise ValueError(f"{num_beams} beams cannot fill {self._feature_map_size} columns")
+        self._beams_per_col = num_beams // self._feature_map_size
+        self._usable_beams = num_beams
+        if num_beams % self._feature_map_size == 0:
+            self._bin_starts = None
+            self._bin_sizes = None
+        else:
+            edges = np.arange(self._feature_map_size + 1) * num_beams // self._feature_map_size
+            self._bin_starts = edges[:-1]
+            self._bin_sizes = np.diff(edges).astype(np.float32)
 
     def reset(self) -> None:
         """Reset ring buffer for a new episode."""
@@ -433,8 +453,7 @@ class StackedLaserMapSpace(BaseObservationSpace):
             if n != self._ring_buffer.shape[1]:
                 # Beam count changed — reallocate and recompute constants
                 self._ring_buffer = np.zeros((self._laser_stack_size, n), dtype=np.float32)
-                self._beams_per_col = max(1, n // self._feature_map_size)
-                self._usable_beams = self._feature_map_size * self._beams_per_col
+                self._set_bins(n)
             else:
                 self._ring_buffer[:] = 0.0
             self._ring_idx = 0
@@ -450,14 +469,18 @@ class StackedLaserMapSpace(BaseObservationSpace):
         ordered = np.roll(self._ring_buffer, -self._ring_idx, axis=0)
         if beam_order is not None:
             ordered = np.take(ordered, beam_order, axis=1)
-        reshaped = ordered[:, : self._usable_beams].reshape(
-            self._laser_stack_size, self._feature_map_size, self._beams_per_col
-        )
 
         # 5. Per-column min (even rows) and mean (odd rows)
         summary = np.empty((self._laser_stack_size * 2, self._feature_map_size), dtype=np.float32)
-        summary[::2] = reshaped.min(axis=2)
-        summary[1::2] = reshaped.mean(axis=2)
+        if self._bin_starts is None:
+            reshaped = ordered[:, : self._usable_beams].reshape(
+                self._laser_stack_size, self._feature_map_size, self._beams_per_col
+            )
+            summary[::2] = reshaped.min(axis=2)
+            summary[1::2] = reshaped.mean(axis=2)
+        else:
+            summary[::2] = np.minimum.reduceat(ordered, self._bin_starts, axis=1)
+            summary[1::2] = np.add.reduceat(ordered, self._bin_starts, axis=1) / self._bin_sizes
 
         # 6. Tile flat summary to fill H × W
         flat = summary.ravel()  # 1600 for defaults
@@ -753,15 +776,18 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
 
     name = "LaserCartesianMapSpace"
     requires = {"front_laser": LidarRanges}
+    encoding_version = 2
 
     def __init__(
         self,
         laser_num_beams: int = 720,
         laser_max_range: float = 30.0,
         laser_angle_min: float = -np.pi,
+        laser_angle_increment: float | None = None,
         feature_map_size: int = 80,
         roi_in_m: float = 20.0,
         flatten: bool = False,
+        encoding_version: int = 1,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -770,7 +796,9 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
         Args:
             laser_num_beams: Number of beams in the laser scan (default 720 for Jackal).
             laser_max_range: Maximum valid range in meters; beams at or above this are excluded.
-            laser_angle_min: Angle of beam 0 in radians; beams are spaced evenly over 2π.
+            laser_angle_min: Angle of beam 0 in radians.
+            laser_angle_increment: Angle between beams in radians; None spaces the beams over 2*pi.
+                Encoding 1 always spaces them over 2*pi.
             feature_map_size: Grid resolution — the grid is (feature_map_size × feature_map_size).
             roi_in_m: Total grid extent in meters (grid covers ±roi_in_m/2 around robot).
             flatten: If True, return a flat 1D array; otherwise return a 2D array.
@@ -779,13 +807,12 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
         self._hit_threshold = np.float32(laser_max_range * 0.99)
 
         # Pre-compute per-beam trig values once — no per-step memory allocation
-        angles = np.linspace(
-            laser_angle_min,
-            laser_angle_min + 2.0 * np.pi,
-            laser_num_beams,
-            endpoint=False,
-            dtype=np.float32,
-        )
+        if encoding_version < 2 or laser_angle_increment is None:
+            angles = np.linspace(
+                laser_angle_min, laser_angle_min + 2.0 * np.pi, laser_num_beams, endpoint=False, dtype=np.float32
+            )
+        else:
+            angles = (laser_angle_min + laser_angle_increment * np.arange(laser_num_beams)).astype(np.float32)
         self._cos_a = np.cos(angles)
         self._sin_a = np.sin(angles)
 
@@ -794,6 +821,7 @@ class LaserCartesianMapSpace(BaseFeatureMapSpace):
             feature_map_size=feature_map_size,
             roi_in_m=roi_in_m,
             flatten=flatten,
+            encoding_version=encoding_version,
             **kwargs,
         )
 

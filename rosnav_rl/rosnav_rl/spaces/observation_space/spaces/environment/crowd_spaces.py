@@ -5,7 +5,8 @@ from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from rosnav_rl.observations.utils.types import CrowdTimeToContact
+from rosnav_rl.observations.utils.reachability_tube import bound_metadata
+from rosnav_rl.observations.utils.types import CrowdReachability, CrowdReachabilityTube, CrowdTimeToContact
 from rosnav_rl.spaces.observation_space.observation_space_factory import SpaceFactory
 from rosnav_rl.spaces.observation_space.space_categories import SpaceCategory
 from rosnav_rl.spaces.observation_space.spaces.base_observation_space import BaseObservationSpace
@@ -34,3 +35,61 @@ class CrowdTimeToContactSpace(BaseObservationSpace):
     def encode_observation(self, crowd_ttc: CrowdTimeToContact, *args: Any, **kwargs: Any) -> CrowdTimeToContact:
         assert isinstance(self._space, spaces.Box)
         return np.clip(np.asarray(crowd_ttc, dtype=np.float32), self._space.low, self._space.high)
+
+
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.ENVIRONMENT)
+class CrowdReachabilitySpace(BaseObservationSpace):
+    """Largest and second largest blocked share, count of mostly blocked pedestrians and the blocked share of their union."""
+
+    name = "CrowdReachabilitySpace"
+    requires = {"crowd_reachability": CrowdReachability}
+
+    def __init__(self, reach_count_cap: int = 10, *args: Any, **kwargs: Any) -> None:
+        self._count_cap = reach_count_cap
+        super().__init__(*args, **kwargs)
+
+    def get_gym_space(self) -> spaces.Space:
+        return spaces.Box(
+            low=np.zeros(4, dtype=np.float32),
+            high=np.array([1.0, 1.0, self._count_cap, 1.0], dtype=np.float32),
+            dtype=np.float32,
+        )
+
+    @BaseObservationSpace.apply_normalization
+    def encode_observation(self, crowd_reachability: CrowdReachability, *args: Any, **kwargs: Any) -> CrowdReachability:
+        assert isinstance(self._space, spaces.Box)
+        return np.clip(np.asarray(crowd_reachability, dtype=np.float32), self._space.low, self._space.high)
+
+
+@SpaceFactory.register(auto_name=True, category=SpaceCategory.ENVIRONMENT)
+class CrowdReachabilityTubeSpace(BaseObservationSpace):
+    """Minimum, second minimum, count inside the tube and minimum ahead of the crowd HJ reachability value."""
+
+    name = "CrowdReachabilityTubeSpace"
+    requires = {"crowd_tube": CrowdReachabilityTube}
+
+    def __init__(
+        self,
+        value_cap: float = 1.5,
+        count_cap: int = 10,
+        max_linear_vel: float = 1.0,
+        max_angular_vel: float = 1.0,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        self._value_cap = value_cap
+        self._count_cap = count_cap
+        bound_metadata(max_linear_vel, max_angular_vel)
+        super().__init__(*args, **kwargs)
+
+    def get_gym_space(self) -> spaces.Space:
+        return spaces.Box(
+            low=np.array([-self._value_cap, -self._value_cap, 0.0, -self._value_cap], dtype=np.float32),
+            high=np.array([self._value_cap, self._value_cap, self._count_cap, self._value_cap], dtype=np.float32),
+            dtype=np.float32,
+        )
+
+    @BaseObservationSpace.apply_normalization
+    def encode_observation(self, crowd_tube: CrowdReachabilityTube, *args: Any, **kwargs: Any) -> CrowdReachabilityTube:
+        assert isinstance(self._space, spaces.Box)
+        return np.clip(np.asarray(crowd_tube, dtype=np.float32), self._space.low, self._space.high)

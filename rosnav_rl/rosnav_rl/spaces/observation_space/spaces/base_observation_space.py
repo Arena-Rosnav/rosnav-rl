@@ -38,11 +38,13 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
 
     name: ClassVar[str]
     requires: dict[str, Any] = {}
+    encoding_version: ClassVar[int] = 1
 
     def __init__(
         self,
         normalize: bool = False,
         normalizer: str = "max_abs",
+        encoding_version: int = 1,
         **kwargs: Any,
     ) -> None:
         """Initialize the observation space.
@@ -50,8 +52,13 @@ class BaseObservationSpace(ErrorReportingMixin, ABC, RequiresProtocol):
         Args:
             normalize: Whether to normalize observations.
             normalizer: Name of normalizer ("max_abs", "min_max", "standard", "identity").
+            encoding_version: Encoding the policy trained with, from 1 to the class's encoding_version.
             **kwargs: Additional arguments passed to the normalizer.
         """
+        if not 1 <= encoding_version <= type(self).encoding_version:
+            raise ValueError(
+                f"{type(self).__name__} has encodings 1 to {type(self).encoding_version}, got {encoding_version}"
+            )
         # Initialize parent mixins
         super().__init__(
             component_type=ComponentType.OBSERVATION_SPACE,

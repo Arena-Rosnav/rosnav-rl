@@ -169,7 +169,7 @@ reward:
       reward: -0.2
 
     factored_reverse_drive:
-      factor: 0.05
+      factor: -0.05
       threshold: 0.0
       _on_safe_dist_violation: true
 
@@ -184,6 +184,8 @@ Parameters prefixed with `_` are typically internal flags:
 - `_on_safe_dist_violation`: Whether this unit is evaluated during safety violations
 - `_follow_subgoal`: Whether to check subgoal instead of main goal
 - `_goal_update_threshold`: Distance threshold for goal progress updates
+
+A key that a unit's constructor does not accept raises a `ValueError` naming the unit and its accepted keys.
 
 ## How It Works
 

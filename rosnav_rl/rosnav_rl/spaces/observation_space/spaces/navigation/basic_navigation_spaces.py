@@ -44,10 +44,12 @@ class DistAngleToGoalSpace(BaseObservationSpace):
     requires = {
         "dist_angle_to_goal": DistanceAngleMetrics,  # Distance and angle to navigation goal
     }
+    encoding_version = 2
 
-    def __init__(self, goal_max_dist: float = 30, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, goal_max_dist: float = 30, encoding_version: int = 1, *args: Any, **kwargs: Any) -> None:
         self._max_dist = goal_max_dist
-        super().__init__(*args, **kwargs)
+        self._clip = encoding_version >= 2
+        super().__init__(*args, encoding_version=encoding_version, **kwargs)
 
     def get_gym_space(self) -> spaces.Space:
         """
@@ -85,7 +87,11 @@ class DistAngleToGoalSpace(BaseObservationSpace):
                 - Range: distance ∈ [0, max_dist], angle ∈ [-π, π]
                 - Example: [2.5, 0.785] (2.5m away, 45° to the right)
         """
-        return dist_angle_to_goal
+        if not self._clip:
+            return dist_angle_to_goal
+        clipped = np.array(dist_angle_to_goal, copy=True)
+        clipped[0] = min(clipped[0], self._max_dist)
+        return clipped
 
 
 @SpaceFactory.register(auto_name=True, category=SpaceCategory.NAVIGATION)

@@ -78,12 +78,11 @@ class ObservationManager:
 
     Example:
         ```python
-        import yaml
+        from rosnav_rl.utils.yaml_io import load_yaml
         from rosnav_rl.observations.core.manager import ObservationManager
 
         # Load configuration
-        with open('observations.yaml', 'r') as f:
-            config = yaml.safe_load(f)
+        config = load_yaml('observations.yaml')
 
         # Create manager from config
         obs_manager = ObservationManager.from_config(
@@ -258,12 +257,11 @@ class ObservationManager:
         Example:
             Basic usage with YAML config file:
             ```python
-            import yaml
+            from rosnav_rl.utils.yaml_io import load_yaml
             from rosnav_rl.observations.core.manager import ObservationManager
 
             # Load configuration
-            with open('observations.yaml', 'r') as f:
-                config = yaml.safe_load(f)
+            config = load_yaml('observations.yaml')
 
             # Create manager
             obs_manager = ObservationManager.from_config(
@@ -391,6 +389,21 @@ class ObservationManager:
             if deadline is not None and time.monotonic() > deadline:
                 return False
             time.sleep(0.002)
+
+    def fresh_stamps(self) -> dict[str, tuple[type, Time | None]]:
+        """Resolved topic, message type and latest header stamp of every stamped collector that requires fresh data."""
+        stamps: dict[str, tuple[type, Time | None]] = {}
+        for collector in self._collectors.values():
+            if (
+                not collector.up_to_date_required
+                or collector.message_type.get_fields_and_field_types().get("header") != "std_msgs/Header"
+            ):
+                continue
+            topic = collector.topic if collector.topic.startswith("/") else str(self._ns(collector.topic))
+            msg = collector.latest_msg
+            stamp = None if msg is None or collector.update_count == 0 else Time.from_msg(msg.header.stamp)
+            stamps[topic] = (collector.message_type, stamp)
+        return stamps
 
     def get_observations(self, **extra_observations: Any) -> dict[str, Any]:
         """

@@ -35,6 +35,10 @@ dev = [
 tuning = [
     "optuna>=3.0.0",
 ]
+reachability = [
+    "hj-reachability==0.7.0",
+    "jax[cpu]==0.6.2",
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

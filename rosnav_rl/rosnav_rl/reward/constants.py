@@ -3,7 +3,6 @@ import enum
 
 class REWARD_CONSTANTS:
     MIN_GOAL_RADIUS = 0.1
-    NO_MOVEMENT_TOLERANCE = 0.1
 
 
 class DONE_REASONS(enum.Enum):
@@ -23,6 +22,7 @@ class DEFAULTS:
 
     class NO_MOVEMENT:
         REWARD: float = -0.01
+        TOLERANCE_FRACTION: float = 0.2
         _ON_SAFE_DIST_VIOLATION: bool = True
 
     class APPROACH_GOAL:
@@ -60,7 +60,6 @@ class DEFAULTS:
 
     class REVERSE_DRIVE:
         REWARD: float = -0.01
-        THRESHOLD: float = -0.5
         _ON_SAFE_DIST_VIOLATION: bool = True
 
     class ABRUPT_VEL_CHANGE:

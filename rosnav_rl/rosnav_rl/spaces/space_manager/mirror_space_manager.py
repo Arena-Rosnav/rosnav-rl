@@ -10,6 +10,8 @@ from rosnav_rl.utils.type_aliases import DecodedAction, ObservationDict
 
 from ..observation_space.spaces.dynamics import LastActionSpace
 from ..observation_space.spaces.environment import (
+    CrowdReachabilitySpace,
+    CrowdReachabilityTubeSpace,
     CrowdTimeToContactSpace,
     LaserCartesianMapSpace,
     PedestrianLocationSpace,
@@ -101,8 +103,10 @@ class MirrorSpaceManager(BaseSpaceManager):
             PedestrianTypeSpace.name,
             PedestrianSocialStateSpace.name,
             PedestrianLocationSpace.name,
-            LaserCartesianMapSpace.name,
         )
+        if name == LaserCartesianMapSpace.name:
+            self._check_cartesian_mirror(name, space)
+            return _flip_rows
         if name in rows:
             return _flip_rows
         if name == PedestrianVelYSpace.name:
@@ -121,9 +125,18 @@ class MirrorSpaceManager(BaseSpaceManager):
             if not isinstance(space, spaces.Box):
                 raise ValueError(f"'{name}' must be a Box to be reflected")
             return self._checked_negate(name, space, tuple(range(1, space.shape[-1])))
-        if name == CrowdTimeToContactSpace.name:
+        if name in (CrowdTimeToContactSpace.name, CrowdReachabilitySpace.name, CrowdReachabilityTubeSpace.name):
             return _identity
         raise ValueError(f"no reflection rule for observation space '{name}'")
+
+    def _check_cartesian_mirror(self, name: str, space: spaces.Space) -> None:
+        if not isinstance(space, spaces.Box) or space.shape[-1] % 2:
+            raise ValueError(f"'{name}' cannot be mirrored with an odd feature_map_size")
+        parameters = self._spec.parameters
+        increment = parameters.laser_angle_increment
+        if increment is None or self._spec.observation_encodings.get(name, 1) < 2:
+            increment = 2.0 * np.pi / parameters.laser_num_beams
+        mirrored_beams(parameters.laser_num_beams, parameters.laser_angle_min, increment)
 
     @staticmethod
     def _checked_negate(name: str, space: spaces.Space, indices: tuple[int, ...]) -> Callable[[np.ndarray], np.ndarray]:

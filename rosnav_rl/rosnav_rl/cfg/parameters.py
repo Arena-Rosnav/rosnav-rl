@@ -8,7 +8,8 @@ There is no separate "simulation state container" — all parameters live here.
 Construction-time fields are fed to observation spaces via
 :meth:`observation_kwargs`; step-time fields (``robot_radius``,
 ``safety_distance``, ``goal_radius``, ``max_steps``) are read directly from
-this object by reward units and generators.
+this object by reward units and generators, and all but ``goal_radius`` also
+reach the observation spaces.
 
 Usage::
 
@@ -17,7 +18,7 @@ Usage::
     params = AgentParameters(laser_num_beams=360, robot_radius=0.215)
 
     # Construction-time: feed to observation spaces
-    obs_kwargs = params.observation_kwargs()   # 18 keys (17 sensor/nav + normalizer)
+    obs_kwargs = params.observation_kwargs()
 
     # Inference-time: reconstruct from a saved AgentConfig
     params = AgentParameters.from_spec(agent_config)
@@ -34,6 +35,9 @@ if TYPE_CHECKING:
     from rosnav_rl.cfg.agent import AgentConfig
 
 
+OBSERVATION_REWARD_FIELDS = frozenset({"robot_radius", "safety_distance", "max_steps"})
+
+
 class AgentParameters(BaseModel, frozen=True):
     """All fixed runtime parameters for the agent pipeline.
 
@@ -44,11 +48,12 @@ class AgentParameters(BaseModel, frozen=True):
     ``BaseObservationSpace`` constructor via
     :meth:`~rosnav_rl.spaces.space_manager.base_space_manager.BaseSpaceManager`):
 
-    - Laser: ``laser_num_beams``, ``laser_max_range``
+    - Laser: ``laser_num_beams``, ``laser_max_range``, ``laser_angle_min``, ``laser_angle_increment``
     - Velocity: ``min/max_linear_vel``, ``min/max_translational_vel``, ``min/max_angular_vel``
     - Pedestrian: ``ped_num_types``, ``ped_min/max_speed_x/y``, ``ped_social_state_num``
     - Navigation: ``goal_max_dist``, ``subgoal_max_dist``
     - General: ``normalize``, ``normalizer``
+    - Robot and episode: ``robot_radius``, ``safety_distance``, ``max_steps``
 
     **Reward / generator fields** (read per-step by reward units and
     observation generators directly from this object):
@@ -108,7 +113,7 @@ class AgentParameters(BaseModel, frozen=True):
         description=(
             "Minimum linear velocity (m/s). "
             "Used by: VelocityObservationSpace (space low bound). "
-            "Set to robot_description.velocity_limits.linear min."
+            "Set to the configured action space linear min (the robot velocity_limits without one)."
         ),
     )
     max_linear_vel: float = Field(
@@ -117,7 +122,7 @@ class AgentParameters(BaseModel, frozen=True):
             "Maximum linear velocity (m/s). "
             "Used by: VelocityObservationSpace (space high bound), "
             "VelocityHistorySpace (normalisation). "
-            "Set to robot_description.velocity_limits.linear max."
+            "Set to the configured action space linear max (the robot velocity_limits without one)."
         ),
     )
     min_translational_vel: float = Field(
@@ -125,7 +130,7 @@ class AgentParameters(BaseModel, frozen=True):
         description=(
             "Minimum translational (y-axis) velocity for holonomic robots (m/s). "
             "Used by: VelocityObservationSpace (holonomic y-vel low bound). "
-            "Set to robot_description.velocity_limits.linear min."
+            "Set to the configured action space lateral min, linear on a differential drive."
         ),
     )
     max_translational_vel: float = Field(
@@ -133,7 +138,7 @@ class AgentParameters(BaseModel, frozen=True):
         description=(
             "Maximum translational (y-axis) velocity for holonomic robots (m/s). "
             "Used by: VelocityObservationSpace (holonomic y-vel high bound). "
-            "Set to robot_description.velocity_limits.linear max."
+            "Set to the configured action space lateral max, linear on a differential drive."
         ),
     )
     min_angular_vel: float = Field(
@@ -141,7 +146,7 @@ class AgentParameters(BaseModel, frozen=True):
         description=(
             "Minimum angular velocity (rad/s). "
             "Used by: VelocityObservationSpace (space low bound). "
-            "Set to robot_description.velocity_limits.angular min."
+            "Set to the configured action space angular min (the robot velocity_limits without one)."
         ),
     )
     max_angular_vel: float = Field(
@@ -150,7 +155,7 @@ class AgentParameters(BaseModel, frozen=True):
             "Maximum angular velocity (rad/s). "
             "Used by: VelocityObservationSpace (space high bound), "
             "VelocityHistorySpace (normalisation). "
-            "Set to robot_description.velocity_limits.angular max."
+            "Set to the configured action space angular max (the robot velocity_limits without one)."
         ),
     )
 
@@ -255,8 +260,7 @@ class AgentParameters(BaseModel, frozen=True):
             "Minimum safe clearance from obstacles (m). "
             "Used by: RewardFactoredSafeDistance, "
             "LaserSafetyViolationGenerator (triggers safety flag when min_laser <= safety_distance). "
-            "Note: LaserSafetyClearanceSpace and RiskAwareNavigationSpace accept "
-            "safety_distance as a direct constructor kwarg and are NOT driven by this field. "
+            "Also used by: SafetyContextSpace, SpatialAwarenessSpace. "
             "Set to arena_config.general.safety_distance at training time."
         ),
     )
@@ -288,17 +292,16 @@ class AgentParameters(BaseModel, frozen=True):
     def observation_kwargs(self) -> dict[str, Any]:
         """Return the subset of fields required by observation space constructors.
 
-        Excludes fields tagged ``json_schema_extra={"group": "reward"}`` —
-        those are ``robot_radius``, ``safety_distance``, ``goal_radius``, and
-        ``max_steps``, which reward units and generators read directly from this
-        object and are not consumed by observation spaces.
+        Excludes fields tagged ``json_schema_extra={"group": "reward"}`` except
+        ``robot_radius``, ``safety_distance`` and ``max_steps``, which
+        observation spaces also consume. ``goal_radius`` stays excluded.
 
         New observation-pipeline fields are included automatically; only reward
         fields need the explicit ``json_schema_extra={"group": "reward"}`` tag.
 
         Returns:
-            dict: 18 keyword arguments suitable for ``BaseObservationSpace``
-                  constructors (17 sensor/nav fields + ``normalizer``).
+            dict: keyword arguments suitable for ``BaseObservationSpace``
+                  constructors.
 
         Example::
 
@@ -308,7 +311,8 @@ class AgentParameters(BaseModel, frozen=True):
         return {
             name: getattr(self, name)
             for name, field_info in self.__class__.model_fields.items()
-            if not (
+            if name in OBSERVATION_REWARD_FIELDS
+            or not (
                 isinstance(field_info.json_schema_extra, dict) and field_info.json_schema_extra.get("group") == "reward"
             )
         }
