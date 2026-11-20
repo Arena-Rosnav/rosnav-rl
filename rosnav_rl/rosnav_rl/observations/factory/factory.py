@@ -226,19 +226,36 @@ def set_end_effector_frames(config: dict[str, Any], robot_frame: str, tip_link: 
             params["source_frame"] = posixpath.join(robot_frame, tip_link)
             params["target_frame"] = target_frame
 
-def set_object_pose_frames(config: dict[str, Any], env_scope: str, target_frame: str = "map") -> None:
-    """Point every ObjectPoseTFGenerator in *config* at the YAML-declared frame and map under *env_scope*."""
+def set_object_pose_frames(
+    config: dict[str, Any],
+    env_stem: str,
+    robot_stem: str,
+    target_frame: str = "map",
+) -> None:
+    """Point every ObjectPoseTFGenerator at the YAML-declared leaf under its scope, expressed in target_frame.."""
+
     for name, ds in config.get("datasources", {}).items():
-        if ds.get("type") == "ObjectPoseTFGenerator":
-            params = ds.setdefault("params", {})
-            leaf = params.get("source_frame")
-            if not leaf:
-                raise ValueError(
-                    f"ObjectPoseTFGenerator '{name}' requires a source_frame "
-                    f"(a leaf name relative to the env scope.)"
-                )
-            params["source_frame"] = posixpath.join(env_scope, leaf)
-            params["target_frame"] = target_frame
+        if ds.get("type") != "ObjectPoseTFGenerator":
+            continue
+
+        params = ds.setdefault("params", {})
+        scope = ds.get("scope", "env")
+
+        if scope == "robot":
+            stem = robot_stem
+        elif scope == "env":
+            stem = env_stem
+        else:
+            raise ValueError(f"data source '{name}': unknown scope '{scope}'")
+
+        leaf = params.get("source_frame")
+        if not leaf:
+            raise ValueError(
+                f"ObjectPoseTFGenerator '{name}' requires a source_frame "
+                f"(a leaf name relative to the {scope} scope.)"
+            )
+        params["source_frame"] = posixpath.join(stem, leaf)
+        params["target_frame"] = target_frame
 
 
 def set_grasp_frames(config: dict[str, Any], robot_frame: str) -> None:

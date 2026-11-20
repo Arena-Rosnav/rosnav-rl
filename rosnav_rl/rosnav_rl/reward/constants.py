@@ -119,9 +119,20 @@ class DEFAULTS:
         REWARD: float = 15
         _ON_SAFE_DIST_VIOLATION: bool = False
 
+    class LIFT:
+        REWARD: float = 20.0
+        HEIGHT: float = 0.05
+        MIN_HEIGHT: float = 0.5
+        TERMINATE: bool = True
+        LIFT_STEPS: int = 3,
+        _ON_SAFE_DIST_VIOLATION: bool = False
+
     class ARM_REACH:
         POS_FACTOR: float = 0.3
         NEG_FACTOR: float = 0.5
+        MAX_STEP_DISTANCE: float = 0.1
+        MAX_STEP_ANGLE: float = 0.5
+        ORIENT_FACTOR: float = 0.1
         REACH_RADIUS: float = 0.85
         REACH_BLEND: float = 0.15
         _ON_SAFE_DIST_VIOLATION: bool = True

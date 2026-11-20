@@ -1260,7 +1260,7 @@ class ObjectPoseTFGenerator(Generator[Pose3D]):
         self._last_warn = now
         self._node.get_logger().warn(message)
 
-    def _generate(self, **kwargs: Any) -> np.ndarray:
+    def _generate(self, **kwargs: Any) -> Pose3D:
         if not self._is_initialized:
             try:
                 if not self._tf_buffer.can_transform(
@@ -1295,90 +1295,91 @@ class ObjectPoseTFGenerator(Generator[Pose3D]):
 
         return self._last_pose
 
-
-class ArmGoalLocationInEndEffectorFrameGenerator(Generator[RelativePose3D]):
-    """Goal Location in Robot Base Frame Generator
-
-    Transforms a global 3D goal pose into the robot's local base coordinate frame
-    for manipulation planning.
-
-    Technical Specifications:
-    - Input: Global goal Pose3D, Robot base Pose3D
-    - Output: Goal Pose3D in robot-centric frame
-
-    Output Format: np.ndarray of shape (7,) [x, y, z, qx, qy, qz, qw]
-    """
+class GraspPointGnerator(Generator[Pose3D]):
 
     requires = {
+        "left_finger_tip_pose": Pose3D,
+        "right_finger_tip_pose": Pose3D,
         "end_effector_pose": Pose3D,
     }
 
+    def __init__(
+        self,
+        name: str,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        self._last_pose = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+
     def _generate(
         self,
+        left_finger_tip_pose: Pose3D,
+        right_finger_tip_pose: Pose3D,
         end_effector_pose: Pose3D,
         **kwargs: Any,
-    ) -> RelativePose3D:
+    ) -> Pose3D:
+        if any(
+            np.linalg.norm(pose[:3]) < 1e-6
+            for pose in (left_finger_tip_pose, right_finger_tip_pose, end_effector_pose)
+        ):
+            return self._last_pose
 
-        # TODO make proper publisher for goal pose (subgoals?)
-        end_effector_goal_pose = np.array([0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+        self._last_pose = np.concatenate(
+            [
+                0.5 * (left_finger_tip_pose[:3] + right_finger_tip_pose[:3]),
+                end_effector_pose[3:7],
+            ]
+        ).astype(np.float32)
+        return self._last_pose
 
-        ee_pos = end_effector_pose[:3]
-        goal_pos = end_effector_goal_pose[:3]
-
-        ee_quat = end_effector_pose[3:]
-        goal_quat = end_effector_goal_pose[3:]
-
-        r_ee = R.from_quat(ee_quat)
-        r_goal = R.from_quat(goal_quat)
-
-        r_ee_inv = r_ee.inv()
-
-        rel_pos = r_ee_inv.apply(goal_pos - ee_pos)
-
-        rel_rot = r_ee_inv * r_goal
-        rel_quat = rel_rot.as_quat()
-
-        return np.concatenate([rel_pos, rel_quat]).astype(np.float32)
-
-
-class ArmDistAngleToGoalGenerator(Generator[DistanceAngleMetrics]):
+class GraspAlignmentGenerator(Generator[DistanceAngleMetrics]):
     """3D Distance and Angular Error to Goal Generator
 
     Computes the scalar 3D translational distance (meters) and rotational
-    angular error (radians) between the end-effector and the target pose.
+    angular error (radians) between the grasp point and the target pose.
 
     Technical Specifications:
-    - Input: Goal pose relative to end-effector frame (RelativePose3D)
+    - Input: grasp_point and target_pose (Pose3D)
     - Output: [translational_distance, rotational_error_radians]
 
     Output Format: np.ndarray of shape (2,)
     """
 
     requires = {
-        "arm_goal_in_ee_frame": RelativePose3D,
+        "grasp_point": Pose3D,
+        "target_pose": Pose3D,
     }
+
+    def __init__(self, name: str, direction_epsilon: float = 0.05, **kwargs: Any):
+        super().__init__(name, **kwargs)
+        self._direction_epsilon = direction_epsilon
+        self._last_direction: np.ndarray | None = None
 
     def _generate(
         self,
-        arm_goal_in_ee_frame: RelativePose3D,
+        grasppoint: Pose3D,
+        target_pose: Pose3D,
         **kwargs: Any,
     ) -> DistanceAngleMetrics:
-        """Computes 3D distance and scalar rotational error.
+        delta = target_pose[:3] - grasppoint[:3]
+        distance = float(np.linalg.norm(delta))
 
-        Args:
-            arm_goal_in_ee_frame (RelativePose3D): [x, y, z, qx, qy, qz, qw] relative array
+        if distance > self._direction_epsilon:
+            self._last_direction = delta / distance
 
-        Returns:
-            DistanceAngleMetrics: np.ndarray (2,) [distance_m, rotation_error_rad]
-        """
+        if self._last_direction is None:
+            return np.array([distance, 0.0], dtype=np.float32)
 
-        dist_m = np.linalg.norm(arm_goal_in_ee_frame[:3])
+        tool_z = R.from_quat(grasppoint[3:7]).as_matrix()[:, 2]
+        direction = self._last_direction
 
-        w = np.clip(abs(arm_goal_in_ee_frame[6]), 0.0, 1.0)
-        rot_error_rad = 2.0 * np.arccos(w)
-
-        return np.array([dist_m, rot_error_rad], dtype=np.float32)
-
+        error = float(
+            np.arctan2(
+                np.linalg.norm(np.cross(tool_z, direction)),
+                float(np.dot(tool_z, direction)),
+            )
+        )
+        return np.array([distance, error], dtype=np.float32)
 
 class ArenaPedestrianTypeGenerator(Generator[PedestrianTypeArray]):
     """Type code per Arena pedestrian, all of type 0."""
