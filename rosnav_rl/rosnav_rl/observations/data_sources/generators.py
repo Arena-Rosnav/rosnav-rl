@@ -1357,11 +1357,11 @@ class GraspAlignmentGenerator(Generator[DistanceAngleMetrics]):
 
     def _generate(
         self,
-        grasppoint: Pose3D,
+        grasp_point: Pose3D,
         target_pose: Pose3D,
         **kwargs: Any,
     ) -> DistanceAngleMetrics:
-        delta = target_pose[:3] - grasppoint[:3]
+        delta = target_pose[:3] - grasp_point[:3]
         distance = float(np.linalg.norm(delta))
 
         if distance > self._direction_epsilon:
@@ -1370,7 +1370,7 @@ class GraspAlignmentGenerator(Generator[DistanceAngleMetrics]):
         if self._last_direction is None:
             return np.array([distance, 0.0], dtype=np.float32)
 
-        tool_z = R.from_quat(grasppoint[3:7]).as_matrix()[:, 2]
+        tool_z = R.from_quat(grasp_point[3:7]).as_matrix()[:, 2]
         direction = self._last_direction
 
         error = float(
