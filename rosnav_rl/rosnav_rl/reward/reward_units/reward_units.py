@@ -2094,9 +2094,11 @@ class RewardLinearVelBoost(RewardUnit):
         """Reset internal state for new episode."""
         pass
 
+
 # ================ MOBILE MANIPULATION ================ #
 
 # ===================== GRASPING ====================== #
+
 
 @RewardUnitFactory.register("grasp")
 class RewardGraspSuccess(RewardUnit):
@@ -2122,9 +2124,7 @@ class RewardGraspSuccess(RewardUnit):
 
     def check_parameters(self) -> None:
         if self._reward < 0.0:
-            self._report_warning(
-                f"grasp reward should be positive. Current value: {self._reward}"
-            )
+            self._report_warning(f"grasp reward should be positive. Current value: {self._reward}")
 
     def __call__(
         self,
@@ -2142,6 +2142,7 @@ class RewardGraspSuccess(RewardUnit):
 
     def reset(self) -> None:
         self._was_grasping = False
+
 
 @RewardUnitFactory.register("object_retention")
 class RewardObjectRetention(RewardUnit):
@@ -2194,13 +2195,9 @@ class RewardObjectRetention(RewardUnit):
 
     def check_parameters(self) -> None:
         if self._reward > 0.0:
-            self._report_warning(
-                f"object_retention reward should be negative. Current value: {self._reward}"
-            )
+            self._report_warning(f"object_retention reward should be negative. Current value: {self._reward}")
         if self._delivery_radius <= 0.0:
-            self._report_warning(
-                f"delivery_radius must be positive. Current value: {self._delivery_radius}"
-            )
+            self._report_warning(f"delivery_radius must be positive. Current value: {self._delivery_radius}")
 
     def reset(self) -> None:
         super().reset()
@@ -2244,6 +2241,7 @@ class RewardObjectRetention(RewardUnit):
         self.add_info({"retention_violation": True})
         if self._terminate:
             self.add_info(self.DONE_INFO)
+
 
 @RewardUnitFactory.register("delivery_success")
 class RewardDeliverySuccess(RewardUnit):
@@ -2290,9 +2288,7 @@ class RewardDeliverySuccess(RewardUnit):
 
     def check_parameters(self) -> None:
         if self._reward < 0.0:
-            self._report_warning(
-                f"Delivery success reward should be positive. Current value: {self._reward}"
-            )
+            self._report_warning(f"Delivery success reward should be positive. Current value: {self._reward}")
 
     def reset(self) -> None:
         self._held_steps = 0
@@ -2304,13 +2300,7 @@ class RewardDeliverySuccess(RewardUnit):
         dy = float(target_pose[1] - self._delivery_xy[1])
         return float(np.hypot(dx, dy)) <= self._delivery_radius
 
-    def __call__(
-        self,
-        grasp_state: GraspStateSpec,
-        target_pose: Pose3D,
-        *args: Any,
-        **kwargs: Any
-    ) -> None:
+    def __call__(self, grasp_state: GraspStateSpec, target_pose: Pose3D, *args: Any, **kwargs: Any) -> None:
         if self._target in grasp_state.other:
             self._held_steps += 1
             self._settled_steps = 0
@@ -2333,6 +2323,7 @@ class RewardDeliverySuccess(RewardUnit):
 
 
 # =================== ARM MOVEMENT ==================== #
+
 
 @RewardUnitFactory.register("arm_reach")
 class RewardArmReach(RewardUnit):
@@ -2431,11 +2422,7 @@ class RewardObjectLifted(RewardUnit):
         "grasp_state": GraspStateSpec,
     }
 
-    DONE_INFO = {
-        "is_done": True,
-        "done_reason": DONE_REASONS.SUCCESS,
-        "is_success": True
-    }
+    DONE_INFO = {"is_done": True, "done_reason": DONE_REASONS.SUCCESS, "is_success": True}
 
     @check_params
     def __init__(
@@ -2474,13 +2461,7 @@ class RewardObjectLifted(RewardUnit):
         self._held_steps: int = 0
         self._above: int = 0
 
-    def __call__(
-        self,
-        target_pose: Pose3D,
-        grasp_state: GraspStateSpec,
-        *args: Any,
-        **kwargs: Any
-    ) -> None:
+    def __call__(self, target_pose: Pose3D, grasp_state: GraspStateSpec, *args: Any, **kwargs: Any) -> None:
 
         if self._awarded:
             return
@@ -2497,12 +2478,7 @@ class RewardObjectLifted(RewardUnit):
         else:
             self._held_steps = 0
 
-        lifted = (
-            self._ever_grasped
-            and grasping
-            and z >= self._z0 + self._lift_height
-            and z >= self._min_height
-        )
+        lifted = self._ever_grasped and grasping and z >= self._z0 + self._lift_height and z >= self._min_height
 
         self._above = self._above + 1 if lifted else 0
 
@@ -2512,7 +2488,9 @@ class RewardObjectLifted(RewardUnit):
             if self._terminate:
                 self.add_info(self.DONE_INFO)
 
+
 # =================== NAVIGATION ==================== #
+
 
 @RewardUnitFactory.register("goal_reached_navigation")
 class RewardGoalReachedNavigation(RewardGoalReached):

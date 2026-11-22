@@ -17,7 +17,6 @@ import people_msgs.msg as people_msgs
 import rclpy
 import ros_gz_interfaces.msg as ros_gz_interfaces
 import sensor_msgs.msg as sensor_msgs
-import tf2_ros
 import trajectory_msgs.msg as trajectory_msgs
 
 from ..utils.pose import Pose2DType, pose3d_to_pose2d
@@ -25,7 +24,6 @@ from ..utils.types import (
     ArenaPedestrianDetections,
     ArmActionTrajectory,
     ContactData,
-    ContactDataSpec,
     ContactPoint,
     GripperState,
     ImageData,
@@ -219,6 +217,7 @@ class JointStateCollector(Collector[control_msgs.JointTrajectoryControllerState,
             for name, pos, vel, eff in zip(names, positions, velocities, efforts, strict=False)
         }
 
+
 class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory], ArmActionTrajectory):
     """
     Collects and preprocesses joint trajectory data from a ROS topic.
@@ -235,6 +234,7 @@ class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory], ArmAc
 
         return positions, tfs
 
+
 class GripperStateCollector(Collector[control_msgs.GripperCommand.Feedback, GripperState]):
     """
     Collects gripper state from the gripper action server feedback topic.
@@ -246,10 +246,11 @@ class GripperStateCollector(Collector[control_msgs.GripperCommand.Feedback, Grip
     def _preprocess(self, msg: control_msgs.GripperCommand.Feedback) -> GripperState:
         return {
             "position": float(msg.position),
-            "effort"  : float(msg.effort),
-            "stalled" : bool(msg.stalled),
-            "reached_goal" : bool(msg.reached_goal),
+            "effort": float(msg.effort),
+            "stalled": bool(msg.stalled),
+            "reached_goal": bool(msg.reached_goal),
         }
+
 
 class ContactCollector(Collector[ros_gz_interfaces.Contacts, ContactData]):
     """Collects contact state from a Gazebo contact sensor."""
@@ -270,9 +271,7 @@ class ContactCollector(Collector[ros_gz_interfaces.Contacts, ContactData]):
                 "requirement would block forever."
             )
 
-        super().__init__(
-            name, topic, node, up_to_date_required=False, **kwargs
-        )
+        super().__init__(name, topic, node, up_to_date_required=False, **kwargs)
 
         # gz-sim only publishes while a contact exists, so a reading must expire.
         self.timeout = timeout
@@ -303,8 +302,7 @@ class ContactCollector(Collector[ros_gz_interfaces.Contacts, ContactData]):
                 if has_wrench:
                     w = contact.wrenches[i].body_1_wrench
                     wrench = np.array(
-                        [w.force.x, w.force.y, w.force.z,
-                         w.torque.x, w.torque.y, w.torque.z],
+                        [w.force.x, w.force.y, w.force.z, w.torque.x, w.torque.y, w.torque.z],
                         dtype=np.float32,
                     )
 
@@ -325,4 +323,3 @@ class ContactCollector(Collector[ros_gz_interfaces.Contacts, ContactData]):
         if self._clock is not None and self.age > self.timeout:
             return ContactData()
         return self._value if self._value is not None else ContactData()
-

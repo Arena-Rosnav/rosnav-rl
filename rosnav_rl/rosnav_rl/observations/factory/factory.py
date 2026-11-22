@@ -25,6 +25,7 @@ _GENERATOR_TYPE_ALIASES: dict[str, str] = {
     "EndEffectorPoseTFGenerator": "ObjectPoseTFGenerator",
 }
 
+
 def _ros_msg_type_string(msg_cls: type) -> str:
     """Derive 'package/MsgClass' string from a ROS message class.
 
@@ -102,8 +103,7 @@ class ObservationFactory:
         for alias, target in _GENERATOR_TYPE_ALIASES.items():
             if target not in self._generators:
                 raise ValueError(
-                    f"generator type alias '{alias}' points at '{target}', "
-                    f"which is not a registered generator"
+                    f"generator type alias '{alias}' points at '{target}', which is not a registered generator"
                 )
             self._generators[alias] = self._generators[target]
 
@@ -226,6 +226,7 @@ def set_end_effector_frames(config: dict[str, Any], robot_frame: str, tip_link: 
             params["source_frame"] = posixpath.join(robot_frame, tip_link)
             params["target_frame"] = target_frame
 
+
 def set_object_pose_frames(
     config: dict[str, Any],
     env_stem: str,
@@ -251,8 +252,7 @@ def set_object_pose_frames(
         leaf = params.get("source_frame")
         if not leaf:
             raise ValueError(
-                f"ObjectPoseTFGenerator '{name}' requires a source_frame "
-                f"(a leaf name relative to the {scope} scope.)"
+                f"ObjectPoseTFGenerator '{name}' requires a source_frame (a leaf name relative to the {scope} scope.)"
             )
         params["source_frame"] = posixpath.join(stem, leaf)
         params["target_frame"] = target_frame

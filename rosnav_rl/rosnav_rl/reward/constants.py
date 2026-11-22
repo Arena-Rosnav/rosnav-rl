@@ -124,7 +124,7 @@ class DEFAULTS:
         HEIGHT: float = 0.05
         MIN_HEIGHT: float = 0.5
         TERMINATE: bool = True
-        LIFT_STEPS: int = 3,
+        LIFT_STEPS: int = (3,)
         _ON_SAFE_DIST_VIOLATION: bool = False
 
     class ARM_REACH:

@@ -1295,8 +1295,8 @@ class ObjectPoseTFGenerator(Generator[Pose3D]):
 
         return self._last_pose
 
-class GraspPointGnerator(Generator[Pose3D]):
 
+class GraspPointGnerator(Generator[Pose3D]):
     requires = {
         "left_finger_tip_pose": Pose3D,
         "right_finger_tip_pose": Pose3D,
@@ -1319,8 +1319,7 @@ class GraspPointGnerator(Generator[Pose3D]):
         **kwargs: Any,
     ) -> Pose3D:
         if any(
-            np.linalg.norm(pose[:3]) < 1e-6
-            for pose in (left_finger_tip_pose, right_finger_tip_pose, end_effector_pose)
+            np.linalg.norm(pose[:3]) < 1e-6 for pose in (left_finger_tip_pose, right_finger_tip_pose, end_effector_pose)
         ):
             return self._last_pose
 
@@ -1331,6 +1330,7 @@ class GraspPointGnerator(Generator[Pose3D]):
             ]
         ).astype(np.float32)
         return self._last_pose
+
 
 class GraspAlignmentGenerator(Generator[DistanceAngleMetrics]):
     """3D Distance and Angular Error to Goal Generator
@@ -1380,6 +1380,7 @@ class GraspAlignmentGenerator(Generator[DistanceAngleMetrics]):
             )
         )
         return np.array([distance, error], dtype=np.float32)
+
 
 class ArenaPedestrianTypeGenerator(Generator[PedestrianTypeArray]):
     """Type code per Arena pedestrian, all of type 0."""
@@ -1475,6 +1476,7 @@ class CrowdTimeToContactGenerator(Generator[CrowdTimeToContact]):
         out[3] = ttc[ahead].min() if ahead.any() else self.horizon
         return out
 
+
 class GraspStateGenerator(Generator[GraspState]):
     """Grasp state generated from contact sensors."""
 
@@ -1508,40 +1510,36 @@ class GraspStateGenerator(Generator[GraspState]):
         self._tol, self._align = inside_tolerance, min_normal_alignment
 
     def _lookup(self) -> tuple[np.ndarray, np.ndarray] | None:
-            if self._buffer is None:
-                return None
-            try:
-                left = self._buffer.lookup_transform(
-                    self._target_frame, self._left, rclpy.time.Time(),
-                    timeout=rclpy.duration.Duration(seconds=0.0),
-                )
-                right = self._buffer.lookup_transform(
-                    self._target_frame, self._right, rclpy.time.Time(),
-                    timeout=rclpy.duration.Duration(seconds=0.0),
-                )
-            except tf2_ros.TransformException:
-                return None
+        if self._buffer is None:
+            return None
+        try:
+            left = self._buffer.lookup_transform(
+                self._target_frame,
+                self._left,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.0),
+            )
+            right = self._buffer.lookup_transform(
+                self._target_frame,
+                self._right,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.0),
+            )
+        except tf2_ros.TransformException:
+            return None
 
-            p_left = np.array([
-                left.transform.translation.x,
-                left.transform.translation.y,
-                left.transform.translation.z
-                ], dtype=np.float64)
-            p_right = np.array([
-                right.transform.translation.x,
-                right.transform.translation.y,
-                right.transform.translation.z
-            ], dtype=np.float64)
+        p_left = np.array(
+            [left.transform.translation.x, left.transform.translation.y, left.transform.translation.z], dtype=np.float64
+        )
+        p_right = np.array(
+            [right.transform.translation.x, right.transform.translation.y, right.transform.translation.z],
+            dtype=np.float64,
+        )
 
-            return p_left, p_right
+        return p_left, p_right
 
     def _inward(
-        self,
-        reading: ContactData,
-        p_own: np.ndarray,
-        p_other: np.ndarray,
-        tol: float,
-        min_align: float
+        self, reading: ContactData, p_own: np.ndarray, p_other: np.ndarray, tol: float, min_align: float
     ) -> tuple[ContactPoint, ...]:
         """Contacts on the jaw-facing side of one pad."""
         if reading is None:
@@ -1562,11 +1560,8 @@ class GraspStateGenerator(Generator[GraspState]):
         return name.split("::", 1)[0]
 
     def _generate(
-            self,
-            left_fingertip_contact: ContactData,
-            right_fingertip_contact: ContactData,
-            **kwargs : Any
-        ) -> GraspState:
+        self, left_fingertip_contact: ContactData, right_fingertip_contact: ContactData, **kwargs: Any
+    ) -> GraspState:
 
         frames = self._lookup()
         now = time.monotonic()
@@ -1578,14 +1573,15 @@ class GraspStateGenerator(Generator[GraspState]):
             self._last_frames, self._last_ok = frames, now
 
         p_left, p_right = frames
-        left  = self._inward(left_fingertip_contact,  p_left,  p_right, self._tol, self._align)
-        right = self._inward(right_fingertip_contact, p_right, p_left,  self._tol, self._align)
+        left = self._inward(left_fingertip_contact, p_left, p_right, self._tol, self._align)
+        right = self._inward(right_fingertip_contact, p_right, p_left, self._tol, self._align)
 
         common = {self._model(c.other) for c in left} & {self._model(c.other) for c in right}
         common.discard("")
         if not common:
             return GraspState()
         return GraspState(other=sorted(common))
+
 
 class CrowdReachabilityGenerator(Generator[CrowdReachability]):
     """Share of the robot's candidate velocities that lead to contact within `horizon`: largest, second largest, count above one half, union."""
