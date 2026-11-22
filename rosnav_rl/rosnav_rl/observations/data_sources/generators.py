@@ -60,7 +60,6 @@ from ..utils.types import (
     PedestrianWorldLocations,
     Pose2D,
     Pose3D,
-    RelativePose3D,
     RobotRelativePosition,
     RobotVelocity,
     SafetyStatus,
