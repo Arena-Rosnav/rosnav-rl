@@ -8,6 +8,7 @@ and preprocess the raw data into a clean, usable format.
 from typing import Any
 
 import arena_people_msgs.msg as arena_people_msgs
+import control_msgs.action as control_actions
 import control_msgs.msg as control_msgs
 import geometry_msgs.msg as geometry_msgs
 import nav2_msgs.msg as nav2_msgs
@@ -218,7 +219,7 @@ class JointStateCollector(Collector[control_msgs.JointTrajectoryControllerState,
         }
 
 
-class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory], ArmActionTrajectory):
+class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory,  ArmActionTrajectory]):
     """
     Collects and preprocesses joint trajectory data from a ROS topic.
     """
@@ -235,7 +236,7 @@ class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory], ArmAc
         return positions, tfs
 
 
-class GripperStateCollector(Collector[control_msgs.GripperCommand.Feedback, GripperState]):
+class GripperStateCollector(Collector[control_actions.GripperCommand.Feedback, GripperState]):
     """
     Collects gripper state from the gripper action server feedback topic.
 
@@ -243,7 +244,7 @@ class GripperStateCollector(Collector[control_msgs.GripperCommand.Feedback, Grip
     and exposes position, effort, stalled, and reached_goal.
     """
 
-    def _preprocess(self, msg: control_msgs.GripperCommand.Feedback) -> GripperState:
+    def _preprocess(self, msg: control_actions.GripperCommand.Feedback) -> GripperState:
         return {
             "position": float(msg.position),
             "effort": float(msg.effort),

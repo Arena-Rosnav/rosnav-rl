@@ -2268,7 +2268,6 @@ class RewardDeliverySuccess(RewardUnit):
         drop_steps: int = DEFAULTS.MANIPULATION.DROP_STEPS,
         delivery_xy: tuple[float, float] = DEFAULTS.MANIPULATION.DELIVERY_XY,
         delivery_radius: float = DEFAULTS.MANIPULATION.DELIVERY_RADIUS,
-        terminate: bool = DEFAULTS.DELIVERY.TERMINATE,
         _on_safe_dist_violation: bool = DEFAULTS.DELIVERY._ON_SAFE_DIST_VIOLATION,
         *args: Any,
         **kwargs: Any,
@@ -2280,7 +2279,6 @@ class RewardDeliverySuccess(RewardUnit):
         self._drop_steps = max(1, int(drop_steps))
         self._delivery_xy = delivery_xy
         self._delivery_radius = delivery_radius
-        self._terminate = terminate
 
         self._held_steps = 0
         self._settled_steps = 0
