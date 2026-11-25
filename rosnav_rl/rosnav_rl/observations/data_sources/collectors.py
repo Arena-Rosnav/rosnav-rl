@@ -219,7 +219,7 @@ class JointStateCollector(Collector[control_msgs.JointTrajectoryControllerState,
         }
 
 
-class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory,  ArmActionTrajectory]):
+class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory, ArmActionTrajectory]):
     """
     Collects and preprocesses joint trajectory data from a ROS topic.
     """
