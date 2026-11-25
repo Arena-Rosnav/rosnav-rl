@@ -96,8 +96,6 @@ class ObservationFactory:
             if inspect.isclass(obj) and issubclass(obj, Generator) and obj is not Generator:
                 self._generators[name] = obj
 
-
-
     def create_data_sources(self, config: dict[str, Any], **kwargs: Any) -> dict[str, DataSource]:
         """
         Create data sources from configuration.
@@ -213,16 +211,12 @@ def set_object_pose_frames(config: dict[str, Any], env_stem: str, robot_stem: st
 
         unknown = set(ds) - {"type", "params", "scope"}
         if unknown:
-            raise ValueError(
-                f"data source '{name}': unknown keys {sorted(unknown)}"
-            )
+            raise ValueError(f"data source '{name}': unknown keys {sorted(unknown)}")
 
         params = ds.setdefault("params", {})
 
         if not isinstance(params, dict):
-            raise ValueError(
-                f"data source '{name}': 'params' must be a mapping"
-            )
+            raise ValueError(f"data source '{name}': 'params' must be a mapping")
 
         scope = ds.get("scope", "env")
 
@@ -231,23 +225,15 @@ def set_object_pose_frames(config: dict[str, Any], env_stem: str, robot_stem: st
         elif scope == "env":
             stem = env_stem
         else:
-            raise ValueError(
-                f"data source '{name}': unknown scope '{scope}'"
-            )
+            raise ValueError(f"data source '{name}': unknown scope '{scope}'")
 
         leaf = params.get("source_frame")
 
         if not isinstance(leaf, str) or not leaf:
-            raise ValueError(
-                f"ObjectPoseTFGenerator '{name}' requires a "
-                f"source_frame leaf name"
-            )
+            raise ValueError(f"ObjectPoseTFGenerator '{name}' requires a source_frame leaf name")
 
         if "/" in leaf or leaf in {".", ".."}:
-            raise ValueError(
-                f"ObjectPoseTFGenerator '{name}': "
-                f"source_frame must be a leaf name, got '{leaf}'"
-            )
+            raise ValueError(f"ObjectPoseTFGenerator '{name}': source_frame must be a leaf name, got '{leaf}'")
 
         params["source_frame"] = posixpath.join(stem, leaf)
         params["target_frame"] = target_frame

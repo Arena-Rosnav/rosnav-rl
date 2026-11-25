@@ -1537,7 +1537,9 @@ class GraspStateGenerator(Generator[GraspState]):
 
         return p_left, p_right
 
-    def _inward(self, reading: ContactData, p_own: np.ndarray, p_other: np.ndarray, tol: float, min_align: float) -> tuple[ContactPoint, ...]:
+    def _inward(
+        self, reading: ContactData, p_own: np.ndarray, p_other: np.ndarray, tol: float, min_align: float
+    ) -> tuple[ContactPoint, ...]:
         """Contacts on the jaw-facing side of one pad."""
         if reading is None:
             return ()
