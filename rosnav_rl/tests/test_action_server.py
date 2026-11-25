@@ -20,11 +20,15 @@ Prerequisites (for smoke test):
 import os
 import threading
 from pathlib import Path
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 from unittest.mock import patch
 
 import numpy as np
 import pytest
+
+if TYPE_CHECKING:
+    from rosnav_rl.action_server.base_server import ActionServer
+    from rosnav_rl.rl_agent import RL_Agent
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -185,6 +189,19 @@ class FixedObservationCollector:
         return _raw_observation()
 
 
+def _server(agent: "RL_Agent | None", namespace: str) -> "ActionServer":
+    from rosnav_rl.action_server.base_server import ActionServer
+
+    class ConcreteServer(ActionServer):
+        def _initialize_agent(self_inner):
+            return agent
+
+        def _initialize_observation_collector(self_inner):
+            return FixedObservationCollector()
+
+    return ConcreteServer(agent_name="action_server_agent", namespace=namespace)
+
+
 @ros2
 class TestGetCommandService:
     """Integration tests for the GetCommand ROS2 service using a real AGENT_1 policy."""
@@ -193,21 +210,11 @@ class TestGetCommandService:
     def _spin(self):
         """Start the action server node in a background thread; tear it down after."""
         import rclpy
-        from rosnav_rl.action_server.base_server import ActionServer
-
-        agent = _agent_1()
-
-        class ConcreteServer(ActionServer):
-            def _initialize_agent(self_inner):
-                return agent
-
-            def _initialize_observation_collector(self_inner):
-                return FixedObservationCollector()
 
         if not rclpy.ok():
             rclpy.init()
 
-        self.server = ConcreteServer(agent_name="action_server_agent", namespace="test_ns")
+        self.server = _server(_agent_1(), "test_ns")
 
         self._spin_thread = threading.Thread(target=self.server.start, daemon=True)
         self._spin_thread.start()
@@ -241,20 +248,36 @@ class TestGetCommandService:
         executor.shutdown()
         client_node.destroy_node()
 
-    def test_get_command_before_agent_init_returns_empty_action(self):
-        from rosnav_rl_msgs.srv import GetCommand
 
-        saved_agent = self.server.agent
-        self.server.agent = None
+@ros2
+def test_get_command_before_agent_init_returns_empty_action():
+    import rclpy
+    from rosnav_rl_msgs.srv import GetCommand
 
-        request = GetCommand.Request()
-        response = GetCommand.Response()
-        result = self.server._ActionServer__handle_next_action_srv(request, response)
+    if not rclpy.ok():
+        rclpy.init()
+    server = _server(None, "unstarted_ns")
+    try:
+        result = server._ActionServer__handle_next_action_srv(GetCommand.Request(), GetCommand.Response())
+    finally:
+        server.node.destroy_node()
 
-        assert list(result.action) == []
-        assert result.action_type == ""
+    assert list(result.action) == []
+    assert result.action_type == ""
 
-        self.server.agent = saved_agent
+
+@ros2
+def test_a_server_stopped_before_it_spins_returns_from_start():
+    import rclpy
+
+    if not rclpy.ok():
+        rclpy.init()
+    server = _server(_agent_1(), "stopped_ns")
+    try:
+        server.stop()
+        server.start()
+    finally:
+        server.node.destroy_node()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

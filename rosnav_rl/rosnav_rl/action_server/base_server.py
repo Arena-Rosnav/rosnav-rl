@@ -55,6 +55,7 @@ class ActionServer(ABC):
         )
         self.logger = self.node.get_logger()
         self._executor = SingleThreadedExecutor()
+        self._executor.add_node(self.node)
 
     @abstractmethod
     def _initialize_agent(self) -> RL_Agent: ...
@@ -164,7 +165,6 @@ class ActionServer(ABC):
         self.logger.info("[Rosnav-RL | Action Server] Observation collector initialized.")
 
         self.logger.info("[Rosnav-RL | Action Server] Spinning...")
-        self._executor.add_node(self.node)
         self._executor.spin()
 
     def stop(self) -> None:
