@@ -3,9 +3,7 @@
 import numpy as np
 
 from rosnav_rl.cfg.parameters import AgentParameters
-from rosnav_rl.observations.data_sources.generators import (
-    GraspDistanceAngleGenerator
-)
+from rosnav_rl.observations.data_sources.generators import GraspDistanceAngleGenerator
 
 PARAMS = AgentParameters()
 

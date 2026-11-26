@@ -31,6 +31,7 @@ def _step(reward_function: RewardFunction, **obs) -> tuple[float, dict]:
         simulation_state_container=PARAMS,
     )
 
+
 def _arm_reach(**overrides) -> RewardFunction:
     params = {
         "pos_factor": 1.0,
@@ -123,6 +124,7 @@ def test_arm_reach_stops_once_the_target_is_grasped():
 
     assert reward == 0.0
 
+
 def _object_lifted(**overrides) -> RewardFunction:
     params = {
         "reward": 5.0,
@@ -148,8 +150,8 @@ def _lift_step(reward_function: RewardFunction, z: float, *, grasped=True) -> tu
 def test_object_lifted_awards_after_holding_the_lift():
     rf = _object_lifted()
 
-    assert _lift_step(rf, 0.0)[0] == 0.0   
-    assert _lift_step(rf, 0.2)[0] == 0.0 
+    assert _lift_step(rf, 0.0)[0] == 0.0
+    assert _lift_step(rf, 0.2)[0] == 0.0
 
     reward, info = _lift_step(rf, 0.2)
 
@@ -171,7 +173,7 @@ def test_object_lifted_needs_the_target_to_be_grasped():
 def test_object_lifted_requires_acquire_steps_of_contact():
     rf = _object_lifted(acquire_steps=2, lift_steps=1)
 
-    assert _lift_step(rf, 0.0)[0] == 0.0 
+    assert _lift_step(rf, 0.0)[0] == 0.0
 
     reward, info = _lift_step(rf, 0.2)
 
@@ -182,10 +184,10 @@ def test_object_lifted_requires_acquire_steps_of_contact():
 def test_object_lifted_resets_the_contact_counter_on_release():
     rf = _object_lifted(acquire_steps=2, lift_steps=1)
 
-    _lift_step(rf, 0.0) 
+    _lift_step(rf, 0.0)
     _lift_step(rf, 0.0, grasped=False)
 
-    assert _lift_step(rf, 0.2)[0] == 0.0 
+    assert _lift_step(rf, 0.2)[0] == 0.0
 
 
 def test_object_lifted_respects_the_lift_height():

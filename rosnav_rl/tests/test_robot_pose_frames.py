@@ -48,7 +48,12 @@ def test_other_datasources_are_untouched():
 
 
 def test_end_effector_generator_points_at_the_arm_tip_under_the_robot_frame():
-    config = {"datasources": {"ee": {"type": "ObjectPoseTFGenerator", "scope": "robot", "params": {"source_frame" : "robot_arm_tool0"}}, **_config()["datasources"]}}
+    config = {
+        "datasources": {
+            "ee": {"type": "ObjectPoseTFGenerator", "scope": "robot", "params": {"source_frame": "robot_arm_tool0"}},
+            **_config()["datasources"],
+        }
+    }
 
     set_object_pose_frames(config, "env_0", "env_0/rbkairos", "env_0/rbkairos/odom")
 
