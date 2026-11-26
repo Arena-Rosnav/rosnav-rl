@@ -15,7 +15,6 @@ import nav2_msgs.msg as nav2_msgs
 import nav_msgs.msg as nav_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
-import rclpy
 import ros_gz_interfaces.msg as ros_gz_interfaces
 import sensor_msgs.msg as sensor_msgs
 import trajectory_msgs.msg as trajectory_msgs
