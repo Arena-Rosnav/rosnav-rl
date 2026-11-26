@@ -1579,7 +1579,7 @@ class GraspStateGenerator(Generator[GraspState]):
         common.discard("")
         if not common:
             return GraspState()
-        return GraspState(tuple(other=sorted(common)))
+        return GraspState(other=tuple(sorted(common)))
 
 
 class CrowdReachabilityGenerator(Generator[CrowdReachability]):
