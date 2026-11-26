@@ -2351,6 +2351,7 @@ class RewardArmReach(RewardUnit):
         self._pos_factor = pos_factor
         self._neg_factor = neg_factor
         self._orient_factor = orient_factor
+        self._target = target
         self._reach_radius = reach_radius
         self._reach_blend = reach_blend
         self._max_step_distance = max_step_distance
@@ -2394,7 +2395,7 @@ class RewardArmReach(RewardUnit):
 
         prev_d, self._prev_d = self._prev_d, d
         prev_a, self._prev_a = self._prev_a, a
-        if prev_d is None:
+        if prev_d is None or prev_a is None:
             return
 
         delta_d = prev_d - d
@@ -2453,11 +2454,11 @@ class RewardObjectLifted(RewardUnit):
 
     def reset(self) -> None:
         super().reset()
-        self._z0: float | None = None
-        self._ever_grasped: bool = False
-        self._awarded: bool = False
-        self._held_steps: int = 0
-        self._above: int = 0
+        self._z0 = None
+        self._ever_grasped = False
+        self._awarded = False
+        self._held_steps = 0
+        self._above = 0
 
     def __call__(self, target_pose: Pose3D, grasp_state: GraspStateSpec, *args: Any, **kwargs: Any) -> None:
 

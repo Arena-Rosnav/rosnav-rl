@@ -19,6 +19,7 @@ import rclpy
 import ros_gz_interfaces.msg as ros_gz_interfaces
 import sensor_msgs.msg as sensor_msgs
 import trajectory_msgs.msg as trajectory_msgs
+from rclpy.node import Node
 
 from ..utils.pose import Pose2DType, pose3d_to_pose2d
 from ..utils.types import (
@@ -226,10 +227,11 @@ class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory, ArmAct
 
     def _preprocess(self, msg: trajectory_msgs.JointTrajectory) -> ArmActionTrajectory:
 
+        points = list(msg.points)
         if not msg.points:
             return np.array([]), 0.0
 
-        point = msg.points[0]
+        point = points[0]
         positions = np.asarray(point.positions, dtype=float)
         tfs = float(point.time_from_start.sec) + float(point.time_from_start.nanosec) * 1e-9
 
@@ -260,8 +262,8 @@ class ContactCollector(Collector[ros_gz_interfaces.Contacts, ContactData]):
         self,
         name: str,
         topic: str,
-        node: rclpy.node.Node | None = None,
-        timeout: float = 0.5,
+        node: Node | None = None,
+        expiry: float = 0.5,
         up_to_date_required: bool = False,
         **kwargs: Any,
     ):
@@ -275,7 +277,7 @@ class ContactCollector(Collector[ros_gz_interfaces.Contacts, ContactData]):
         super().__init__(name, topic, node, up_to_date_required=False, **kwargs)
 
         # gz-sim only publishes while a contact exists, so a reading must expire.
-        self.timeout = timeout
+        self.expiry = expiry
 
     def _preprocess(self, msg: ros_gz_interfaces.Contacts) -> ContactData:
         contacts: list[ContactPoint] = []
@@ -319,8 +321,8 @@ class ContactCollector(Collector[ros_gz_interfaces.Contacts, ContactData]):
 
         return ContactData(tuple(contacts))
 
-    def get_observation(self) -> ContactData:
+    def get_observation(self, obs_dict: dict[str, Any] | None = None, **kwargs: Any) -> ContactData:
         """The sensor only publishes while a contact exists; expire stale readings."""
-        if self._clock is not None and self.age > self.timeout:
+        if self._clock is not None and self.age > self.expiry:
             return ContactData()
         return self._value if self._value is not None else ContactData()
