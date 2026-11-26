@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from rosnav_rl.observations.factory.factory import set_end_effector_frames, set_robot_pose_frames
+from rosnav_rl.observations.factory.factory import set_object_pose_frames, set_robot_pose_frames
 
 
 def _config() -> dict:
@@ -48,9 +48,14 @@ def test_other_datasources_are_untouched():
 
 
 def test_end_effector_generator_points_at_the_arm_tip_under_the_robot_frame():
-    config = {"datasources": {"ee": {"type": "EndEffectorPoseTFGenerator", "params": {}}, **_config()["datasources"]}}
+    config = {
+        "datasources": {
+            "ee": {"type": "ObjectPoseTFGenerator", "scope": "robot", "params": {"source_frame": "robot_arm_tool0"}},
+            **_config()["datasources"],
+        }
+    }
 
-    set_end_effector_frames(config, "env_0/rbkairos", "robot_arm_tool0")
+    set_object_pose_frames(config, "env_0", "env_0/rbkairos", "env_0/rbkairos/odom")
 
     assert config["datasources"]["ee"]["params"] == {
         "source_frame": "env_0/rbkairos/robot_arm_tool0",

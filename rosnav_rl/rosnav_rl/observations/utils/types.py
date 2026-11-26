@@ -615,6 +615,92 @@ JointStates = Annotated[
     ),
 ]
 
+ArmActionTrajectory = Annotated[
+    tuple[np.ndarray, float],
+    DataSpec(
+        description="Tuple storing a arm joint Trajectory (action_array, time_from_start)",
+        source="/last_arm_action topic (trajectory_msgs/JointTrajectory)",
+        units="action_array: rad, time_from_start: seconds",
+        example=("([1.57, 0.0, 1.32, 1.2, 1.1, 0.0], 0.1)"),
+    ),
+]
+
+GripperState = Annotated[
+    dict[str, float | bool],
+    DataSpec(
+        description="Gripper state from action feedback",
+        source="gripper action feedback topic (_action/feedback)",
+        units="position: meters, effort: Newtons",
+        constraints="keys: position, effort, stalled, reached_goal",
+        example="{'position': 0.085, 'effort': 5.0, 'stalled': False, 'reached_goal': True}",
+    ),
+]
+
+
+@dataclass(frozen=True)
+class ContactPoint:
+    """One contact point reported by contact sensor."""
+
+    other: str
+    position: np.ndarray
+    normal: np.ndarray
+    depth: float
+    wrench: np.ndarray | None = None
+
+
+@dataclass(frozen=True)
+class ContactData:
+    """All cotacts reported by a contact sensor."""
+
+    contacts: tuple[ContactPoint, ...] = ()
+
+    @property
+    def in_contact(self) -> bool:
+        return bool(self.contacts)
+
+
+ContactDataSpec = Annotated[
+    ContactData,
+    DataSpec(
+        description="Contact state of one contact sensor.",
+        source="Gazebo contact sensor bridged as ros_gz_interfaces/msg/Contacts",
+        units="position: m (x,y,z), normal: unitless (x,y,z), depth: m, wrench: N | Nm (Fx,Fy,Fz,Tx,Ty,Tz)",
+        constraints="empty tuple means no contact",
+        example=(
+            "ContactReading(contacts=("
+            "ContactPoint("
+            "other='target_box::box_link', "
+            "position=array([0.45, 0.12, 0.05]), "
+            "normal=array([0.0, -1.0, 0.0]), "
+            "depth=0.003, "
+            "wrench=array([12.5, 0.2, -1.1, 0.0, 0.0, 0.0]), "
+            "inward=True"
+            "),)"
+            ")"
+        ),
+    ),
+]
+
+
+@dataclass(frozen=True)
+class GraspState:
+    other: tuple[str, ...] = ()
+
+    @property
+    def grasping(self) -> bool:
+        return bool(self.other)
+
+
+GraspStateSpec = Annotated[
+    GraspState,
+    DataSpec(
+        description="Grasp state of a Gripper.",
+        shape="tuple of model names",
+        source="Contact data.",
+        constraints="empty tuple means nothing is grasped",
+        example="GraspState(grasping=True, other='target_cube')",
+    ),
+]
 
 # Export all type annotations for easy importing
 __all__ = [
@@ -666,4 +752,9 @@ __all__ = [
     "RobotPoseVector",
     "LocalizationQualityVector",
     "JointStates",
+    "ArmActionTrajectory",
+    "GripperState",
+    "ContactPoint",
+    "ContactData",
+    "ContactDataSpec",
 ]

@@ -39,11 +39,15 @@ from ..utils.semantic import (
 from ..utils.types import (
     ArenaPedestrianDetections,
     ArenaPedestrianStates,
+    ContactData,
+    ContactDataSpec,
+    ContactPoint,
     CrowdReachability,
     CrowdReachabilityTube,
     CrowdTimeToContact,
     DistanceAngleMetrics,
     GoalLocation,
+    GraspState,
     LidarRanges,
     PedestrianDetections,
     PedestrianDistances,
@@ -56,7 +60,6 @@ from ..utils.types import (
     PedestrianWorldLocations,
     Pose2D,
     Pose3D,
-    RelativePose3D,
     RobotRelativePosition,
     RobotVelocity,
     SafetyStatus,
@@ -1216,8 +1219,8 @@ class ArenaPedestrianStateGenerator(Generator[ArenaPedestrianStates]):
         return self._animation_states_buffer
 
 
-class EndEffectorPoseTFGenerator(Generator[Pose3D]):
-    """Pose [x, y, z, qx, qy, qz, qw] of the robot's end effector frame in target_frame from the TF tree."""
+class ObjectPoseTFGenerator(Generator[Pose3D]):
+    """Pose [x, y, z, qx, qy, qz, qw] of the objects frame in target_frame from the TF tree."""
 
     requires = {}
 
@@ -1234,9 +1237,9 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
         super().__init__(name, **kwargs)
 
         if not node:
-            raise ValueError("EndEffectorPoseTFGenerator requires a ROS 2 node.")
+            raise ValueError("ObjectPoseTFGenerator requires a ROS 2 node.")
         if not source_frame:
-            raise ValueError("EndEffectorPoseTFGenerator requires a non-empty source_frame.")
+            raise ValueError("ObjectPoseTFGenerator requires a non-empty source_frame.")
 
         self._node = node
         self._tf_buffer = tf2_ros.Buffer(node=self._node)
@@ -1256,7 +1259,7 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
         self._last_warn = now
         self._node.get_logger().warn(message)
 
-    def _generate(self, **kwargs: Any) -> np.ndarray:
+    def _generate(self, **kwargs: Any) -> Pose3D:
         if not self._is_initialized:
             try:
                 if not self._tf_buffer.can_transform(
@@ -1292,88 +1295,91 @@ class EndEffectorPoseTFGenerator(Generator[Pose3D]):
         return self._last_pose
 
 
-class ArmGoalLocationInEndEffectorFrameGenerator(Generator[RelativePose3D]):
-    """Goal Location in Robot Base Frame Generator
-
-    Transforms a global 3D goal pose into the robot's local base coordinate frame
-    for manipulation planning.
-
-    Technical Specifications:
-    - Input: Global goal Pose3D, Robot base Pose3D
-    - Output: Goal Pose3D in robot-centric frame
-
-    Output Format: np.ndarray of shape (7,) [x, y, z, qx, qy, qz, qw]
-    """
-
+class GraspPointGnerator(Generator[Pose3D]):
     requires = {
+        "left_finger_tip_pose": Pose3D,
+        "right_finger_tip_pose": Pose3D,
         "end_effector_pose": Pose3D,
     }
 
+    def __init__(
+        self,
+        name: str,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        self._last_pose = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+
     def _generate(
         self,
+        left_finger_tip_pose: Pose3D,
+        right_finger_tip_pose: Pose3D,
         end_effector_pose: Pose3D,
         **kwargs: Any,
-    ) -> RelativePose3D:
+    ) -> Pose3D:
+        if any(
+            np.linalg.norm(pose[:3]) < 1e-6 for pose in (left_finger_tip_pose, right_finger_tip_pose, end_effector_pose)
+        ):
+            return self._last_pose
 
-        # TODO make proper publisher for goal pose (subgoals?)
-        end_effector_goal_pose = np.array([0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
-
-        ee_pos = end_effector_pose[:3]
-        goal_pos = end_effector_goal_pose[:3]
-
-        ee_quat = end_effector_pose[3:]
-        goal_quat = end_effector_goal_pose[3:]
-
-        r_ee = R.from_quat(ee_quat)
-        r_goal = R.from_quat(goal_quat)
-
-        r_ee_inv = r_ee.inv()
-
-        rel_pos = r_ee_inv.apply(goal_pos - ee_pos)
-
-        rel_rot = r_ee_inv * r_goal
-        rel_quat = rel_rot.as_quat()
-
-        return np.concatenate([rel_pos, rel_quat]).astype(np.float32)
+        self._last_pose = np.concatenate(
+            [
+                0.5 * (left_finger_tip_pose[:3] + right_finger_tip_pose[:3]),
+                end_effector_pose[3:7],
+            ]
+        ).astype(np.float32)
+        return self._last_pose
 
 
-class ArmDistAngleToGoalGenerator(Generator[DistanceAngleMetrics]):
-    """3D Distance and Angular Error to Goal Generator
+class GraspDistanceAngleGenerator(Generator[DistanceAngleMetrics]):
+    """3D distance and approach-angle error for a grasp.
 
-    Computes the scalar 3D translational distance (meters) and rotational
-    angular error (radians) between the end-effector and the target pose.
+    Returns ``[distance_m, angle_rad]`` where ``angle_rad`` is the angle between the
+    grasp tool's z-axis and the approach direction ``grasp_point -> target_pose``.
+    The target's orientation is ignored.
 
     Technical Specifications:
-    - Input: Goal pose relative to end-effector frame (RelativePose3D)
+    - Input: grasp_point and target_pose (Pose3D)
     - Output: [translational_distance, rotational_error_radians]
 
     Output Format: np.ndarray of shape (2,)
     """
 
     requires = {
-        "arm_goal_in_ee_frame": RelativePose3D,
+        "grasp_point": Pose3D,
+        "target_pose": Pose3D,
     }
+
+    def __init__(self, name: str, direction_epsilon: float = 0.05, **kwargs: Any):
+        super().__init__(name, **kwargs)
+        self._direction_epsilon = direction_epsilon
+        self._last_direction: np.ndarray | None = None
 
     def _generate(
         self,
-        arm_goal_in_ee_frame: RelativePose3D,
+        grasp_point: Pose3D,
+        target_pose: Pose3D,
         **kwargs: Any,
     ) -> DistanceAngleMetrics:
-        """Computes 3D distance and scalar rotational error.
+        delta = target_pose[:3] - grasp_point[:3]
+        distance = float(np.linalg.norm(delta))
 
-        Args:
-            arm_goal_in_ee_frame (RelativePose3D): [x, y, z, qx, qy, qz, qw] relative array
+        if distance > self._direction_epsilon:
+            self._last_direction = delta / distance
 
-        Returns:
-            DistanceAngleMetrics: np.ndarray (2,) [distance_m, rotation_error_rad]
-        """
+        if self._last_direction is None:
+            return np.array([distance, 0.0], dtype=np.float32)
 
-        dist_m = np.linalg.norm(arm_goal_in_ee_frame[:3])
+        tool_z = R.from_quat(grasp_point[3:7]).as_matrix()[:, 2]
+        direction = self._last_direction
 
-        w = np.clip(abs(arm_goal_in_ee_frame[6]), 0.0, 1.0)
-        rot_error_rad = 2.0 * np.arccos(w)
-
-        return np.array([dist_m, rot_error_rad], dtype=np.float32)
+        error = float(
+            np.arctan2(
+                np.linalg.norm(np.cross(tool_z, direction)),
+                float(np.dot(tool_z, direction)),
+            )
+        )
+        return np.array([distance, error], dtype=np.float32)
 
 
 class ArenaPedestrianTypeGenerator(Generator[PedestrianTypeArray]):
@@ -1469,6 +1475,112 @@ class CrowdTimeToContactGenerator(Generator[CrowdTimeToContact]):
         out[2] = float(np.count_nonzero(ttc < self.imminent))
         out[3] = ttc[ahead].min() if ahead.any() else self.horizon
         return out
+
+
+class GraspStateGenerator(Generator[GraspState]):
+    """Grasp state generated from contact sensors."""
+
+    requires = {
+        "left_fingertip_contact": ContactDataSpec,
+        "right_fingertip_contact": ContactDataSpec,
+    }
+
+    HOLD_S = 0.1
+
+    def __init__(
+        self,
+        name: str,
+        node: rclpy.Node | None = None,
+        left_frame: str = "",
+        right_frame: str = "",
+        target_frame: str = "odom",
+        inside_tolerance: float = 0.0,
+        min_normal_alignment: float = 0.5,
+        **kwargs: Any,
+    ):
+        super().__init__(name, **kwargs)
+        if not node:
+            raise ValueError("GraspStateGenerator requires a ROS 2 node.")
+        if not left_frame or not right_frame:
+            raise ValueError("GraspStateGenerator requires left_frame and right_frame.")
+
+        self._buffer = tf2_ros.Buffer(node=node)
+        self._listener = tf2_ros.TransformListener(self._buffer, node)
+        self._left, self._right, self._target_frame = left_frame, right_frame, target_frame
+        self._tol, self._align = inside_tolerance, min_normal_alignment
+
+    def _lookup(self) -> tuple[np.ndarray, np.ndarray] | None:
+        if self._buffer is None:
+            return None
+        try:
+            left = self._buffer.lookup_transform(
+                self._target_frame,
+                self._left,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.0),
+            )
+            right = self._buffer.lookup_transform(
+                self._target_frame,
+                self._right,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.0),
+            )
+        except tf2_ros.TransformException:
+            return None
+
+        p_left = np.array(
+            [left.transform.translation.x, left.transform.translation.y, left.transform.translation.z], dtype=np.float64
+        )
+        p_right = np.array(
+            [right.transform.translation.x, right.transform.translation.y, right.transform.translation.z],
+            dtype=np.float64,
+        )
+
+        return p_left, p_right
+
+    def _inward(
+        self, reading: ContactData, p_own: np.ndarray, p_other: np.ndarray, tol: float, min_align: float
+    ) -> tuple[ContactPoint, ...]:
+        """Contacts on the jaw-facing side of one pad."""
+        if reading is None:
+            return ()
+        axis = p_other - p_own
+        length = np.linalg.norm(axis)
+        if length < 1e-6:
+            return ()
+        axis /= length
+        out = []
+        for c in reading.contacts:
+            aligned = np.linalg.norm(c.normal) < 1e-6 or abs(c.normal @ axis) >= min_align
+            if aligned and (c.position - p_own) @ axis > tol:
+                out.append(c)
+        return tuple(out)
+
+    def _model(self, name: str) -> str:
+        return name.split("::", 1)[0]
+
+    def _generate(
+        self, left_fingertip_contact: ContactData, right_fingertip_contact: ContactData, **kwargs: Any
+    ) -> GraspState:
+
+        frames = self._lookup()
+        now = time.monotonic()
+        if frames is None:
+            if self._last_frames is None or now - self._last_ok >= self.HOLD_S:
+                return GraspState()
+            frames = self._last_frames
+        else:
+            self._last_frames, self._last_ok = frames, now
+
+        p_left, p_right = frames
+        left = self._inward(left_fingertip_contact, p_left, p_right, self._tol, self._align)
+        right = self._inward(right_fingertip_contact, p_right, p_left, self._tol, self._align)
+
+        common = {self._model(c.other) for c in left} & {self._model(c.other) for c in right}
+        common.discard("")
+        if not common:
+            return GraspState()
+        return GraspState(other=tuple(sorted(common)))
 
 
 class CrowdReachabilityGenerator(Generator[CrowdReachability]):

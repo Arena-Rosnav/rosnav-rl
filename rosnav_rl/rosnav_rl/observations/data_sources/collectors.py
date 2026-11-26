@@ -8,17 +8,25 @@ and preprocess the raw data into a clean, usable format.
 from typing import Any
 
 import arena_people_msgs.msg as arena_people_msgs
+import control_msgs.action as control_actions
+import control_msgs.msg as control_msgs
 import geometry_msgs.msg as geometry_msgs
 import nav2_msgs.msg as nav2_msgs
 import nav_msgs.msg as nav_msgs
 import numpy as np
 import people_msgs.msg as people_msgs
+import ros_gz_interfaces.msg as ros_gz_interfaces
 import sensor_msgs.msg as sensor_msgs
-from control_msgs.msg import JointTrajectoryControllerState
+import trajectory_msgs.msg as trajectory_msgs
+from rclpy.node import Node
 
 from ..utils.pose import Pose2DType, pose3d_to_pose2d
 from ..utils.types import (
     ArenaPedestrianDetections,
+    ArmActionTrajectory,
+    ContactData,
+    ContactPoint,
+    GripperState,
     ImageData,
     JointStates,
     LidarRanges,
@@ -187,12 +195,12 @@ class ArenaPedestrianCollector(Collector[arena_people_msgs.Pedestrians, ArenaPed
         return msg
 
 
-class JointStateCollector(Collector[JointTrajectoryControllerState, JointStates]):
+class JointStateCollector(Collector[control_msgs.JointTrajectoryControllerState, JointStates]):
     """
     Collects and preprocesses joint state data from a ROS topic.
     """
 
-    def _preprocess(self, msg: JointTrajectoryControllerState) -> JointStates:
+    def _preprocess(self, msg: control_msgs.JointTrajectoryControllerState) -> JointStates:
 
         names = msg.joint_names
         positions = msg.feedback.positions
@@ -209,3 +217,111 @@ class JointStateCollector(Collector[JointTrajectoryControllerState, JointStates]
             }
             for name, pos, vel, eff in zip(names, positions, velocities, efforts, strict=False)
         }
+
+
+class JointTrajectoryCollector(Collector[trajectory_msgs.JointTrajectory, ArmActionTrajectory]):
+    """
+    Collects and preprocesses joint trajectory data from a ROS topic.
+    """
+
+    def _preprocess(self, msg: trajectory_msgs.JointTrajectory) -> ArmActionTrajectory:
+
+        points = list(msg.points)
+        if not msg.points:
+            return np.array([]), 0.0
+
+        point = points[0]
+        positions = np.asarray(point.positions, dtype=float)
+        tfs = float(point.time_from_start.sec) + float(point.time_from_start.nanosec) * 1e-9
+
+        return positions, tfs
+
+
+class GripperStateCollector(Collector[control_actions.GripperCommand.Feedback, GripperState]):
+    """
+    Collects gripper state from the gripper action server feedback topic.
+
+    Subscribes to the action feedback topic (e.g. ``<gripper_controller>/gripper_cmd/_action/feedback``)
+    and exposes position, effort, stalled, and reached_goal.
+    """
+
+    def _preprocess(self, msg: control_actions.GripperCommand.Feedback) -> GripperState:
+        return {
+            "position": float(msg.position),
+            "effort": float(msg.effort),
+            "stalled": bool(msg.stalled),
+            "reached_goal": bool(msg.reached_goal),
+        }
+
+
+class ContactCollector(Collector[ros_gz_interfaces.Contacts, ContactData]):
+    """Collects contact state from a Gazebo contact sensor."""
+
+    def __init__(
+        self,
+        name: str,
+        topic: str,
+        node: Node | None = None,
+        expiry: float = 0.5,
+        up_to_date_required: bool = False,
+        **kwargs: Any,
+    ):
+        if up_to_date_required:
+            raise ValueError(
+                "ContactCollector must not require up-to-date data: gz contact "
+                "sensors stop publishing when the contact ends, so a freshness "
+                "requirement would block forever."
+            )
+
+        super().__init__(name, topic, node, up_to_date_required=False, **kwargs)
+
+        # gz-sim only publishes while a contact exists, so a reading must expire.
+        self.expiry = expiry
+
+    def _preprocess(self, msg: ros_gz_interfaces.Contacts) -> ContactData:
+        contacts: list[ContactPoint] = []
+
+        for contact in msg.contacts:
+            other: str = contact.collision2.name
+
+            n = len(contact.positions)
+            has_normal = len(contact.normals) == n
+            has_depth = len(contact.depths) == n
+            has_wrench = len(contact.wrenches) == n
+
+            for i, pos in enumerate(contact.positions):
+                normal = np.zeros(3, dtype=np.float32)
+                if has_normal:
+                    raw = contact.normals[i]
+                    normal = np.array([raw.x, raw.y, raw.z], dtype=np.float32)
+                    length = float(np.linalg.norm(normal))
+                    if length > 1e-6:
+                        normal /= length
+
+                depth = float(contact.depths[i]) if has_depth else 0.0
+
+                wrench = None
+                if has_wrench:
+                    w = contact.wrenches[i].body_1_wrench
+                    wrench = np.array(
+                        [w.force.x, w.force.y, w.force.z, w.torque.x, w.torque.y, w.torque.z],
+                        dtype=np.float32,
+                    )
+
+                contacts.append(
+                    ContactPoint(
+                        other=other,
+                        position=np.array([pos.x, pos.y, pos.z], dtype=np.float32),
+                        normal=normal,
+                        depth=depth,
+                        wrench=wrench,
+                    )
+                )
+
+        return ContactData(tuple(contacts))
+
+    def get_observation(self, obs_dict: dict[str, Any] | None = None, **kwargs: Any) -> ContactData:
+        """The sensor only publishes while a contact exists; expire stale readings."""
+        if self._clock is not None and self.age > self.expiry:
+            return ContactData()
+        return self._value if self._value is not None else ContactData()

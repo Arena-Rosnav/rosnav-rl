@@ -9,6 +9,7 @@ class DONE_REASONS(enum.Enum):
     STEP_LIMIT = enum.auto()
     COLLISION = enum.auto()
     SUCCESS = enum.auto()
+    DROP = enum.auto()
 
 
 class DEFAULTS:
@@ -30,10 +31,6 @@ class DEFAULTS:
         _GOAL_UPDATE_THRESHOLD: float = 2.5
         _TERM_THRESHOLD: float = 2.0
         _ON_SAFE_DIST_VIOLATION: bool = True
-
-    class ARM_GOAL_REACHED:
-        GOAL_RADIUS: float = 0.05
-        ANGLE_TOLERANCE: float = 0.2
 
     class ARM_APPROACH_GOAL:
         POS_FACTOR: float = 0.3
@@ -100,4 +97,42 @@ class DEFAULTS:
         TYPE: int = 1
         DISTANCE: float = 1.25
         FACTOR: float = -0.5
+        _ON_SAFE_DIST_VIOLATION: bool = True
+
+    class MANIPULATION:
+        TARGET: str = "target_cube"
+        ACQUIRE_STEPS: int = 3
+        DROP_STEPS: int = 3
+        DELIVERY_XY: tuple[float, float] = (0.0, 0.0)
+        DELIVERY_RADIUS: float = 0.5
+
+    class GRASP:
+        REWARD: float = 15.0
+        _ON_SAFE_DIST_VIOLATION: bool = True
+
+    class OBJECT_RETENTION:
+        REWARD: float = -15.0
+        TERMINATE: bool = True
+        _ON_SAFE_DIST_VIOLATION: bool = False
+
+    class DELIVERY:
+        REWARD: float = 15
+        _ON_SAFE_DIST_VIOLATION: bool = False
+
+    class LIFT:
+        REWARD: float = 20.0
+        HEIGHT: float = 0.05
+        MIN_HEIGHT: float = 0.5
+        TERMINATE: bool = True
+        LIFT_STEPS: int = 3
+        _ON_SAFE_DIST_VIOLATION: bool = False
+
+    class ARM_REACH:
+        POS_FACTOR: float = 0.3
+        NEG_FACTOR: float = 0.5
+        MAX_STEP_DISTANCE: float = 0.1
+        MAX_STEP_ANGLE: float = 0.5
+        ORIENT_FACTOR: float = 0.1
+        REACH_RADIUS: float = 0.85
+        REACH_BLEND: float = 0.15
         _ON_SAFE_DIST_VIOLATION: bool = True

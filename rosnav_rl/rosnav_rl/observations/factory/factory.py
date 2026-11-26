@@ -202,13 +202,56 @@ def set_robot_pose_frames(config: dict[str, Any], robot_frame: str, base_frame: 
             params["target_frame"] = posixpath.join(robot_frame, "odom")
 
 
-def set_end_effector_frames(config: dict[str, Any], robot_frame: str, tip_link: str) -> None:
-    """Point every EndEffectorPoseTFGenerator in *config* at the arm tip and odom frames under *robot_frame*."""
+def set_object_pose_frames(config: dict[str, Any], env_frame: str, robot_frame: str, target_frame: str = "map") -> None:
+    """Configure ObjectPoseTFGenerator frame names."""
+
+    for name, ds in config.get("datasources", {}).items():
+        if ds.get("type") != "ObjectPoseTFGenerator":
+            continue
+
+        unknown = set(ds) - {"type", "params", "scope"}
+        if unknown:
+            raise ValueError(f"data source '{name}': unknown keys {sorted(unknown)}")
+
+        params = ds.setdefault("params", {})
+
+        if not isinstance(params, dict):
+            raise ValueError(f"data source '{name}': 'params' must be a mapping")
+
+        scope = ds.get("scope", "env")
+
+        if scope == "robot":
+            stem = robot_frame
+        elif scope == "env":
+            stem = env_frame
+        else:
+            raise ValueError(f"data source '{name}': unknown scope '{scope}'")
+
+        leaf = params.get("source_frame")
+
+        if not isinstance(leaf, str) or not leaf:
+            raise ValueError(f"ObjectPoseTFGenerator '{name}' requires a source_frame leaf name")
+
+        if leaf == stem or leaf.startswith(stem + "/"):
+            params["source_frame"] = leaf
+        elif "/" in leaf or leaf in {".", ".."}:
+            raise ValueError(f"ObjectPoseTFGenerator '{name}': source_frame must be a leaf name, got '{leaf}'")
+        else:
+            params["source_frame"] = posixpath.join(stem, leaf)
+
+        params["target_frame"] = target_frame
+
+
+def set_grasp_frames(config: dict[str, Any], robot_frame: str, target_frame: str = "map") -> None:
+    """Prefix every GraspStateGenerator's fingertip frames with the robot TF namespace."""
     for ds in config.get("datasources", {}).values():
-        if ds.get("type") == "EndEffectorPoseTFGenerator":
+        if ds.get("type") == "GraspStateGenerator":
             params = ds.setdefault("params", {})
-            params["source_frame"] = posixpath.join(robot_frame, tip_link)
-            params["target_frame"] = posixpath.join(robot_frame, "odom")
+            for key in ("left_frame", "right_frame"):
+                frame = params.get(key)
+                if frame:
+                    params[key] = posixpath.join(robot_frame, frame)
+            params["target_frame"] = target_frame
 
 
 def set_pedestrians_topic(config: dict[str, Any], robot_ns: str) -> None:

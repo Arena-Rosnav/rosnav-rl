@@ -44,7 +44,7 @@ class CollectorManager:
         """
         stale_collectors = None
         for name, collector in collectors.items():
-            obs_dict[name] = collector._value  # Direct attribute access (bypass method call)
+            obs_dict[name] = collector.get_observation()
             if collector._stale and collector.up_to_date_required and self._wait_for_obs:
                 if stale_collectors is None:
                     stale_collectors = []
@@ -57,7 +57,7 @@ class CollectorManager:
             self._waiting_strategy.wait_for_collectors(stale_collectors, collectors)
             # Update observation values after waiting
             for name in stale_collectors:
-                obs_dict[name] = collectors[name]._value
+                obs_dict[name] = collectors[name].get_observation()
 
         # Mark all collectors as stale for next collection cycle
         self._invalidate_observations(collectors)

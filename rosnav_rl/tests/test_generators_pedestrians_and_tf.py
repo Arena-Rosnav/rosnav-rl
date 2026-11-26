@@ -16,7 +16,7 @@ from rosnav_rl.observations.data_sources.generators import (
     ArenaPedestrianRelativeLocationGenerator,
     ArenaPedestrianRelativeVelGenerator,
     ArenaPedestrianStateGenerator,
-    EndEffectorPoseTFGenerator,
+    ObjectPoseTFGenerator,
     PedestrianDistanceGenerator,
     PedestrianLocationGenerator,
     PedestrianRelativeVelGenerator,
@@ -348,11 +348,11 @@ def pose3d_transform(parent, child, x, y, z):
 
 def test_end_effector_generator_requires_a_source_frame(node):
     with pytest.raises(ValueError, match="non-empty source_frame"):
-        EndEffectorPoseTFGenerator(name="end_effector_pose", node=node)
+        ObjectPoseTFGenerator(name="end_effector_pose", node=node)
 
 
 def test_end_effector_generator_reads_its_own_robots_tip_frame(node):
-    gen = EndEffectorPoseTFGenerator(
+    gen = ObjectPoseTFGenerator(
         name="end_effector_pose", node=node, source_frame="env_1/ur5/tool0", target_frame="env_1/ur5/base_link"
     )
     gen._tf_buffer.set_transform(pose3d_transform("env_0/ur5/base_link", "env_0/ur5/tool0", 9.0, 9.0, 9.0), "test")
@@ -364,7 +364,7 @@ def test_end_effector_generator_reads_its_own_robots_tip_frame(node):
 
 
 def test_end_effector_generator_holds_its_pose_and_warns_once_while_the_frame_is_missing(node, capfd):
-    gen = EndEffectorPoseTFGenerator(
+    gen = ObjectPoseTFGenerator(
         name="end_effector_pose", node=node, source_frame="env_1/ur5/tool0", target_frame="env_1/ur5/base_link"
     )
     gen._tf_buffer.set_transform(pose3d_transform("env_0/ur5/base_link", "env_0/ur5/tool0", 9.0, 9.0, 9.0), "test")

@@ -8,11 +8,14 @@ from rosnav_rl.cfg.parameters import AgentParameters
 from rosnav_rl.observations.utils.types import (
     DistanceAngleMetrics,
     GoalRelativePosition,
+    GraspState,
+    GraspStateSpec,
     LidarRanges,
     PedestrianRelativeLocations,
     PedestrianRelativeVelocities,
     PedestrianTypeMinDistances,
     Pose2D,
+    Pose3D,
     RobotActionVector,
     SafetyStatus,
     SubgoalRelativePosition,
@@ -49,8 +52,9 @@ __all__ = [
     "RewardRootVelocityDifference",
     "RewardTwoFactorVelocityDifference",
     "RewardActiveHeadingDirection",
-    "RewardArmGoalReached",
-    "RewardArmApproachGoal",
+    "RewardGraspSuccess",
+    "RewardObjectRetention",
+    "RewardDeliverySuccess",
 ]
 
 
@@ -2091,12 +2095,161 @@ class RewardLinearVelBoost(RewardUnit):
         pass
 
 
-@RewardUnitFactory.register("arm_goal_reached")
-class RewardArmGoalReached(RewardUnit):
-    """Reward unit for calculating the reward when arm reaches goal"""
+# ================ MOBILE MANIPULATION ================ #
+
+# ===================== GRASPING ====================== #
+
+
+@RewardUnitFactory.register("grasp")
+class RewardGraspSuccess(RewardUnit):
+    """Rewards grasping the target object."""
 
     requires = {
-        "arm_dist_angle_to_goal": DistanceAngleMetrics,
+        "grasp_state": GraspStateSpec,
+    }
+
+    def __init__(
+        self,
+        reward_function: RewardFunction,
+        reward: float = DEFAULTS.GRASP.REWARD,
+        target: str = DEFAULTS.MANIPULATION.TARGET,
+        _on_safe_dist_violation: bool = DEFAULTS.GRASP._ON_SAFE_DIST_VIOLATION,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+        self._reward = reward
+        self._target = target
+        self._was_grasping = False
+
+    def check_parameters(self) -> None:
+        if self._reward < 0.0:
+            self._report_warning(f"grasp reward should be positive. Current value: {self._reward}")
+
+    def __call__(
+        self,
+        grasp_state: GraspStateSpec,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+
+        grasping = grasp_state.grasping and self._target in grasp_state.other
+
+        # Reward the onset, not every step of a sustained grasp.
+        if grasping and not self._was_grasping:
+            self.add_reward(self._reward)
+        self._was_grasping = grasping
+
+    def reset(self) -> None:
+        self._was_grasping = False
+
+
+@RewardUnitFactory.register("object_retention")
+class RewardObjectRetention(RewardUnit):
+    """Penalise losing the target after it has been stably grasped.
+
+    Fires once per drop event, once the target has been absent from the grasp
+    state for ``drop_steps`` consecutive steps. Suppressed near the delivery
+    zone, where releasing the object is the intended action. Optionally ends
+    the episode as a mission failure.
+    """
+
+    requires = {
+        "grasp_state": GraspStateSpec,
+        "target_pose": Pose3D,
+    }
+
+    DONE_INFO = {
+        "is_done": True,
+        "done_reason": DONE_REASONS.DROP,
+        "is_success": False,
+    }
+
+    @check_params
+    def __init__(
+        self,
+        reward_function: RewardFunction,
+        reward: float = DEFAULTS.OBJECT_RETENTION.REWARD,
+        target: str = DEFAULTS.MANIPULATION.TARGET,
+        acquire_steps: int = DEFAULTS.MANIPULATION.ACQUIRE_STEPS,
+        drop_steps: int = DEFAULTS.MANIPULATION.DROP_STEPS,
+        delivery_xy: tuple[float, float] = DEFAULTS.MANIPULATION.DELIVERY_XY,
+        delivery_radius: float = DEFAULTS.MANIPULATION.DELIVERY_RADIUS,
+        terminate: bool = DEFAULTS.OBJECT_RETENTION.TERMINATE,
+        _on_safe_dist_violation: bool = DEFAULTS.OBJECT_RETENTION._ON_SAFE_DIST_VIOLATION,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+        self._reward = reward
+        self._target = target
+        self._acquire_steps = max(1, int(acquire_steps))
+        self._drop_steps = max(1, int(drop_steps))
+        self._delivery_xy = delivery_xy
+        self._delivery_radius = delivery_radius
+        self._terminate = terminate
+
+        self._held_steps = 0
+        self._lost_steps = 0
+        self._ever_grasped = False
+
+    def check_parameters(self) -> None:
+        if self._reward > 0.0:
+            self._report_warning(f"object_retention reward should be negative. Current value: {self._reward}")
+        if self._delivery_radius <= 0.0:
+            self._report_warning(f"delivery_radius must be positive. Current value: {self._delivery_radius}")
+
+    def reset(self) -> None:
+        super().reset()
+        self._held_steps = 0
+        self._lost_steps = 0
+        self._ever_grasped = False
+
+    def _at_delivery(self, target_pose: Pose3D) -> bool:
+        dx = float(target_pose[0]) - float(self._delivery_xy[0])
+        dy = float(target_pose[1]) - float(self._delivery_xy[1])
+        return float(np.hypot(dx, dy)) <= self._delivery_radius
+
+    def __call__(
+        self,
+        grasp_state: GraspState,
+        target_pose: Pose3D,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        if self._target in grasp_state.other:
+            self._held_steps += 1
+            self._lost_steps = 0
+            if self._held_steps >= self._acquire_steps:
+                self._ever_grasped = True
+            return
+
+        self._held_steps = 0
+
+        if not self._ever_grasped:
+            return
+
+        if self._at_delivery(target_pose):
+            self._lost_steps = 0
+            return
+
+        self._lost_steps += 1
+        if self._lost_steps != self._drop_steps:
+            return
+
+        self.add_reward(self._reward)
+        self.add_info({"retention_violation": True})
+        if self._terminate:
+            self.add_info(self.DONE_INFO)
+
+
+@RewardUnitFactory.register("delivery_success")
+class RewardDeliverySuccess(RewardUnit):
+    """Rewards Sucessfull delivery of a target object to a target loacation."""
+
+    requires = {
+        "grasp_state": GraspStateSpec,
+        "target_pose": Pose3D,
     }
 
     DONE_INFO = {
@@ -2109,129 +2262,260 @@ class RewardArmGoalReached(RewardUnit):
     def __init__(
         self,
         reward_function: RewardFunction,
-        reward: float = DEFAULTS.GOAL_REACHED.REWARD,
-        goal_radius: float = DEFAULTS.ARM_GOAL_REACHED.GOAL_RADIUS,
-        angle_tolerance: float = DEFAULTS.ARM_GOAL_REACHED.ANGLE_TOLERANCE,
-        _on_safe_dist_violation: bool = DEFAULTS.GOAL_REACHED._ON_SAFE_DIST_VIOLATION,
+        reward: float = DEFAULTS.DELIVERY.REWARD,
+        target: str = DEFAULTS.MANIPULATION.TARGET,
+        acquire_steps: int = DEFAULTS.MANIPULATION.ACQUIRE_STEPS,
+        drop_steps: int = DEFAULTS.MANIPULATION.DROP_STEPS,
+        delivery_xy: tuple[float, float] = DEFAULTS.MANIPULATION.DELIVERY_XY,
+        delivery_radius: float = DEFAULTS.MANIPULATION.DELIVERY_RADIUS,
+        _on_safe_dist_violation: bool = DEFAULTS.DELIVERY._ON_SAFE_DIST_VIOLATION,
         *args: Any,
         **kwargs: Any,
     ) -> None:
-
         super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
         self._reward = reward
-        self._goal_radius = goal_radius
-        self._angle_tolerance = angle_tolerance
+        self._target = target
+        self._acquire_steps = max(1, int(acquire_steps))
+        self._drop_steps = max(1, int(drop_steps))
+        self._delivery_xy = delivery_xy
+        self._delivery_radius = delivery_radius
 
-    def check_parameters(self, *args: Any, **kwargs: Any):
+        self._held_steps = 0
+        self._settled_steps = 0
+        self._ever_grasped = False
+
+    def check_parameters(self) -> None:
         if self._reward < 0.0:
-            warn_msg = (
-                f"Reconsider this reward. "
-                f"Negative rewards may lead to unfavorable behaviors. "
-                f"Current value: {self._reward}"
-            )
-            self._report_warning(warn_msg)
+            self._report_warning(f"Delivery success reward should be positive. Current value: {self._reward}")
 
-    def __call__(
-        self,
-        arm_dist_angle_to_goal: DistanceAngleMetrics,
-        *args: Any,
-        **kwargs: Any,
-    ) -> None:
-        """Calculates the reward and updates the information when the goal is reached.
+    def reset(self) -> None:
+        self._held_steps = 0
+        self._settled_steps = 0
+        self._ever_grasped = False
 
-        Args:
-            arm_dist_angle_to_goal: Distance and rotation error from the end effector to the arm goal.
-        """
-        target_distance = arm_dist_angle_to_goal[0]
-        rotational_error = arm_dist_angle_to_goal[1]
+    def _at_delivery(self, target_pose: Pose3D) -> bool:
+        dx = float(target_pose[0] - self._delivery_xy[0])
+        dy = float(target_pose[1] - self._delivery_xy[1])
+        return float(np.hypot(dx, dy)) <= self._delivery_radius
 
-        position_reached = target_distance < self._goal_radius
-        orientation_reached = rotational_error < self._angle_tolerance
+    def __call__(self, grasp_state: GraspStateSpec, target_pose: Pose3D, *args: Any, **kwargs: Any) -> None:
+        if self._target in grasp_state.other:
+            self._held_steps += 1
+            self._settled_steps = 0
+            if self._held_steps >= self._acquire_steps:
+                self._ever_grasped = True
+            return
 
-        if position_reached and orientation_reached:
-            self.add_reward(self._reward)
-            self.add_info(self.DONE_INFO)
+        self._held_steps = 0
+
+        if not (self._ever_grasped and self._at_delivery(target_pose)):
+            self._settled_steps = 0
+            return
+
+        self._settled_steps += 1
+        if self._settled_steps != self._drop_steps:
+            return
+
+        self.add_reward(self._reward)
+        self.add_info(self.DONE_INFO)
 
 
-@RewardUnitFactory.register("arm_approach_goal")
-class RewardArmApproachGoal(RewardUnit):
-    """Reward unit for arm goal approach behavior with distance-based computation.
+# =================== ARM MOVEMENT ==================== #
 
-    Provides a positive delta-reward for moving the end-effector closer to the target
-    and a negative delta-reward for moving away. This creates a potential field that
-    guides the arm toward the goal without punishing it just for starting far away.
 
-    Technical Specifications:
-    - Distance-Based Reward: Delta potential field using step-by-step position differences
-    - Adaptive Thresholds: Distance-jump detection to prevent reward noise if goal teleports
-
-    Configuration:
-    - pos_factor: Positive reward scaling for moving closer
-    - neg_factor: Negative reward scaling for moving away (should be > pos_factor)
-    - _goal_update_threshold: Maximum allowed single-step distance change before ignoring (jump detection)
-    """
-
+@RewardUnitFactory.register("arm_reach")
+class RewardArmReach(RewardUnit):
     requires = {
-        "arm_dist_angle_to_goal": DistanceAngleMetrics,
+        "grasp_dist_angle": DistanceAngleMetrics,
+        "target_pose": Pose3D,
+        "robot_pose": Pose2D,
+        "grasp_state": GraspStateSpec,
     }
 
     @check_params
     def __init__(
         self,
-        reward_function: "RewardFunction",
-        pos_factor: float = DEFAULTS.ARM_APPROACH_GOAL.POS_FACTOR,
-        neg_factor: float = DEFAULTS.ARM_APPROACH_GOAL.NEG_FACTOR,
-        _goal_update_threshold: float = DEFAULTS.ARM_APPROACH_GOAL._GOAL_UPDATE_THRESHOLD,
+        reward_function: RewardFunction,
+        pos_factor: float = DEFAULTS.ARM_REACH.POS_FACTOR,
+        neg_factor: float = DEFAULTS.ARM_REACH.NEG_FACTOR,
+        orient_factor: float = DEFAULTS.ARM_REACH.ORIENT_FACTOR,
+        target: str = DEFAULTS.MANIPULATION.TARGET,
+        reach_radius: float = DEFAULTS.ARM_REACH.REACH_RADIUS,
+        reach_blend: float = DEFAULTS.ARM_REACH.REACH_BLEND,
+        max_step_distance: float = DEFAULTS.ARM_REACH.MAX_STEP_DISTANCE,
+        max_step_angle: float = DEFAULTS.ARM_REACH.MAX_STEP_ANGLE,
         _on_safe_dist_violation: bool = DEFAULTS.ARM_APPROACH_GOAL._ON_SAFE_DIST_VIOLATION,
         *args: Any,
         **kwargs: Any,
-    ):
-        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+    ) -> None:
         self._pos_factor = pos_factor
         self._neg_factor = neg_factor
-        self._goal_update_threshold = _goal_update_threshold
+        self._orient_factor = orient_factor
+        self._target = target
+        self._reach_radius = reach_radius
+        self._reach_blend = reach_blend
+        self._max_step_distance = max_step_distance
+        self._max_step_angle = max_step_angle
+        self._prev_d: float | None = None
+        self._prev_a: float | None = None
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
 
-        self.last_distance = None
+    def _get_coefficient(self, robot_pose: Pose2D, target_pose: Pose3D) -> float:
+        d = float(np.linalg.norm(robot_pose[:2] - target_pose[:2]))
+        return float(
+            np.clip(
+                (self._reach_radius + self._reach_blend - d) / (2.0 * self._reach_blend),
+                0.0,
+                1.0,
+            )
+        )
 
-    def check_parameters(self, *args: Any, **kwargs: Any):
-        if self._pos_factor < 0 or self._neg_factor < 0:
-            warn_msg = (
-                f"Both factors should be positive. "
-                f"Current values: [pos_factor={self._pos_factor}], "
-                f"[neg_factor={self._neg_factor}]"
-            )
-            self._report_warning(warn_msg)
-        if self._pos_factor >= self._neg_factor:
-            warn_msg = (
-                "'pos_factor' should be smaller than 'neg_factor' otherwise "
-                "oscillatory/rotary trajectories will get exploited for positive net reward. "
-                f"Current values: [pos_factor={self._pos_factor}], "
-                f"[neg_factor={self._neg_factor}]"
-            )
-            self._report_warning(warn_msg)
+    def _shape(self, delta: float) -> float:
+        if delta > 0.0:
+            return self._pos_factor * delta
+        if delta < 0.0:
+            return self._neg_factor * delta
+        return 0.0
 
     def __call__(
         self,
-        arm_dist_angle_to_goal: np.ndarray,
+        grasp_dist_angle: DistanceAngleMetrics,
+        target_pose: Pose3D,
+        robot_pose: Pose2D,
+        grasp_state: GraspStateSpec,
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Calculate reward based on change in end-effector distance.
 
-        Args:
-            arm_dist_angle_to_goal: np.ndarray (2,) [distance_m, rotation_error_rad]
-        """
-        current_distance = float(arm_dist_angle_to_goal[0])
+        if self._target in grasp_state.other:
+            return
 
-        if self.last_distance is not None:
-            distance_change = self.last_distance - current_distance
+        d = float(grasp_dist_angle[0])
+        a = float(grasp_dist_angle[1])
 
-            if abs(distance_change) < self._goal_update_threshold:
-                factor = self._pos_factor if distance_change > 0 else self._neg_factor
-                self.add_reward(float(factor * distance_change))
+        prev_d, self._prev_d = self._prev_d, d
+        prev_a, self._prev_a = self._prev_a, a
+        if prev_d is None or prev_a is None:
+            return
 
-        self.last_distance = current_distance
+        delta_d = prev_d - d
+        delta_a = prev_a - a
 
-    def reset(self):
-        """Reset internal state for a new episode."""
-        self.last_distance = None
+        if abs(delta_d) > self._max_step_distance or abs(delta_a) > self._max_step_angle:
+            return
+
+        shaping = self._shape(delta_d) + self._orient_factor * self._shape(delta_a)
+        self.add_reward(self._get_coefficient(robot_pose, target_pose) * shaping)
+
+    def reset(self) -> None:
+        self._prev_d = None
+        self._prev_a = None
+
+
+@RewardUnitFactory.register("object_lifted")
+class RewardObjectLifted(RewardUnit):
+    """Success when the grasped target rises aboce its spawn height and stays there."""
+
+    requires = {
+        "target_pose": Pose3D,
+        "grasp_state": GraspStateSpec,
+    }
+
+    DONE_INFO = {"is_done": True, "done_reason": DONE_REASONS.SUCCESS, "is_success": True}
+
+    @check_params
+    def __init__(
+        self,
+        reward_function: RewardFunction,
+        reward: float = DEFAULTS.LIFT.REWARD,
+        lift_height: float = DEFAULTS.LIFT.HEIGHT,
+        min_height: float = DEFAULTS.LIFT.MIN_HEIGHT,
+        terminate: bool = DEFAULTS.LIFT.TERMINATE,
+        target: str = DEFAULTS.MANIPULATION.TARGET,
+        acquire_steps: int = DEFAULTS.MANIPULATION.ACQUIRE_STEPS,
+        lift_steps: int = DEFAULTS.LIFT.LIFT_STEPS,
+        _on_safe_dist_violation: bool = DEFAULTS.LIFT._ON_SAFE_DIST_VIOLATION,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        self._reward = reward
+        self._lift_height = lift_height
+        self._min_height = min_height
+        self._lift_steps = lift_steps
+        self._terminate = terminate
+        self._target = target
+        self._acquire_steps = acquire_steps
+        self._z0: float | None = None
+        self._ever_grasped: bool = False
+        self._awarded: bool = False
+        self._held_steps: int = 0
+        self._above: int = 0
+        super().__init__(reward_function, _on_safe_dist_violation, *args, **kwargs)
+
+    def reset(self) -> None:
+        super().reset()
+        self._z0 = None
+        self._ever_grasped = False
+        self._awarded = False
+        self._held_steps = 0
+        self._above = 0
+
+    def __call__(self, target_pose: Pose3D, grasp_state: GraspStateSpec, *args: Any, **kwargs: Any) -> None:
+
+        if self._awarded:
+            return
+
+        z = float(target_pose[2])
+        if self._z0 is None:
+            self._z0 = z
+
+        grasping = self._target in grasp_state.other
+        if grasping:
+            self._held_steps += 1
+            if self._held_steps >= self._acquire_steps:
+                self._ever_grasped = True
+        else:
+            self._held_steps = 0
+
+        lifted = self._ever_grasped and grasping and z >= self._z0 + self._lift_height and z >= self._min_height
+
+        self._above = self._above + 1 if lifted else 0
+
+        if self._above >= self._lift_steps:
+            self._awarded = True
+            self.add_reward(self._reward)
+            if self._terminate:
+                self.add_info(self.DONE_INFO)
+
+
+# =================== NAVIGATION ==================== #
+
+
+@RewardUnitFactory.register("goal_reached_navigation")
+class RewardGoalReachedNavigation(RewardGoalReached):
+    """
+    Reward unit that provides a positive reward when the robot reaches
+    within the goal radius, but does NOT terminate the episode.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._reward_given = False
+        self._last_goal = None
+
+    def __call__(
+        self,
+        dist_angle_to_goal: GoalRelativePosition,
+        dist_angle_to_subgoal: SubgoalRelativePosition,
+        simulation_state_container: AgentParameters,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Calculates the reward when the goal is reached without ending the episode."""
+        target_distance = dist_angle_to_subgoal[0] if self._follow_subgoal else dist_angle_to_goal[0]
+
+        if target_distance < simulation_state_container.goal_radius:
+            self.add_reward(self._reward)
+
+        # Always return not done so the episode continues
+        self.add_info(self.NOT_DONE_INFO)
