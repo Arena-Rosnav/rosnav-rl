@@ -202,7 +202,7 @@ def set_robot_pose_frames(config: dict[str, Any], robot_frame: str, base_frame: 
             params["target_frame"] = posixpath.join(robot_frame, "odom")
 
 
-def set_object_pose_frames(config: dict[str, Any], env_stem: str, robot_stem: str, target_frame: str = "map") -> None:
+def set_object_pose_frames(config: dict[str, Any], env_frame: str, robot_frame: str, target_frame: str = "map") -> None:
     """Configure ObjectPoseTFGenerator frame names."""
 
     for name, ds in config.get("datasources", {}).items():
@@ -221,9 +221,9 @@ def set_object_pose_frames(config: dict[str, Any], env_stem: str, robot_stem: st
         scope = ds.get("scope", "env")
 
         if scope == "robot":
-            stem = robot_stem
+            stem = robot_frame
         elif scope == "env":
-            stem = env_stem
+            stem = env_frame
         else:
             raise ValueError(f"data source '{name}': unknown scope '{scope}'")
 
@@ -232,10 +232,13 @@ def set_object_pose_frames(config: dict[str, Any], env_stem: str, robot_stem: st
         if not isinstance(leaf, str) or not leaf:
             raise ValueError(f"ObjectPoseTFGenerator '{name}' requires a source_frame leaf name")
 
-        if "/" in leaf or leaf in {".", ".."}:
+        if leaf == stem or leaf.startswith(stem + "/"):
+            params["source_frame"] = leaf
+        elif "/" in leaf or leaf in {".", ".."}:
             raise ValueError(f"ObjectPoseTFGenerator '{name}': source_frame must be a leaf name, got '{leaf}'")
+        else:
+            params["source_frame"] = posixpath.join(stem, leaf)
 
-        params["source_frame"] = posixpath.join(stem, leaf)
         params["target_frame"] = target_frame
 
 

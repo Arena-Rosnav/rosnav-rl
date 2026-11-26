@@ -1331,11 +1331,12 @@ class GraspPointGnerator(Generator[Pose3D]):
         return self._last_pose
 
 
-class GraspAlignmentGenerator(Generator[DistanceAngleMetrics]):
-    """3D Distance and Angular Error to Goal Generator
+class GraspDistanceAngleGenerator(Generator[DistanceAngleMetrics]):
+    """3D distance and approach-angle error for a grasp.
 
-    Computes the scalar 3D translational distance (meters) and rotational
-    angular error (radians) between the grasp point and the target pose.
+    Returns ``[distance_m, angle_rad]`` where ``angle_rad`` is the angle between the
+    grasp tool's z-axis and the approach direction ``grasp_point -> target_pose``.
+    The target's orientation is ignored.
 
     Technical Specifications:
     - Input: grasp_point and target_pose (Pose3D)
