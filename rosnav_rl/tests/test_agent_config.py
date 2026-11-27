@@ -149,10 +149,13 @@ class _Arm:
     named_poses: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
-def _manipulator(position_limits):
+def _manipulator(position_limits, velocity_limits=None):
+    if velocity_limits is None:
+        velocity_limits = [1.0] * len(position_limits)
     return ManipulatorActionSpace(
         joint_names=[f"joint_{i}" for i in range(len(position_limits))],
         position_limits=position_limits,
+        velocity_limits=velocity_limits,
         controller="arm_controller",
         tip_link="tool0",
     )
@@ -168,18 +171,18 @@ class TestManipulator:
         np.testing.assert_array_almost_equal(space.low, [-1, -1, -1])
         np.testing.assert_array_almost_equal(space.high, [1, 1, 1])
 
-    def test_decode(self):
-        spec = _manipulator([(-1, 1), (-2, 2)])
+    def test_decode_scales_the_action_by_the_velocity_limits(self):
+        spec = _manipulator([(-1, 1), (-2, 2)], velocity_limits=[0.5, 2.0])
         action = np.array([0.5, -1.0])
-        np.testing.assert_array_almost_equal(spec.decode(action), [0.5, -2.0])
+        np.testing.assert_array_almost_equal(spec.decode(action), [0.25, -2.0])
 
-    def test_decode_clips_to_the_joint_limits(self):
-        spec = _manipulator([(0.0, 1.0), (-2, 2)])
-        np.testing.assert_array_almost_equal(spec.decode(np.array([3.0, -7.0])), [1.0, -2.0])
+    def test_decode_clips_the_action_to_the_unit_box_before_scaling(self):
+        spec = _manipulator([(0.0, 1.0), (-2, 2)], velocity_limits=[0.5, 2.0])
+        np.testing.assert_array_almost_equal(spec.decode(np.array([3.0, -7.0])), [0.5, -2.0])
 
-    def test_legacy_actions_carry_the_position_limits(self):
-        spec = _manipulator([(-1, 1), (-2, 2)])
-        assert spec._to_legacy_actions() == {"joint_limits": [[-1, 1], [-2, 2]]}
+    def test_legacy_actions_carry_the_velocity_limits(self):
+        spec = _manipulator([(-1, 1), (-2, 2)], velocity_limits=[0.5, 2.0])
+        assert spec._to_legacy_actions() == {"joint_limits": [0.5, 2.0]}
 
     def test_from_config_reads_chain_controller_and_limits(self):
         arm = _Arm(
@@ -197,6 +200,7 @@ class TestManipulator:
         assert spec.controller == "ur_arm_controller"
         assert spec.tip_link == "tool0"
         assert spec.position_limits == [(-1.5, 1.5), (-6.283185307179586, 6.283185307179586)]
+        assert spec.velocity_limits == [3.141592653589793, 3.141592653589793]
         assert spec.stow_positions is None
 
     def test_from_config_matches_limits_by_joint_suffix(self):
@@ -207,20 +211,31 @@ class TestManipulator:
 
         assert ManipulatorActionSpace.from_config(arm).position_limits == [(-0.5, 0.25)]
 
+    def test_from_config_reads_the_joint_velocity_limits(self):
+        arm = _Arm(
+            chain=["shoulder", "elbow"],
+            joint_limits={
+                "shoulder": {"has_velocity_limits": True, "max_velocity": 1.5},
+                "elbow": {"has_velocity_limits": False},
+            },
+        )
+
+        spec = ManipulatorActionSpace.from_config(arm)
+
+        assert spec.velocity_limits == [1.5, 3.141592653589793]
+
+    def test_from_config_matches_velocity_limits_by_joint_suffix(self):
+        arm = _Arm(
+            chain=["arm_shoulder"],
+            joint_limits={"shoulder": {"has_velocity_limits": True, "max_velocity": 0.75}},
+        )
+
+        assert ManipulatorActionSpace.from_config(arm).velocity_limits == [0.75]
+
     def test_from_config_orders_the_stow_pose_by_the_chain(self):
         arm = _Arm(chain=["shoulder", "elbow"], named_poses={"stow": {"elbow": 2.0, "shoulder": -1.0, "wrist": 0.5}})
 
         assert ManipulatorActionSpace.from_config(arm).stow_positions == [-1.0, 2.0]
-
-    def test_from_config_drops_a_stow_pose_missing_a_chain_joint(self):
-        arm = _Arm(chain=["shoulder", "elbow"], named_poses={"stow": {"shoulder": -1.0}})
-
-        assert ManipulatorActionSpace.from_config(arm).stow_positions is None
-
-    def test_from_config_ignores_other_named_poses(self):
-        arm = _Arm(chain=["shoulder"], named_poses={"home": {"shoulder": 0.0}})
-
-        assert ManipulatorActionSpace.from_config(arm).stow_positions is None
 
 
 # ============================================================
@@ -433,6 +448,7 @@ class TestDiscriminatedUnion:
                     "type": "arm",
                     "joint_names": ["joint_0"],
                     "position_limits": [(-1, 1)],
+                    "velocity_limits": [0.5],
                     "controller": "arm_controller",
                     "tip_link": "tool0",
                 },

@@ -174,7 +174,11 @@ def test_reflected_split_decisions_are_named_decoded_actions():
 
 def test_arm_actions_are_refused():
     arm = ManipulatorActionSpace(
-        joint_names=["shoulder"], position_limits=[(-1.0, 1.0)], controller="arm_controller", tip_link="tool0"
+        joint_names=["shoulder"],
+        position_limits=[(-1.0, 1.0)],
+        velocity_limits=[0.5],
+        controller="arm_controller",
+        tip_link="tool0",
     )
 
     with pytest.raises(ValueError, match="arm actions"):

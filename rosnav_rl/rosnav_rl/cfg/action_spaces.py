@@ -463,30 +463,30 @@ class ManipulatorActionSpace(BaseActionSpace, frozen=True):
     type: Literal["arm"] = "arm"
     joint_names: list[str]
     position_limits: list[tuple[float, float]]
+    velocity_limits: list[float]
     controller: str
     tip_link: str
     stow_positions: list[float] | None = None
 
     @property
     def num_dof(self) -> int:
-        return len(self.position_limits)
+        return len(self.velocity_limits)
 
     def get_gym_space(self) -> spaces.Box:
         return spaces.Box(-1, 1, shape=(self.num_dof,))
 
     def decode(self, action: np.ndarray) -> np.ndarray:
         action = np.clip(action, -1.0, 1.0)
-        lo = np.array([lo for lo, _ in self.position_limits], dtype=np.float32)
-        hi = np.array([hi for _, hi in self.position_limits], dtype=np.float32)
-        return np.asarray((action + 1.0) / 2.0 * (hi - lo) + lo, dtype=np.float32)
+        return action * np.asarray(self.velocity_limits, dtype=np.float32)
 
     def _to_legacy_actions(self) -> dict:
-        return {"joint_limits": [list(lim) for lim in self.position_limits]}
+        return {"joint_limits": [lim for lim in self.velocity_limits]}
 
     @classmethod
     def from_config(cls, arm_spec: RobotArm) -> ManipulatorActionSpace:
         joint_names = arm_spec.chain
         position_limits = []
+        velocity_limits = []
 
         limits_dict = arm_spec.joint_limits
 
@@ -500,12 +500,19 @@ class ManipulatorActionSpace(BaseActionSpace, frozen=True):
             else:
                 position_limits.append((-6.283185307179586, 6.283185307179586))
 
+            if isinstance(jl, dict) and jl.get("has_velocity_limits", False):
+                max_vel = float(cast("SupportsFloat", jl["max_velocity"]))
+                velocity_limits.append(max_vel)
+            else:
+                velocity_limits.append(3.141592653589793)
+
         stow = arm_spec.named_poses.get("stow")
         stow_positions = [stow[jn] for jn in joint_names] if stow and all(jn in stow for jn in joint_names) else None
 
         return cls(
             joint_names=joint_names,
             position_limits=position_limits,
+            velocity_limits=velocity_limits,
             controller=arm_spec.controller,
             tip_link=arm_spec.tip_link,
             stow_positions=stow_positions,
