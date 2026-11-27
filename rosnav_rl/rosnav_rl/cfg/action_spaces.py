@@ -480,12 +480,11 @@ class ManipulatorActionSpace(BaseActionSpace, frozen=True):
         return action * np.asarray(self.velocity_limits, dtype=np.float32)
 
     def _to_legacy_actions(self) -> dict:
-        return {"joint_limits": [list(lim) for lim in self.velocity_limits]}
+        return {"joint_limits": [lim for lim in self.velocity_limits]}
 
     @classmethod
     def from_config(cls, arm_spec: RobotArm) -> ManipulatorActionSpace:
         joint_names = arm_spec.chain
-        velocity_scale = 0.25
         position_limits = []
         velocity_limits = []
 
@@ -502,10 +501,10 @@ class ManipulatorActionSpace(BaseActionSpace, frozen=True):
                 position_limits.append((-6.283185307179586, 6.283185307179586))
 
             if isinstance(jl, dict) and jl.get("has_velocity_limits", False):
-                max_vel = float(cast("SupportsFloat", jl["max_velocity"])) * velocity_scale
+                max_vel = float(cast("SupportsFloat", jl["max_velocity"]))
                 velocity_limits.append(max_vel)
             else:
-                velocity_limits.append(3.141592653589793 * velocity_scale)
+                velocity_limits.append(3.141592653589793)
 
         stow = arm_spec.named_poses.get("stow")
         stow_positions = [stow[jn] for jn in joint_names] if stow and all(jn in stow for jn in joint_names) else None
